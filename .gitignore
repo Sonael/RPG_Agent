@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+*.pyo
+.env
+campanhas/
+*.json
+*.md
+!requirements.txt
+.DS_Store

@@ -8,13 +8,16 @@ import os
 import json
 from typing import Optional
 from supabase import create_client, Client
+from postgrest import SyncPostgrestClient
 
 
-def _client() -> Client:
-    """Cria e retorna um cliente Supabase usando as variáveis de ambiente."""
-    url = os.environ["SUPABASE_URL"]
-    key = os.environ["SUPABASE_SERVICE_KEY"]   # service key bypassa RLS — seguro no backend
-    return create_client(url, key)
+def _client() -> SyncPostgrestClient:
+    url = f"{os.environ['SUPABASE_URL']}/rest/v1"
+    headers = {
+        "apikey": os.environ["SUPABASE_SERVICE_KEY"],
+        "Authorization": f"Bearer {os.environ['SUPABASE_SERVICE_KEY']}"
+    }
+    return SyncPostgrestClient(url, headers=headers)
 
 
 # ---------------------------------------------------------------------------
@@ -27,8 +30,9 @@ def list_campaigns(user_id: str) -> list[dict]:
     Retorna lista de dicts com: name, chapter, characters, events, diary, has_history.
     """
     sb = _client()
+    # Em bibliotecas puras, usamos .from_() em vez de .table()
     result = (
-        sb.table("campaigns")
+        sb.from_("campaigns") 
         .select("name, data")
         .eq("user_id", user_id)
         .order("updated_at", desc=True)

@@ -10,12 +10,13 @@ from typing import Optional
 
 from supabase import create_client, Client
 from flask import request, g, jsonify
+from gotrue import SyncClient as AuthClient
 
 
-def _client() -> Client:
-    return create_client(
-        os.environ["SUPABASE_URL"],
-        os.environ["SUPABASE_ANON_KEY"],
+def _client() -> AuthClient:
+    return AuthClient(
+        url=f"{os.environ['SUPABASE_URL']}/auth/v1",
+        headers={"apikey": os.environ["SUPABASE_ANON_KEY"]}
     )
 
 
@@ -30,7 +31,7 @@ def register(email: str, password: str) -> dict:
     ou lança exceção em caso de erro.
     """
     sb = _client()
-    result = sb.auth.sign_up({"email": email, "password": password})
+    result = sb.sign_up(email=email, password=password)
     if not result.user:
         raise ValueError("Não foi possível criar a conta.")
     return {
