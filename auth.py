@@ -1,6 +1,6 @@
 """
 auth.py
-Autenticação via Supabase Auth (email + senha).
+Autenticação via Supabase Auth (email + senha) usando gotrue diretamente.
 Expõe o decorator require_auth para proteger rotas do Flask.
 """
 
@@ -8,7 +8,6 @@ import os
 from functools import wraps
 from typing import Optional
 
-from supabase import create_client, Client
 from flask import request, g, jsonify
 from gotrue import SyncClient as AuthClient
 
@@ -27,10 +26,9 @@ def _client() -> AuthClient:
 def register(email: str, password: str) -> dict:
     """
     Registra um novo usuário via Supabase Auth.
-    Retorna dict com 'user' e 'session' em caso de sucesso,
-    ou lança exceção em caso de erro.
     """
     sb = _client()
+    # Correto: em gotrue o método é direto no client
     result = sb.sign_up(email=email, password=password)
     if not result.user:
         raise ValueError("Não foi possível criar a conta.")
@@ -45,10 +43,10 @@ def register(email: str, password: str) -> dict:
 def login(email: str, password: str) -> dict:
     """
     Autentica um usuário existente.
-    Retorna dict com tokens de acesso.
     """
     sb = _client()
-    result = sb.auth.sign_in_with_password({"email": email, "password": password})
+    # AJUSTADO: removido o '.auth' pois sb já é o cliente de autenticação
+    result = sb.sign_in_with_password({"email": email, "password": password})
     if not result.user:
         raise ValueError("Email ou senha incorretos.")
     return {
@@ -62,11 +60,11 @@ def login(email: str, password: str) -> dict:
 def get_user_id(token: str) -> Optional[str]:
     """
     Valida o JWT e retorna o user_id correspondente.
-    Retorna None se o token for inválido ou expirado.
     """
     try:
         sb = _client()
-        user = sb.auth.get_user(token)
+        # AJUSTADO: removido o '.auth'
+        user = sb.get_user(token)
         return user.user.id if user.user else None
     except Exception:
         return None
@@ -77,10 +75,6 @@ def get_user_id(token: str) -> Optional[str]:
 # ---------------------------------------------------------------------------
 
 def require_auth(f):
-    """
-    Decorator Flask que extrai e valida o JWT do header Authorization.
-    Em caso de sucesso, injeta g.user_id e g.token na requisição.
-    """
     @wraps(f)
     def decorated(*args, **kwargs):
         auth_header = request.headers.get("Authorization", "")

@@ -7,11 +7,11 @@ Toda operação de banco passa por aqui — o resto do sistema não conhece Supa
 import os
 import json
 from typing import Optional
-from supabase import create_client, Client
 from postgrest import SyncPostgrestClient
 
 
 def _client() -> SyncPostgrestClient:
+    """Cria e retorna um cliente Postgrest direto."""
     url = f"{os.environ['SUPABASE_URL']}/rest/v1"
     headers = {
         "apikey": os.environ["SUPABASE_SERVICE_KEY"],
@@ -27,10 +27,9 @@ def _client() -> SyncPostgrestClient:
 def list_campaigns(user_id: str) -> list[dict]:
     """
     Lista todas as campanhas de um usuário com metadados resumidos.
-    Retorna lista de dicts com: name, chapter, characters, events, diary, has_history.
     """
     sb = _client()
-    # Em bibliotecas puras, usamos .from_() em vez de .table()
+    # Correto: usa .from_()
     result = (
         sb.from_("campaigns") 
         .select("name, data")
@@ -57,11 +56,11 @@ def list_campaigns(user_id: str) -> list[dict]:
 def get_campaign(user_id: str, name: str) -> Optional[dict]:
     """
     Carrega os dados completos de uma campanha.
-    Retorna o dict de dados ou None se não existir.
     """
     sb = _client()
+    # Ajustado: .table() -> .from_()
     result = (
-        sb.table("campaigns")
+        sb.from_("campaigns")
         .select("data")
         .eq("user_id", user_id)
         .eq("name", name)
@@ -75,11 +74,11 @@ def get_campaign(user_id: str, name: str) -> Optional[dict]:
 
 def save_campaign(user_id: str, name: str, data: dict) -> None:
     """
-    Salva (insert ou update) os dados de uma campanha.
-    Usa upsert com conflito em (user_id, name).
+    Salva (insert ou update) os dados de uma campanha via upsert.
     """
     sb = _client()
-    sb.table("campaigns").upsert(
+    # Ajustado: .table() -> .from_()
+    sb.from_("campaigns").upsert(
         {"user_id": user_id, "name": name, "data": data},
         on_conflict="user_id,name",
     ).execute()
@@ -88,20 +87,23 @@ def save_campaign(user_id: str, name: str, data: dict) -> None:
 def delete_campaign(user_id: str, name: str) -> None:
     """Remove uma campanha do banco."""
     sb = _client()
-    sb.table("campaigns").delete().eq("user_id", user_id).eq("name", name).execute()
+    # Ajustado: .table() -> .from_()
+    sb.from_("campaigns").delete().eq("user_id", user_id).eq("name", name).execute()
 
 
 def rename_campaign(user_id: str, old_name: str, new_name: str) -> None:
     """Renomeia uma campanha."""
     sb = _client()
-    sb.table("campaigns").update({"name": new_name}).eq("user_id", user_id).eq("name", old_name).execute()
+    # Ajustado: .table() -> .from_()
+    sb.from_("campaigns").update({"name": new_name}).eq("user_id", user_id).eq("name", old_name).execute()
 
 
 def campaign_exists(user_id: str, name: str) -> bool:
-    """Verifica se uma campanha com esse nome já existe para o usuário."""
+    """Verifica se uma campanha com esse nome já existe."""
     sb = _client()
+    # Ajustado: .table() -> .from_()
     result = (
-        sb.table("campaigns")
+        sb.from_("campaigns")
         .select("name")
         .eq("user_id", user_id)
         .eq("name", name)
