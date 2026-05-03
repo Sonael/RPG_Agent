@@ -1,0 +1,105 @@
+{
+  "campaign_type": "romance",
+  "characters": {
+    "lorena fael": {
+      "name": "Lorena Fael",
+      "description": "Humana, 23 anos, 175cm, pele parda marrom, cabelos longos cacheados pretos, olhos castanho escuro. Maid pessoal da nobre elfa Celina.",
+      "traits": "Trabalhadora, observadora, discreta mas com forte senso de justiça. Sabe seu lugar na sociedade mas sonha com mais.",
+      "status": "viva",
+      "notes": "Protagonista da história, desenvolve romance slowburn com o príncipe feérico"
+    },
+    "celina silvaren": {
+      "name": "Celina Silvaren",
+      "description": "Elfa da nobreza feérica, patroa de Lorena. Linda e gentil, mas presa a uma família terrível. Tem cabelos prateados longos e olhos verdes esmeralda.",
+      "traits": "Gentil, compassiva, presa às tradições familiares, sonhadora em segredo",
+      "status": "vivo",
+      "notes": "Família recebeu convite para o baile real onde o príncipe procurará esposa"
+    },
+    "príncipe lucius kasghard": {
+      "name": "Príncipe Lucius Kasghard",
+      "description": "Príncipe herdeiro do reino feérico, solteiro e em busca de uma esposa através de um baile real",
+      "traits": "Misterioso, reservado, sob pressão da coroa, possivelmente relutante com o arranjo matrimonial",
+      "status": "vivo",
+      "notes": "Objeto do interesse romântico de Lorena, mas relação deve ser slowburn e não clichê"
+    },
+    "celina": {
+      "name": "Celina",
+      "description": "Elfa da nobreza, cabelos prateados longos, olhos verdes, gentil e compassiva em contraste com sua família cruel",
+      "traits": "Gentil, vulnerável, inteligente, apreensiva com as expectativas familiares, trata Lorena com respeito",
+      "status": "viva",
+      "notes": "Candidata ao casamento com o príncipe Valerius, possui uma relação próxima e atípica com sua maid humana Lorena"
+    }
+  },
+  "locations": {
+    "mansão da família silvaren": {
+      "name": "Mansão da Família Silvaren",
+      "description": "Uma imponente mansão feérica com arquitetura elegante e mágica, onde vivem os nobres elfos da família Silvaren. Os corredores são adornados com tapeçarias brilhantes e plantas mágicas que emitem luz suave. O ambiente é ao mesmo tempo luxuoso e intimidador para os humanos que servem lá.",
+      "details": "",
+      "notes": ""
+    }
+  },
+  "events": [
+    {
+      "index": 1,
+      "summary": "Lorena aceita acompanhar Celina ao baile real como sua acompanhante pessoal, um ato incomum para uma humana",
+      "characters_involved": "Lorena Fael, Celina",
+      "location": "Mansão da Família Silvaren",
+      "consequence": "Lorena terá presença em evento real, quebrando protocolos sociais"
+    },
+    {
+      "index": 2,
+      "summary": "Lorena é humilhada pela família Silvaren durante o café da manhã, sendo designada para representar o príncipe nos exercícios de etiqueta de Celina",
+      "characters_involved": "Lorena Fael, Celina, Lady Isolde, Lorde Theron, Elrian",
+      "location": "Mansão da Família Silvaren",
+      "consequence": "Aumento da tensão social e humilhação de Lorena"
+    }
+  ],
+  "conversation_history": [
+    {
+      "role": "user",
+      "text": "“Eu acho…” começo, fazendo o penteado dela. “Que o príncipe quem deveria ficar feliz por ser escolhido pela senhorita. A senhora é a mais bela das alegas, mais gentil e cuidadosa, e desconfio que a mais inteligente. Não Che que lhe digo palavras vãs para tranquilizar, digo apenas a verdade.” Sorrio. “Apenas seja a senhora. Seu brilho é impossível de passar despercebido.” Digo, sincera"
+    },
+    {
+      "role": "assistant",
+      "text": "Celina para por um momento, suas mãos pousando sobre as suas no espelho. Seus olhos verdes brilham com uma umidade que ela tenta disfarçar. \"Lorena...\", ela sussurra, sua voz carregada de uma emoção que transcende as barreiras entre suas raças. \"Você sempre diz exatamente o que preciso ouvir.\"\n\nVocê sente um calor subir em suas bochechas — não de vergonha, mas de uma conexão genuína que poucos humanos têm a oportunidade de experimentar com um elfo de nobreza. Seus dedos continuam o trabalho, entrelaçando os fios prateados com uma delicadeza que vem de anos de prática e, sim, de afeição.\n\n\"Não são palavras vãs\", você insiste, encontrando seu olhar no reflexo. \"Vejo como trata até os servos mais humildes. Lembro quando insistiu para que a família desse cobertores extras para os estábulos no inverno passado. Ou quando...\"\n\nEla interrompe com um sorriso triste. \"Pequenos gestos que não mudam nada no fim das contas.\"\n\n\"Mudam para aqueles que recebem\", você rebate, sua voz firme. \"Mudam para mim.\"\n\nO silêncio que se segue é denso, carregado de tudo o que não pode ser dito em voz alta. Celina se vira, pegando suas mãos nas dela. Seus dedos longos e elegantes envolvem os seus — mais curtos, marcados pelo trabalho, mas igualmente importantes neste momento.\n\n\"Às vezes penso que você deveria estar no meu lugar\", ela murmura, seus olhos escaneando seu rosto como se visse algo que ninguém mais vê. \"Você tem uma força que eu nunca terei. Uma coragem...\"\n\nSeu coração parece querer sair do peito. É perigoso demais, este caminho que a conversa está tomando. Perigoso e... tentador.\n\n\"Minha lady\", você diz suavemente, recuando suas mãos com uma relutância que dói. \"O sol já está alto. Sua mãe certamente espera você para o café da manhã.\"\n\nCelina suspira, a máscara da nobreza reassumindo seu lugar. \"Sim, claro.\" Ela se levanta, ajustando a bainha do robe. \"Você virá comigo ao baile, não é? Como minha acompanhante pessoal?\"\n\nA pergunta pega você de surpresa. Humanos não são normalmente permitidos em eventos reais, exceto como serviçal invisível.\n\n\"Eu... não sei se...\"\n\n\"Insisto\", ela diz, e há uma determinação nova em sua voz. \"Quero você lá. Preciso de você lá.\"\n\nSeu estômago se contrai com uma mistura de terror e antecipação. O baile real. O príncipe. Tudo isso... e você lá, no meio, como uma humana entre criaturas que te consideram inferior.\n\nO que você responde a Celina?"
+    },
+    {
+      "role": "user",
+      "text": "“Como quiser, milady. A senhora é gentil demais em me convidar.” Faço uma reverência"
+    },
+    {
+      "role": "assistant",
+      "text": "Celina segura seu queixo gentilmente, impedindo que você complete a reverência. \"Por favor, Lorena. Quando estamos sozinhas, não precisa disso.\" Seus olhos suplicam por uma igualdade que o mundo lá fora nunca permitiria.\n\nO toque dela em seu rosto é como seda — suave, mas com um peso que vai muito além do físico. Você sente o calor da mão dela contra sua pele, uma conexão íntima que faz seu coração bater mais rápido. Há algo tão vulnerável neste gesto, como se Celina estivesse tentando atravessar sozinha um abismo que exigiria milhares de anos para ser transposto.\n\n\"Você não entende\", ela sussurra, seus dedos ainda acariciando levemente sua linha do maxilar. \"Não é gentileza. É... necessidade. Naquela sala cheia de olhos julgadores e sorrisos falsos, eu precisarei de um rosto verdadeiro. Precisarei de você.\"\n\nSua voz treme quase imperceptivelmente, e você percebe o medo genuíno por trás da confiança nobre. Celina não está apenas ansiosa com a perspectiva de conhecer o príncipe — ela está aterrorizada com o circo social que sua família transformou esta oportunidade.\n\nVocê se endireita, mas não recua completamente. Permanece ali, neste espaço íntimo que vocês criaram entre duas mundos separados. \"Estarei lá\", você promete, e desta vez não há reverência em sua voz, apenas determinação. \"Onde minha lady precisar de mim.\"\n\nEla sorri, um verdadeiro sorriso que alcança seus olhos pela primeira vez nesta manhã. \"Obrigada, Lorena. Agora... vamos enfrentar o café da manhã. Minha mãe provavelmente já tem uma lista de 'comportamentos apropriados' do tamanho de um pergaminho real.\"\n\nEnquanto ela se veste com suas roupas formais, você não pode deixar de notar como seus próprios dedos tremem ao abotoar o vestido. O baile real. Você, uma humana, no coração do poder feérico. Apenas pensar nisso faz sua garganta apertar.\n\nMas então você olha para Celina — realmente olha — e vê a mesma ansiedade refletida em seus olhos verdes. De repente, não se trata mais de humanas e elfos, de servas e nobres. São duas jovens, ambas presas em expectativas que não escolheram, prestes a entrar em um mundo que pode devorá-las vivas.\n\nO que você faz agora? Acompanha Celina para enfrentar a família Silvaren no café da manhã? Ou precisa de um momento para processar tudo isso sozinha antes de mergulhar nas águas turbulentas da corte feérica?"
+    },
+    {
+      "role": "user",
+      "text": "Eu a acompanho no café da manhã como todas as manhãs, e me coloco perto de uma parede, invisível"
+    },
+    {
+      "role": "assistant",
+      "text": "Ao entrar na sala de jantar, o ar muda imediatamente. A atmosfera íntima do quarto de Celina é substituída por uma frieza quase palpável. A mesa de mogno alongada poderia acomodar vinte pessoas, mas hoje só há três: Lady Isolde Silvaren, matriarca da família, Lorde Theron Silvaren, e seu filho mais velho, Elrian.\n\nVocê assume sua posição habitual — junto à parede de madeira escura, mãos cruzadas à frente, olhos baixos mas atentos. Tornar-se invisível é uma arte que você dominou há anos. Respirar suavemente, não fazer ruído, mover-se apenas quando necessário.\n\n\"Finalmente decidiu nos honrar com sua presença, Celina\", Lady Isolde diz sem levantar os olhos do seu chá. Sua voz é como gelo cortado — precisa e gelada.\n\n\"Desculpe, mãe. Estava me preparando para o dia\", Celina responde, sentando-se com uma graça que parece custar-lhe esforço.\n\nElrian ri baixinho — um som desagradável que você sempre associou a ratos rastejando nas paredes. \"Preparando-se? Para quê? Para falhar em impressionar o príncipe como falha em tudo?\"\n\nVocê sente seus dedos se contraírem, mas mantém a expressão neutra. Defender Celina aqui seria pior do que inútil — seria perigoso.\n\n\"Elrian, poupe-nos de sua insignificância hoje\", Lorde Theron intervém, sua voz um rugido abafado. \"Temos assuntos importantes a discutir.\" Ele fixa os olhos em Celina. \"O baile é em três semanas. Três semanas para transformar você em uma candidata digna do príncipe Valerius.\"\n\nLady Isolde coloca sua xícara com um clique preciso. \"Começaremos com etiqueta real após o café. Movimentos, postura, linguagem corporal. Você se move como... como uma humana.\" Ela diz a palavra como se fosse um insulto, e você sente o peso dela como um golpe físico.\n\nCelina mantém a compostura, mas você vê como seus dedos apertam o guardanapo no colo. \"Sim, mãe.\"\n\n\"E depois, modulação vocal\", Elrian acrescenta com um sorriso maldoso. \"Seu tom é muito... comum. O príncipe espera elegância, não a fala de uma plebeia.\"\n\nÉ então que Lady Isolde parece notar sua presença pela primeira vez. Seus olhos — do mesmo verde que os de Celina, mas sem nenhuma de sua calor — passam por você como se fosse parte da mobília. \"A humana pode ser útil. Ela pode representar o príncipe durante os exercícios de cortesia. Afinal, está acostumada a se curvar.\"\n\nA humilação queima em seu peito, mas você mantém a respiração estável. Celina olha rapidamente para você, seus olhos pedindo desculpas silenciosamente.\n\nO que você faz? Aceita este papel degradante em silêncio, como sempre fez? Ou há uma maneira de manter sua dignidade sem colocar Celina — e a si mesma — em perigo ainda maior?"
+    },
+    {
+      "role": "user",
+      "text": "Eu assinto silenciosamente, como quem diz “sim, senhora” e continuo na parede até terminarem"
+    },
+    {
+      "role": "assistant",
+      "text": "O assentimento sai de você como um reflexo condicionado — a cabeça inclinada levemente, os olhos baixos, nenhuma emoção visível. É a dança que você aprendeu desde que colocou os pés nesta mansão: a dança da submissão calculada.\n\nLady Isolde parece satisfeita com sua complacência e volta sua atenção para Celina. \"Excelente. Pelo menos a humana serve para algo além de polir prataria.\"\n\nVocê sente as palavras como pequenas agulhas perfurando sua pele, mas mantém a respiração calma. É apenas ar, apenas som. É o que você repete para si mesma enquanto eles continuam seu planejamento cruel.\n\nElrian elabora um plano de \"encantamento real\" que soa mais como um manual de tortura social. Lorde Theron discute alianças políticas como se Celina fosse um peão em um jogo de xadrez. E através de tudo isso, Celina permanece sentada, seu rosto um máscara de obediência, mas você vê como seus ombros estão tensos, como seus dedos não param de torcer o guardanapo.\n\nQuando finalmente se levantam — após loooongos quarenta e cinco minutos que pareceram horas — você espera até que todos tenham saído antes de se mover. É então que percebe que Celina ficou para trás, parada diante da janela, seus ombros curvados sob um peso invisível.\n\nEla se vira, e seus olhos encontram os seus. Não há necessidade de palavras. A vergonha neles é tão palpável que você quase pode tocá-la.\n\n\"Lorena, eu...\" ela começa, mas a voz falha.\n\nVocê se aproxima, mantendo ainda uma distância apropriada caso alguém entre. \"Não precisa dizer nada, minha lady\", você sussurra. \"Não é sua culpa.\"\n\nMas ela balança a cabeça, uma lágrima teimosa escapando pelo seu rosto perfeito. \"É sim. Cada vez que me calo, cada vez que deixo eles te tratarem assim... é minha culpa.\"\n\nO confessionário é tão raro, tão perigoso, que você quase não sabe como responder. Seu coração dói por ela — por ambas.\n\n\"Vamos focar no baile\", você diz suavemente, mudando de assunto. \"Precisamos escolher seu vestido. Algo que a faça sentir poderosa, não apenas bonita.\"\n\nCelina enxuga o rosto, compondo-se. \"Sim. Você tem razão.\" Ela respira fundo. \"Venha comigo ao guarda-roupas. Preciso de seu olhar.\"\n\nMas enquanto seguem pelos corredores silenciosos da mansão, você não pode deixar de pensar nas palavras de Lady Isolde. \"Representar o príncipe durante os exercícios de cortesia.\" A ideia é humilhante, mas... também intrigante. \n\nPela primeira vez, você terá permissão para ficar de pé enquanto um elfo se curva. Pela primeira vez, mesmo que apenas em fingimento, alguém mostrará deferência a você.\n\nO que isso fará com você? E o mais importante — como você usará essa posição inesperada? Para proteger Celina? Para desafiar silenciosamente o sistema? Ou apenas para sobreviver, como sempre fez?"
+    }
+  ],
+  "story_summary": "Lorena Fael, uma humana de 23 anos, serve como maid pessoal de Celina, uma elfa nobre da família Silvaren. O mundo é governado pelos feéricos, com humanos na base da hierarquia social. O rei anunciou um baile para encontrar uma esposa para o príncipe herdeiro, e a família de Celina recebeu um convite. Lorena lida com sentimentos complexos enquanto ajuda sua patroa a se preparar para o evento que pode mudar suas vidas.",
+  "current_scene": "Introdução: Lorena prepara Celina para o dia",
+  "current_location": "Mansão da Família Silvaren",
+  "chapter": 1,
+  "quest_flags": {
+    "reino_feerico": "ativo",
+    "sistema_de_castas": "humano_inferior",
+    "baile_real": "convidada_celina",
+    "relacao_lorena_celina": "maid_pessoal",
+    "lorena_convite_baile": "aceito"
+  },
+  "party": [],
+  "diary": [],
+  "name": "Thaynazinha ruindade pura"
+}

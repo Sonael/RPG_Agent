@@ -1,0 +1,656 @@
+"""
+server.py
+Backend Flask do RPG Agent.
+Execute com: python server.py
+Acesse em:  http://localhost:5000
+"""
+
+import asyncio
+import json
+import queue
+import threading
+import time
+import os
+
+from flask import Flask, Response, g, jsonify, request, send_from_directory, stream_with_context
+from google.genai import types as gtypes
+
+import memory
+import database
+from auth import require_auth, register as auth_register, login as auth_login
+from agent import create_agent, get_campaign_config
+from session import APP_NAME, USER_ID, SESSION_ID, create_runner
+from validator import validate
+
+app = Flask(__name__, static_folder="static")
+
+# ---------------------------------------------------------------------------
+# Asyncio bridge — loop dedicado rodando em thread daemon
+# ---------------------------------------------------------------------------
+
+_loop = asyncio.new_event_loop()
+threading.Thread(target=_loop.run_forever, daemon=True, name="adk-loop").start()
+
+def run_async(coro):
+    """Submete coroutine ao loop dedicado e aguarda resultado (bloqueante)."""
+    return asyncio.run_coroutine_threadsafe(coro, _loop).result(timeout=120)
+
+# ---------------------------------------------------------------------------
+# Estado global — isolado por user_id
+# ---------------------------------------------------------------------------
+
+# {user_id: {"runner": ..., "session_service": ..., "is_ollama": bool}}
+_sessions: dict = {}
+
+# ---------------------------------------------------------------------------
+# CORS (aplicação local, qualquer origem)
+# ---------------------------------------------------------------------------
+
+@app.before_request
+def handle_preflight():
+    if request.method == "OPTIONS":
+        resp = app.make_default_options_response()
+        resp.headers.update({
+            "Access-Control-Allow-Origin":  "*",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization",
+            "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
+        })
+        return resp
+
+@app.after_request
+def add_cors(resp):
+    resp.headers.update({
+        "Access-Control-Allow-Origin":  "*",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization",
+        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
+    })
+    return resp
+
+# ---------------------------------------------------------------------------
+# Static
+# ---------------------------------------------------------------------------
+
+@app.route("/")
+def index():
+    return send_from_directory("static", "index.html")
+
+# ---------------------------------------------------------------------------
+# Autenticação
+# ---------------------------------------------------------------------------
+
+@app.route("/api/auth/register", methods=["POST"])
+def register():
+    data = request.json or {}
+    email    = data.get("email", "").strip()
+    password = data.get("password", "")
+    if not email or not password:
+        return jsonify({"error": "Email e senha são obrigatórios."}), 400
+    try:
+        result = auth_register(email, password)
+        return jsonify({"ok": True, **result})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route("/api/auth/login", methods=["POST"])
+def login():
+    data = request.json or {}
+    email    = data.get("email", "").strip()
+    password = data.get("password", "")
+    if not email or not password:
+        return jsonify({"error": "Email e senha são obrigatórios."}), 400
+    try:
+        result = auth_login(email, password)
+        return jsonify({"ok": True, **result})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 401
+
+# ---------------------------------------------------------------------------
+# Campanhas
+# ---------------------------------------------------------------------------
+
+@app.route("/api/campaigns")
+@require_auth
+def list_campaigns():
+    try:
+        result = database.list_campaigns(g.user_id)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/campaigns/<name>", methods=["DELETE"])
+@require_auth
+def delete_campaign(name):
+    try:
+        database.delete_campaign(g.user_id, name)
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/campaigns/<name>/rename", methods=["POST"])
+@require_auth
+def rename_campaign(name):
+    new_name = "".join(
+        c for c in request.json.get("name", "")
+        if c.isalnum() or c in " _-"
+    ).strip()
+    if not new_name:
+        return jsonify({"error": "Nome inválido"}), 400
+    if database.campaign_exists(g.user_id, new_name):
+        return jsonify({"error": "Já existe uma campanha com esse nome"}), 409
+    try:
+        database.rename_campaign(g.user_id, name, new_name)
+        return jsonify({"name": new_name})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# ---------------------------------------------------------------------------
+# Início de sessão
+# ---------------------------------------------------------------------------
+
+@app.route("/api/ollama/models")
+def ollama_models():
+    import urllib.request, urllib.error
+    base = os.environ.get("OLLAMA_API_BASE", "http://localhost:11434")
+    try:
+        with urllib.request.urlopen(f"{base}/api/tags", timeout=3) as r:
+            data   = json.loads(r.read())
+            models = [m["name"] for m in data.get("models", [])]
+            return jsonify({"ok": True, "models": models})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e), "models": []})
+
+@app.route("/api/session/start", methods=["POST"])
+@require_auth
+def start_session():
+    user_id = g.user_id
+
+    data          = request.json
+    campaign_name = data.get("campaign")
+    model_id      = data.get("model", "gemini-2.5-flash")
+    campaign_type = data.get("campaign_type", "fantasia")
+    story_mode    = data.get("story_mode", "ask")
+    story_input   = data.get("story_input", "")
+    genre         = data.get("genre", "")
+
+    # Define identidade da sessão no memory
+    memory.CURRENT_USER_ID = user_id
+    memory.CAMPAIGN_NAME   = campaign_name
+    has_history = memory.load_campaign()
+
+    memory.campaign["name"] = campaign_name
+
+    if not has_history:
+        memory.campaign["campaign_type"] = campaign_type
+        memory.save_campaign()
+    else:
+        campaign_type = memory.campaign.get("campaign_type", campaign_type)
+
+    if model_id.startswith("ollama:"):
+        from google.adk.models.lite_llm import LiteLlm
+        os.environ.setdefault("OLLAMA_API_BASE", "http://localhost:11434")
+        model       = LiteLlm(model=f"ollama_chat/{model_id[7:]}")
+        model_label = f"Ollama — {model_id[7:]}"
+        is_ollama   = True
+    elif model_id.startswith("deepseek:"):
+        from google.adk.models.lite_llm import LiteLlm
+        model_name  = model_id[9:]
+        model       = LiteLlm(model=f"deepseek/{model_name}")
+        model_label = f"DeepSeek — {model_name}"
+        is_ollama   = False
+    else:
+        model       = model_id
+        model_label = f"Gemini — {model_id}"
+        is_ollama   = False
+
+    agent = create_agent(model, campaign_type)
+    runner, session_service = create_runner(agent)
+    run_async(session_service.create_session(
+        app_name=APP_NAME, user_id=USER_ID, session_id=SESSION_ID
+    ))
+
+    _sessions[user_id] = {
+        "runner":          runner,
+        "session_service": session_service,
+        "is_ollama":       is_ollama,
+    }
+
+    if has_history:
+        opening      = _build_recap()
+        opening_type = "recap"
+    elif story_mode == "custom" and story_input:
+        opening = (
+            f"O jogador quer começar uma campanha com o seguinte cenário:\n\n"
+            f"{story_input}\n\n"
+            "Use essa descrição como ponto de partida. Apresente o mundo, "
+            "introduza o personagem do jogador e inicie a narrativa."
+        )
+        opening_type = "new"
+    elif story_mode == "random":
+        opening = (
+            f"Crie uma campanha aleatória de {genre if genre else 'fantasia'}. "
+            "Apresente o mundo, o personagem do jogador e a situação inicial "
+            "de forma imersiva, sem perguntar nada — comece narrando."
+        )
+        opening_type = "new"
+    else:
+        opening      = "Olá! Pergunte ao jogador o tema ou cenário da campanha."
+        opening_type = "ask"
+
+    return jsonify({
+        "ok":                   True,
+        "has_history":          has_history,
+        "opening":              opening,
+        "opening_type":         opening_type,
+        "model_label":          model_label,
+        "campaign":             campaign_name,
+        "campaign_type":        campaign_type,
+        "campaign_config":      get_campaign_config(campaign_type),
+        "conversation_history": memory.campaign.get("conversation_history", []),
+    })
+
+
+def _build_recap() -> str:
+    from tools import get_full_context
+    contexto = get_full_context()
+    hist = memory.campaign["conversation_history"][-40:]
+    lines = [
+        f"[{'Jogador' if e['role']=='user' else 'Mestre'}]: {e['text']}"
+        for e in hist
+    ]
+    return (
+        "Estamos retomando uma aventura em andamento. "
+        "Abaixo está o estado completo do mundo e o histórico recente.\n\n"
+        f"{contexto}\n\n"
+        f"--- HISTÓRICO RECENTE ---\n{chr(10).join(lines)}\n\n"
+        "Faça um breve recap ao jogador do ponto em que estávamos "
+        "e aguarde a próxima ação dele para continuar a narrativa."
+    )
+
+# ---------------------------------------------------------------------------
+# Chat com SSE
+# ---------------------------------------------------------------------------
+
+@app.route("/api/chat", methods=["POST"])
+@require_auth
+def chat():
+    user_id = g.user_id
+    sess    = _sessions.get(user_id)
+    if not sess:
+        return jsonify({"error": "Sessão não iniciada"}), 400
+
+    runner    = sess["runner"]
+    is_ollama = sess["is_ollama"]
+
+    texto     = request.json.get("message", "").strip()
+    registrar = request.json.get("registrar", True)
+    if not texto:
+        return jsonify({"error": "Mensagem vazia"}), 400
+
+    texto_agente = texto
+    if is_ollama:
+        texto_agente = (
+            "[INSTRUÇÃO OBRIGATÓRIA: responda EXCLUSIVAMENTE em português do Brasil. "
+            "Nunca use outro idioma, nem mesmo parcialmente.]\n\n"
+            + texto
+        )
+
+    if registrar:
+        memory.campaign["conversation_history"].append({"role": "user", "text": texto})
+
+    result_q = queue.Queue()
+    MAX_RETRIES = 3
+
+    WRITE_TOOLS = {
+        "save_character", "save_location", "save_event", "set_flag",
+        "add_diary_entry", "update_character_status", "update_story_summary",
+        "update_world_state", "add_party_member", "remove_party_member", "clear_flag",
+    }
+
+    async def run_agent():
+        msg = gtypes.Content(role="user", parts=[gtypes.Part(text=texto_agente)])
+        for attempt in range(MAX_RETRIES):
+            full = ""
+            try:
+                async for event in runner.run_async(
+                    user_id=USER_ID, session_id=SESSION_ID, new_message=msg
+                ):
+                    if event.content and event.content.parts:
+                        for part in event.content.parts:
+                            fc = getattr(part, "function_call", None)
+                            if fc and getattr(fc, "name", None):
+                                name = fc.name
+                                args = dict(fc.args) if fc.args else {}
+                                kind = "write" if name in WRITE_TOOLS else "read"
+                                result_q.put(("tool_call", {"name": name, "args": args, "kind": kind}))
+
+                    if event.is_final_response() and event.content and event.content.parts:
+                        for part in event.content.parts:
+                            if part.text:
+                                full += part.text
+
+                result_q.put(("done", full))
+                return
+            except Exception as exc:
+                err = str(exc).lower()
+                is_retryable = any(k in err for k in ("overloaded", "429", "503", "rate limit", "quota", "resource exhausted"))
+                if is_retryable and attempt < MAX_RETRIES - 1:
+                    wait = 2 ** attempt
+                    result_q.put(("retrying", f"Serviço sobrecarregado. Tentando novamente em {wait}s..."))
+                    await asyncio.sleep(wait)
+                else:
+                    result_q.put(("error", str(exc)))
+                    return
+
+    # Inicia a thread e atrela um "capturador de desastres" a ela
+    future = asyncio.run_coroutine_threadsafe(run_agent(), _loop)
+
+    def on_thread_done(fut):
+        try:
+            fut.result() # Se a thread explodiu, o erro será revelado aqui
+        except Exception as e:
+            result_q.put(("error", f"Erro fatal interno na thread da IA: {e}"))
+
+    future.add_done_callback(on_thread_done)
+
+    def generate():
+        while True:
+            try:
+                # O try/except queue.Empty garante que nunca mais vai dar o erro 500 do seu log!
+                kind, content = result_q.get(timeout=120)
+                
+                if kind == "retrying":
+                    yield f"data: {json.dumps({'type':'retrying','content':content})}\n\n"
+                elif kind == "tool_call":
+                    yield f"data: {json.dumps({'type':'tool_call','tool':content})}\n\n"
+                elif kind == "error":
+                    yield f"data: {json.dumps({'type':'error','content':content})}\n\n"
+                    return
+                elif kind == "done":
+                    if registrar and content:
+                        memory.campaign["conversation_history"].append({"role": "assistant", "text": content})
+                        memory.save_campaign()
+
+                    result = validate(content)
+                    violations = [
+                        {"severity": v.severity, "rule": v.rule, "message": v.message, "detail": v.detail}
+                        for v in result.violations
+                    ]
+
+                    yield f"data: {json.dumps({'type':'text','content':content})}\n\n"
+                    if violations:
+                        yield f"data: {json.dumps({'type':'violations','violations':violations})}\n\n"
+                    yield f"data: {json.dumps({'type':'done'})}\n\n"
+                    return
+            except queue.Empty:
+                yield f"data: {json.dumps({'type':'error','content':'Timeout: A API da IA não respondeu em 120s. Verifique sua chave de API ou se o Ollama está rodando corretamente.'})}\n\n"
+                return
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+# ---------------------------------------------------------------------------
+# Memória
+# ---------------------------------------------------------------------------
+
+@app.route("/api/memory")
+@require_auth
+def get_memory_state():
+    c = memory.campaign
+    ct = c.get("campaign_type", "fantasia")
+    return jsonify({
+        "campaign_type":    ct,
+        "campaign_config":  get_campaign_config(ct),
+        "chapter":          c.get("chapter", 1),
+        "current_location": c.get("current_location", ""),
+        "current_scene":    c.get("current_scene", ""),
+        "story_summary":    c.get("story_summary", ""),
+        "quest_flags":      c.get("quest_flags", {}),
+        "party":            c.get("party", []),
+        "characters":       list(c.get("characters", {}).values()),
+        "locations":        list(c.get("locations", {}).values()),
+        "events":           c.get("events", []),
+        "diary":            c.get("diary", []),
+        "conversation_history": c.get("conversation_history", []),
+    })
+
+
+@app.route("/api/diary/export", methods=["POST"])
+@require_auth
+def export_diary():
+    content  = memory.export_diary_md()
+    filename = f"{memory.CAMPAIGN_NAME or 'campanha'}.diario.md"
+    return Response(
+        content,
+        mimetype="text/markdown",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+@app.route("/api/campaigns/import", methods=["POST"])
+@require_auth
+def import_campaign():
+    data         = request.json
+    name         = "".join(c for c in data.get("name", "") if c.isalnum() or c in " _-").strip()
+    campaign_data = data.get("campaign", {})
+
+    if not name:
+        return jsonify({"error": "Nome inválido"}), 400
+    if not campaign_data:
+        return jsonify({"error": "JSON de campanha vazio"}), 400
+    if database.campaign_exists(g.user_id, name):
+        return jsonify({"error": f"Já existe uma campanha com o nome '{name}'"}), 409
+
+    payload = {
+        "name":                 name,
+        "campaign_type":        campaign_data.get("campaign_type", "fantasia"),
+        "chapter":              campaign_data.get("chapter", 1),
+        "current_location":     campaign_data.get("current_location", ""),
+        "current_scene":        campaign_data.get("current_scene", ""),
+        "story_summary":        campaign_data.get("story_summary", ""),
+        "quest_flags":          campaign_data.get("quest_flags", {}),
+        "party":                campaign_data.get("party", []),
+        "characters":           campaign_data.get("characters", {}),
+        "locations":            campaign_data.get("locations", {}),
+        "events":               campaign_data.get("events", []),
+        "diary":                campaign_data.get("diary", []),
+        "conversation_history": [],
+    }
+
+    database.save_campaign(g.user_id, name, payload)
+    return jsonify({"ok": True, "name": name})
+
+
+@app.route("/api/session/end", methods=["POST"])
+@require_auth
+def end_session():
+    user_id = g.user_id
+
+    if memory.campaign and memory.campaign.get("name"):
+        try:
+            print(f"Salvando estado final de '{memory.campaign['name']}' antes de encerrar...")
+            memory.save_campaign()
+        except Exception as e:
+            print(f"Falha ao salvar durante o encerramento: {e}")
+            return jsonify({"ok": False, "error": "Falha ao persistir dados"}), 500
+
+    _sessions.pop(user_id, None)
+    memory.reset_campaign()
+    memory.CURRENT_USER_ID = None
+    memory.CAMPAIGN_NAME   = None
+    return jsonify({"ok": True})
+
+
+@app.route("/api/memory/characters/<name>", methods=["PUT"])
+@require_auth
+def update_character(name):
+    data = request.json
+    key  = name.lower()
+    if key not in memory.campaign["characters"]:
+        return jsonify({"error": "Não encontrado"}), 404
+    ch = memory.campaign["characters"][key]
+    ch.update({k: v for k, v in data.items() if k in ch})
+    # Se o nome mudou, remigra a chave
+    new_name = data.get("name", "").strip()
+    if new_name and new_name.lower() != key:
+        memory.campaign["characters"][new_name.lower()] = ch
+        del memory.campaign["characters"][key]
+    memory.save_campaign()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/memory/characters/<name>", methods=["DELETE"])
+@require_auth
+def delete_character(name):
+    key = name.lower()
+    if key not in memory.campaign["characters"]:
+        return jsonify({"error": "Não encontrado"}), 404
+    del memory.campaign["characters"][key]
+    memory.save_campaign()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/memory/locations/<name>", methods=["PUT"])
+@require_auth
+def update_location(name):
+    data = request.json
+    key  = name.lower()
+    if key not in memory.campaign["locations"]:
+        return jsonify({"error": "Não encontrado"}), 404
+    loc = memory.campaign["locations"][key]
+    loc.update({k: v for k, v in data.items() if k in loc})
+    new_name = data.get("name", "").strip()
+    if new_name and new_name.lower() != key:
+        memory.campaign["locations"][new_name.lower()] = loc
+        del memory.campaign["locations"][key]
+    memory.save_campaign()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/memory/locations/<name>", methods=["DELETE"])
+@require_auth
+def delete_location(name):
+    key = name.lower()
+    if key not in memory.campaign["locations"]:
+        return jsonify({"error": "Não encontrado"}), 404
+    del memory.campaign["locations"][key]
+    memory.save_campaign()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/memory/flags/<name>", methods=["PUT"])
+@require_auth
+def update_flag(name):
+    value = request.json.get("value", "")
+    memory.campaign["quest_flags"][name] = value
+    memory.save_campaign()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/memory/flags/<name>", methods=["DELETE"])
+@require_auth
+def delete_flag(name):
+    memory.campaign["quest_flags"].pop(name, None)
+    memory.save_campaign()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/memory/party/<name>", methods=["PUT"])
+@require_auth
+def update_party_member(name):
+    data  = request.json
+    party = memory.campaign["party"]
+    for m in party:
+        if m["name"].lower() == name.lower():
+            m.update({k: v for k, v in data.items() if k in m})
+            memory.save_campaign()
+            return jsonify({"ok": True})
+    return jsonify({"error": "Não encontrado"}), 404
+
+
+@app.route("/api/memory/party/<name>", methods=["DELETE"])
+@require_auth
+def delete_party_member(name):
+    before = len(memory.campaign["party"])
+    memory.campaign["party"] = [m for m in memory.campaign["party"] if m["name"].lower() != name.lower()]
+    if len(memory.campaign["party"]) == before:
+        return jsonify({"error": "Não encontrado"}), 404
+    memory.save_campaign()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/memory/events/<int:index>", methods=["PUT"])
+@require_auth
+def update_event(index):
+    data   = request.json
+    events = memory.campaign["events"]
+    for e in events:
+        if e["index"] == index:
+            e.update({k: v for k, v in data.items() if k in e})
+            memory.save_campaign()
+            return jsonify({"ok": True})
+    return jsonify({"error": "Não encontrado"}), 404
+
+
+@app.route("/api/memory/events/<int:index>", methods=["DELETE"])
+@require_auth
+def delete_event(index):
+    before = len(memory.campaign["events"])
+    memory.campaign["events"] = [e for e in memory.campaign["events"] if e["index"] != index]
+    if len(memory.campaign["events"]) == before:
+        return jsonify({"error": "Não encontrado"}), 404
+    memory.save_campaign()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/memory/diary/<int:index>", methods=["PUT"])
+@require_auth
+def update_diary(index):
+    data  = request.json
+    diary = memory.campaign["diary"]
+    if index < 0 or index >= len(diary):
+        return jsonify({"error": "Não encontrado"}), 404
+    diary[index].update({k: v for k, v in data.items() if k in diary[index]})
+    memory.save_campaign()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/memory/diary/<int:index>", methods=["DELETE"])
+@require_auth
+def delete_diary(index):
+    diary = memory.campaign["diary"]
+    if index < 0 or index >= len(diary):
+        return jsonify({"error": "Não encontrado"}), 404
+    diary.pop(index)
+    memory.save_campaign()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/memory/world", methods=["PUT"])
+@require_auth
+def update_world():
+    data = request.json
+    for field in ("chapter", "current_location", "current_scene", "story_summary"):
+        if field in data:
+            memory.campaign[field] = data[field]
+    memory.save_campaign()
+    return jsonify({"ok": True})
+
+# ---------------------------------------------------------------------------
+# Inicialização
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    print("=" * 50)
+    print("   RPG Agent — Interface Web")
+    # Agora o print reflete que ele está aberto para a rede
+    print("   Acesse: http://0.0.0.0:7777") 
+    print("=" * 50)
+    
+    # O segredo está no host='0.0.0.0'
+    app.run(host='0.0.0.0', debug=False, port=7777, threaded=True)
