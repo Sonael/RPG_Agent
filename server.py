@@ -28,12 +28,24 @@ app = Flask(__name__, static_folder="static")
 # Asyncio bridge — loop dedicado rodando em thread daemon
 # ---------------------------------------------------------------------------
 
-_loop = asyncio.new_event_loop()
-threading.Thread(target=_loop.run_forever, daemon=True, name="adk-loop").start()
+_loop = None
+
+def _start_background_loop(loop):
+    asyncio.set_event_loop(loop)
+    loop.run_forever()
+
+def get_loop():
+    global _loop
+    if _loop is None:
+        _loop = asyncio.new_event_loop()
+        t = threading.Thread(target=_start_background_loop, args=(_loop,), daemon=True, name="adk-loop")
+        t.start()
+    return _loop
 
 def run_async(coro):
     """Submete coroutine ao loop dedicado e aguarda resultado (bloqueante)."""
-    return asyncio.run_coroutine_threadsafe(coro, _loop).result(timeout=120)
+    loop = get_loop()
+    return asyncio.run_coroutine_threadsafe(coro, loop).result(timeout=120)
 
 # ---------------------------------------------------------------------------
 # Estado global — isolado por user_id
