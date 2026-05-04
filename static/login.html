@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RPG Agent — Login</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚔️</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css?v=3">
+</head>
+<body>
+
+  <!-- Dialog -->
+  <div id="dialog-overlay" class="hidden">
+    <div id="dialog-box">
+      <div id="dialog-accent"></div>
+      <div id="dialog-inner">
+        <div id="dialog-head"><div id="dialog-icon"></div><div id="dialog-title"></div></div>
+        <div id="dialog-message"></div>
+      </div>
+      <div id="dialog-buttons"></div>
+    </div>
+  </div>
+
+  <div class="login-page">
+    <div class="login-card">
+      <div class="login-accent"></div>
+
+      <div class="login-header">
+        <div class="login-title">RPG AGENT</div>
+        <div class="login-subtitle">RPG AGENT · Google ADK</div>
+      </div>
+
+      <div class="auth-tabs">
+        <button id="tab-login" class="auth-tab active" onclick="switchTab('login')">Entrar</button>
+        <button id="tab-register" class="auth-tab" onclick="switchTab('register')">Criar conta</button>
+      </div>
+
+      <div class="login-body">
+        <div class="field-group">
+          <label for="auth-email">Email</label>
+          <input id="auth-email" type="email" placeholder="seu@email.com">
+        </div>
+
+        <div class="field-group">
+          <label for="auth-password">Senha</label>
+          <input id="auth-password" type="password" placeholder="mínimo 6 caracteres">
+        </div>
+
+        <div class="auth-error" id="auth-error"></div>
+
+        <button id="auth-submit-btn" class="btn-gold" onclick="submitAuth()">Entrar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/js/utils.js?v=3"></script>
+  <script src="/static/js/auth.js?v=3"></script>
+</body>
+</html>

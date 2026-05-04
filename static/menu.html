@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RPG Agent — Menu</title>
+  <link rel="icon"
+    href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚔️</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css?v=2">
+</head>
+
+<body>
+
+  <!-- Dialog -->
+  <div id="dialog-overlay" class="hidden">
+    <div id="dialog-box">
+      <div id="dialog-accent"></div>
+      <div id="dialog-inner">
+        <div id="dialog-head">
+          <div id="dialog-icon"></div>
+          <div id="dialog-title"></div>
+        </div>
+        <div id="dialog-message"></div>
+      </div>
+      <div id="dialog-buttons"></div>
+    </div>
+  </div>
+
+  <!-- Import modal -->
+  <div id="import-overlay" class="hidden">
+    <div class="import-box">
+      <div class="import-header">
+        <div>
+          <div
+            style="font-family:'Cinzel',serif;font-size:10px;letter-spacing:0.15em;text-transform:uppercase;color:var(--blue);margin-bottom:4px;">
+            Importar Campanha</div>
+          <div style="font-family:'Cinzel',serif;font-size:16px;color:var(--gold);">Trazer história de outro chat</div>
+        </div>
+        <button class="import-close" onclick="closeImportModal()">✕</button>
+      </div>
+
+      <div class="import-body">
+        <p class="section-label">Passo 1 — Copie o prompt abaixo</p>
+        <p style="font-size:14px;color:#7a9aaa;line-height:1.6;margin-bottom:14px;">Cole este prompt no chat onde estava
+          jogando. A IA vai gerar um JSON com toda a história.</p>
+        <div class="import-prompt-wrap">
+          <div id="import-prompt-text" class="import-prompt-box"></div>
+          <button id="copy-prompt-btn" class="import-copy-btn" onclick="copyImportPrompt()">Copiar</button>
+        </div>
+
+        <p class="section-label" style="margin-top:20px;">Passo 2 — Cole o JSON gerado</p>
+        <textarea id="import-json-input" placeholder="Cole o JSON aqui..." style="min-height:120px;"
+          oninput="onImportJsonChange()"></textarea>
+        <div id="import-json-status"
+          style="font-family:'JetBrains Mono',monospace;font-size:10px;margin-top:6px;min-height:16px;"></div>
+
+        <p class="section-label" style="margin-top:16px;">Passo 3 — Nome da campanha</p>
+        <input type="text" id="import-campaign-name" placeholder="Ex: Aventura em Mirwen">
+      </div>
+
+      <div class="import-footer">
+        <button class="btn-ghost" onclick="closeImportModal()">Cancelar</button>
+        <button id="import-confirm-btn" class="btn-save" onclick="confirmImport()" disabled
+          style="opacity:0.4;">Importar Campanha</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Page -->
+  <div class="menu-page">
+    <div class="menu-card">
+      <div class="menu-header">
+        <div class="menu-title">RPG AGENT</div>
+        <div class="menu-subtitle">Selecione ou crie uma campanha</div>
+        <button class="menu-logout-btn" onclick="logout()" title="Sair da conta">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
+            <line x1="12" y1="2" x2="12" y2="12"></line>
+          </svg>
+        </button>
+      </div>
+
+      <div class="menu-body">
+
+        <!-- Seleção de campanha -->
+        <div class="menu-section">
+          <div class="section-label">Campanha</div>
+          <div class="campaign-list" id="campaign-list">
+            <div style="padding:12px 14px;font-size:12px;color:var(--text-muted);font-style:italic;">Carregando...</div>
+          </div>
+
+          <button class="btn-dashed" onclick="toggleNewCampaign()">+ Nova Campanha</button>
+          <button class="btn-dashed blue" onclick="openImportModal()">↓ Importar de outro chat</button>
+
+          <!-- Formulário nova campanha -->
+          <div class="new-campaign-form" id="new-campaign-form">
+            <input type="text" id="new-campaign-name" placeholder="Nome da campanha..." style="margin-bottom:12px;">
+
+            <div class="section-label" style="margin-top:4px;">Início da história</div>
+            <div class="story-mode-grid">
+              <button class="story-mode-btn selected" id="mode-custom" onclick="setStoryMode('custom')">
+                Eu descrevo<br><span style="font-size:9px;opacity:0.7;">meu cenário</span>
+              </button>
+              <button class="story-mode-btn" id="mode-random" onclick="setStoryMode('random')">
+                Aleatória<br><span style="font-size:9px;opacity:0.7;">o Mestre cria</span>
+              </button>
+            </div>
+
+            <div id="story-custom-input" style="margin-top:10px;">
+              <textarea id="story-input" placeholder="Descreva o cenário, personagem, contexto..."></textarea>
+            </div>
+            <div id="story-random-input" class="hidden" style="margin-top:10px;">
+              <input type="text" id="genre-input" placeholder="Gênero: fantasia medieval, cyberpunk... (opcional)">
+            </div>
+          </div>
+        </div>
+
+        <!-- Estilo de RPG -->
+        <div class="menu-section" id="campaign-type-section" style="display:none;">
+          <div class="section-label">Estilo de RPG</div>
+          <select id="campaign-type-select">
+            <option value="fantasia">⚔️ Fantasia / Aventura</option>
+            <option value="romance">💌 Romance / Drama</option>
+            <option value="horror">🕯️ Horror / Suspense</option>
+            <option value="misterio">🔍 Mistério / Investigação</option>
+            <option value="scifi">🚀 Ficção Científica / Cyberpunk</option>
+            <option value="faroeste">🤠 Faroeste / Velho Oeste</option>
+          </select>
+        </div>
+
+        <!-- Modelo -->
+        <div class="menu-section">
+          <div class="section-label">Modelo</div>
+          <select id="model-select" onchange="onModelChange()">
+
+            <!-- Modelos Gemini 3.x Disponíveis (Free Tier) -->
+            <optgroup label="Google Gemini 3.x">
+              <option value="gemini-3.1-flash-lite-preview">Gemini 3.1 Flash-Lite — Recomendado (15 RPM / 500 RPD)
+              </option>
+              <option value="gemini-3-flash">Gemini 3 Flash — (5 RPM / 20 RPD)</option>
+              <option value="gemini-3.1-flash-tts">Gemini 3.1 Flash TTS — (3 RPM / 10 RPD)</option>
+            </optgroup>
+
+            <!-- Modelos Gemini 2.5 Disponíveis (Free Tier) -->
+            <optgroup label="Google Gemini 2.5">
+              <option value="gemini-2.5-flash">Gemini 2.5 Flash — (5 RPM / 20 RPD)</option>
+              <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite — (10 RPM / 20 RPD)</option>
+            </optgroup>
+
+            <!-- Modelos Gemma (Alta Cota Diária) -->
+            <optgroup label="Google Gemma (Alta Performance)">
+              <option value="gemma-3-27b-it">Gemma 3 27B — (30 RPM / 14.4K RPD)</option>
+              <option value="gemma-4-26b-it">Gemma 4 26B — (15 RPM / 1.5K RPD)</option>
+              <option value="gemma-4-31b-it">Gemma 4 31B — (15 RPM / 1.5K RPD)</option>
+            </optgroup>
+
+            <!-- APIs Externas e Local -->
+            <optgroup label="DeepSeek (API)">
+              <option value="deepseek:deepseek-chat">DeepSeek V3.1 671B</option>
+              <option value="deepseek:deepseek-reasoner">DeepSeek R1 671B</option>
+            </optgroup>
+
+            <!-- <optgroup label="Ollama (local)" id="ollama-optgroup">
+              <option value="__ollama_loading__" disabled>Verificando Ollama...</option>
+            </optgroup> -->
+          </select>
+          <div id="ollama-status"
+            style="margin-top:7px;font-family:'JetBrains Mono',monospace;font-size:10px;min-height:14px;"></div>
+        </div>
+
+        <!-- Chaves de API -->
+        <div class="menu-section">
+          <div class="section-label" style="display:flex;justify-content:space-between;align-items:center;">
+            <span>Chaves de API</span>
+            <button onclick="toggleApiKeys()" id="apikeys-toggle-btn" style="
+              background:none;border:none;cursor:pointer;
+              font-family:'JetBrains Mono',monospace;font-size:10px;
+              color:var(--text-muted);letter-spacing:0.05em;padding:0;">
+              mostrar ▾
+            </button>
+          </div>
+
+          <div id="apikeys-body" class="hidden" style="margin-top:10px;">
+            <p style="font-size:12px;color:var(--text-muted);line-height:1.6;margin-bottom:12px;">
+              Suas chaves ficam salvas apenas neste dispositivo e nunca são enviadas para nossos servidores
+              permanentemente.
+            </p>
+
+            <!-- Google API Key -->
+            <div style="margin-bottom:12px;">
+              <label style="display:block;font-family:'JetBrains Mono',monospace;font-size:10px;
+                letter-spacing:0.1em;text-transform:uppercase;color:var(--gold-dim);margin-bottom:6px;">
+                Google AI Studio (Gemini)
+              </label>
+              <div style="display:flex;gap:6px;">
+                <input type="password" id="google-api-key-input" placeholder="AIza..." style="flex:1;"
+                  oninput="onApiKeyChange()">
+                <button onclick="toggleKeyVisibility('google-api-key-input', this)" style="background:var(--bg3);border:1px solid var(--border2);border-radius:3px;
+                  padding:0 10px;cursor:pointer;color:var(--text-muted);font-size:13px;
+                  transition:color 0.15s;white-space:nowrap;" title="Mostrar/ocultar chave">👁</button>
+              </div>
+              <div
+                style="margin-top:4px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted);">
+                Obtenha em: <a href="https://aistudio.google.com/apikey" target="_blank"
+                  style="color:var(--blue);text-decoration:none;">aistudio.google.com/apikey</a>
+              </div>
+            </div>
+
+            <!-- DeepSeek API Key -->
+            <div style="margin-bottom:12px;">
+              <label style="display:block;font-family:'JetBrains Mono',monospace;font-size:10px;
+                letter-spacing:0.1em;text-transform:uppercase;color:var(--gold-dim);margin-bottom:6px;">
+                DeepSeek
+              </label>
+              <div style="display:flex;gap:6px;">
+                <input type="password" id="deepseek-api-key-input" placeholder="sk-..." style="flex:1;"
+                  oninput="onApiKeyChange()">
+                <button onclick="toggleKeyVisibility('deepseek-api-key-input', this)" style="background:var(--bg3);border:1px solid var(--border2);border-radius:3px;
+                  padding:0 10px;cursor:pointer;color:var(--text-muted);font-size:13px;
+                  transition:color 0.15s;white-space:nowrap;" title="Mostrar/ocultar chave">👁</button>
+              </div>
+              <div
+                style="margin-top:4px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted);">
+                Obtenha em: <a href="https://platform.deepseek.com/api_keys" target="_blank"
+                  style="color:var(--blue);text-decoration:none;">platform.deepseek.com/api_keys</a>
+              </div>
+            </div>
+
+            <div style="display:flex;gap:8px;justify-content:flex-end;">
+              <button onclick="clearApiKeys()" style="
+                background:transparent;border:1px solid var(--border2);border-radius:3px;
+                color:var(--text-muted);font-family:'Cinzel',serif;font-size:10px;
+                letter-spacing:0.08em;padding:7px 14px;cursor:pointer;transition:all 0.15s;"
+                onmouseover="this.style.borderColor='var(--red)';this.style.color='var(--red)'"
+                onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--text-muted)'">
+                Limpar
+              </button>
+              <button onclick="saveApiKeys()" style="
+                background:var(--gold-dim);border:none;border-radius:3px;
+                color:#080b11;font-family:'Cinzel',serif;font-size:10px;
+                font-weight:700;letter-spacing:0.08em;padding:7px 16px;
+                cursor:pointer;transition:background 0.15s;" onmouseover="this.style.background='var(--gold)'"
+                onmouseout="this.style.background='var(--gold-dim)'">
+                Salvar Chaves
+              </button>
+            </div>
+
+            <div id="apikeys-status" style="
+              font-family:'JetBrains Mono',monospace;font-size:10px;
+              margin-top:8px;min-height:14px;text-align:right;"></div>
+          </div>
+        </div>
+
+        <button class="btn-gold" id="start-btn" onclick="startSession()" disabled>Iniciar Sessão</button>
+
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/js/utils.js?v=2"></script>
+  <script src="/static/js/menu.js?v=2"></script>
+  <script>
+    // ════════════════════════════════════════════
+    //  Gerenciamento de chaves de API
+    // ════════════════════════════════════════════
+
+    const GOOGLE_KEY_STORAGE = 'rpg_google_api_key';
+    const DEEPSEEK_KEY_STORAGE = 'rpg_deepseek_api_key';
+
+    function loadApiKeys() {
+      const gk = localStorage.getItem(GOOGLE_KEY_STORAGE) || '';
+      const dk = localStorage.getItem(DEEPSEEK_KEY_STORAGE) || '';
+      document.getElementById('google-api-key-input').value = gk;
+      document.getElementById('deepseek-api-key-input').value = dk;
+      updateApiKeyStatus(gk, dk);
+    }
+
+    function saveApiKeys() {
+      const gk = document.getElementById('google-api-key-input').value.trim();
+      const dk = document.getElementById('deepseek-api-key-input').value.trim();
+      if (gk) localStorage.setItem(GOOGLE_KEY_STORAGE, gk);
+      else localStorage.removeItem(GOOGLE_KEY_STORAGE);
+      if (dk) localStorage.setItem(DEEPSEEK_KEY_STORAGE, dk);
+      else localStorage.removeItem(DEEPSEEK_KEY_STORAGE);
+      const status = document.getElementById('apikeys-status');
+      status.style.color = 'var(--green)';
+      status.textContent = '✓ Chaves salvas neste dispositivo.';
+      setTimeout(() => { status.textContent = ''; }, 3000);
+      updateApiKeyStatus(gk, dk);
+    }
+
+    function clearApiKeys() {
+      localStorage.removeItem(GOOGLE_KEY_STORAGE);
+      localStorage.removeItem(DEEPSEEK_KEY_STORAGE);
+      document.getElementById('google-api-key-input').value = '';
+      document.getElementById('deepseek-api-key-input').value = '';
+      const status = document.getElementById('apikeys-status');
+      status.style.color = 'var(--text-muted)';
+      status.textContent = 'Chaves removidas.';
+      setTimeout(() => { status.textContent = ''; }, 3000);
+      updateApiKeyStatus('', '');
+    }
+
+    function onApiKeyChange() {
+      const gk = document.getElementById('google-api-key-input').value.trim();
+      const dk = document.getElementById('deepseek-api-key-input').value.trim();
+      updateApiKeyStatus(gk, dk);
+    }
+
+    function updateApiKeyStatus(gk, dk) {
+      const btn = document.getElementById('apikeys-toggle-btn');
+      const hasSaved = !!localStorage.getItem(GOOGLE_KEY_STORAGE) || !!localStorage.getItem(DEEPSEEK_KEY_STORAGE);
+      const isOpen = !document.getElementById('apikeys-body').classList.contains('hidden');
+      btn.textContent = (hasSaved ? '● ' : '') + (isOpen ? 'ocultar ▴' : 'mostrar ▾');
+      btn.style.color = hasSaved ? 'var(--green)' : 'var(--text-muted)';
+    }
+
+    function toggleApiKeys() {
+      document.getElementById('apikeys-body').classList.toggle('hidden');
+      updateApiKeyStatus(
+        document.getElementById('google-api-key-input').value,
+        document.getElementById('deepseek-api-key-input').value,
+      );
+    }
+
+    function toggleKeyVisibility(inputId, btn) {
+      const input = document.getElementById(inputId);
+      if (input.type === 'password') { input.type = 'text'; btn.style.color = 'var(--gold)'; }
+      else { input.type = 'password'; btn.style.color = 'var(--text-muted)'; }
+    }
+
+    // Expõe as chaves para o menu.js incluir no payload do startSession
+    window.getApiKeys = function () {
+      return {
+        google_api_key: localStorage.getItem(GOOGLE_KEY_STORAGE) || '',
+        deepseek_api_key: localStorage.getItem(DEEPSEEK_KEY_STORAGE) || '',
+      };
+    };
+
+    // Patch do fetch — intercepta /api/session/start e injeta as chaves automaticamente
+    // Isso garante que funciona independente de como o menu.js monta o payload.
+    const _originalFetch = window.fetch;
+    window.fetch = function (url, options = {}) {
+      if (typeof url === 'string' && url.includes('/api/session/start') && options.method === 'POST') {
+        try {
+          const keys = window.getApiKeys();
+          if (keys.google_api_key || keys.deepseek_api_key) {
+            const body = JSON.parse(options.body || '{}');
+            if (keys.google_api_key) body.google_api_key = keys.google_api_key;
+            if (keys.deepseek_api_key) body.deepseek_api_key = keys.deepseek_api_key;
+            options = { ...options, body: JSON.stringify(body) };
+          }
+        } catch (e) { }
+      }
+      return _originalFetch.call(this, url, options);
+    };
+
+    // Carrega as chaves salvas ao abrir o menu
+    loadApiKeys();
+  </script>
+
+</html>

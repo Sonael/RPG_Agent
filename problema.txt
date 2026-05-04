@@ -1,7 +1,0 @@
-
-
-
-no futuro eu quero que ele salve o historico de mensagens para que quando o usuario voltar para a conversar ele possa ler o que aconteceu antes, quero isso em um lugar separado, não precisa mandar o historico para o modelo, mas quero que ele seja salvo para o usuário ler depois.
-
-
-

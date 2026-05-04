@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RPG Agent — Sessão</title>
+  <link rel="icon"
+    href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚔️</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js"></script>
+  <link rel="stylesheet" href="/static/css/style.css?v=2">
+</head>
+
+<body>
+
+  <!-- Dialog -->
+  <div id="dialog-overlay" class="hidden">
+    <div id="dialog-box">
+      <div id="dialog-accent"></div>
+      <div id="dialog-inner">
+        <div id="dialog-head">
+          <div id="dialog-icon"></div>
+          <div id="dialog-title"></div>
+        </div>
+        <div id="dialog-message"></div>
+      </div>
+      <div id="dialog-buttons"></div>
+    </div>
+  </div>
+
+  <!-- Edit modal -->
+  <div id="edit-overlay" class="hidden">
+    <div class="edit-box">
+      <div class="edit-header">
+        <div>
+          <div id="edit-type" class="edit-type">Editando</div>
+          <div id="edit-name" class="edit-name">—</div>
+        </div>
+        <button class="edit-close" onclick="closeEditModal()">✕</button>
+      </div>
+      <div id="edit-body" class="edit-body"></div>
+      <div class="edit-footer">
+        <button id="edit-del-btn" class="btn-danger" onclick="deleteCurrentItem()">Deletar</button>
+        <div style="display:flex;gap:8px;">
+          <button class="btn-ghost" onclick="closeEditModal()">Cancelar</button>
+          <button class="btn-save" onclick="saveCurrentItem()">Salvar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sidebar overlay (mobile) -->
+  <div id="sidebar-overlay"></div>
+
+  <!-- Game layout -->
+  <div class="game-page">
+
+    <!-- ── Sidebar ── -->
+    <aside id="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-header-row">
+          <div style="min-width:0;">
+            <div class="sb-campaign" id="sb-campaign">—</div>
+            <div class="sb-model" id="sb-model">—</div>
+            <div class="sb-location" id="sb-location">—</div>
+
+            <!-- Painel de Métricas da API (Quota) -->
+            <div class="quota-panel"
+              style="margin-top: 10px; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 4px; border: 1px solid var(--border);">
+              <div
+                style="font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--gold-dim); text-transform: uppercase; margin-bottom: 5px; letter-spacing: 0.05em;">
+                Status do Oráculo (Sessão)
+              </div>
+              <div
+                style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-family: 'JetBrains Mono', monospace; font-size: 10px;">
+                <div title="Requisições nesta sessão">REQ: <span id="stat-req" style="color: var(--text);">0</span>
+                </div>
+                <div title="Total de tokens processados">TOK: <span id="stat-tokens"
+                    style="color: var(--text);">0</span></div>
+              </div>
+              <!-- Barra visual de proximidade do limite (RPM) -->
+              <div
+                style="height: 3px; background: var(--border2); margin-top: 6px; border-radius: 2px; overflow: hidden;"
+                title="Frequência de requisições por minuto">
+                <div id="rpm-bar"
+                  style="width: 0%; height: 100%; background: var(--gold); transition: width 0.4s, background-color 0.3s;">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="sb-btn-group">
+            <button class="sb-btn" onclick="backToMenu()" title="Encerrar sessão" style="font-size:18px;">✕</button>
+            <button class="sb-btn" onclick="logout()" title="Sair da conta"
+              style="display: flex; align-items: center; justify-content: center;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
+                <line x1="12" y1="2" x2="12" y2="12"></line>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="sidebar-tabs">
+        <button class="tab-btn active" data-tab="mundo" onclick="switchTab('mundo')">Mundo</button>
+        <button class="tab-btn" data-tab="enciclopedia" onclick="switchTab('enciclopedia')">Encicl.</button>
+        <button class="tab-btn" data-tab="diario" onclick="switchTab('diario')">Diário</button>
+      </div>
+
+      <div class="sidebar-content">
+
+        <!-- Tab: Mundo -->
+        <div class="tab-panel active" id="tab-mundo">
+          <div class="sb-section">
+            <div class="sb-section-title">Estado</div>
+            <div class="world-state">
+              <div class="world-state-item"><span class="ws-label">Capítulo</span><span class="ws-value"
+                  id="ws-chapter">—</span></div>
+              <div class="world-state-item"><span class="ws-label">Local</span><span class="ws-value"
+                  id="ws-location">—</span></div>
+            </div>
+          </div>
+          <div class="sb-section">
+            <div class="sb-section-title">Validação</div>
+            <div id="sb-violations"><span class="empty-state">Nenhuma violação detectada.</span></div>
+          </div>
+          <div class="sb-section">
+            <div class="sb-section-title">
+              Resumo
+              <span class="sb-edit-link" onclick="openSummaryEdit()">editar</span>
+            </div>
+            <div class="story-summary" id="sb-summary" onclick="openSummaryEdit()">Nenhum resumo ainda.</div>
+          </div>
+          <div class="sb-section">
+            <div class="sb-section-title">Flags</div>
+            <div id="sb-flags"><span class="empty-state">Nenhuma flag ainda.</span></div>
+          </div>
+        </div>
+
+        <!-- Tab: Enciclopédia -->
+        <div class="tab-panel" id="tab-enciclopedia">
+          <div class="sb-section">
+            <div class="sb-section-title" id="sb-party-title">Grupo</div>
+            <div id="sb-party"><span class="empty-state">Nenhum membro ainda.</span></div>
+          </div>
+          <div class="sb-section">
+            <div class="sb-section-title">Personagens</div>
+            <div id="sb-chars"><span class="empty-state">Nenhum personagem ainda.</span></div>
+          </div>
+          <div class="sb-section">
+            <div class="sb-section-title">Locais</div>
+            <div id="sb-locs"><span class="empty-state">Nenhum local ainda.</span></div>
+          </div>
+        </div>
+
+        <!-- Tab: Diário -->
+        <div class="tab-panel" id="tab-diario">
+          <div class="sb-section">
+            <div class="sb-section-title">Entradas</div>
+            <div id="sb-diary"><span class="empty-state">Diário vazio.</span></div>
+          </div>
+          <button class="btn-export" onclick="exportDiary()">Exportar como .md</button>
+        </div>
+
+      </div>
+    </aside>
+
+    <!-- ── Chat ── -->
+    <main id="chat-area">
+      <div id="mobile-header">
+        <button id="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+        <div id="mobile-title">RPG AGENT</div>
+      </div>
+
+      <div id="chat-history"></div>
+
+      <div id="input-area">
+        <div style="position:relative;">
+          <!-- Autocomplete de comandos -->
+          <div id="cmd-menu" style="display:none;" class="cmd-menu-wrap">
+            <div class="cmd-menu-hdr">Comandos disponíveis</div>
+            <div id="cmd-menu-items"></div>
+          </div>
+
+          <div class="input-row">
+            <textarea id="chat-input" rows="1" placeholder="O que você faz? (/ para comandos)..."
+              onkeydown="handleKey(event)" oninput="onInputChange(this)"></textarea>
+            <button id="send-btn" onclick="sendMessage()">Enviar</button>
+          </div>
+        </div>
+        <div class="input-hint">/ para comandos · Enter para enviar · Shift+Enter para nova linha</div>
+      </div>
+    </main>
+
+  </div>
+
+  <script src="/static/js/utils.js?v=2"></script>
+  <script src="/static/js/game.js?v=2"></script>
+</body>
+
+</html>
