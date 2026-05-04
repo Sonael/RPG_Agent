@@ -17,7 +17,7 @@ from google.genai import types as gtypes
 
 import memory
 import database
-from auth import require_auth, register as auth_register, login as auth_login
+from auth import require_auth, register as auth_register, login as auth_login, refresh_session
 from agent import create_agent, get_campaign_config
 from session import APP_NAME, USER_ID, SESSION_ID, create_runner
 from validator import validate
@@ -166,6 +166,25 @@ def login():
         result = auth_login(email, password)
         return jsonify({"ok": True, **result})
     except Exception as e:
+        return jsonify({"error": str(e)}), 401
+    
+@app.route("/api/auth/refresh", methods=["POST"])
+def refresh_token():
+    """
+    Rota chamada silenciosamente pelo frontend para renovar o JWT expirado.
+    """
+    data = request.json or {}
+    token = data.get("refresh_token")
+    
+    if not token:
+        return jsonify({"error": "Refresh token ausente."}), 400
+        
+    try:
+        # Chama a função que acabamos de criar no auth.py
+        result = refresh_session(token)
+        return jsonify({"ok": True, **result})
+    except Exception as e:
+        # Retorna 401 para que o frontend saiba que a renovação falhou de vez
         return jsonify({"error": str(e)}), 401
 
 # ---------------------------------------------------------------------------

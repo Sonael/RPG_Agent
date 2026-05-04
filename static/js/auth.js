@@ -52,7 +52,8 @@ async function submitAuth() {
       return;
     }
 
-    setToken(data.access_token);
+    // Salvando os dois tokens na memória do navegador
+    setTokens(data.access_token, data.refresh_token);
     window.location.href = '/menu.html';
 
   } catch (e) {
@@ -120,10 +121,13 @@ async function handleEmailConfirmation() {
     });
     const data = await res.json();
     const token = (res.ok && data.ok && data.access_token) ? data.access_token : params.access_token;
-    setToken(token);
+    const refresh = (res.ok && data.ok && data.refresh_token) ? data.refresh_token : params.refresh_token;
+    
+    // Salva os dois tokens recebidos
+    setTokens(token, refresh);
   } catch (_) {
     // Backend sem rota /confirm → usa token do hash diretamente
-    setToken(params.access_token);
+    setTokens(params.access_token, params.refresh_token);
   }
 
   history.replaceState(null, '', window.location.pathname);
@@ -164,8 +168,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   const confirmed = await handleEmailConfirmation();
   if (confirmed) return;
 
-  // 2. Já tem sessão salva → vai direto ao menu
-  if (getToken()) { window.location.href = '/menu.html'; return; }
+  // 2. Já tem sessão salva → vai direto ao menu (agora usando a nova função de leitura)
+  const tokens = getTokens();
+  if (tokens && tokens.access) { window.location.href = '/menu.html'; return; }
 
   // 3. Tela de login normal
   document.getElementById('auth-email')?.addEventListener('keydown',    e => { if (e.key === 'Enter') document.getElementById('auth-password').focus(); });

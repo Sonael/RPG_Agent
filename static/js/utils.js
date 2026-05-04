@@ -6,16 +6,66 @@ const API = '';
 // ═══════════════════════════════════════
 //  Auth token helpers
 // ═══════════════════════════════════════
-function getToken()       { return localStorage.getItem('rpg_token'); }
-function setToken(t)      { localStorage.setItem('rpg_token', t); }
-function clearToken()     { localStorage.removeItem('rpg_token'); }
-function requireAuth()    { if (!getToken()) { window.location.href = '/login.html'; return false; } return true; }
+function getTokens() {
+  return {
+    access:  localStorage.getItem('rpg_access_token'),
+    refresh: localStorage.getItem('rpg_refresh_token')
+  };
+}
 
-function authFetch(url, opts = {}) {
+function setTokens(access, refresh) {
+  localStorage.setItem('rpg_access_token', access);
+  if (refresh) localStorage.setItem('rpg_refresh_token', refresh);
+}
+
+function clearTokens() {
+  localStorage.removeItem('rpg_access_token');
+  localStorage.removeItem('rpg_refresh_token');
+  localStorage.removeItem('rpg_token'); // Limpa o antigo por precaução
+}
+
+function requireAuth() {
+  const tokens = getTokens();
+  if (!tokens.access) { 
+    window.location.href = '/login.html'; 
+    return false; 
+  } 
+  return true; 
+}
+
+async function authFetch(url, opts = {}) {
+  const tokens = getTokens();
   const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
-  const tok = getToken();
-  if (tok) headers['Authorization'] = `Bearer ${tok}`;
-  return fetch(url, { ...opts, headers });
+  
+  if (tokens.access) headers['Authorization'] = `Bearer ${tokens.access}`;
+
+  let response = await fetch(url, { ...opts, headers });
+
+  // Se o token expirou (erro 401) e temos um refresh token, tenta renovar silenciosamente
+  if (response.status === 401 && tokens.refresh) {
+    const refreshRes = await fetch(`${API}/api/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: tokens.refresh })
+    });
+
+    if (refreshRes.ok) {
+      const newData = await refreshRes.json();
+      
+      // Atualiza as chaves no navegador
+      setTokens(newData.access_token, newData.refresh_token);
+      
+      // Refaz a requisição original com a nova chave de acesso válida
+      headers['Authorization'] = `Bearer ${newData.access_token}`;
+      response = await fetch(url, { ...opts, headers });
+    } else {
+      // Se o refresh falhar (ex: ficou dias sem jogar e expirou tudo), desloga o usuário
+      clearTokens();
+      window.location.href = '/login.html';
+    }
+  }
+
+  return response;
 }
 
 // ═══════════════════════════════════════

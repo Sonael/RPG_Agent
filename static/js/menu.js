@@ -27,7 +27,7 @@ async function logout() {
   const ok = await showConfirm('Sair da conta', 'Você será desconectado.', 'warning', 'Sair');
   if (!ok) return;
   try { await authFetch(`${API}/api/session/end`, { method: 'POST' }); } catch (_) {}
-  clearToken();
+  clearTokens();
   localStorage.removeItem('rpg_session');
   window.location.href = '/login.html';
 }
@@ -39,7 +39,7 @@ async function loadCampaigns() {
   const list = document.getElementById('campaign-list');
   try {
     const res  = await authFetch(`${API}/api/campaigns`);
-    if (res.status === 401) { clearToken(); window.location.href = '/login.html'; return; }
+    if (res.status === 401) { clearTokens(); window.location.href = '/login.html'; return; }
     const data = await res.json();
 
     if (!data.length) {

@@ -128,7 +128,7 @@ async function logout() {
   
   try { await authFetch(`${API}/api/session/end`, { method: 'POST' }); } catch (_) { }
   
-  clearToken();
+  clearTokens();
   localStorage.removeItem('rpg_session');
   window.location.href = '/login.html';
 }
@@ -539,7 +539,7 @@ function applyCampaignConfig(cfg) {
 async function refreshMemory() {
   try {
     const res = await authFetch(`${API}/api/memory`);
-    if (res.status === 401) { clearToken(); window.location.href = '/login.html'; return; }
+    if (res.status === 401) { clearTokens(); window.location.href = '/login.html'; return; }
     const mem = await res.json();
     if (mem.campaign_config) applyCampaignConfig(mem.campaign_config);
     renderMemory(mem);

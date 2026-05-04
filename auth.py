@@ -15,7 +15,7 @@ def _client() -> AuthClient:
 
 def register(email: str, password: str) -> dict:
     sb = _client()
-    result = sb.sign_up({"email": email, "password": password}) # Direto no sb[cite: 2]
+    result = sb.sign_up({"email": email, "password": password})
     if not result.user:
         raise ValueError("Não foi possível criar a conta.")
     return {
@@ -27,7 +27,6 @@ def register(email: str, password: str) -> dict:
 
 def login(email: str, password: str) -> dict:
     sb = _client()
-    # AJUSTADO: Removido '.auth'[cite: 2]
     result = sb.sign_in_with_password({"email": email, "password": password})
     if not result.user:
         raise ValueError("Email ou senha incorretos.")
@@ -38,10 +37,28 @@ def login(email: str, password: str) -> dict:
         "refresh_token": result.session.refresh_token,
     }
 
+def refresh_session(refresh_token: str) -> dict:
+    """
+    Renova a sessão do usuário usando o refresh_token.
+    """
+    try:
+        sb = _client()
+        # O cliente GoTrue possui um método nativo para renovar a sessão
+        result = sb.refresh_session(refresh_token)
+        
+        if not result or not result.session:
+            raise ValueError("Não foi possível renovar a sessão.")
+            
+        return {
+            "access_token":  result.session.access_token,
+            "refresh_token": result.session.refresh_token,
+        }
+    except Exception as e:
+        raise ValueError(f"Sessão expirada ou token inválido: {str(e)}")
+
 def get_user_id(token: str) -> Optional[str]:
     try:
         sb = _client()
-        # AJUSTADO: Removido '.auth'[cite: 2]
         user = sb.get_user(token)
         return user.user.id if user.user else None
     except Exception:
@@ -85,7 +102,7 @@ def require_auth(f):
 
         except Exception as e:
             # Útil para debug local, mas você pode simplificar a mensagem no Render
-            return jsonify({"error": f"Falha na verificação: {str(e)}"}), 500
+            return jsonify({"error": f"Falha na verificação: {str(e)}"}), 401
 
         return f(*args, **kwargs)
     return decorated
