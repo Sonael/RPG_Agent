@@ -11,7 +11,7 @@
   <link
     href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap"
     rel="stylesheet">
-  <link rel="stylesheet" href="/static/css/style.css?v=2">
+  <link rel="stylesheet" href="/static/css/style.css?v=3">
 </head>
 
 <body>
@@ -45,6 +45,16 @@
       </div>
 
       <div class="import-body">
+        <div class="import-tabs">
+          <button class="import-tab active" data-theme="dnd"      onclick="setImportTheme('dnd')">D&amp;D (Regras)</button>
+          <button class="import-tab"        data-theme="fantasia"  onclick="setImportTheme('fantasia')">Fantasia</button>
+          <button class="import-tab"        data-theme="romance"   onclick="setImportTheme('romance')">Romance</button>
+          <button class="import-tab"        data-theme="horror"    onclick="setImportTheme('horror')">Horror</button>
+          <button class="import-tab"        data-theme="misterio"  onclick="setImportTheme('misterio')">Mistério</button>
+          <button class="import-tab"        data-theme="scifi"     onclick="setImportTheme('scifi')">Sci-Fi</button>
+          <button class="import-tab"        data-theme="faroeste"  onclick="setImportTheme('faroeste')">Faroeste</button>
+        </div>
+
         <p class="section-label">Passo 1 — Copie o prompt abaixo</p>
         <p style="font-size:14px;color:#7a9aaa;line-height:1.6;margin-bottom:14px;">Cole este prompt no chat onde estava
           jogando. A IA vai gerar um JSON com toda a história.</p>
@@ -125,6 +135,7 @@
         <div class="menu-section" id="campaign-type-section" style="display:none;">
           <div class="section-label">Estilo de RPG</div>
           <select id="campaign-type-select">
+            <option value="dnd">🐉 D&amp;D / RPG Estruturado</option>
             <option value="fantasia">⚔️ Fantasia / Aventura</option>
             <option value="romance">💌 Romance / Drama</option>
             <option value="horror">🕯️ Horror / Suspense</option>

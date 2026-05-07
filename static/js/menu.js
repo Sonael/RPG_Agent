@@ -198,71 +198,63 @@ function onModelChange() {
 // ═══════════════════════════════════════
 //  Modal de importação
 // ═══════════════════════════════════════
-const IMPORT_PROMPT = `Analise meticulosamente toda a nossa conversa até agora. Você deve agir como um Arquivista de Mundos, extraindo não apenas fatos, mas a atmosfera, as nuances psicológicas e as ramificações de cada escolha feita pelo jogador. Extraia o máximo de detalhes possível para garantir a continuidade perfeita da narrativa.
+let currentImportTheme = 'dnd';
 
-Gere um JSON com EXATAMENTE esta estrutura (não adicione campos extras, não remova campos):
+function getImportPrompt(theme) {
+  const isDnd = theme === 'dnd';
+  const themeFocus = {
+    dnd:      "focando nas mecânicas de combate, itens, magias e progressão de aventura",
+    fantasia: "focando na magia do mundo, facções e feitos heroicos",
+    romance:  "focando intensamente nos sentimentos, intimidade, segredos e no estado atual dos relacionamentos",
+    horror:   "focando na tensão, nos traumas adquiridos, na sanidade e nos medos",
+    misterio: "focando nas pistas coletadas, suspeitos, álibis e na linha investigativa",
+    scifi:    "focando na tecnologia, implantes cibernéticos, corporações e recursos",
+    faroeste: "focando na reputação, alianças, recompensas e na moralidade crua",
+  };
 
-{
-  "campaign_type": "<fantasia|romance|horror|misterio|scifi|faroeste>",
-  "chapter": <número do capítulo atual>,
-  "current_location": "<nome exato do local onde a história está agora>",
-  "current_scene": "<detalhamento vívido da cena atual>",
-  "story_summary": "<resumo denso de 10 a 15 linhas>",
-  "characters": {
-    "<nome_em_lowercase>": {
-      "name": "<Nome Completo>",
-      "description": "<descrição física minuciosa>",
-      "traits": "<análise psicológica profunda>",
-      "status": "<vivo|morto|desaparecido|preso|outro>",
-      "notes": "<objetivos pessoais ocultos>"
-    }
-  },
-  "locations": {
-    "<nome_em_lowercase>": {
-      "name": "<Nome do Local>",
-      "description": "<descrição sensorial completa>",
-      "details": "<pontos geográficos específicos>",
-      "notes": "<eventos passados ocorridos aqui>"
-    }
-  },
-  "events": [
-    {
-      "index": 1,
-      "summary": "<narração detalhada>",
-      "characters_involved": "<nomes separados por vírgula>",
-      "location": "<onde ocorreu>",
-      "consequence": "<consequência imediata e ramificações>"
-    }
-  ],
-  "party": [
-    {
-      "name": "<nome>",
-      "role": "<função ou classe>",
-      "notes": "<fatos marcantes>"
-    }
-  ],
-  "quest_flags": {
-    "<nome_da_flag>": "<valor detalhado>"
-  },
-  "diary": [
-    {
-      "chapter": <número>,
-      "title": "<título evocativo>",
-      "content": "<narração em terceira pessoa com estilo literário>"
-    }
-  ]
+  let prompt = `Analise meticulosamente toda a nossa conversa até agora. Você deve agir como um Arquivista de Mundos, extraindo não apenas fatos, mas a atmosfera, as nuances psicológicas e as ramificações de cada escolha. Extraia o máximo de detalhes possível para garantir a continuidade perfeita da narrativa, ${themeFocus[theme]}.\n\nGere um JSON com EXATAMENTE esta estrutura:\n\n{\n`;
+  prompt += `  "campaign_type": "${theme}",\n`;
+  prompt += `  "dnd_mode": ${isDnd},\n`;
+  prompt += `  "chapter": <número do capítulo atual>,\n`;
+  prompt += `  "current_location": "<nome exato do local onde a história está agora>",\n`;
+  prompt += `  "current_scene": "<detalhamento vívido da cena atual>",\n`;
+  prompt += `  "story_summary": "<resumo denso de 10 a 15 linhas>",\n`;
+
+  if (isDnd) {
+    prompt += `  "combat_state": { "is_active": false, "initiative_order": [], "current_turn_index": 0, "round": 1 },\n`;
+  }
+
+  prompt += `  "characters": {\n    "<Nome Exato Maiusculo e Minusculo>": {\n      "name": "<Nome Exato Maiusculo e Minusculo>",\n     "description": "<descrição física minuciosa>",\n      "traits": "<análise psicológica profunda>",\n      "status": "<vivo|morto|desaparecido|preso|inconsciente|outro>",\n      "notes": "<objetivos pessoais ocultos>"`;
+
+  if (isDnd) {
+    prompt += `,\n      "sheet": {\n        "classe": "<classe>", "raca": "<raça>", "nivel": 1, "xp": 0, "xp_proximo": 300,\n        "forca": 10, "destreza": 10, "constituicao": 10, "inteligencia": 10, "sabedoria": 10, "carisma": 10,\n        "vida_atual": 10, "vida_max": 10, "mana_atual": 0, "mana_max": 0, "ca": 10, "proficiencia": 2, "hit_die": 8,\n        "ouro": 0, "prata": 0, "cobre": 0,\n        "equipamentos": {"armadura": null, "escudo": null, "arma_principal": null, "amuleto": null},\n        "condicoes": [],\n        "death_saves_sucessos": 0, "death_saves_falhas": 0\n      },\n      "inventario": [\n        {"nome": "<nome_item>", "qtd": 1, "descricao": "<efeito>"}\n      ],\n      "habilidades": [\n        {"nome": "<nome_hab>", "descricao": "<efeito>", "custo_mana": 0, "dado": "1d6"}\n      ]`;
+  }
+
+  prompt += `\n    }\n  },\n  "locations": {\n    "<nome_em_lowercase>": {\n      "name": "<Nome do Local>",\n      "description": "<descrição sensorial completa>",\n      "details": "<pontos geográficos específicos>",\n      "notes": "<eventos passados ocorridos aqui>"\n    }\n  },\n  "events": [\n    {\n      "index": 1,\n      "summary": "<narração detalhada>",\n      "characters_involved": "<nomes separados por vírgula>",\n      "location": "<onde ocorreu>",\n      "consequence": "<consequência imediata e ramificações>"\n    }\n  ],\n  "party": [\n    {\n      "name": "<nome>",\n      "role": "<função ou classe>",\n      "notes": "<fatos marcantes>"\n    }\n  ],\n  "quest_flags": {\n    "<nome_da_flag>": "<valor detalhado>"\n  },\n  "diary": [\n    {\n      "chapter": <numero>,\n      "title": "<título evocativo>",\n      "content": "<narração em terceira pessoa com estilo literário>"\n    }\n  ]\n}\n\nResponda APENAS com o JSON, sem explicações, sem blocos de código markdown.`;
+
+  return prompt;
 }
 
-Responda APENAS com o JSON, sem explicações, sem blocos de código markdown.`.trim();
+function setImportTheme(theme) {
+  currentImportTheme = theme;
+  document.querySelectorAll('.import-tab').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.theme === theme);
+  });
+  document.getElementById('import-prompt-text').textContent = getImportPrompt(theme);
+  // Reseta feedback de cópia
+  const copyBtn = document.getElementById('copy-prompt-btn');
+  if (copyBtn) { copyBtn.textContent = 'Copiar'; copyBtn.style.color = ''; copyBtn.style.borderColor = ''; }
+}
 
 function openImportModal() {
-  document.getElementById('import-prompt-text').textContent = IMPORT_PROMPT;
   document.getElementById('import-json-input').value        = '';
   document.getElementById('import-campaign-name').value     = '';
   document.getElementById('import-json-status').textContent = '';
   document.getElementById('import-confirm-btn').disabled    = true;
   document.getElementById('import-confirm-btn').style.opacity = '0.4';
   document.getElementById('import-overlay').classList.remove('hidden');
+  // Preenche prompt com o tema padrão (D&D) e reseta abas
+  setImportTheme('dnd');
 }
 
 function closeImportModal() {
@@ -270,11 +262,12 @@ function closeImportModal() {
 }
 
 function copyImportPrompt() {
-  navigator.clipboard.writeText(IMPORT_PROMPT).then(() => {
+  const text = getImportPrompt(currentImportTheme);
+  navigator.clipboard.writeText(text).then(() => {
     const btn = document.getElementById('copy-prompt-btn');
     const old = btn.textContent;
-    btn.textContent    = 'Copiado!';
-    btn.style.color    = 'var(--green)';
+    btn.textContent       = 'Copiado!';
+    btn.style.color       = 'var(--green)';
     btn.style.borderColor = 'var(--green)';
     setTimeout(() => { btn.textContent = old; btn.style.color = ''; btn.style.borderColor = ''; }, 2000);
   });

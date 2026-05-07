@@ -242,6 +242,47 @@ textarea      { resize:vertical; min-height:80px; }
 #send-btn  { background:var(--gold-dim); border:none; border-radius:4px; color:#080b11; font-family:'Cinzel',serif; font-size:11px; font-weight:700; letter-spacing:0.1em; padding:11px 20px; cursor:pointer; height:46px; white-space:nowrap; transition:background 0.15s,box-shadow 0.15s; }
 #send-btn:hover    { background:var(--gold); box-shadow:0 0 12px rgba(200,168,75,0.25); }
 #send-btn:disabled { opacity:0.4; cursor:not-allowed; background:var(--border2); }
+
+/* Botão de abrir/fechar bandeja de dados (ao lado do textarea) */
+#dice-tray-btn {
+  flex-shrink: 0;
+  width: 46px;
+  height: 46px;
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: 4px;
+  font-size: 22px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  outline: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+  color: var(--text-dim);
+}
+#dice-tray-btn:hover {
+  border-color: var(--gold-dim);
+  background: rgba(200,168,75,0.08);
+  color: var(--text);
+  transform: translateY(-1px);
+}
+#dice-tray-btn.active {
+  background: rgba(200,168,75,0.15);
+  border-color: var(--gold);
+  color: var(--gold);
+  box-shadow: 0 0 12px rgba(200,168,75,0.25), inset 0 0 8px rgba(200,168,75,0.1);
+  transform: translateY(1px);
+}
+#dice-tray-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
 .input-hint { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--text-muted); margin-top:8px; text-align:center; }
 .cmd-menu-wrap { position:absolute; bottom:calc(100% + 6px); left:0; right:0; background:var(--bg2); border:1px solid var(--border2); border-radius:4px; overflow:hidden; box-shadow:0 -8px 32px rgba(0,0,0,0.5); z-index:10; max-height:320px; overflow-y:auto; }
 .cmd-menu-hdr  { padding:8px 14px 6px; font-family:'Cinzel',serif; font-size:9px; letter-spacing:0.15em; text-transform:uppercase; color:var(--gold-dim); border-bottom:1px solid var(--border); }
@@ -282,6 +323,259 @@ textarea      { resize:vertical; min-height:80px; }
 .import-copy-btn    { position:absolute; top:8px; right:8px; background:var(--bg2); border:1px solid var(--border2); border-radius:3px; color:var(--gold-dim); font-family:'Cinzel',serif; font-size:9px; letter-spacing:0.1em; padding:4px 10px; cursor:pointer; transition:all 0.15s; }
 .import-copy-btn:hover { border-color:var(--gold-dim); color:var(--gold); }
 
+/* Abas de tema do modal de importação */
+.import-tabs { display:flex; gap:6px; margin-bottom:16px; overflow-x:auto; padding-bottom:4px; scrollbar-width:thin; }
+.import-tabs::-webkit-scrollbar       { height:4px; }
+.import-tabs::-webkit-scrollbar-thumb { background:var(--border2); border-radius:2px; }
+.import-tab        { background:var(--bg3); border:1px solid var(--border2); border-radius:3px; color:var(--text-muted); font-family:'Cinzel',serif; font-size:10px; letter-spacing:0.1em; padding:6px 12px; cursor:pointer; white-space:nowrap; transition:all 0.15s; text-transform:uppercase; }
+.import-tab:hover  { border-color:var(--gold-dim); color:var(--gold); }
+.import-tab.active { background:rgba(200,168,75,0.1); border-color:var(--gold); color:var(--gold-bright); }
+
+/* ════════════ D&D — BARRAS DE VIDA E MANA ════════════ */
+
+/* Card D&D — estende o .char-card base */
+.dnd-char-card { border-color:rgba(68,136,204,0.18); }
+.dnd-char-card:hover { border-color:rgba(68,136,204,0.45) !important; background:rgba(68,136,204,0.04) !important; }
+
+/* Badge de Classe de Armadura */
+.dnd-ca {
+  margin-left:auto;
+  font-family:'JetBrains Mono',monospace;
+  font-size:10px;
+  color:#80b0d8;
+  padding:1px 7px;
+  background:rgba(68,136,204,0.12);
+  border:1px solid rgba(68,136,204,0.28);
+  border-radius:10px;
+  white-space:nowrap;
+  flex-shrink:0;
+}
+
+/* Container das barras */
+.stat-bar-wrap { margin-top:8px; }
+
+/* Linha de rótulo: "❤️ HP" à esquerda, "12/20" à direita */
+.stat-bar-label {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  font-family:'JetBrains Mono',monospace;
+  font-size:9px;
+  color:var(--text-muted);
+  text-transform:uppercase;
+  letter-spacing:0.05em;
+  margin-bottom:4px;
+}
+.stat-bar-label span:last-child {
+  color:var(--text-dim);
+  font-size:10px;
+  font-weight:500;
+}
+
+/* Trilho de fundo */
+.stat-bar-track {
+  height:7px;
+  background:rgba(255,255,255,0.05);
+  border-radius:4px;
+  overflow:hidden;
+  border:1px solid rgba(255,255,255,0.04);
+}
+
+/* Preenchimento genérico (cor vinda por inline style no JS) */
+.stat-bar-fill {
+  height:100%;
+  border-radius:4px;
+  transition:width 0.7s cubic-bezier(0.4,0,0.2,1), background 0.5s ease;
+}
+
+/* Barra de HP — degradê vermelho (cor base; pode ser sobrescrita pelo JS) */
+.hp-bar {
+  background:linear-gradient(90deg,#8b2222,#c44444);
+  box-shadow:0 0 8px rgba(196,68,68,0.35);
+}
+
+/* Barra de Mana — degradê azul */
+.mana-bar {
+  background:linear-gradient(90deg,#1a3d7a,#4488cc);
+  box-shadow:0 0 8px rgba(68,136,204,0.35);
+}
+
+/* Badges de Condições */
+.condition-badges {
+  display:flex;
+  flex-wrap:wrap;
+  gap:4px;
+  margin-top:8px;
+}
+.condition-badge {
+  font-family:'JetBrains Mono',monospace;
+  font-size:8px;
+  padding:2px 7px;
+  border-radius:10px;
+  background:rgba(196,68,68,0.14);
+  border:1px solid rgba(196,68,68,0.32);
+  color:#d88080;
+  text-transform:uppercase;
+  letter-spacing:0.06em;
+  white-space:nowrap;
+}
+
+/* ════════════ DADO VISUAL (DICE TRAY) ════════════ */
+
+/* Bloco destacado de rolagem de dado no balão do Mestre */
+.dice-roll-box {
+  display:inline-flex;
+  align-items:center;
+  gap:10px;
+  background:rgba(200,168,75,0.06);
+  border:1px solid rgba(200,168,75,0.22);
+  border-left:3px solid var(--gold-dim);
+  border-radius:6px;
+  padding:7px 14px 7px 12px;
+  margin:6px 0;
+  font-family:'JetBrains Mono',monospace;
+  font-size:12px;
+  line-height:1;
+  backdrop-filter:blur(2px);
+}
+
+/* Fórmula: "1d20 + 3 =" */
+.dice-formula {
+  color:#7a9aaa;
+  font-size:11px;
+  letter-spacing:0.03em;
+}
+
+/* Número do resultado */
+.dice-result {
+  font-family:'Cinzel',serif;
+  font-size:22px;
+  font-weight:700;
+  color:var(--gold-bright);
+  text-shadow:0 0 14px rgba(240,200,104,0.45);
+  line-height:1;
+  min-width:28px;
+  text-align:center;
+}
+
+/* Crítico natural — verde */
+.dice-result.dice-crit {
+  color:#5dd6a0;
+  text-shadow:0 0 18px rgba(74,170,128,0.7);
+}
+
+/* Falha crítica — vermelho */
+.dice-result.dice-fumble {
+  color:#e05858;
+  text-shadow:0 0 18px rgba(196,68,68,0.7);
+}
+
+/* Sufixo após o resultado ("🌟 CRÍTICO NATURAL", "💀 FALHA CRÍTICA") */
+.dice-suffix {
+  font-size:11px;
+  color:var(--text-muted);
+  letter-spacing:0.04em;
+}
+
+/* ════════════ TURN TRACKER — Rastreador de Turnos ════════════ */
+
+#turn-tracker {
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(196,68,68,0.06) 0%, rgba(8,11,17,0) 100%);
+  padding: 10px 40px;
+  overflow: hidden;
+}
+
+#turn-tracker-inner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 44px;
+}
+
+/* Label "⚔️ Rodada N" */
+.tt-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  font-family: 'Cinzel', serif;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--gold-dim);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.tt-sword { font-size: 14px; }
+
+/* Container das cartas — scroll horizontal em telas pequenas */
+#tt-cards {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  flex: 1;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+#tt-cards::-webkit-scrollbar { display: none; }
+
+/* Carta de personagem */
+.tt-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: 'Cinzel', serif;
+  font-size: 11px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--border2);
+  background: rgba(255,255,255,0.03);
+  color: var(--text-dim);
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.3s ease;
+}
+
+/* Turno ativo — destaque dourado com brilho */
+.tt-card.tt-active {
+  border-color: var(--gold);
+  background: rgba(200,168,75,0.14);
+  color: var(--gold-bright);
+  box-shadow: 0 0 14px rgba(200,168,75,0.3), inset 0 0 8px rgba(200,168,75,0.08);
+  font-weight: 600;
+  animation: ttPulse 2s ease infinite;
+}
+
+@keyframes ttPulse {
+  0%, 100% { box-shadow: 0 0 10px rgba(200,168,75,0.25), inset 0 0 6px rgba(200,168,75,0.06); }
+  50%       { box-shadow: 0 0 22px rgba(200,168,75,0.45), inset 0 0 12px rgba(200,168,75,0.12); }
+}
+
+/* Turnos já passados nesta rodada — esmaecidos */
+.tt-card.tt-past {
+  opacity: 0.35;
+}
+
+/* Seta de turno ativo */
+.tt-turn-arrow {
+  font-size: 8px;
+  color: var(--gold);
+  animation: ttArrow 0.8s ease infinite alternate;
+}
+@keyframes ttArrow {
+  from { transform: translateX(0); }
+  to   { transform: translateX(3px); }
+}
+
+/* Nome dentro da carta */
+.tt-card-name {
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* Mobile */
 #mobile-header { display:none !important; }
 @media (max-width:768px) {
@@ -299,9 +593,73 @@ textarea      { resize:vertical; min-height:80px; }
   #send-btn     { height:50px; padding:0 15px; font-size:12px; min-width:80px; }
   .menu-card    { max-width:none; }
   .menu-body    { padding:20px; }
+
+  /* D&D em mobile: dado um pouco menor */
+  .dice-result { font-size:18px; }
+  .dice-roll-box { gap:7px; padding:6px 10px 6px 10px; }
+
+  /* Turn Tracker mobile */
+  #turn-tracker { padding:8px 15px; }
+  .tt-label     { font-size:9px; }
+  .tt-card      { font-size:10px; padding:4px 10px; }
 }
 
 /* Esconder tags de pensamento */
 think {
     display: none;
 }
+
+/* ════════════ RESULTADO BRUTO DO MESTRE — Caixa "Mesa Pública" ════════════ */
+.dice-result-row { justify-content: flex-start; }
+
+.dice-result-log {
+  background: rgba(8,11,17,0.7);
+  border: 1px solid rgba(200,168,75,0.2);
+  border-left: 3px solid var(--gold-dim);
+  border-radius: 6px;
+  overflow: hidden;
+  max-width: 520px;
+  animation: msgIn 0.2s ease forwards;
+  margin-bottom: 12px;
+}
+
+.drl-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px 5px;
+  background: rgba(200,168,75,0.06);
+  border-bottom: 1px solid rgba(200,168,75,0.12);
+}
+
+.drl-label {
+  font-family: 'Cinzel', serif;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--gold-dim);
+}
+
+.drl-badge {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 2px 6px;
+}
+
+.drl-content {
+  padding: 10px 14px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--text-dim);
+  white-space: pre-wrap;
+}
+
+.drl-content .dice-roll-box { margin: 4px 0; padding: 5px 10px; }
+.drl-content .dice-result { font-size: 18px; }

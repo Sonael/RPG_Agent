@@ -1,9 +1,11 @@
 """
 tools.py
 Todas as ferramentas expostas ao agente de RPG.
+Inclui as ferramentas base de narrativa e as ferramentas D&D (tools_dnd.py).
 """
 
 import memory
+from tools_dnd import DND_TOOLS
 
 
 # ---------------------------------------------------------------------------
@@ -27,12 +29,18 @@ def save_character(
         status:      Estado atual (ex: vivo, morto, desaparecido, aliado, inimigo).
         notes:       Qualquer detalhe adicional relevante para a narrativa.
     """
-    memory.campaign["characters"][name.lower()] = {
-        "name":        name,
+    key = memory.char_key(name)
+    existing = memory.campaign["characters"].get(key, {})
+    memory.campaign["characters"][key] = {
+        "name":        existing.get("name", name),  # preserva capitalização original
         "description": description,
         "traits":      traits,
         "status":      status,
         "notes":       notes,
+        # Preserva campos D&D se já existirem (evita sobrescrever ficha com save_character)
+        "sheet":       existing.get("sheet"),
+        "inventario":  existing.get("inventario", []),
+        "habilidades": existing.get("habilidades", []),
     }
     memory.save_campaign()
     return f"Personagem '{name}' salvo na memória."
@@ -41,20 +49,50 @@ def save_character(
 def get_character(name: str) -> str:
     """
     Recupera os detalhes de um personagem pelo nome.
+    Se o personagem tiver ficha D&D, exibe também os atributos e recursos.
 
     Args:
         name: Nome do personagem a consultar.
     """
-    data = memory.campaign["characters"].get(name.lower())
+    data = memory.campaign["characters"].get(memory.char_key(name))
     if not data:
         return f"Nenhum personagem chamado '{name}' encontrado na memória."
-    return (
+
+    base = (
         f"[{data['name']}]\n"
         f"Descrição: {data['description']}\n"
         f"Traços: {data['traits']}\n"
         f"Status: {data['status']}\n"
         f"Notas: {data['notes']}"
     )
+
+    sheet = data.get("sheet")
+    if not sheet:
+        return base
+
+    # Resumo compacto da ficha D&D para consulta rápida durante o jogo
+    s = sheet
+    def _mod(v): return (v - 10) // 2
+    def _ms(v):
+        m = _mod(v)
+        return f"{v}({'+' if m >= 0 else ''}{m})"
+
+    sheet_summary = (
+        f"\n── Ficha D&D ──────────────────────\n"
+        f"  {s['classe']} {s['raca']} Nível {s['nivel']} | XP {s['xp']}/{s.get('xp_proximo', '?')}\n"
+        f"  ❤️  {s['vida_atual']}/{s['vida_max']}  ✨ {s['mana_atual']}/{s['mana_max']}  🛡️  CA {s['ca']}\n"
+        f"  FOR {_ms(s['forca'])}  DES {_ms(s['destreza'])}  CON {_ms(s['constituicao'])}\n"
+        f"  INT {_ms(s['inteligencia'])}  SAB {_ms(s['sabedoria'])}  CAR {_ms(s['carisma'])}\n"
+        f"  Prof: +{s['proficiencia']}"
+    )
+    habs = data.get("habilidades", [])
+    if habs:
+        sheet_summary += "\n  Habilidades: " + ", ".join(h["nome"] for h in habs)
+    inv = data.get("inventario", [])
+    if inv:
+        sheet_summary += "\n  Inventário: " + ", ".join(f"{i['nome']} x{i['qtd']}" for i in inv)
+
+    return base + sheet_summary
 
 
 def list_characters() -> str:
@@ -77,7 +115,7 @@ def update_character_status(name: str, new_status: str, notes: str = "") -> str:
         new_status: Novo estado (ex: ferido, morto, aliado confirmado).
         notes:      Notas adicionais a acrescentar (acumula, não substitui).
     """
-    data = memory.campaign["characters"].get(name.lower())
+    data = memory.campaign["characters"].get(memory.char_key(name))
     if not data:
         return f"Personagem '{name}' não encontrado. Use save_character primeiro."
     data["status"] = new_status
@@ -100,8 +138,9 @@ def add_party_member(name: str, role: str = "", notes: str = "") -> str:
         role:  Função no grupo (ex: guerreira, mago, ladino).
         notes: Detalhes adicionais sobre o membro.
     """
-    party = memory.campaign["party"]
-    if any(m["name"].lower() == name.lower() for m in party):
+    party    = memory.campaign["party"]
+    name_key = memory.char_key(name)
+    if any(memory.char_key(m["name"]) == name_key for m in party):
         return f"'{name}' já está no grupo."
     party.append({"name": name, "role": role, "notes": notes})
     memory.save_campaign()
@@ -115,9 +154,10 @@ def remove_party_member(name: str) -> str:
     Args:
         name: Nome do personagem a remover.
     """
-    party = memory.campaign["party"]
+    party    = memory.campaign["party"]
+    name_key = memory.char_key(name)
     original = len(party)
-    memory.campaign["party"] = [m for m in party if m["name"].lower() != name.lower()]
+    memory.campaign["party"] = [m for m in party if memory.char_key(m["name"]) != name_key]
     if len(memory.campaign["party"]) < original:
         memory.save_campaign()
         return f"'{name}' removido do grupo."
@@ -481,6 +521,46 @@ def get_scene_context(extra_characters: str = "", extra_locations: str = "") -> 
         lines  = [f"• #{e['index']}: {e['summary']} → {e['consequence']}" for e in recent]
         parts.append("Eventos recentes:\n" + "\n".join(lines))
 
+    # Status D&D da party (exibido apenas quando algum membro tem ficha)
+    party_names = {m["name"].lower() for m in c["party"]}
+    dnd_chars   = [
+        ch for key, ch in c["characters"].items()
+        if ch.get("sheet") and (key in party_names or ch["name"] == c.get("protagonist", ""))
+    ]
+    if dnd_chars:
+        def _bar(cur, mx, w=8):
+            pct = cur / mx if mx > 0 else 0
+            return "▓" * int(pct * w) + "░" * (w - int(pct * w))
+        def _warn(cur, mx):
+            if cur == 0:    return " ⚠️INCONSCIENTE"
+            if cur <= mx // 4: return " ⚠️CRÍTICO"
+            return ""
+        status_lines = []
+        for ch in dnd_chars:
+            s = ch["sheet"]
+            bar = _bar(s["vida_atual"], s["vida_max"])
+            status_lines.append(
+                f"  {ch['name']} Nv.{s['nivel']} {s['classe']}{_warn(s['vida_atual'], s['vida_max'])}"
+                f"  ❤️[{bar}]{s['vida_atual']}/{s['vida_max']}  ✨{s['mana_atual']}/{s['mana_max']}  🛡️CA{s['ca']}"
+            )
+        parts.append("Status D&D:\n" + "\n".join(status_lines))
+
+    # Estado de combate ativo (Iniciativa)
+    cs = c.get("combat_state", {})
+    if cs.get("is_active"):
+        order   = cs.get("initiative_order", [])
+        idx     = cs.get("current_turn_index", 0)
+        round_n = cs.get("round", 1)
+        current = order[idx] if order else "?"
+        order_str = " → ".join(
+            f"[{n}]" if i == idx else n for i, n in enumerate(order)
+        )
+        parts.append(
+            f"⚔️  COMBATE ATIVO — Rodada {round_n}\n"
+            f"   🎯 Vez de: {current}\n"
+            f"   Ordem: {order_str}"
+        )
+
     return "\n\n".join(parts)
 
 
@@ -593,4 +673,6 @@ ALL_TOOLS = [
     # Contexto (dinâmico e completo)
     get_scene_context,
     get_full_context,
+    # Ferramentas D&D (motor de regras)
+    *DND_TOOLS,
 ]

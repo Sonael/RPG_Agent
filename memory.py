@@ -19,8 +19,10 @@ campaign: dict = {}
 
 def _defaults() -> dict:
     return {
-        "name":                 "",    # nome da campanha (preenchido ao carregar)
+        "name":                 "",
         "campaign_type":        "fantasia",
+        "dnd_mode":             False,   # True quando o estilo for "dnd"
+        "protagonist":          "",      # Nome do personagem principal do jogador
         "characters":           {},
         "locations":            {},
         "events":               [],
@@ -32,7 +34,67 @@ def _defaults() -> dict:
         "quest_flags":          {},
         "party":                [],
         "diary":                [],
+        "combat_state": {
+            "is_active":           False,
+            "initiative_order":    [],
+            "current_turn_index":  0,
+            "round":               1,
+            "turn_resolved":       False,  # True após attack_roll/use_ability; False ao chamar next_turn
+        },
     }
+
+
+def _migrate_sheet_fields(char: dict) -> None:
+    """
+    Garante que fichas antigas (salvas antes da v2) tenham todos os campos
+    novos com valores padrão. Chamado automaticamente após load_campaign.
+    Nunca sobrescreve valores já existentes.
+    """
+    sheet = char.get("sheet")
+    if sheet is None:
+        return
+
+    defaults_v2 = {
+        "ouro":                 0,
+        "prata":                0,
+        "cobre":                0,
+        "equipamentos":         {"armadura": None, "escudo": None, "arma_principal": None, "amuleto": None},
+        "condicoes":            [],
+        "death_saves_sucessos": 0,
+        "death_saves_falhas":   0,
+    }
+
+    for key, default_val in defaults_v2.items():
+        if key not in sheet:
+            # Copiar para evitar objetos mutáveis compartilhados
+            import copy
+            sheet[key] = copy.deepcopy(default_val)
+
+
+def _migrate_combat_state() -> None:
+    """
+    Garante que campanhas antigas tenham o campo combat_state com estrutura completa.
+    """
+    defaults = {
+        "is_active":          False,
+        "initiative_order":   [],
+        "current_turn_index": 0,
+        "round":              1,
+        "turn_resolved":      False,
+    }
+    cs = campaign.setdefault("combat_state", {})
+    for key, val in defaults.items():
+        if key not in cs:
+            cs[key] = val
+
+
+def char_key(name: str) -> str:
+    """
+    Normaliza o nome de um personagem para uso como chave no dict `characters`.
+    Garante que 'Bandido Raso', 'bandido raso', 'Bandido_Raso' e '  Bandido Raso  '
+    sejam sempre tratados como a mesma chave — eliminando duplicatas e KeyErrors.
+    """
+    return name.lower().strip().replace("_", " ")
 
 
 def reset_campaign() -> None:
@@ -82,6 +144,13 @@ def load_campaign() -> bool:
         evts  = len(campaign["events"])
         diary = len(campaign["diary"])
         hist  = len(campaign["conversation_history"])
+
+        # Migra fichas antigas para incluir campos da v2 (ouro, condições, etc.)
+        for char in campaign["characters"].values():
+            _migrate_sheet_fields(char)
+
+        # Migra estrutura de estado de combate para campanhas antigas
+        _migrate_combat_state()
 
         print(
             f"Campanha carregada: {chars} personagens, {locs} locais, "

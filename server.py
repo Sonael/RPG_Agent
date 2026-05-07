@@ -462,6 +462,15 @@ def chat():
                                 args = dict(fc.args) if fc.args else {}
                                 kind = "write" if name in WRITE_TOOLS else "read"
                                 result_q.put(("tool_call", {"name": name, "args": args, "kind": kind}))
+
+                            # Captura o RETORNO da ferramenta executada pelo backend
+                            fr = getattr(part, "function_response", None)
+                            if fr and getattr(fr, "name", None):
+                                resp_dict = dict(fr.response) if fr.response else {}
+                                # O ADK injeta a string de retorno do Python na chave "result"
+                                conteudo = resp_dict.get("result", "")
+                                if conteudo:
+                                    result_q.put(("tool_result", {"tool_name": fr.name, "content": str(conteudo)}))
                                 
                     # Atualização de cota/tokens
                     if event.usage_metadata:
@@ -529,6 +538,10 @@ def chat():
                     # Registra a chamada de ferramenta (leitura ou escrita)
                     yield f"data: {json.dumps({'type': 'tool_call', 'tool': content})}\n\n"
 
+                elif kind == "tool_result":
+                    # Envia o resultado bruto da ferramenta direto para a interface
+                    yield f"data: {json.dumps({'type': 'tool_result', 'tool_name': content['tool_name'], 'content': content['content']})}\n\n"
+
                 elif kind == "quota_update":
                     # NOVIDADE: Envia os dados de consumo de tokens (RPM/TPM) para o painel de métricas
                     yield f"data: {json.dumps({'type': 'quota', 'content': content})}\n\n"
@@ -580,21 +593,46 @@ def chat():
 @app.route("/api/memory")
 @require_auth
 def get_memory_state():
-    c = memory.campaign
+    c  = memory.campaign
     ct = c.get("campaign_type", "fantasia")
+
+    all_chars_map = c.get("characters", {})
+
+    # Enriquece cada membro do party com dados completos (sheet, inventario, habilidades)
+    # vindos de characters — o array party só guarda {name, role, notes}
+    enriched_party = []
+    for member in c.get("party", []):
+        key  = member.get("name", "").lower().strip().replace("_", " ")
+        full = all_chars_map.get(key, {})
+        enriched_party.append({**full, **member})
+
+    # NPCs/personagens que já estão no party não aparecem de novo em "Personagens"
+    party_keys = {m.get("name", "").lower().strip() for m in c.get("party", [])}
+    chars_only = [
+        v for k, v in all_chars_map.items()
+        if v.get("name", "").lower().strip() not in party_keys
+    ]
+
     return jsonify({
         "campaign_type":    ct,
+        "dnd_mode":         c.get("dnd_mode", False),
         "campaign_config":  get_campaign_config(ct),
         "chapter":          c.get("chapter", 1),
         "current_location": c.get("current_location", ""),
         "current_scene":    c.get("current_scene", ""),
         "story_summary":    c.get("story_summary", ""),
         "quest_flags":      c.get("quest_flags", {}),
-        "party":            c.get("party", []),
-        "characters":       list(c.get("characters", {}).values()),
+        "party":            enriched_party,
+        "characters":       chars_only,
         "locations":        list(c.get("locations", {}).values()),
         "events":           c.get("events", []),
         "diary":            c.get("diary", []),
+        "combat_state":     c.get("combat_state", {
+            "is_active":          False,
+            "initiative_order":   [],
+            "current_turn_index": 0,
+            "round":              1,
+        }),
         "conversation_history": c.get("conversation_history", []),
     })
 
@@ -625,20 +663,35 @@ def import_campaign():
     if database.campaign_exists(g.user_id, name):
         return jsonify({"error": f"Já existe uma campanha com o nome '{name}'"}), 409
 
+    # Normaliza chaves do dict characters para lowercase (padrão char_key).
+    # Sem isso, uma campanha importada com "Sonael" e o backend buscando "sonael"
+    # cria entradas duplicadas a cada chamada de ferramenta.
+    raw_chars = campaign_data.get("characters", {})
+    normalized_chars = {
+        k.lower().strip().replace("_", " "): v
+        for k, v in raw_chars.items()
+    }
+
     payload = {
         "name":                 name,
         "campaign_type":        campaign_data.get("campaign_type", "fantasia"),
+        "dnd_mode":             campaign_data.get("dnd_mode", False),
+        "protagonist":          campaign_data.get("protagonist", ""),
         "chapter":              campaign_data.get("chapter", 1),
         "current_location":     campaign_data.get("current_location", ""),
         "current_scene":        campaign_data.get("current_scene", ""),
         "story_summary":        campaign_data.get("story_summary", ""),
         "quest_flags":          campaign_data.get("quest_flags", {}),
         "party":                campaign_data.get("party", []),
-        "characters":           campaign_data.get("characters", {}),
+        "characters":           normalized_chars,
         "locations":            campaign_data.get("locations", {}),
         "events":               campaign_data.get("events", []),
         "diary":                campaign_data.get("diary", []),
         "conversation_history": [],
+        "combat_state":         campaign_data.get("combat_state", {
+            "is_active": False, "initiative_order": [],
+            "current_turn_index": 0, "round": 1,
+        }),
     }
 
     database.save_campaign(g.user_id, name, payload)

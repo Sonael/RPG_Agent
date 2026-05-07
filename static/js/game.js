@@ -6,6 +6,30 @@ let maxRPD = parseInt(localStorage.getItem('rpg_max_rpd') || '500');
 let sessionRequests = parseInt(localStorage.getItem('rpg_daily_reqs') || '0');
 let sessionTokens = parseInt(localStorage.getItem('rpg_total_tokens') || '0');
 
+// ── Ferramentas que mudam estado visível na sidebar/HUD (HP, mana, turno) ──
+// Um refreshMemory() é disparado imediatamente ao receber o tool_result delas,
+// sem esperar o evento 'done', para que barras e turn-tracker reajam na hora.
+const STATE_TOOLS = new Set([
+  'modify_hp', 'modify_mana', 'attack_roll', 'use_ability',
+  'next_turn', 'roll_initiative', 'end_combat',
+  'apply_condition', 'remove_condition', 'short_rest', 'long_rest',
+  'roll_death_save', 'equip_item', 'unequip_item', 'set_stat',
+  'modify_currency', 'grant_xp',
+]);
+
+// ── D&D: ferramentas que envolvem dados — tratadas de forma especial ──
+const DICE_TOOL_NAMES = new Set([
+  'roll_dice', 'attack_roll', 'make_skill_check', 'use_ability',
+  'roll_death_save', 'grant_xp', 'short_rest', 'long_rest',
+  'modify_hp', 'modify_mana',
+]);
+
+// Flag para saber se o turno corrente usou ferramentas de dado
+let _pendingDiceTools = [];
+
+// ── Bandeja de dados do jogador ──
+let _diceTrayOpen = false;
+
 // ── Init ──
 document.addEventListener('DOMContentLoaded', async () => {
   if (!requireAuth()) return;
@@ -274,12 +298,49 @@ async function sendToAgent(text, registrar) {
           updateQuotaUI();
         }
         else if (ev.type === 'tool_call') {
-          pendingTools.push(ev.tool);
+          if (DICE_TOOL_NAMES.has(ev.tool.name)) {
+            // Ferramentas de dado: mostrar bloco de "dado em mesa" separado
+            _pendingDiceTools.push(ev.tool);
+          } else {
+            pendingTools.push(ev.tool);
+          }
+
+          // ── REFRESH ANTECIPADO ───────────────────────────────────────────
+          // Para ferramentas de estado, agenda um refresh leve com delay curto
+          // (300 ms) — tempo suficiente para o backend processar e salvar.
+          // Isso garante que HUD e barras atualizem mesmo se tool_result não
+          // for emitido pelo servidor.
+          if (STATE_TOOLS.has(ev.tool.name)) {
+            setTimeout(() => refreshMemory(), 400);
+          }
+        }
+        // Resultado bruto de ferramenta de dado, emitido pelo server.py
+        // (requer: yield sse_event('tool_result', {tool_name, content, is_dice_tool: True}))
+        else if (ev.type === 'tool_result') {
+          removeTyping(typId);
+          appendDiceResultLog(ev.tool_name, ev.content);
+
+          // ── ATUALIZAÇÃO REATIVA ──────────────────────────────────────────
+          // Se a ferramenta muda estado visível (HP, mana, turno), atualiza
+          // a sidebar e o HUD imediatamente, sem esperar o evento 'done'.
+          if (STATE_TOOLS.has(ev.tool_name)) {
+            refreshMemory();
+          }
         }
         else if (ev.type === 'text') {
+          // Esvazia chips de ferramentas narrativas
           if (pendingTools.length) {
             appendToolLog(pendingTools);
             pendingTools = [];
+          }
+          // Esvazia ferramentas de dado: extrai o resultado matemático do texto
+          // e exibe numa caixa "Resultado Bruto" antes da narrativa
+          if (_pendingDiceTools.length) {
+            const diceNames = _pendingDiceTools.map(t => t.name);
+            _pendingDiceTools = [];
+            removeTyping(typId);
+            renderDiceFromResponse(ev.content, diceNames);
+            return; // appendMaster é chamado dentro de renderDiceFromResponse
           }
           removeTyping(typId);
           appendMaster(ev.content);
@@ -312,19 +373,17 @@ async function sendToAgent(text, registrar) {
 }
 
 /**
- * Atualiza o painel visual de métricas na sidebar[cite: 2, 8].
+ * Atualiza o painel visual de métricas na sidebar.
  */
 function updateQuotaUI() {
   const reqEl = document.getElementById('stat-req');
   const tokEl = document.getElementById('stat-tokens');
   const barEl = document.getElementById('rpm-bar');
 
-  // Exibe o contador dinâmico (ex: 12 / 50 ou 12 / 2000)[cite: 8, 9]
   if (reqEl) reqEl.textContent = `${sessionRequests} / ${maxRPD}`;
   if (tokEl) tokEl.textContent = sessionTokens.toLocaleString();
 
   if (barEl) {
-    // O cálculo da barra agora usa o maxRPD vindo do backend[cite: 8]
     const dailyPercent = Math.min((sessionRequests / maxRPD) * 100, 100);
     barEl.style.width = dailyPercent + '%';
 
@@ -340,13 +399,28 @@ async function handleSlash(raw) {
   const cmd = raw.trim().toLowerCase();
 
   if (cmd === '/ajuda') {
+    const isDnd = window._lastMem
+      ? (window._lastMem.dnd_mode === true || window._lastMem.campaign_type === 'dnd')
+      : false;
+    const dndText = isDnd
+      ? '\n---\n### ⚔️ Comandos D&D (zero tokens)\n' +
+        '* **`/ficha [nome]`** · Atributos, CA e equipamentos\n' +
+        '* **`/inventario [nome]`** · Itens e moedas\n' +
+        '* **`/habilidades [nome]`** · Magias e poderes\n' +
+        '* **`/status`** · HP e Mana rápido do grupo\n' +
+        '* **`/condicoes [nome]`** · Condições ativas\n' +
+        '* **`/combate`** · Iniciativa e turno atual\n' +
+        '* **`/rolar <XdY+Z>`** · Rola dado local (ex: `/rolar 2d6+3`)'
+      : '';
+
     appendSystem(
       '## 📜 Comandos\n---\n' +
       '* **`/personagens`** · NPCs e status\n* **`/locais`** · Locais registrados\n' +
       '* **`/grupo`** · Companheiros\n* **`/flags`** · Decisões e estados\n' +
       '* **`/contexto`** · Memória completa\n* **`/diario`** · Crônicas\n' +
       '* **`/resumo`** · Recapitulação\n* **`/exportar`** · Exportar .md\n---\n' +
-      '* **`/salvar local <nome>`**\n* **`/salvar personagem <nome>`**\n* **`/salvar evento <desc>`**'
+      '* **`/salvar local <nome>`**\n* **`/salvar personagem <nome>`**\n* **`/salvar evento <desc>`**' +
+      dndText
     );
     return true;
   }
@@ -373,6 +447,183 @@ async function handleSlash(raw) {
     appendSystem(`### ✅ Exportado\n💾 \`${d.path.split('/').pop()}\``); return true;
   }
 
+  // ─────────────────────────────────────────────────────────────
+  //  Comandos D&D — processados localmente, zero tokens de LLM
+  // ─────────────────────────────────────────────────────────────
+
+  // Auxiliar: busca personagens alvo ou todo o grupo com ficha
+  // Auxiliar: busca personagens alvo ou todo o grupo com ficha
+  async function _getDndChars(targetName) {
+    const mem = await (await authFetch(`${API}/api/memory`)).json();
+    if (!(mem.dnd_mode === true || mem.campaign_type === 'dnd')) return { mem, chars: null };
+    
+    // Junta as duas listas para a busca: heróis e NPCs
+    const allChars = [...mem.party, ...mem.characters];
+    let chars;
+    
+    if (targetName) {
+      const c = allChars.find(ch => ch.name.toLowerCase() === targetName && ch.sheet);
+      chars = c ? [c] : [];
+    } else {
+      // Se não passar nome, retorna apenas o grupo de aventureiros (party)
+      chars = mem.party.filter(c => c.sheet);
+    }
+    return { mem, chars };
+  }
+
+  // Helper: modificador de atributo D&D
+  function _mod(val) { const m = Math.floor((val - 10) / 2); return (m >= 0 ? '+' : '') + m; }
+
+  // /ficha [nome]
+  if (cmd.startsWith('/ficha')) {
+    const target = raw.trim().split(' ').slice(1).join(' ').toLowerCase();
+    const { mem, chars } = await _getDndChars(target);
+    if (!chars) { appendSystem('Comando exclusivo do modo D&D.'); return true; }
+    if (!chars.length) { appendSystem(target ? `Nenhuma ficha D&D encontrada para '${target}'.` : 'Nenhum membro do grupo possui ficha D&D.'); return true; }
+
+    const text = chars.map(c => {
+      const s = c.sheet; const eq = s.equipamentos || {};
+      const conds = s.condicoes?.length ? s.condicoes.map(cd => cd.nome || cd).join(', ') : 'Nenhuma';
+      const hpBar = s.vida_max > 0 ? Math.round((s.vida_atual / s.vida_max) * 10) : 0;
+      const hpVis = '█'.repeat(hpBar) + '░'.repeat(10 - hpBar);
+      return (
+        `### 🛡️ Ficha — ${c.name}\n` +
+        `**Nível ${s.nivel} ${s.classe} (${s.raca})** · XP: ${s.xp}/${s.xp_proximo}\n\n` +
+        `❤️ \`${hpVis}\` ${s.vida_atual}/${s.vida_max} HP  ✨ ${s.mana_atual}/${s.mana_max} Mana  🛡️ CA ${s.ca}\n\n` +
+        `| FOR | DES | CON | INT | SAB | CAR |\n|-----|-----|-----|-----|-----|-----|\n` +
+        `| ${s.forca}(${_mod(s.forca)}) | ${s.destreza}(${_mod(s.destreza)}) | ${s.constituicao}(${_mod(s.constituicao)}) | ${s.inteligencia}(${_mod(s.inteligencia)}) | ${s.sabedoria}(${_mod(s.sabedoria)}) | ${s.carisma}(${_mod(s.carisma)}) |\n\n` +
+        `**Equipado:** Arma: ${eq.arma_principal || '—'} · Armadura: ${eq.armadura || '—'} · Escudo: ${eq.escudo || '—'} · Amuleto: ${eq.amuleto || '—'}\n\n` +
+        `**Condições:** ${conds}  |  **Saves de morte:** ✅ ${s.death_saves_sucessos || 0} / ❌ ${s.death_saves_falhas || 0}`
+      );
+    }).join('\n\n---\n\n');
+    appendSystem(text); return true;
+  }
+
+  // /inventario [nome]
+  if (cmd.startsWith('/inventario')) {
+    const target = raw.trim().split(' ').slice(1).join(' ').toLowerCase();
+    const { mem, chars } = await _getDndChars(target);
+    if (!chars) { appendSystem('Comando exclusivo do modo D&D.'); return true; }
+    if (!chars.length) { appendSystem(target ? `Nenhuma ficha encontrada para '${target}'.` : 'Nenhum membro do grupo possui ficha D&D.'); return true; }
+
+    const text = chars.map(c => {
+      const s = c.sheet; const inv = c.inventario || [];
+      const items = inv.length
+        ? inv.map(i => `* **${i.nome}** ×${i.qtd}${i.descricao ? ` — *${i.descricao}*` : ''}`).join('\n')
+        : '* Bolsa vazia';
+      return (
+        `### 🎒 Inventário — ${c.name}\n\n` +
+        `🪙 **${s.ouro || 0}** Ouro · 🥈 **${s.prata || 0}** Prata · 🟤 **${s.cobre || 0}** Cobre\n\n` +
+        `**Itens:**\n${items}`
+      );
+    }).join('\n\n---\n\n');
+    appendSystem(text); return true;
+  }
+
+  // /habilidades [nome]
+  if (cmd.startsWith('/habilidades')) {
+    const target = raw.trim().split(' ').slice(1).join(' ').toLowerCase();
+    const { mem, chars } = await _getDndChars(target);
+    if (!chars) { appendSystem('Comando exclusivo do modo D&D.'); return true; }
+    if (!chars.length) { appendSystem(target ? `Nenhuma ficha encontrada para '${target}'.` : 'Nenhum membro do grupo possui ficha D&D.'); return true; }
+
+    const text = chars.map(c => {
+      const habs = c.habilidades || [];
+      const list = habs.length
+        ? habs.map(h => `* **${h.nome}** · Dado: \`${h.dado}\` · Custo: ${h.custo_mana} mana\n  > *${h.descricao}*`).join('\n\n')
+        : '* Nenhuma habilidade aprendida.';
+      const mana = c.sheet ? `✨ Mana: **${c.sheet.mana_atual}/${c.sheet.mana_max}**` : '';
+      return `### ⚡ Habilidades — ${c.name}  ${mana}\n\n${list}`;
+    }).join('\n\n---\n\n');
+    appendSystem(text); return true;
+  }
+
+  // /status — HP e Mana de todo o grupo em uma linha por personagem
+  if (cmd === '/status') {
+    const { mem, chars } = await _getDndChars('');
+    if (!chars) { appendSystem('Comando exclusivo do modo D&D.'); return true; }
+    if (!chars.length) { appendSystem('Nenhum membro do grupo possui ficha D&D.'); return true; }
+
+    const lines = chars.map(c => {
+      const s = c.sheet;
+      const hpPct = s.vida_max > 0 ? Math.round((s.vida_atual / s.vida_max) * 100) : 0;
+      const hpIcon = hpPct > 60 ? '🟢' : hpPct > 30 ? '🟡' : '🔴';
+      const conds = s.condicoes?.length ? ` ⚠️ *${s.condicoes.map(cd => cd.nome || cd).join(', ')}*` : '';
+      return `${hpIcon} **${c.name}** — ❤️ ${s.vida_atual}/${s.vida_max} HP · ✨ ${s.mana_atual}/${s.mana_max} Mana · 🛡️ CA ${s.ca}${conds}`;
+    });
+    appendSystem(`### ⚔️ Status do Grupo\n\n${lines.join('\n')}`); return true;
+  }
+
+  // /condicoes [nome]
+  if (cmd.startsWith('/condicoes')) {
+    const target = raw.trim().split(' ').slice(1).join(' ').toLowerCase();
+    const { mem, chars } = await _getDndChars(target);
+    if (!chars) { appendSystem('Comando exclusivo do modo D&D.'); return true; }
+    if (!chars.length) { appendSystem(target ? `Nenhuma ficha encontrada para '${target}'.` : 'Nenhum membro do grupo possui ficha D&D.'); return true; }
+
+    const lines = chars.map(c => {
+      const conds = c.sheet?.condicoes || [];
+      if (!conds.length) return `**${c.name}** — ✅ Sem condições ativas`;
+      return `**${c.name}** — ${conds.map(cd => {
+        const nome = cd.nome || cd;
+        const dur  = cd.duracao !== undefined ? ` (${cd.duracao} turnos)` : '';
+        return `🔴 ${nome}${dur}`;
+      }).join(' · ')}`;
+    });
+    appendSystem(`### 🔴 Condições Ativas\n\n${lines.join('\n')}`); return true;
+  }
+
+  // /combate — estado da iniciativa sem chamar a IA
+  if (cmd === '/combate') {
+    const mem = window._lastMem || await (await authFetch(`${API}/api/memory`)).json();
+    const cs = mem.combat_state;
+    if (!cs || !cs.is_active) {
+      appendSystem('### ⚔️ Combate\n\n*Nenhum combate em andamento.*\nUse `/iniciar combate` ou aguarde o Mestre rolar iniciativa.');
+      return true;
+    }
+    const order = cs.initiative_order || [];
+    const idx   = cs.current_turn_index ?? 0;
+    const list  = order.map((n, i) => {
+      const arrow = i === idx ? ' **◀ VEZ ATUAL**' : i < idx ? ' ~~(já agiu)~~' : '';
+      return `${i + 1}. ${n}${arrow}`;
+    }).join('\n');
+    appendSystem(`### ⚔️ Combate em Andamento — Rodada ${cs.round}\n\n**Vez de:** ${order[idx] || '?'}\n\n**Ordem de iniciativa:**\n${list}`);
+    return true;
+  }
+
+  // /rolar <XdY+Z> — rola localmente sem gastar tokens
+  const mRolar = raw.match(/^\/rolar\s+(.+)/i);
+  if (mRolar) {
+    const formula = mRolar[1].trim();
+    // Suporta: 1d20, 2d6+3, d8-1, 4d4, 1d20+5
+    const rollRe = /^(\d*)d(\d+)([+-]\d+)?$/i;
+    const match  = formula.replace(/\s+/g, '').match(rollRe);
+    if (!match) {
+      appendSystem(`⚠️ Fórmula inválida: \`${formula}\`\nFormato: \`XdY\` ou \`XdY+Z\`  (ex: \`2d6+3\`, \`1d20\`, \`d8-1\`)`);
+      return true;
+    }
+    const numDice = parseInt(match[1] || '1');
+    const sides   = parseInt(match[2]);
+    const bonus   = parseInt(match[3] || '0');
+    if (numDice < 1 || numDice > 20 || sides < 2 || sides > 100) {
+      appendSystem('⚠️ Limites: 1–20 dados, d2–d100.'); return true;
+    }
+    const rolls  = Array.from({ length: numDice }, () => Math.floor(Math.random() * sides) + 1);
+    const rawSum = rolls.reduce((a, b) => a + b, 0);
+    const total  = rawSum + bonus;
+    const bonStr = bonus !== 0 ? ` ${bonus >= 0 ? '+' : ''}${bonus}` : '';
+    const rollStr = numDice > 1 ? `[${rolls.join(' + ')}]` : `${rolls[0]}`;
+    const isCrit   = sides === 20 && numDice === 1 && rolls[0] === 20;
+    const isFumble = sides === 20 && numDice === 1 && rolls[0] === 1;
+    const tag = isCrit ? ' 🌟 CRÍTICO NATURAL' : isFumble ? ' 💀 FALHA CRÍTICA' : '';
+    appendSystem(
+      `### 🎲 /rolar ${formula}\n\n` +
+      `Resultado: ${rollStr}${bonStr} = **${total}**${tag}\n\n` +
+      `*Rolado localmente — não enviado ao Mestre.*`
+    );
+    return true;
+  }
+
   if (cmd === '/resumo') {
     appendUser('📜 Solicitando recapitulação...');
     await sendToAgent('Faça um resumo dramático e imersivo de todos os eventos importantes. Use get_full_context para garantir precisão.', false);
@@ -394,14 +645,28 @@ async function handleSlash(raw) {
 //  Renderização de mensagens
 // ═══════════════════════════════════════
 const TOOL_META = {
+  // Narrativa
   get_character: '👤', get_location: '📍', get_scene_context: '🧭', get_full_context: '📚',
   get_recent_events: '📜', get_flag: '🚩', get_diary: '📖', list_characters: '👥',
   list_locations: '🗺️', list_party: '🫂', list_flags: '🚩', save_character: '💾',
   save_location: '💾', save_event: '💾', set_flag: '🔖', add_diary_entry: '✍️',
   update_character_status: '🔄', update_story_summary: '🔄', update_world_state: '🔄',
   add_party_member: '➕', remove_party_member: '➖', clear_flag: '🗑️',
+  // D&D — mecânica de dados
+  roll_dice: '🎲', attack_roll: '⚔️', make_skill_check: '🎯', use_ability: '⚡',
+  roll_death_save: '💀', modify_hp: '❤️', modify_mana: '✨', grant_xp: '⭐',
+  short_rest: '🛌', long_rest: '🌙',
+  // D&D — fichas e inventário
+  create_character_sheet: '📋', get_character_sheet: '📋', get_combat_status: '⚔️',
+  add_item: '📦', remove_item: '🗑️', list_inventory: '📦', learn_ability: '📖',
+  set_stat: '🔧',
+  // D&D v2
+  equip_item: '🗡️', unequip_item: '🗡️', apply_condition: '🔴',
+  remove_condition: '🟢', modify_currency: '💰',
 };
+
 const TOOL_LABEL = {
+  // Narrativa
   get_character: 'lendo personagem', get_location: 'lendo local', get_scene_context: 'verificando cena',
   get_full_context: 'carregando contexto', get_recent_events: 'consultando eventos', get_flag: 'verificando flag',
   get_diary: 'lendo diário', list_characters: 'listando personagens', list_locations: 'listando locais',
@@ -410,6 +675,20 @@ const TOOL_LABEL = {
   add_diary_entry: 'escrevendo no diário', update_character_status: 'atualizando personagem',
   update_story_summary: 'atualizando resumo', update_world_state: 'atualizando mundo',
   add_party_member: 'adicionando ao grupo', remove_party_member: 'removendo do grupo', clear_flag: 'removendo flag',
+  // D&D — mecânica de dados
+  roll_dice: 'rolando dado', attack_roll: 'resolvendo ataque', make_skill_check: 'teste de habilidade',
+  use_ability: 'usando habilidade', roll_death_save: 'teste de morte',
+  modify_hp: 'atualizando vida', modify_mana: 'atualizando mana', grant_xp: 'concedendo XP',
+  short_rest: 'descanso curto', long_rest: 'descanso longo',
+  // D&D — fichas e inventário
+  create_character_sheet: 'criando ficha', get_character_sheet: 'lendo ficha',
+  get_combat_status: 'status de combate', add_item: 'adicionando item',
+  remove_item: 'removendo item', list_inventory: 'listando inventário',
+  learn_ability: 'aprendendo habilidade', set_stat: 'ajustando atributo',
+  // D&D v2
+  equip_item: 'equipando item', unequip_item: 'desequipando item',
+  apply_condition: 'aplicando condição', remove_condition: 'removendo condição',
+  modify_currency: 'atualizando moedas',
 };
 
 function appendToolLog(tools) {
@@ -426,13 +705,179 @@ function appendToolLog(tools) {
   c.appendChild(w); scrollDown();
 }
 
+// ═══════════════════════════════════════
+//  Fix 2 — Transparência dos dados do Mestre
+// ═══════════════════════════════════════
+
+/**
+ * Padrões que identificam linhas de resultado matemático puro
+ * emitidas pelas ferramentas D&D (tools_dnd.py).
+ * Exemplos:
+ *   ⚔️  Aldric ataca Goblin com espada!
+ *   🎲 Teste de Destreza — CD 15
+ *      d20=14 +3(mod) = **17**
+ *   ❤️  Vida: 20 → 12/20
+ *   ✨ Mana: 10 → 8/10
+ */
+const DICE_RESULT_RE = /(?:🎲|⚔️|✨|❤️|⚡|💀|🌙|🛌|⭐)[^\n]*/g;
+
+/**
+ * Extrai linhas de resultado bruto do texto do Mestre e devolve
+ * { raw: string, narrative: string }.
+ * As linhas de dado ficam no topo como "Resultado Bruto".
+ */
+function splitDiceAndNarrative(text) {
+  const lines = text.split('\n');
+  const raw = [], narrative = [];
+
+  // Heurística: as primeiras linhas com emoji de mecânica D&D são resultado bruto.
+  // Assim que encontrar uma linha sem emoji mecânico após o bloco inicial, para.
+  let inRawBlock = true;
+  for (const line of lines) {
+    if (inRawBlock && /^[\s]*(?:🎲|⚔️|✨|❤️|⚡|💀|🌙|🛌|⭐|\s+d20=|\s+Dano:|\s+Custo:|\s+Cura:|\s+Vida:|[✅❌🌟💀⚠️])/.test(line)) {
+      raw.push(line);
+    } else {
+      inRawBlock = false;
+      narrative.push(line);
+    }
+  }
+  return {
+    raw: raw.join('\n').trim(),
+    narrative: narrative.join('\n').trim(),
+  };
+}
+
+/**
+ * Exibe bloco "Resultado Bruto" + narrativa separada.
+ * Chamado quando sabemos que uma ferramenta de dado foi usada.
+ */
+function renderDiceFromResponse(text, diceToolNames) {
+  const { raw, narrative } = splitDiceAndNarrative(text);
+
+  if (raw) {
+    // Mostra o resultado mecânico numa caixa "mesa pública"
+    appendDiceResultLog(diceToolNames[0] || 'roll_dice', raw);
+  }
+
+  // Narrativa restante
+  if (narrative) {
+    appendMaster(narrative);
+  } else if (!raw) {
+    // Fallback: texto não separável, exibe tudo como narrativa normal
+    appendMaster(text);
+  }
+}
+
+/**
+ * Caixa de "Resultado Bruto" — emitido pelo server ou extraído do texto.
+ * Simula a sensação de ver o dado cair na mesa.
+ */
+function appendDiceResultLog(toolName, content) {
+  const labels = {
+    attack_roll:      '⚔️ Ataque — Resultado da Mesa',
+    make_skill_check: '🎯 Teste de Habilidade — Mesa Pública',
+    roll_dice:        '🎲 Rolagem de Dado — Mesa Pública',
+    use_ability:      '⚡ Habilidade — Resultado da Mesa',
+    roll_death_save:  '💀 Teste de Morte — Mesa Pública',
+    modify_hp:        '❤️ Variação de Vida',
+    modify_mana:      '✨ Variação de Mana',
+    grant_xp:         '⭐ XP Concedido',
+    short_rest:       '🛌 Descanso Curto',
+    long_rest:        '🌙 Descanso Longo',
+  };
+  const label = labels[toolName] || '🎲 Resultado da Mesa';
+
+  const row = document.createElement('div');
+  row.className = 'msg-row dice-result-row';
+  row.innerHTML = `
+    <div class="dice-result-log">
+      <div class="drl-header">
+        <span class="drl-label">${label}</span>
+        <span class="drl-badge">resultado bruto</span>
+      </div>
+      <div class="drl-content">${processDiceRolls(escapeHtml(content))}</div>
+    </div>`;
+  document.getElementById('chat-history').appendChild(row);
+  scrollDown();
+}
+
+// ═══════════════════════════════════════
+//  Fix 1 — Bandeja de Dados do Jogador
+// ═══════════════════════════════════════
+
+function toggleDiceTray() {
+  if (waiting) return;
+  _diceTrayOpen = !_diceTrayOpen;
+  const tray = document.getElementById('dice-tray');
+  const btn  = document.getElementById('dice-tray-btn');
+  tray.classList.toggle('hidden', !_diceTrayOpen);
+  btn.classList.toggle('active', _diceTrayOpen);
+}
+
+/**
+ * Rola um dado do lado do cliente (Math.random — não editável pelo jogador)
+ * e envia o resultado ao agente como mensagem travada.
+ */
+function rollPlayerDie(sides) {
+  if (waiting) return;
+
+  const modifier = parseInt(document.getElementById('dice-modifier')?.value) || 0;
+  const rawRoll  = Math.floor(Math.random() * sides) + 1;
+  const total    = rawRoll + modifier;
+
+  const isCrit   = sides === 20 && rawRoll === 20;
+  const isFumble = sides === 20 && rawRoll === 1;
+
+  // Fecha a bandeja
+  if (_diceTrayOpen) toggleDiceTray();
+
+  // Renderiza o resultado visualmente (não editável)
+  appendPlayerRoll(sides, rawRoll, modifier, total, isCrit, isFumble);
+
+  // Monta mensagem para o agente — clara e não ambígua
+  const modText  = modifier !== 0 ? ` ${modifier >= 0 ? '+' : ''}${modifier} (modificador)` : '';
+  const critText = isCrit ? ' — CRÍTICO NATURAL!' : isFumble ? ' — FALHA CRÍTICA!' : '';
+  const msg = `[DADO DO JOGADOR — rolado pelo sistema, não editável] 1d${sides}${modText}: rolei ${rawRoll}, total ${total}${critText}`;
+
+  // Envia ao agente mas NÃO mostra como mensagem de usuário (já foi renderizado)
+  sendToAgent(msg, true);
+}
+
+/**
+ * Renderiza o resultado do dado do jogador como um card visual distinto
+ * que não pode ser confundido com texto digitado.
+ */
+function appendPlayerRoll(sides, rawRoll, modifier, total, isCrit, isFumble) {
+  const modStr = modifier !== 0
+    ? `<span class="pr-mod">${modifier >= 0 ? '+' : ''}${modifier}</span>`
+    : '';
+  const statusCls = isCrit ? 'pr-crit' : isFumble ? 'pr-fumble' : total >= Math.ceil(sides * 0.75) ? 'pr-high' : total <= Math.ceil(sides * 0.25) ? 'pr-low' : '';
+  const statusLabel = isCrit ? '🌟 CRÍTICO NATURAL' : isFumble ? '💀 FALHA CRÍTICA' : '';
+
+  const row = document.createElement('div');
+  row.className = 'msg-row player-roll-row';
+  row.innerHTML = `
+    <div class="player-roll-box ${statusCls}">
+      <div class="pr-die-face">d${sides}</div>
+      <div class="pr-center">
+        <div class="pr-eyebrow">🎲 Você rolou</div>
+        <div class="pr-total">${total}</div>
+        ${modifier !== 0 ? `<div class="pr-breakdown">dado ${rawRoll} ${modStr}</div>` : ''}
+      </div>
+      ${statusLabel ? `<div class="pr-status">${statusLabel}</div>` : ''}
+      <div class="pr-lock" title="Resultado gerado pelo sistema — não editável">🔒</div>
+    </div>`;
+  document.getElementById('chat-history').appendChild(row);
+  scrollDown();
+}
+
 function renderHistory(history) {
   history.forEach(e => {
     if (e.role === 'user') appendUser(e.text);
     else if (e.role === 'assistant') {
       const row = document.createElement('div'); row.className = 'msg-row master';
       const b = document.createElement('div'); b.className = 'msg-bubble'; b.style.opacity = '0.75';
-      b.innerHTML = marked.parse(e.text || '');
+      b.innerHTML = marked.parse(processDiceRolls(e.text || ''));
       row.innerHTML = '<div class="msg-label">Mestre</div>'; row.appendChild(b);
       document.getElementById('chat-history').appendChild(row);
     }
@@ -482,8 +927,59 @@ function updateTyping(id, msg) {
 
 function removeTyping(id) { document.getElementById(id)?.remove(); }
 
+// ═══════════════════════════════════════
+//  Dado Visual — pré-processamento de texto
+// ═══════════════════════════════════════
+
+/**
+ * Transforma linhas contendo 🎲 em blocos HTML estilizados.
+ * Deve ser chamado ANTES de marked.parse().
+ * Suporta formatos como:
+ *   🎲 1d20 + 3 = **18**
+ *   🎲 2d6: [4 + 2] = **6**
+ *   🎲 1d20 = **20** 🌟 CRÍTICO NATURAL
+ *   🎲 1d20 = **1** 💀 FALHA CRÍTICA
+ */
+function processDiceRolls(text) {
+  return text.replace(/(🎲[^\n]+)/g, (match) => {
+    // Detecta crítico / fumble — inclui variações com e sem espaço
+    const isCrit   = /CRÍTICO\s*NATURAL|🌟\s*CRÍTICO|🌟/.test(match);
+    const isFumble = /FALHA\s*CRÍTICA|💀\s*FALHA|💀/.test(match);
+    const resClass = isCrit ? 'dice-crit' : isFumble ? 'dice-fumble' : '';
+
+    // Extrai o número do resultado: = **N**
+    const numMatch = match.match(/=\s*\*\*(\d+)\*\*/);
+    if (!numMatch) return match; // sem resultado formatado → mantém original
+
+    const num = numMatch[1];
+
+    // Fórmula: tudo entre 🎲 e = **N**
+    const formulaMatch = match.match(/🎲\s*(.+?)\s*=\s*\*\*\d+\*\*/);
+    const formula = formulaMatch ? formulaMatch[1].trim() : '';
+
+    // Sufixo após = **N**
+    // 1. Captura tudo após o número
+    // 2. Remove espaços, vírgulas, pontos e pontos-e-vírgulas soltos
+    //    que não carregam sentido (ex: "= **17**," → suffix vazio)
+    // 3. Só renderiza se restar pelo menos um caractere alfanumérico ou emoji
+    const rawSuffix   = (match.match(/=\s*\*\*\d+\*\*\s*(.*)/) || [])[1] ?? '';
+    const suffix      = rawSuffix.trim().replace(/^[\s,;.]+|[\s,;.]+$/g, '');
+    const hasMeaning  = /[\p{L}\p{N}\p{Emoji_Presentation}]/u.test(suffix);
+
+    return (
+      `<div class="dice-roll-box">` +
+        `<span class="dice-formula">🎲 ${formula} =</span>` +
+        `<span class="dice-result ${resClass}">${num}</span>` +
+        (hasMeaning ? `<span class="dice-suffix">${suffix}</span>` : '') +
+      `</div>`
+    );
+  });
+}
+
 async function typewriter(el, text) {
-  el.innerHTML = marked.parse(text); el.style.opacity = '0';
+  // Pré-processa rolagens de dado antes do Markdown
+  el.innerHTML = marked.parse(processDiceRolls(text));
+  el.style.opacity = '0';
   let op = 0;
   const t = setInterval(() => { op = Math.min(1, op + 0.08); el.style.opacity = op; scrollDown(); if (op >= 1) clearInterval(t); }, 20);
 }
@@ -525,15 +1021,180 @@ function switchTab(name) {
 }
 
 function toggleSidebar(forceClose = false) {
-  const s = document.getElementById('sidebar'); const o = document.getElementById('sidebar-overlay');
-  if (forceClose || s.classList.contains('active')) { s.classList.remove('active'); o.classList.remove('active'); document.body.style.overflow = ''; }
-  else { s.classList.add('active'); o.classList.add('active'); document.body.style.overflow = 'hidden'; }
+  const s = document.getElementById('sidebar');
+  const o = document.getElementById('sidebar-overlay');
+
+  if (forceClose || s.classList.contains('active')) {
+    s.classList.remove('active');
+    o.classList.remove('active');
+    document.body.style.overflow = '';
+  } else {
+    s.classList.add('active');
+    o.classList.add('active');
+    document.body.style.overflow = 'hidden';
+  }
 }
 
 function applyCampaignConfig(cfg) {
   if (!cfg) return;
   window._campaignConfig = cfg;
   const pt = document.getElementById('sb-party-title'); if (pt) pt.textContent = cfg.party_label || 'Grupo';
+}
+
+// ═══════════════════════════════════════
+//  D&D — Card de Personagem com Barras
+// ═══════════════════════════════════════
+
+/**
+ * Constrói o HTML de um card de personagem no modo D&D.
+ * Exibe barras de HP (colorida por % de vida) e Mana (azul),
+ * badge de CA (Classe de Armadura) e badges de condições.
+ *
+ * @param {object} c    - objeto do personagem (com c.sheet opcional)
+ * @param {number} idx  - índice no array (para referência em window._lastMem)
+ * @param {string} type - 'party' | 'character'
+ */
+function buildDndCharCard(c, idx, type) {
+  const sheet = c.sheet || null;
+
+  // ── Dados da ficha ──
+  const hpCur  = sheet?.vida_atual  !== undefined ? sheet.vida_atual  : '?';
+  const hpMax  = sheet?.vida_max    !== undefined ? sheet.vida_max    : '?';
+  const manaCur = sheet?.mana_atual !== undefined ? sheet.mana_atual  : null;
+  const manaMax = sheet?.mana_max   !== undefined ? sheet.mana_max    : null;
+  const ca      = sheet?.ca !== undefined ? sheet.ca : null;
+  const condicoes = Array.isArray(sheet?.condicoes) ? sheet.condicoes : [];
+
+  // ── Porcentagens para largura das barras ──
+  const hpPct = (typeof hpMax === 'number' && hpMax > 0 && typeof hpCur === 'number')
+    ? Math.min(100, Math.max(0, (hpCur / hpMax) * 100))
+    : 0;
+  const manaPct = (typeof manaMax === 'number' && manaMax > 0 && typeof manaCur === 'number')
+    ? Math.min(100, Math.max(0, (manaCur / manaMax) * 100))
+    : 0;
+
+  // ── Cor da barra de HP: verde → dourado → vermelho conforme % ──
+  const hpGradient = hpPct > 60
+    ? 'linear-gradient(90deg,#2a6b48,#4aaa80)'   // saudável
+    : hpPct > 30
+      ? 'linear-gradient(90deg,#7a5f10,#c8a84b)' // ferido
+      : 'linear-gradient(90deg,#8b2222,#c44444)'; // crítico
+  const hpGlow = hpPct > 60
+    ? 'rgba(74,170,128,0.4)'
+    : hpPct > 30
+      ? 'rgba(200,168,75,0.4)'
+      : 'rgba(196,68,68,0.4)';
+
+  // ── Status badge ──
+  const st = (c.status || '').toLowerCase();
+  const stCls = st.includes('mort') ? 'dead' : st.includes('desapar') ? 'missing' : '';
+
+  // ── Referências para o modal de edição ──
+  const nameEsc = (c.name || '').replace(/'/g, "\\'");
+  const keyEsc  = type === 'party'
+    ? nameEsc
+    : (c.name || '').toLowerCase().replace(/'/g, "\\'");
+  const dataRef = type === 'party'
+    ? `window._lastMem.party[${idx}]`
+    : `window._lastMem.characters[${idx}]`;
+
+  // ── Monta o HTML ──
+  let html = `<div class="char-card editable dnd-char-card" onclick="openEditModal('${type}','${keyEsc}',${dataRef})">`;
+
+  // Cabeçalho: nome + status + CA
+  html += `<div class="char-name">${escapeHtml(c.name || '')}`;
+  if (c.status) html += `<span class="char-status ${stCls}">${escapeHtml(c.status)}</span>`;
+  if (ca !== null) html += `<span class="dnd-ca">🛡️ ${ca}</span>`;
+  html += `</div>`;
+
+  if (sheet) {
+    // Barra de HP
+    html += `
+      <div class="stat-bar-wrap">
+        <div class="stat-bar-label">
+          <span>❤️ HP</span>
+          <span>${hpCur}/${hpMax}</span>
+        </div>
+        <div class="stat-bar-track">
+          <div class="stat-bar-fill" style="width:${hpPct}%;background:${hpGradient};box-shadow:0 0 8px ${hpGlow};"></div>
+        </div>
+      </div>`;
+
+    // Barra de Mana (só se o personagem tiver mana definida)
+    if (manaMax !== null && manaMax > 0) {
+      html += `
+        <div class="stat-bar-wrap">
+          <div class="stat-bar-label">
+            <span>✨ Mana</span>
+            <span>${manaCur}/${manaMax}</span>
+          </div>
+          <div class="stat-bar-track">
+            <div class="stat-bar-fill mana-bar" style="width:${manaPct}%;"></div>
+          </div>
+        </div>`;
+    }
+
+    // Condições ativas
+    if (condicoes.length) {
+      html += `<div class="condition-badges">`;
+      condicoes.forEach(cd => {
+        html += `<span class="condition-badge">${escapeHtml(String(cd))}</span>`;
+      });
+      html += `</div>`;
+    }
+  } else {
+    // Fallback sem ficha: mostra notas ou descrição resumida
+    const desc = c.notes || c.description || '';
+    if (desc) {
+      html += `<div class="char-desc">${escapeHtml(desc.substring(0, 90))}${desc.length > 90 ? '…' : ''}</div>`;
+    }
+  }
+
+  html += `</div>`;
+  return html;
+}
+
+// ═══════════════════════════════════════
+//  Memória — refresh e render
+// ═══════════════════════════════════════
+
+// ═══════════════════════════════════════
+//  Turn Tracker — Rastreador de Turnos D&D
+// ═══════════════════════════════════════
+
+/**
+ * Renderiza o rastreador de turnos de iniciativa.
+ * Visível apenas durante combate ativo (combat_state.is_active === true).
+ * @param {object|null} cs - combat_state da memória
+ */
+function renderTurnTracker(cs) {
+  const tracker = document.getElementById('turn-tracker');
+  if (!tracker) return;
+
+  if (!cs || !cs.is_active || !cs.initiative_order || !cs.initiative_order.length) {
+    tracker.classList.add('hidden');
+    return;
+  }
+
+  tracker.classList.remove('hidden');
+
+  const roundEl = document.getElementById('tt-round');
+  if (roundEl) roundEl.textContent = `Rodada ${cs.round || 1}`;
+
+  const cards = document.getElementById('tt-cards');
+  if (!cards) return;
+
+  const order = cs.initiative_order;
+  const idx   = cs.current_turn_index ?? 0;
+
+  cards.innerHTML = order.map((name, i) => {
+    const isActive = i === idx;
+    const isPast   = i < idx;
+    return `<div class="tt-card ${isActive ? 'tt-active' : ''} ${isPast ? 'tt-past' : ''}" title="${escapeHtml(name)}">
+      <span class="tt-card-name">${escapeHtml(name)}</span>
+      ${isActive ? '<span class="tt-turn-arrow">▶</span>' : ''}
+    </div>`;
+  }).join('');
 }
 
 async function refreshMemory() {
@@ -553,25 +1214,59 @@ function renderMemory(mem) {
   document.getElementById('ws-location').textContent = mem.current_location || '—';
   document.getElementById('sb-summary').textContent = mem.story_summary || 'Nenhum resumo ainda.';
 
+  // ── Turn Tracker ──────────────────────────────────────────────────────────
+  renderTurnTracker(mem.combat_state);
+
   // Flags
   const fEl = document.getElementById('sb-flags');
   fEl.innerHTML = !Object.keys(mem.quest_flags).length ? '<span class="empty-state">Nenhuma flag ainda.</span>' :
     Object.entries(mem.quest_flags).map(([k, v]) => `<div class="flag-item editable" onclick="openEditModal('flag','${k}',{key:'${k}',value:'${v.replace(/'/g, "\\'")}'})"><span class="flag-key">${k}</span><span class="flag-val">${v}</span></div>`).join('');
 
-  // Grupo
+  // Detecta modo D&D
+  const isDnd = mem.dnd_mode === true || mem.campaign_type === 'dnd';
+
+  // Injeta os comandos D&D no autocomplete de forma dinâmica, evitando duplicatas
+  const dndCmds = ['/ficha', '/inventario', '/habilidades', '/status', '/condicoes', '/combate', '/rolar'];
+  COMMANDS.splice(0, COMMANDS.length, ...COMMANDS.filter(c => !dndCmds.includes(c.cmd)));
+  if (isDnd) {
+    COMMANDS.push(
+      { cmd: '/ficha',       arg: '[nome]',  desc: 'Atributos, CA e equipamentos' },
+      { cmd: '/inventario',  arg: '[nome]',  desc: 'Itens e moedas do alvo ou grupo' },
+      { cmd: '/habilidades', arg: '[nome]',  desc: 'Magias e poderes do alvo ou grupo' },
+      { cmd: '/status',      arg: '',        desc: 'HP e Mana rápido de todo o grupo' },
+      { cmd: '/condicoes',   arg: '[nome]',  desc: 'Condições ativas no alvo ou grupo' },
+      { cmd: '/combate',     arg: '',        desc: 'Ordem de iniciativa e turno atual' },
+      { cmd: '/rolar',       arg: '<XdY+Z>', desc: 'Rola uma fórmula local' },
+    );
+  }
+
+  // ── Grupo (party) ──
   const pEl = document.getElementById('sb-party');
-  pEl.innerHTML = !mem.party.length ? '<span class="empty-state">Nenhum membro ainda.</span>' :
-    mem.party.map((p, i) => `<div class="char-card editable" onclick="openEditModal('party','${p.name.replace(/'/g, "\\'")}',window._lastMem.party[${i}])"><div class="char-name">${p.name} <span class="char-status">${p.role}</span></div><div class="char-desc">${p.notes || ''}</div></div>`).join('');
+  pEl.innerHTML = !mem.party.length
+    ? '<span class="empty-state">Nenhum membro ainda.</span>'
+    : mem.party.map((p, i) => {
+        if (isDnd) return buildDndCharCard(p, i, 'party');
+        return `<div class="char-card editable" onclick="openEditModal('party','${p.name.replace(/'/g, "\\'")}',window._lastMem.party[${i}])">` +
+          `<div class="char-name">${p.name} <span class="char-status">${p.role || ''}</span></div>` +
+          `<div class="char-desc">${p.notes || ''}</div>` +
+          `</div>`;
+      }).join('');
 
-  // Personagens
+  // ── Personagens ──
   const cEl = document.getElementById('sb-chars');
-  cEl.innerHTML = !mem.characters.length ? '<span class="empty-state">Nenhum personagem ainda.</span>' :
-    mem.characters.map((c, i) => {
-      const st = c.status?.toLowerCase() || 'vivo'; const cls = st.includes('mort') ? 'dead' : st.includes('desapar') ? 'missing' : '';
-      return `<div class="char-card editable" onclick="openEditModal('character','${c.name.toLowerCase().replace(/'/g, "\\'")}',window._lastMem.characters[${i}])"><div class="char-name">${c.name}<span class="char-status ${cls}">${c.status}</span></div><div class="char-desc">${(c.description || '').substring(0, 100)}${(c.description || '').length > 100 ? '…' : ''}</div></div>`;
-    }).join('');
+  cEl.innerHTML = !mem.characters.length
+    ? '<span class="empty-state">Nenhum personagem ainda.</span>'
+    : mem.characters.map((c, i) => {
+        if (isDnd) return buildDndCharCard(c, i, 'character');
+        const st = c.status?.toLowerCase() || 'vivo';
+        const cls = st.includes('mort') ? 'dead' : st.includes('desapar') ? 'missing' : '';
+        return `<div class="char-card editable" onclick="openEditModal('character','${c.name.toLowerCase().replace(/'/g, "\\'")}',window._lastMem.characters[${i}])">` +
+          `<div class="char-name">${c.name}<span class="char-status ${cls}">${c.status}</span></div>` +
+          `<div class="char-desc">${(c.description || '').substring(0, 100)}${(c.description || '').length > 100 ? '…' : ''}</div>` +
+          `</div>`;
+      }).join('');
 
-  // Diário
+  // ── Diário ──
   const dEl = document.getElementById('sb-diary');
   dEl.innerHTML = !mem.diary.length ? '<span class="empty-state">Diário vazio.</span>' :
     [...mem.diary].reverse().slice(0, 8).map((d, i) => {
@@ -579,7 +1274,7 @@ function renderMemory(mem) {
       return `<div class="diary-entry editable" onclick="openEditModal('diary',null,window._lastMem.diary[${ri}],${ri})"><div class="diary-entry-title">Cap.${d.chapter} — ${d.title}</div><div class="diary-entry-content">${(d.content || '').substring(0, 160)}${(d.content || '').length > 160 ? '…' : ''}</div></div>`;
     }).join('');
 
-  // Locais
+  // ── Locais ──
   const lEl = document.getElementById('sb-locs');
   if (lEl) {
     const locs = mem.locations || [];
@@ -631,7 +1326,31 @@ function field(id, label, value, type = 'input', opts = {}) {
 
 function buildEditFields(type, data) {
   switch (type) {
-    case 'character': return field('name', 'Nome', data.name) + field('description', 'Descrição', data.description, 'textarea') + field('traits', 'Traços', data.traits, 'textarea', { rows: 2 }) + field('status', 'Status', data.status, 'select', { options: ['vivo', 'morto', 'ferido', 'desaparecido', 'preso', 'aliado', 'inimigo', 'exilado'] }) + field('notes', 'Notas', data.notes, 'textarea', { rows: 2 });
+    case 'character': {
+      let html = field('name', 'Nome', data.name)
+        + field('description', 'Descrição', data.description, 'textarea')
+        + field('traits', 'Traços', data.traits, 'textarea', { rows: 2 })
+        + field('status', 'Status', data.status, 'select', { options: ['vivo', 'morto', 'ferido', 'desaparecido', 'preso', 'aliado', 'inimigo', 'exilado'] })
+        + field('notes', 'Notas', data.notes, 'textarea', { rows: 2 });
+      if (data.sheet) {
+        const s = data.sheet;
+        html += `
+          <div style="border-top:1px solid var(--border);margin:12px 0 16px;padding-top:14px;">
+            <div style="font-family:'Cinzel',serif;font-size:10px;letter-spacing:0.15em;text-transform:uppercase;color:var(--gold-dim);margin-bottom:12px;">⚔️ Ficha D&D</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              ${field('sheet_vida_atual',  'HP Atual',      s.vida_atual  ?? 0)}
+              ${field('sheet_vida_max',    'HP Máximo',     s.vida_max    ?? 0)}
+              ${field('sheet_mana_atual',  'Mana Atual',    s.mana_atual  ?? 0)}
+              ${field('sheet_mana_max',    'Mana Máx',      s.mana_max    ?? 0)}
+              ${field('sheet_ca',          'CA (Armadura)', s.ca          ?? 0)}
+              ${field('sheet_xp',          'XP',            s.xp          ?? 0)}
+              ${field('sheet_ouro',        'Ouro',          s.ouro        ?? 0)}
+              ${field('sheet_prata',       'Prata',         s.prata       ?? 0)}
+            </div>
+          </div>`;
+      }
+      return html;
+    }
     case 'party': return field('name', 'Nome', data.name) + field('role', 'Função', data.role) + field('notes', 'Notas', data.notes, 'textarea', { rows: 2 });
     case 'location': return field('name', 'Nome', data.name) + field('description', 'Descrição', data.description, 'textarea') + field('details', 'Detalhes', data.details, 'textarea', { rows: 2 }) + field('notes', 'Notas', data.notes, 'textarea', { rows: 2 });
     case 'flag': return field('flag_key', 'Nome da Flag', data.key) + field('flag_value', 'Valor', data.value);
@@ -645,7 +1364,24 @@ function buildEditFields(type, data) {
 function getEditValues() {
   const v = id => (document.getElementById(`ef-${id}`)?.value || '').trim();
   switch (_editCtx.type) {
-    case 'character': return { name: v('name'), description: v('description'), traits: v('traits'), status: v('status'), notes: v('notes') };
+    case 'character': {
+      const base = { name: v('name'), description: v('description'), traits: v('traits'), status: v('status'), notes: v('notes') };
+      if (_editCtx.data.sheet) {
+        const numField = id => parseFloat(document.getElementById(`ef-${id}`)?.value) || 0;
+        base.sheet = {
+          ..._editCtx.data.sheet,
+          vida_atual: numField('sheet_vida_atual'),
+          vida_max:   numField('sheet_vida_max'),
+          mana_atual: numField('sheet_mana_atual'),
+          mana_max:   numField('sheet_mana_max'),
+          ca:         numField('sheet_ca'),
+          xp:         numField('sheet_xp'),
+          ouro:       numField('sheet_ouro'),
+          prata:      numField('sheet_prata'),
+        };
+      }
+      return base;
+    }
     case 'party': return { name: v('name'), role: v('role'), notes: v('notes') };
     case 'location': return { name: v('name'), description: v('description'), details: v('details'), notes: v('notes') };
     case 'flag': return { key: v('flag_key'), value: v('flag_value') };
@@ -671,6 +1407,13 @@ async function saveCurrentItem() {
   const res = await authFetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   if (res.ok) { closeEditModal(); refreshMemory(); showToast('Salvo com sucesso.'); }
   else { const e = await res.json(); await showAlert('Erro ao salvar', e.error || 'Erro desconhecido.', 'danger'); }
+}
+
+function clearAllViolations() {
+  const violationsDiv = document.getElementById('sb-violations');
+  if (violationsDiv) {
+    violationsDiv.innerHTML = '<span class="empty-state">Nenhuma violação detectada.</span>';
+  }
 }
 
 async function deleteCurrentItem() {
