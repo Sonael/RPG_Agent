@@ -1574,3 +1574,11 @@ async function deleteCurrentItem() {
   if (res.ok) { closeEditModal(); refreshMemory(); showToast('Deletado.'); }
   else await showAlert('Erro', 'Não foi possível remover.', 'danger');
 }
+
+// ── Limpa todas as violações do painel lateral (Escopo Global) ──
+window.clearAllViolations = function() {
+  const violationsDiv = document.getElementById('sb-violations');
+  if (violationsDiv) {
+    violationsDiv.innerHTML = '<span class="empty-state">Nenhuma violação detectada.</span>';
+  }
+};
