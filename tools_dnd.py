@@ -607,6 +607,27 @@ def _parse_dice(formula: str) -> tuple[int, int, int]:
         return 1, 6, 0
 
 
+def _normalize_sheet(sheet: dict) -> None:
+    """
+    Garante que todos os campos numéricos da ficha sejam int.
+    JSON importado pode trazer valores como strings — isso corrige silenciosamente.
+    Chamado em _get_char toda vez que uma ficha é acessada.
+    """
+    INT_FIELDS = (
+        "nivel", "xp", "xp_proximo", "proficiencia", "hit_die",
+        "vida_atual", "vida_max", "mana_atual", "mana_max", "ca",
+        "forca", "destreza", "constituicao", "inteligencia", "sabedoria", "carisma",
+        "ouro", "prata", "cobre",
+        "death_saves_sucessos", "death_saves_falhas",
+    )
+    for field in INT_FIELDS:
+        if field in sheet and not isinstance(sheet[field], int):
+            try:
+                sheet[field] = int(sheet[field])
+            except (ValueError, TypeError):
+                sheet[field] = 0
+
+
 def _get_char(name: str) -> tuple[dict | None, str]:
     """Retorna (char_dict, erro). char é None se não encontrado ou sem ficha."""
     char = memory.campaign["characters"].get(memory.char_key(name))
@@ -614,6 +635,7 @@ def _get_char(name: str) -> tuple[dict | None, str]:
         return None, f"Personagem '{name}' não encontrado."
     if not char.get("sheet"):
         return None, f"'{name}' não tem ficha D&D. Use create_character_sheet primeiro."
+    _normalize_sheet(char["sheet"])
     return char, ""
 
 

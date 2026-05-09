@@ -553,16 +553,35 @@
       width:96vw !important;
       max-width:96vw !important;
       max-height:92vh !important;
+      overflow-x:hidden !important;
     }
     /* Scroll do wizard mais compacto */
     #wizard-scroll {
-      padding:14px 14px !important;
+      padding:12px 12px !important;
+      overflow-x:hidden !important;
     }
-    /* Steps: texto menor */
+    /* Steps: texto menor, sem quebra */
     .wz-step-dot {
-      font-size:10px !important;
-      letter-spacing:0.03em !important;
-      padding:3px 6px !important;
+      font-size:9px !important;
+      letter-spacing:0.02em !important;
+      padding:3px 5px !important;
+      white-space:nowrap;
+    }
+    /* Selects não transbordam — texto truncado */
+    #wizard-box .cwc-body select {
+      max-width:100% !important;
+      overflow:hidden !important;
+      text-overflow:ellipsis !important;
+      white-space:nowrap !important;
+      box-sizing:border-box !important;
+    }
+    /* Grid items sem overflow */
+    .cwc-row2, .cwc-row3, .stat-grid {
+      min-width:0 !important;
+    }
+    .cwc-row2 > *, .cwc-row3 > * {
+      min-width:0 !important;
+      overflow:hidden !important;
     }
     /* Linha de 2 colunas vira 1 em mobile */
     .cwc-row2 {
@@ -597,10 +616,11 @@
     .stat-cell-mod {
       font-size:11px !important;
     }
-    /* Calc row D&D: texto menor */
+    /* Calc row D&D: wrap em telas pequenas */
     .dnd-calc-row {
-      gap:8px !important;
+      gap:6px !important;
       font-size:10px !important;
+      flex-wrap:wrap !important;
     }
     /* Botões wizard */
     #wz-back-btn, #wz-next-btn {
@@ -609,8 +629,37 @@
     }
     /* Linha nome+status do personagem */
     .cwc-body {
-      padding:12px !important;
-      gap:10px !important;
+      padding:10px !important;
+      gap:8px !important;
+    }
+    /* Header do card compacto */
+    .cwc-header {
+      padding:8px 10px !important;
+    }
+    /* Label do wizard menor */
+    .cwc-label {
+      font-size:8px !important;
+    }
+  }
+
+  /* Telas muito pequenas (≤380px) */
+  @media (max-width:380px) {
+    .stat-btn {
+      width:24px !important; height:24px !important;
+      font-size:16px !important;
+    }
+    .stat-val {
+      font-size:18px !important;
+    }
+    .dnd-calc-row {
+      font-size:9px !important;
+    }
+    .wz-step-dot {
+      font-size:8px !important;
+      padding:2px 4px !important;
+    }
+    #wizard-scroll {
+      padding:10px !important;
     }
   }
   </style>

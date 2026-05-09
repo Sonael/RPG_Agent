@@ -1394,7 +1394,6 @@ function buildEditFields(type, data) {
   switch (type) {
     case 'character': {
       let html = field('name', 'Nome', data.name);
-      // 'role' existe quando é membro do grupo (dados enriquecidos via party)
       if (data.role !== undefined) html += field('role', 'Função no Grupo', data.role);
       html += field('description', 'Descrição', data.description, 'textarea')
         + field('traits', 'Traços', data.traits, 'textarea', { rows: 2 })
@@ -1403,17 +1402,55 @@ function buildEditFields(type, data) {
       if (data.sheet) {
         const s = data.sheet;
         html += `
-          <div style="border-top:1px solid var(--border);margin:12px 0 16px;padding-top:14px;">
+          <div style="border-top:1px solid var(--border);margin:12px 0 8px;padding-top:14px;">
             <div style="font-family:'Cinzel',serif;font-size:10px;letter-spacing:0.15em;text-transform:uppercase;color:var(--gold-dim);margin-bottom:12px;">⚔️ Ficha D&D</div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-              ${field('sheet_vida_atual',  'HP Atual',      s.vida_atual  ?? 0)}
-              ${field('sheet_vida_max',    'HP Máximo',     s.vida_max    ?? 0)}
-              ${field('sheet_mana_atual',  'Mana Atual',    s.mana_atual  ?? 0)}
-              ${field('sheet_mana_max',    'Mana Máx',      s.mana_max    ?? 0)}
-              ${field('sheet_ca',          'CA (Armadura)', s.ca          ?? 0)}
-              ${field('sheet_xp',          'XP',            s.xp          ?? 0)}
-              ${field('sheet_ouro',        'Ouro',          s.ouro        ?? 0)}
-              ${field('sheet_prata',       'Prata',         s.prata       ?? 0)}
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+              ${field('sheet_classe',  'Classe', s.classe  ?? '')}
+              ${field('sheet_raca',    'Raça',   s.raca    ?? '')}
+              ${field('sheet_nivel',   'Nível',  s.nivel   ?? 1)}
+              ${field('sheet_xp',      'XP',     s.xp      ?? 0)}
+            </div>
+
+            <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--gold-dim);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;">Vida &amp; Mana</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+              ${field('sheet_vida_atual',   'HP Atual',   s.vida_atual   ?? 0)}
+              ${field('sheet_vida_max',     'HP Máximo',  s.vida_max     ?? 0)}
+              ${field('sheet_mana_atual',   'Mana Atual', s.mana_atual   ?? 0)}
+              ${field('sheet_mana_max',     'Mana Máx',   s.mana_max     ?? 0)}
+              ${field('sheet_ca',           'CA',         s.ca           ?? 0)}
+              ${field('sheet_proficiencia', 'Profic.',    s.proficiencia ?? 2)}
+            </div>
+
+            <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--gold-dim);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;">Atributos</div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px;">
+              ${field('sheet_forca',        'FOR', s.forca        ?? 10)}
+              ${field('sheet_destreza',     'DES', s.destreza     ?? 10)}
+              ${field('sheet_constituicao', 'CON', s.constituicao ?? 10)}
+              ${field('sheet_inteligencia', 'INT', s.inteligencia ?? 10)}
+              ${field('sheet_sabedoria',    'SAB', s.sabedoria    ?? 10)}
+              ${field('sheet_carisma',      'CAR', s.carisma      ?? 10)}
+            </div>
+
+            <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--gold-dim);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;">Moedas</div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px;">
+              ${field('sheet_ouro',  'Ouro',  s.ouro  ?? 0)}
+              ${field('sheet_prata', 'Prata', s.prata ?? 0)}
+              ${field('sheet_cobre', 'Cobre', s.cobre ?? 0)}
+            </div>
+
+            <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--gold-dim);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;">Equipamentos</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+              ${field('sheet_eq_armadura', 'Armadura',      (s.equipamentos?.armadura      ?? ''))}
+              ${field('sheet_eq_escudo',   'Escudo',        (s.equipamentos?.escudo        ?? ''))}
+              ${field('sheet_eq_arma',     'Arma Principal',(s.equipamentos?.arma_principal ?? ''))}
+              ${field('sheet_eq_amuleto',  'Amuleto',       (s.equipamentos?.amuleto       ?? ''))}
+            </div>
+
+            <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--gold-dim);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;">Death Saves</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+              ${field('sheet_ds_suc',  'Sucessos', s.death_saves_sucessos ?? 0)}
+              ${field('sheet_ds_fail', 'Falhas',   s.death_saves_falhas   ?? 0)}
             </div>
           </div>`;
       }
@@ -1434,20 +1471,45 @@ function getEditValues() {
   switch (_editCtx.type) {
     case 'character': {
       const base = { name: v('name'), description: v('description'), traits: v('traits'), status: v('status'), notes: v('notes') };
-      // Inclui 'role' se o personagem é membro do grupo (campo só existe nesse caso)
       if (_editCtx.data.role !== undefined) base.role = v('role');
       if (_editCtx.data.sheet) {
-        const numField = id => parseFloat(document.getElementById(`ef-${id}`)?.value) || 0;
+        const n = id => parseInt(document.getElementById(`ef-${id}`)?.value) || 0;
+        const f = id => (document.getElementById(`ef-${id}`)?.value || '').trim();
         base.sheet = {
           ..._editCtx.data.sheet,
-          vida_atual: numField('sheet_vida_atual'),
-          vida_max:   numField('sheet_vida_max'),
-          mana_atual: numField('sheet_mana_atual'),
-          mana_max:   numField('sheet_mana_max'),
-          ca:         numField('sheet_ca'),
-          xp:         numField('sheet_xp'),
-          ouro:       numField('sheet_ouro'),
-          prata:      numField('sheet_prata'),
+          // Identidade
+          classe:       f('sheet_classe').toLowerCase() || _editCtx.data.sheet.classe,
+          raca:         f('sheet_raca').toLowerCase()   || _editCtx.data.sheet.raca,
+          nivel:        n('sheet_nivel'),
+          xp:           n('sheet_xp'),
+          // Vida & Mana
+          vida_atual:   n('sheet_vida_atual'),
+          vida_max:     n('sheet_vida_max'),
+          mana_atual:   n('sheet_mana_atual'),
+          mana_max:     n('sheet_mana_max'),
+          ca:           n('sheet_ca'),
+          proficiencia: n('sheet_proficiencia'),
+          // Atributos
+          forca:        n('sheet_forca'),
+          destreza:     n('sheet_destreza'),
+          constituicao: n('sheet_constituicao'),
+          inteligencia: n('sheet_inteligencia'),
+          sabedoria:    n('sheet_sabedoria'),
+          carisma:      n('sheet_carisma'),
+          // Moedas
+          ouro:   n('sheet_ouro'),
+          prata:  n('sheet_prata'),
+          cobre:  n('sheet_cobre'),
+          // Equipamentos
+          equipamentos: {
+            armadura:      f('sheet_eq_armadura')  || null,
+            escudo:        f('sheet_eq_escudo')    || null,
+            arma_principal:f('sheet_eq_arma')      || null,
+            amuleto:       f('sheet_eq_amuleto')   || null,
+          },
+          // Death saves
+          death_saves_sucessos: n('sheet_ds_suc'),
+          death_saves_falhas:   n('sheet_ds_fail'),
         };
       }
       return base;
