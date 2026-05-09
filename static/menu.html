@@ -105,44 +105,8 @@
             <div style="padding:12px 14px;font-size:12px;color:var(--text-muted);font-style:italic;">Carregando...</div>
           </div>
 
-          <button class="btn-dashed" onclick="toggleNewCampaign()">+ Nova Campanha</button>
+          <button class="btn-dashed" onclick="openWizard()">+ Nova Campanha</button>
           <button class="btn-dashed blue" onclick="openImportModal()">↓ Importar de outro chat</button>
-
-          <!-- Formulário nova campanha -->
-          <div class="new-campaign-form" id="new-campaign-form">
-            <input type="text" id="new-campaign-name" placeholder="Nome da campanha..." style="margin-bottom:12px;">
-
-            <div class="section-label" style="margin-top:4px;">Início da história</div>
-            <div class="story-mode-grid">
-              <button class="story-mode-btn selected" id="mode-custom" onclick="setStoryMode('custom')">
-                Eu descrevo<br><span style="font-size:9px;opacity:0.7;">meu cenário</span>
-              </button>
-              <button class="story-mode-btn" id="mode-random" onclick="setStoryMode('random')">
-                Aleatória<br><span style="font-size:9px;opacity:0.7;">o Mestre cria</span>
-              </button>
-            </div>
-
-            <div id="story-custom-input" style="margin-top:10px;">
-              <textarea id="story-input" placeholder="Descreva o cenário, personagem, contexto..."></textarea>
-            </div>
-            <div id="story-random-input" class="hidden" style="margin-top:10px;">
-              <input type="text" id="genre-input" placeholder="Gênero: fantasia medieval, cyberpunk... (opcional)">
-            </div>
-          </div>
-        </div>
-
-        <!-- Estilo de RPG -->
-        <div class="menu-section" id="campaign-type-section" style="display:none;">
-          <div class="section-label">Estilo de RPG</div>
-          <select id="campaign-type-select">
-            <option value="dnd">🐉 D&amp;D / RPG Estruturado</option>
-            <option value="fantasia">⚔️ Fantasia / Aventura</option>
-            <option value="romance">💌 Romance / Drama</option>
-            <option value="horror">🕯️ Horror / Suspense</option>
-            <option value="misterio">🔍 Mistério / Investigação</option>
-            <option value="scifi">🚀 Ficção Científica / Cyberpunk</option>
-            <option value="faroeste">🤠 Faroeste / Velho Oeste</option>
-          </select>
         </div>
 
         <!-- Modelo -->
@@ -273,6 +237,383 @@
       </div>
     </div>
   </div>
+
+  <!-- ══════════════════════════════════════════════════════════
+       WIZARD DE CRIAÇÃO DE CAMPANHA
+  ══════════════════════════════════════════════════════════ -->
+  <div id="wizard-overlay" class="hidden" style="
+    position:fixed;inset:0;background:rgba(4,6,10,0.92);
+    display:flex;align-items:center;justify-content:center;
+    z-index:900;padding:16px;box-sizing:border-box;">
+
+    <div id="wizard-box" style="
+      background:var(--bg2);border:1px solid var(--border2);
+      border-radius:8px;width:100%;max-width:760px;
+      max-height:92vh;display:flex;flex-direction:column;
+      box-shadow:0 24px 80px rgba(0,0,0,0.7);overflow:hidden;">
+
+      <!-- Header -->
+      <div style="padding:20px 24px 16px;border-bottom:1px solid var(--border);flex-shrink:0;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+          <div style="font-family:'Cinzel',serif;font-size:18px;color:var(--gold);letter-spacing:0.05em;">Nova Campanha</div>
+          <button onclick="closeWizard()" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer;padding:4px 8px;">✕</button>
+        </div>
+        <!-- Step indicator -->
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div class="wz-step-dot active" id="wz-dot-1" onclick="wizardGoTo(1)">
+            <span>1</span><span style="margin-left:6px;font-size:11px;">Mundo &amp; História</span>
+          </div>
+          <div style="flex:1;height:1px;background:var(--border2);"></div>
+          <div class="wz-step-dot" id="wz-dot-2" onclick="wizardGoTo(2)">
+            <span>2</span><span style="margin-left:6px;font-size:11px;">Personagens</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Panels -->
+      <div style="flex:1;overflow-y:auto;padding:20px 24px;" id="wizard-scroll">
+
+        <!-- ── STEP 1: Mundo & História ── -->
+        <div id="wz-panel-1">
+
+          <!-- IA Cria -->
+          <div style="background:rgba(74,130,160,0.07);border:1px solid rgba(74,130,160,0.25);border-radius:6px;padding:14px 16px;margin-bottom:20px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+              <div style="font-family:'Cinzel',serif;font-size:11px;letter-spacing:0.1em;color:var(--blue);">✨ DEIXE O MESTRE CRIAR</div>
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text-dim);">
+                <input type="checkbox" id="wz-ai-toggle" onchange="toggleAiCreate(this.checked)" style="accent-color:var(--blue);">
+                Ativar
+              </label>
+            </div>
+            <div id="wz-ai-section" class="hidden">
+              <textarea id="wz-ai-prompt" rows="2" placeholder="Descreva a ideia básica. Ex: Um grupo de mercenários em um pântano maldito perseguindo um artefato roubado..." style="margin-bottom:8px;"></textarea>
+              <button onclick="generateLore()" id="wz-ai-btn" style="
+                background:rgba(74,130,160,0.2);border:1px solid var(--blue);
+                color:var(--blue);font-family:'Cinzel',serif;font-size:10px;
+                letter-spacing:0.08em;padding:7px 16px;border-radius:3px;cursor:pointer;">
+                ✨ Gerar com IA
+              </button>
+              <span id="wz-ai-status" style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted);margin-left:10px;"></span>
+            </div>
+            <div id="wz-ai-hint" style="font-size:12px;color:var(--text-muted);">Ative para deixar a IA gerar o resumo, cena e locais automaticamente a partir de uma ideia sua.</div>
+          </div>
+
+          <!-- Nome + Tipo -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+            <div>
+              <div class="section-label" style="margin-bottom:6px;">Nome da Campanha *</div>
+              <input type="text" id="wz-name" placeholder="Ex: A Maldição de Kael-Drak" oninput="wizardValidate()">
+            </div>
+            <div>
+              <div class="section-label" style="margin-bottom:6px;">Estilo de RPG *</div>
+              <select id="wz-type" onchange="onWizardTypeChange()">
+                <option value="dnd">🐉 D&amp;D / RPG Estruturado</option>
+                <option value="fantasia">⚔️ Fantasia / Aventura</option>
+                <option value="romance">💌 Romance / Drama</option>
+                <option value="horror">🕯️ Horror / Suspense</option>
+                <option value="misterio">🔍 Mistério / Investigação</option>
+                <option value="scifi">🚀 Ficção Científica / Cyberpunk</option>
+                <option value="faroeste">🤠 Faroeste / Velho Oeste</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Resumo -->
+          <div style="margin-bottom:16px;">
+            <div class="section-label" style="margin-bottom:6px;">Resumo da História</div>
+            <textarea id="wz-summary" rows="4" placeholder="Descreva o contexto, o que já aconteceu e a situação atual..."></textarea>
+          </div>
+
+          <!-- Cena Atual -->
+          <div style="margin-bottom:16px;">
+            <div class="section-label" style="margin-bottom:6px;">Cena Inicial <span style="color:var(--text-muted);font-size:10px;">(onde a história começa)</span></div>
+            <textarea id="wz-scene" rows="3" placeholder="Descreva a cena de abertura com detalhes sensoriais..."></textarea>
+          </div>
+
+          <!-- Local Atual -->
+          <div style="margin-bottom:20px;">
+            <div class="section-label" style="margin-bottom:6px;">Local Atual</div>
+            <input type="text" id="wz-location" placeholder="Ex: Pântano dos Sussurros">
+          </div>
+
+          <!-- Locais -->
+          <div style="margin-bottom:20px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+              <div class="section-label">Locais</div>
+              <button onclick="addWzLocation()" style="background:none;border:1px solid var(--border2);border-radius:3px;color:var(--gold-dim);font-size:11px;padding:4px 10px;cursor:pointer;">+ Adicionar</button>
+            </div>
+            <div id="wz-locations-list"></div>
+          </div>
+
+          <!-- Eventos -->
+          <div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+              <div class="section-label">Eventos Iniciais</div>
+              <button onclick="addWzEvent()" style="background:none;border:1px solid var(--border2);border-radius:3px;color:var(--gold-dim);font-size:11px;padding:4px 10px;cursor:pointer;">+ Adicionar</button>
+            </div>
+            <div id="wz-events-list"></div>
+          </div>
+        </div>
+
+        <!-- ── STEP 2: Personagens ── -->
+        <div id="wz-panel-2" class="hidden">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+            <div>
+              <div style="font-family:'Cinzel',serif;font-size:13px;color:var(--text);">Personagens &amp; Grupo</div>
+              <div id="wz-char-mode-hint" style="font-size:11px;color:var(--text-muted);margin-top:2px;"></div>
+            </div>
+            <button onclick="addWzChar()" style="
+              background:rgba(200,168,75,0.1);border:1px solid var(--gold-dim);
+              color:var(--gold);font-family:'Cinzel',serif;font-size:10px;
+              letter-spacing:0.08em;padding:7px 14px;border-radius:3px;cursor:pointer;">
+              + Personagem
+            </button>
+          </div>
+          <div id="wz-chars-list"></div>
+          <div id="wz-chars-empty" style="text-align:center;padding:32px;color:var(--text-muted);font-size:13px;">
+            Nenhum personagem ainda.<br>
+            <span style="font-size:11px;">Clique em "+ Personagem" para adicionar.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div style="padding:16px 24px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+        <button id="wz-back-btn" onclick="wizardBack()" style="
+          background:transparent;border:1px solid var(--border2);border-radius:3px;
+          color:var(--text-muted);font-family:'Cinzel',serif;font-size:10px;
+          letter-spacing:0.08em;padding:9px 18px;cursor:pointer;" class="hidden">
+          ← Voltar
+        </button>
+        <div style="display:flex;gap:8px;margin-left:auto;">
+          <div id="wz-err" style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--red);align-self:center;"></div>
+          <button id="wz-next-btn" onclick="wizardNext()" style="
+            background:var(--gold-dim);border:none;border-radius:3px;
+            color:#080b11;font-family:'Cinzel',serif;font-size:10px;
+            font-weight:700;letter-spacing:0.08em;padding:9px 22px;cursor:pointer;">
+            Próximo →
+          </button>
+          <button id="wz-create-btn" onclick="createCampaignFromWizard()" class="hidden" style="
+            background:var(--gold);border:none;border-radius:3px;
+            color:#080b11;font-family:'Cinzel',serif;font-size:11px;
+            font-weight:700;letter-spacing:0.08em;padding:9px 22px;cursor:pointer;">
+            ⚔️ Criar e Iniciar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <style>
+  /* Wizard styles */
+  .wz-step-dot {
+    display:flex;align-items:center;
+    font-family:'Cinzel',serif;font-size:11px;letter-spacing:0.06em;
+    color:var(--text-muted);cursor:pointer;padding:4px 8px;border-radius:4px;
+    transition:color 0.15s;
+  }
+  .wz-step-dot > span:first-child {
+    width:22px;height:22px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    background:var(--bg3);border:1px solid var(--border2);
+    font-size:11px;font-weight:700;transition:all 0.15s;flex-shrink:0;
+  }
+  .wz-step-dot.active { color:var(--gold); }
+  .wz-step-dot.active > span:first-child { background:var(--gold-dim);border-color:var(--gold);color:#080b11; }
+  .wz-step-dot.done > span:first-child { background:rgba(74,170,128,0.2);border-color:var(--green);color:var(--green); }
+
+  /* Character card in wizard */
+  .cwc {
+    border:1px solid var(--border2);border-radius:6px;margin-bottom:12px;overflow:hidden;
+    background:var(--bg);
+  }
+  .cwc-header {
+    display:flex;align-items:center;justify-content:space-between;
+    padding:10px 14px;cursor:pointer;background:var(--bg3);
+    border-bottom:1px solid var(--border);user-select:none;
+  }
+  .cwc-header:hover { background:rgba(255,255,255,0.04); }
+  .cwc-body { padding:16px;display:grid;gap:12px; }
+  .cwc-row2 { display:grid;grid-template-columns:1fr 1fr;gap:10px; }
+  .cwc-row3 { display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px; }
+  .cwc-label {
+    font-family:'JetBrains Mono',monospace;font-size:9px;
+    letter-spacing:0.1em;text-transform:uppercase;
+    color:var(--gold-dim);margin-bottom:4px;display:block;
+  }
+
+  /* Inputs e selects dentro do card de personagem */
+  #wizard-box .cwc-body input:not([type="checkbox"]):not([type="radio"]):not([type="number"]),
+  #wizard-box .cwc-body select,
+  #wizard-box .cwc-body textarea,
+  #wizard-box > div input:not([type="checkbox"]):not([type="radio"]):not([type="number"]) {
+    width:100%;
+    background:var(--bg3);
+    border:1px solid var(--border2);
+    border-radius:3px;
+    color:var(--text);
+    -webkit-text-fill-color:var(--text);
+    font-family:'Crimson Text',serif;
+    font-size:14px;
+    padding:8px 10px;
+    box-sizing:border-box;
+    outline:none;
+    transition:border-color 0.15s;
+    appearance:none;
+    -webkit-appearance:none;
+    min-height:unset;
+  }
+  #wizard-box .cwc-body input:not([type="checkbox"]):not([type="radio"]):not([type="number"]):focus,
+  #wizard-box .cwc-body select:focus,
+  #wizard-box .cwc-body textarea:focus {
+    border-color:var(--gold-dim);
+  }
+  #wizard-box .cwc-body textarea {
+    resize:vertical;
+    min-height:70px;
+    font-size:13px;
+    line-height:1.5;
+  }
+  #wizard-box .cwc-body select {
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23c8a84b'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;
+    background-position:right 10px center;
+    padding-right:28px;
+    cursor:pointer;
+  }
+
+  /* D&D stat block */
+  .stat-grid { display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-top:4px; }
+  .stat-cell {
+    background:var(--bg3);border:1px solid var(--border2);border-radius:4px;
+    padding:6px 4px;text-align:center;
+  }
+  .stat-cell-name {
+    font-family:'Cinzel',serif;font-size:9px;letter-spacing:0.06em;
+    color:var(--gold-dim);display:block;margin-bottom:4px;
+  }
+  .stat-cell input {
+    width:100%;background:transparent;border:none;
+    color:var(--text);
+    -webkit-text-fill-color:var(--text); /* iOS Safari: color não funciona em inputs */
+    opacity:1;                           /* iOS Safari: garante visibilidade */
+    font-family:'JetBrains Mono',monospace;font-size:15px;
+    font-weight:700;text-align:center;padding:0;min-height:unset;
+    outline:none;
+  }
+  .stat-cell-mod {
+    font-family:'JetBrains Mono',monospace;font-size:10px;
+    color:var(--text-muted);display:block;margin-top:2px;
+  }
+  /* Stepper +/− (modo Point Buy) */
+  .stat-stepper {
+    display:flex;align-items:center;justify-content:center;gap:2px;
+  }
+  .stat-btn {
+    width:20px;height:20px;flex-shrink:0;
+    background:var(--bg2);border:1px solid var(--border2);border-radius:3px;
+    color:var(--gold-dim);font-size:14px;line-height:1;
+    display:flex;align-items:center;justify-content:center;
+    cursor:pointer;padding:0;transition:all 0.12s;user-select:none;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .stat-btn:hover:not(:disabled) {
+    background:rgba(200,168,75,0.18);border-color:var(--gold-dim);color:var(--gold);
+  }
+  .stat-btn:active:not(:disabled) { transform:scale(0.88); }
+  .stat-btn:disabled { opacity:0.3;cursor:default; }
+  .stat-val {
+    font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;
+    color:var(--text);min-width:24px;display:block;text-align:center;
+  }
+  .dnd-calc-row {
+    display:flex;gap:14px;flex-wrap:wrap;padding:10px 12px;
+    background:rgba(200,168,75,0.05);border:1px solid rgba(200,168,75,0.15);
+    border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:11px;
+  }
+  .dnd-calc-item { color:var(--text-dim); }
+  .dnd-calc-item span { color:var(--gold);font-weight:700; }
+
+  /* Point buy budget */
+  .pb-budget {
+    padding:8px 12px;background:var(--bg3);border-radius:4px;
+    font-family:'JetBrains Mono',monospace;font-size:11px;
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  }
+
+  /* Location/event cards */
+  .wz-loc-card, .wz-evt-card {
+    border:1px solid var(--border);border-radius:5px;padding:12px;
+    margin-bottom:8px;background:var(--bg);position:relative;
+  }
+
+  /* ── Mobile: wizard responsivo ─────────────────────────── */
+  @media (max-width:520px) {
+    #wizard-box {
+      width:96vw !important;
+      max-width:96vw !important;
+      max-height:92vh !important;
+    }
+    /* Scroll do wizard mais compacto */
+    #wizard-scroll {
+      padding:14px 14px !important;
+    }
+    /* Steps: texto menor */
+    .wz-step-dot {
+      font-size:10px !important;
+      letter-spacing:0.03em !important;
+      padding:3px 6px !important;
+    }
+    /* Linha de 2 colunas vira 1 em mobile */
+    .cwc-row2 {
+      grid-template-columns:1fr !important;
+    }
+    /* Linha de 3 colunas vira 2 em mobile */
+    .cwc-row3 {
+      grid-template-columns:1fr 1fr !important;
+    }
+    /* Grade de atributos: 6→3 colunas, células maiores para toque */
+    .stat-grid {
+      grid-template-columns:repeat(3,1fr) !important;
+      gap:8px !important;
+    }
+    .stat-cell {
+      padding:10px 4px !important;
+    }
+    /* Stepper maior para toque */
+    .stat-btn {
+      width:28px !important; height:28px !important;
+      font-size:18px !important;
+    }
+    .stat-val {
+      font-size:20px !important; min-width:28px !important;
+    }
+    .stat-cell input {
+      font-size:20px !important;
+    }
+    .stat-cell-name {
+      font-size:10px !important;
+    }
+    .stat-cell-mod {
+      font-size:11px !important;
+    }
+    /* Calc row D&D: texto menor */
+    .dnd-calc-row {
+      gap:8px !important;
+      font-size:10px !important;
+    }
+    /* Botões wizard */
+    #wz-back-btn, #wz-next-btn {
+      padding:10px 16px !important;
+      font-size:11px !important;
+    }
+    /* Linha nome+status do personagem */
+    .cwc-body {
+      padding:12px !important;
+      gap:10px !important;
+    }
+  }
+  </style>
 
   <script src="/static/js/utils.js?v=2"></script>
   <script src="/static/js/menu.js?v=2"></script>

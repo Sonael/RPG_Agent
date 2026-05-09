@@ -294,6 +294,238 @@ textarea      { resize:vertical; min-height:80px; }
 .cmd-item-arg  { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--blue); white-space:nowrap; flex-shrink:0; }
 .cmd-item-desc { font-family:'Crimson Text',serif; font-size:13px; color:#7a9aaa; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
+
+/* ═══════════════════════════════════════════════════════
+   BANDEJA DE DADOS DO JOGADOR
+   ═══════════════════════════════════════════════════════ */
+
+/* Painel expandível da bandeja */
+#dice-tray {
+  padding: 10px 14px 12px;
+  background: var(--bg2);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.dice-tray-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  gap: 12px;
+}
+
+.dice-tray-title {
+  font-family: 'Cinzel', serif;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold-dim);
+  flex: 1;
+}
+
+.dice-tray-mod-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.dice-tray-mod-wrap label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.dice-tray-mod-wrap input[type="number"] {
+  width: 54px;
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: 3px;
+  color: var(--text);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+  padding: 4px 6px;
+  outline: none;
+  -moz-appearance: textfield;
+}
+.dice-tray-mod-wrap input[type="number"]::-webkit-inner-spin-button,
+.dice-tray-mod-wrap input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; }
+.dice-tray-mod-wrap input[type="number"]:focus { border-color: var(--gold-dim); }
+
+/* Grid de botões de dado */
+.dice-tray-dice {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.dice-btn {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: 4px;
+  padding: 7px 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  outline: none;
+  -webkit-appearance: none;
+}
+.dice-btn:hover {
+  background: rgba(200,168,75,0.1);
+  border-color: var(--gold-dim);
+  color: var(--gold);
+  transform: translateY(-1px);
+}
+.dice-btn:active {
+  transform: translateY(1px);
+  background: rgba(200,168,75,0.18);
+}
+
+/* d20 destaque dourado */
+.dice-btn-d20 {
+  color: var(--gold-dim);
+  border-color: rgba(200,168,75,0.35);
+  background: rgba(200,168,75,0.06);
+}
+.dice-btn-d20:hover {
+  color: var(--gold);
+  border-color: var(--gold);
+  background: rgba(200,168,75,0.15);
+  box-shadow: 0 0 8px rgba(200,168,75,0.2);
+}
+
+/* d% destaque diferente */
+.dice-btn-d100 {
+  color: var(--text-muted);
+}
+
+/* ═══════════════════════════════════════════════════════
+   RESULTADO DO DADO DO JOGADOR (card no chat)
+   ═══════════════════════════════════════════════════════ */
+
+.player-roll-row {
+  display: flex;
+  justify-content: flex-end;
+  padding: 6px 0;
+}
+
+.player-roll-box {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  padding: 10px 16px;
+  min-width: 180px;
+  max-width: 300px;
+  position: relative;
+  transition: border-color 0.2s;
+}
+
+/* Estados por resultado */
+.player-roll-box.pr-crit {
+  border-color: var(--gold);
+  background: rgba(200,168,75,0.08);
+  box-shadow: 0 0 16px rgba(200,168,75,0.2);
+}
+.player-roll-box.pr-fumble {
+  border-color: var(--red);
+  background: rgba(196,68,68,0.08);
+  box-shadow: 0 0 12px rgba(196,68,68,0.15);
+}
+.player-roll-box.pr-high {
+  border-color: rgba(100,180,100,0.5);
+}
+.player-roll-box.pr-low {
+  border-color: rgba(180,100,100,0.4);
+}
+
+/* Face do dado (d4, d20...) */
+.pr-die-face {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 7px;
+  letter-spacing: 0.06em;
+  flex-shrink: 0;
+}
+
+/* Área central com total */
+.pr-center {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+}
+
+.pr-eyebrow {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.pr-total {
+  font-family: 'Cinzel', serif;
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1;
+}
+.pr-crit  .pr-total { color: var(--gold); }
+.pr-fumble .pr-total { color: var(--red); }
+
+.pr-breakdown {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.pr-mod {
+  color: var(--blue);
+  font-weight: 700;
+}
+
+/* Label de crítico/fumble */
+.pr-status {
+  font-family: 'Cinzel', serif;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  color: var(--gold-dim);
+}
+.pr-fumble .pr-status { color: var(--red); }
+
+/* Cadeado — verificado pelo sistema */
+.pr-lock {
+  font-size: 14px;
+  flex-shrink: 0;
+  opacity: 0.5;
+  cursor: help;
+}
+
 /* Edit modal */
 #edit-overlay { position:fixed; inset:0; z-index:1100; background:rgba(0,0,0,0.85); display:flex; align-items:center; justify-content:center; backdrop-filter:blur(3px); }
 .edit-box     { background:var(--bg2); border:1px solid var(--border2); border-radius:4px; width:100%; max-width:460px; max-height:85vh; overflow-y:auto; box-shadow:0 0 60px rgba(0,0,0,0.8); }
@@ -579,29 +811,101 @@ textarea      { resize:vertical; min-height:80px; }
 /* Mobile */
 #mobile-header { display:none !important; }
 @media (max-width:768px) {
-  #mobile-header { display:flex !important; align-items:center; width:100%; padding:10px 15px; background:var(--bg); border-bottom:1px solid var(--border); position:sticky; top:0; z-index:1000; }
-  #mobile-menu-btn { background:none; border:none; color:var(--text); font-size:26px; cursor:pointer; padding:5px; margin-right:10px; }
-  #mobile-title    { font-family:'Cinzel',serif; font-size:15px; color:var(--gold); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  #sidebar { position:fixed; left:-280px; top:0; bottom:0; width:280px; z-index:1001; transition:transform 0.3s cubic-bezier(0.4,0,0.2,1); }
-  #sidebar.active { transform:translateX(280px); box-shadow:10px 0 30px rgba(0,0,0,0.8); }
-  #sidebar-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:1000; display:none; backdrop-filter:blur(2px); cursor:pointer; }
+  /* ── Layout base ────────────────────────────────────── */
+  #mobile-header {
+    display:flex !important; align-items:center; width:100%;
+    padding:10px 15px; background:var(--bg);
+    border-bottom:1px solid var(--border);
+    position:sticky; top:0; z-index:1000;
+  }
+  #mobile-menu-btn {
+    background:none; border:none; color:var(--text);
+    font-size:26px; cursor:pointer; padding:5px; margin-right:10px;
+  }
+  #mobile-title {
+    font-family:'Cinzel',serif; font-size:15px; color:var(--gold);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+
+  /* ── Sidebar ────────────────────────────────────────── */
+  #sidebar {
+    position:fixed; left:-300px; top:0; bottom:0; width:300px;
+    z-index:1001; transition:transform 0.3s cubic-bezier(0.4,0,0.2,1);
+  }
+  #sidebar.active { transform:translateX(300px); box-shadow:10px 0 30px rgba(0,0,0,0.8); }
+  #sidebar-overlay {
+    position:fixed; inset:0; background:rgba(0,0,0,0.7);
+    z-index:1000; display:none; backdrop-filter:blur(2px); cursor:pointer;
+  }
   #sidebar-overlay.active { display:block; }
-  #chat-history { padding:15px; }
-  .msg-bubble   { max-width:92%; font-size:16px; }
-  #input-area   { padding:10px 10px 30px; }
-  #chat-input   { height:50px !important; min-height:50px; padding:12px; font-size:14px; overflow-y:hidden; }
-  #send-btn     { height:50px; padding:0 15px; font-size:12px; min-width:80px; }
-  .menu-card    { max-width:none; }
-  .menu-body    { padding:20px; }
 
-  /* D&D em mobile: dado um pouco menor */
-  .dice-result { font-size:18px; }
-  .dice-roll-box { gap:7px; padding:6px 10px 6px 10px; }
+  /* ── Chat ───────────────────────────────────────────── */
+  #chat-history { padding:12px; }
+  .msg-bubble   { max-width:95%; font-size:15px; line-height:1.65; }
+  .msg-row.you  { justify-content:flex-end; }
+  .you .msg-bubble { font-size:14px; }
 
-  /* Turn Tracker mobile */
-  #turn-tracker { padding:8px 15px; }
-  .tt-label     { font-size:9px; }
-  .tt-card      { font-size:10px; padding:4px 10px; }
+  /* ── Input area ─────────────────────────────────────── */
+  #input-area { padding:8px 8px 24px; }
+  .input-row  { gap:6px; }
+  #chat-input {
+    height:46px !important; min-height:46px;
+    padding:10px 12px; font-size:14px; overflow-y:hidden;
+  }
+  #send-btn     { height:46px; padding:0 14px; font-size:12px; min-width:72px; }
+  #dice-tray-btn { width:46px; height:46px; font-size:22px; flex-shrink:0; }
+  .input-hint   { font-size:10px; margin-top:4px; }
+
+  /* ── Bandeja de dados (mobile) ──────────────────────── */
+  #dice-tray { padding:8px 10px 10px; }
+  .dice-tray-header { flex-wrap:wrap; gap:6px; margin-bottom:8px; }
+  .dice-tray-title  { font-size:9px; }
+  .dice-tray-dice   { gap:5px; }
+  .dice-btn {
+    font-size:11px; padding:8px 10px;
+    min-width:38px; flex:1;
+  }
+  .dice-tray-mod-wrap input[type="number"] {
+    width:48px; font-size:12px;
+  }
+
+  /* Resultado do dado do jogador (mobile) */
+  .player-roll-box { min-width:0; padding:8px 12px; gap:10px; }
+  .pr-total { font-size:22px; }
+  .pr-die-face { font-size:10px; }
+
+  /* ── Turn tracker (mobile) ──────────────────────────── */
+  #turn-tracker { padding:7px 12px; }
+  #turn-tracker-inner { gap:8px; }
+  .tt-label    { font-size:9px; flex-shrink:0; }
+  .tt-card     { font-size:10px; padding:4px 8px; }
+  .tt-card-name { max-width:60px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #tt-cards    { gap:4px; overflow-x:auto; padding-bottom:2px; flex-wrap:nowrap; }
+
+  /* ── Cards D&D (sidebar mobile) ─────────────────────── */
+  .dnd-char-card { padding:10px 12px; }
+  .char-card-name { font-size:13px; }
+  .stat-bar-wrap  { margin-top:6px; }
+
+  /* ── Caixa de resultado bruto ────────────────────────── */
+  .dice-result-log { max-width:100%; }
+  .drl-content { font-size:10px; padding:8px 10px; }
+
+  /* ── Edit modal (mobile) ─────────────────────────────── */
+  .edit-box {
+    width:96vw !important; max-width:96vw !important;
+    max-height:90vh !important;
+    border-radius:8px;
+  }
+  .edit-header { padding:12px 14px; }
+  .edit-body   { padding:12px 14px; }
+  .edit-footer { padding:10px 14px; }
+
+  /* ── Misc ────────────────────────────────────────────── */
+  .menu-card { max-width:none; }
+  .menu-body { padding:20px; }
+  .dice-result    { font-size:18px; }
+  .dice-roll-box  { gap:7px; padding:6px 10px; }
 }
 
 /* Esconder tags de pensamento */

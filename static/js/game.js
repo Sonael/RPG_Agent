@@ -6,9 +6,16 @@ let maxRPD = parseInt(localStorage.getItem('rpg_max_rpd') || '500');
 let sessionRequests = parseInt(localStorage.getItem('rpg_daily_reqs') || '0');
 let sessionTokens = parseInt(localStorage.getItem('rpg_total_tokens') || '0');
 
+// ── D&D: ferramentas que envolvem dados — tratadas de forma especial ──
+const DICE_TOOL_NAMES = new Set([
+  'roll_dice', 'attack_roll', 'make_skill_check', 'use_ability',
+  'roll_death_save', 'grant_xp', 'short_rest', 'long_rest',
+  'modify_hp', 'modify_mana',
+]);
+
 // ── Ferramentas que mudam estado visível na sidebar/HUD (HP, mana, turno) ──
-// Um refreshMemory() é disparado imediatamente ao receber o tool_result delas,
-// sem esperar o evento 'done', para que barras e turn-tracker reajam na hora.
+// Um refreshMemory() é disparado ao receber o tool_result delas para que
+// barras de HP, mana e o turn tracker reajam imediatamente.
 const STATE_TOOLS = new Set([
   'modify_hp', 'modify_mana', 'attack_roll', 'use_ability',
   'next_turn', 'roll_initiative', 'end_combat',
@@ -17,12 +24,37 @@ const STATE_TOOLS = new Set([
   'modify_currency', 'grant_xp',
 ]);
 
-// ── D&D: ferramentas que envolvem dados — tratadas de forma especial ──
-const DICE_TOOL_NAMES = new Set([
-  'roll_dice', 'attack_roll', 'make_skill_check', 'use_ability',
-  'roll_death_save', 'grant_xp', 'short_rest', 'long_rest',
-  'modify_hp', 'modify_mana',
-]);
+// ── Ícones e cores para condições D&D ────────────────────────────────────
+const COND_ICONS = {
+  'cego': '👁️', 'envenenado': '🟢', 'amedrontado': '😨',
+  'paralisado': '⚡', 'atordoado': '💫', 'inconsciente': '💀',
+  'enfeitiçado': '🔮', 'exausto': '😓', 'deitado': '⬇️',
+  'invisível': '👻', 'petrificado': '🪨', 'amaldiçoado': '🖤',
+  'restrito': '🔗', 'em chamas': '🔥', 'sangrando': '🩸',
+};
+const COND_COLOR = {
+  'paralisado':  { bg:'rgba(196,68,68,0.22)',  border:'rgba(196,68,68,0.55)',  text:'#e08080' },
+  'inconsciente':{ bg:'rgba(196,68,68,0.22)',  border:'rgba(196,68,68,0.55)',  text:'#e08080' },
+  'petrificado': { bg:'rgba(196,68,68,0.22)',  border:'rgba(196,68,68,0.55)',  text:'#e08080' },
+  'atordoado':   { bg:'rgba(200,130,40,0.22)', border:'rgba(200,130,40,0.55)', text:'#e0a060' },
+  'amedrontado': { bg:'rgba(200,130,40,0.22)', border:'rgba(200,130,40,0.55)', text:'#e0a060' },
+  'restrito':    { bg:'rgba(200,130,40,0.22)', border:'rgba(200,130,40,0.55)', text:'#e0a060' },
+  'cego':        { bg:'rgba(200,130,40,0.22)', border:'rgba(200,130,40,0.55)', text:'#e0a060' },
+  'em chamas':   { bg:'rgba(200,130,40,0.22)', border:'rgba(200,130,40,0.55)', text:'#e0a060' },
+  'envenenado':  { bg:'rgba(120,160,40,0.22)', border:'rgba(120,160,40,0.55)', text:'#a0c060' },
+  'exausto':     { bg:'rgba(120,160,40,0.22)', border:'rgba(120,160,40,0.55)', text:'#a0c060' },
+  'sangrando':   { bg:'rgba(180,60,80,0.22)',  border:'rgba(180,60,80,0.55)',  text:'#d07080' },
+  'enfeitiçado': { bg:'rgba(100,80,200,0.22)', border:'rgba(100,80,200,0.55)', text:'#a090e0' },
+  'invisível':   { bg:'rgba(100,80,200,0.22)', border:'rgba(100,80,200,0.55)', text:'#a090e0' },
+  'amaldiçoado': { bg:'rgba(80,60,100,0.35)',  border:'rgba(80,60,100,0.6)',   text:'#9080b0' },
+};
+const _COND_DEFAULT = { bg:'rgba(196,68,68,0.14)', border:'rgba(196,68,68,0.32)', text:'#d88080' };
+
+/** Extrai nome e duração de uma condição (string ou objeto {nome, duracao}). */
+function _condInfo(cd) {
+  if (typeof cd === 'object' && cd !== null) return { nome: cd.nome || '?', dur: cd.duracao };
+  return { nome: String(cd), dur: undefined };
+}
 
 // Flag para saber se o turno corrente usou ferramentas de dado
 let _pendingDiceTools = [];
@@ -304,30 +336,31 @@ async function sendToAgent(text, registrar) {
           } else {
             pendingTools.push(ev.tool);
           }
-
-          // ── REFRESH ANTECIPADO ───────────────────────────────────────────
-          // Para ferramentas de estado, agenda um refresh leve com delay curto
-          // (300 ms) — tempo suficiente para o backend processar e salvar.
-          // Isso garante que HUD e barras atualizem mesmo se tool_result não
-          // for emitido pelo servidor.
-          if (STATE_TOOLS.has(ev.tool.name)) {
-            setTimeout(() => refreshMemory(), 400);
-          }
         }
         // Resultado bruto de ferramenta de dado, emitido pelo server.py
-        // (requer: yield sse_event('tool_result', {tool_name, content, is_dice_tool: True}))
         else if (ev.type === 'tool_result') {
           removeTyping(typId);
           appendDiceResultLog(ev.tool_name, ev.content);
-
-          // ── ATUALIZAÇÃO REATIVA ──────────────────────────────────────────
-          // Se a ferramenta muda estado visível (HP, mana, turno), atualiza
-          // a sidebar e o HUD imediatamente, sem esperar o evento 'done'.
+          // Ferramentas de estado: atualiza sidebar/turn-tracker imediatamente
+          // ao receber o resultado confirmado (HP, mana, turno, condições).
           if (STATE_TOOLS.has(ev.tool_name)) {
             refreshMemory();
           }
         }
+        // Correção automática: verificador pós-resposta detectou violação mecânica
+        // e o servidor está re-executando o agente com prompt de correção.
+        else if (ev.type === 'correction') {
+          const n = ev.violations?.length || 1;
+          const corrId = appendTyping();
+          updateTyping(corrId, `🔄 Verificador: ${n} violação(ões) detectada(s) — corrigindo...`);
+          window._correctionTypId = corrId;
+        }
         else if (ev.type === 'text') {
+          // Remove o indicador de correção se estiver visível
+          if (window._correctionTypId) {
+            removeTyping(window._correctionTypId);
+            window._correctionTypId = null;
+          }
           // Esvazia chips de ferramentas narrativas
           if (pendingTools.length) {
             appendToolLog(pendingTools);
@@ -452,21 +485,24 @@ async function handleSlash(raw) {
   // ─────────────────────────────────────────────────────────────
 
   // Auxiliar: busca personagens alvo ou todo o grupo com ficha
-  // Auxiliar: busca personagens alvo ou todo o grupo com ficha
   async function _getDndChars(targetName) {
     const mem = await (await authFetch(`${API}/api/memory`)).json();
     if (!(mem.dnd_mode === true || mem.campaign_type === 'dnd')) return { mem, chars: null };
-    
-    // Junta as duas listas para a busca: heróis e NPCs
-    const allChars = [...mem.party, ...mem.characters];
+
+    // mem.party = membros do grupo com fichas enriquecidas pelo servidor
+    // mem.characters = NPCs e personagens fora do grupo
+    // É necessário buscar nos DOIS para cobrir qualquer personagem com ficha.
+    const allChars = [...(mem.party || []), ...(mem.characters || [])];
+
     let chars;
-    
     if (targetName) {
-      const c = allChars.find(ch => ch.name.toLowerCase() === targetName && ch.sheet);
+      const c = allChars.find(ch => ch.name?.toLowerCase() === targetName && ch.sheet);
       chars = c ? [c] : [];
     } else {
-      // Se não passar nome, retorna apenas o grupo de aventureiros (party)
-      chars = mem.party.filter(c => c.sheet);
+      // Sem nome: prioriza membros do grupo com ficha
+      chars = (mem.party || []).filter(c => c.sheet);
+      // Fallback: party vazio ou sem fichas → todos com ficha
+      if (!chars.length) chars = allChars.filter(c => c.sheet);
     }
     return { mem, chars };
   }
@@ -509,7 +545,11 @@ async function handleSlash(raw) {
     const text = chars.map(c => {
       const s = c.sheet; const inv = c.inventario || [];
       const items = inv.length
-        ? inv.map(i => `* **${i.nome}** ×${i.qtd}${i.descricao ? ` — *${i.descricao}*` : ''}`).join('\n')
+        ? inv.map(i => {
+            const customBadge = i.custom ? ' `⚠️ CUSTOMIZADO`' : '';
+            const desc = i.descricao ? ` — *${i.descricao}*` : '';
+            return `* **${i.nome}** ×${i.qtd}${customBadge}${desc}`;
+          }).join('\n')
         : '* Bolsa vazia';
       return (
         `### 🎒 Inventário — ${c.name}\n\n` +
@@ -1091,15 +1131,19 @@ function buildDndCharCard(c, idx, type) {
 
   // ── Referências para o modal de edição ──
   const nameEsc = (c.name || '').replace(/'/g, "\\'");
-  const keyEsc  = type === 'party'
-    ? nameEsc
-    : (c.name || '').toLowerCase().replace(/'/g, "\\'");
+  // Para party em modo D&D: abre o modal completo de character (já tem a ficha
+  // enriquecida via get_memory_state). A chave é sempre lowercase para bater com
+  // memory.char_key() no servidor.
+  const keyEsc  = (c.name || '').toLowerCase().trim().replace(/'/g, "\\'");
   const dataRef = type === 'party'
     ? `window._lastMem.party[${idx}]`
     : `window._lastMem.characters[${idx}]`;
 
+  // Party em D&D: abre modal completo com ficha (tipo 'character')
+  const modalType = (type === 'party' && sheet) ? 'character' : type;
+
   // ── Monta o HTML ──
-  let html = `<div class="char-card editable dnd-char-card" onclick="openEditModal('${type}','${keyEsc}',${dataRef})">`;
+  let html = `<div class="char-card editable dnd-char-card" onclick="openEditModal('${modalType}','${keyEsc}',${dataRef})">`;
 
   // Cabeçalho: nome + status + CA
   html += `<div class="char-name">${escapeHtml(c.name || '')}`;
@@ -1134,11 +1178,15 @@ function buildDndCharCard(c, idx, type) {
         </div>`;
     }
 
-    // Condições ativas
+    // Condições ativas com badge colorido por severidade
     if (condicoes.length) {
       html += `<div class="condition-badges">`;
       condicoes.forEach(cd => {
-        html += `<span class="condition-badge">${escapeHtml(String(cd))}</span>`;
+        const { nome, dur } = _condInfo(cd);
+        const icon  = COND_ICONS[nome.toLowerCase()] || '⚠️';
+        const col   = COND_COLOR[nome.toLowerCase()] || _COND_DEFAULT;
+        const label = dur !== undefined ? `${nome} (${dur}t)` : nome;
+        html += `<span class="condition-badge" title="${escapeHtml(label)}" style="background:${col.bg};border-color:${col.border};color:${col.text};">${icon} ${escapeHtml(nome)}</span>`;
       });
       html += `</div>`;
     }
@@ -1187,11 +1235,29 @@ function renderTurnTracker(cs) {
   const order = cs.initiative_order;
   const idx   = cs.current_turn_index ?? 0;
 
+  // Mapa de condições para lookup rápido nos cards do turn tracker
+  const condMap = {};
+  if (window._lastMem) {
+    [...(window._lastMem.party || []), ...(window._lastMem.characters || [])].forEach(ch => {
+      if (ch?.name) condMap[ch.name.toLowerCase().trim()] = ch.sheet?.condicoes || [];
+    });
+  }
+
   cards.innerHTML = order.map((name, i) => {
     const isActive = i === idx;
     const isPast   = i < idx;
+
+    const conds    = condMap[name.toLowerCase().trim()] || [];
+    const condHtml = conds.map(cd => {
+      const { nome } = _condInfo(cd);
+      const icon = COND_ICONS[nome.toLowerCase()] || '⚠️';
+      const col  = COND_COLOR[nome.toLowerCase()] || _COND_DEFAULT;
+      return `<span class="tt-cond-icon" title="${escapeHtml(nome)}" style="color:${col.text};filter:drop-shadow(0 0 3px ${col.text});">${icon}</span>`;
+    }).join('');
+
     return `<div class="tt-card ${isActive ? 'tt-active' : ''} ${isPast ? 'tt-past' : ''}" title="${escapeHtml(name)}">
       <span class="tt-card-name">${escapeHtml(name)}</span>
+      ${condHtml ? `<span class="tt-cond-icons">${condHtml}</span>` : ''}
       ${isActive ? '<span class="tt-turn-arrow">▶</span>' : ''}
     </div>`;
   }).join('');
@@ -1247,7 +1313,7 @@ function renderMemory(mem) {
     : mem.party.map((p, i) => {
         if (isDnd) return buildDndCharCard(p, i, 'party');
         return `<div class="char-card editable" onclick="openEditModal('party','${p.name.replace(/'/g, "\\'")}',window._lastMem.party[${i}])">` +
-          `<div class="char-name">${p.name} <span class="char-status">${p.role || ''}</span></div>` +
+          `<div class="char-name">${p.name} <span class="char-status">${p.role}</span></div>` +
           `<div class="char-desc">${p.notes || ''}</div>` +
           `</div>`;
       }).join('');
@@ -1327,8 +1393,10 @@ function field(id, label, value, type = 'input', opts = {}) {
 function buildEditFields(type, data) {
   switch (type) {
     case 'character': {
-      let html = field('name', 'Nome', data.name)
-        + field('description', 'Descrição', data.description, 'textarea')
+      let html = field('name', 'Nome', data.name);
+      // 'role' existe quando é membro do grupo (dados enriquecidos via party)
+      if (data.role !== undefined) html += field('role', 'Função no Grupo', data.role);
+      html += field('description', 'Descrição', data.description, 'textarea')
         + field('traits', 'Traços', data.traits, 'textarea', { rows: 2 })
         + field('status', 'Status', data.status, 'select', { options: ['vivo', 'morto', 'ferido', 'desaparecido', 'preso', 'aliado', 'inimigo', 'exilado'] })
         + field('notes', 'Notas', data.notes, 'textarea', { rows: 2 });
@@ -1366,6 +1434,8 @@ function getEditValues() {
   switch (_editCtx.type) {
     case 'character': {
       const base = { name: v('name'), description: v('description'), traits: v('traits'), status: v('status'), notes: v('notes') };
+      // Inclui 'role' se o personagem é membro do grupo (campo só existe nesse caso)
+      if (_editCtx.data.role !== undefined) base.role = v('role');
       if (_editCtx.data.sheet) {
         const numField = id => parseFloat(document.getElementById(`ef-${id}`)?.value) || 0;
         base.sheet = {
@@ -1392,6 +1462,11 @@ function getEditValues() {
   }
 }
 
+function addNewFlag() {
+  // Abre o modal de edição com campos vazios para criar uma nova flag
+  openEditModal('flag', 'nova', { key: '', value: '' });
+}
+
 async function saveCurrentItem() {
   if (!_editCtx) return;
   const { type, key, index } = _editCtx; const values = getEditValues();
@@ -1405,15 +1480,24 @@ async function saveCurrentItem() {
   if (!url) return;
 
   const res = await authFetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  if (res.ok) { closeEditModal(); refreshMemory(); showToast('Salvo com sucesso.'); }
-  else { const e = await res.json(); await showAlert('Erro ao salvar', e.error || 'Erro desconhecido.', 'danger'); }
-}
-
-function clearAllViolations() {
-  const violationsDiv = document.getElementById('sb-violations');
-  if (violationsDiv) {
-    violationsDiv.innerHTML = '<span class="empty-state">Nenhuma violação detectada.</span>';
+  if (res.ok) {
+    // Se salvamos um character que também é membro do grupo (tem 'role'),
+    // sincroniza o role/notes/name no array party também.
+    if (type === 'character' && values.role !== undefined) {
+      const isParty = (window._lastMem?.party || []).some(
+        p => (p.name || '').toLowerCase().trim() === key
+      );
+      if (isParty) {
+        await authFetch(`${API}/api/memory/party/${encodeURIComponent(key)}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: values.name, role: values.role || '', notes: values.notes || '' }),
+        });
+      }
+    }
+    closeEditModal(); refreshMemory(); showToast('Salvo com sucesso.');
   }
+  else { const e = await res.json(); await showAlert('Erro ao salvar', e.error || 'Erro desconhecido.', 'danger'); }
 }
 
 async function deleteCurrentItem() {

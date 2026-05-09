@@ -8,6 +8,7 @@ Acesse em:  http://localhost:5000
 import asyncio
 import json
 import queue
+import re
 import threading
 import time
 import os
@@ -21,6 +22,194 @@ from auth import require_auth, register as auth_register, login as auth_login, r
 from agent import create_agent, get_campaign_config
 from session import APP_NAME, USER_ID, SESSION_ID, create_runner
 from validator import validate
+
+
+# ---------------------------------------------------------------------------
+# Loop de verificação pós-resposta (D&D mode)
+# Detecta quando o agente narrou ações mecânicas sem chamar as ferramentas.
+# ---------------------------------------------------------------------------
+
+# Ferramentas que resolvem cada categoria mecânica
+_HP_TOOLS    = {"modify_hp", "attack_roll"}
+_MANA_TOOLS  = {"use_ability", "modify_mana"}
+_INIT_TOOLS  = {"roll_initiative"}
+_ATCK_TOOLS  = {"attack_roll"}
+_LEARN_TOOLS = {"learn_spell", "learn_ability"}  # Ferramentas que ensinam magias/habilidades
+
+# Padrões que indicam que o agente narrou mecânicas sem ferramentas
+_COMBAT_START_RE = re.compile(
+    r'\b(rodada\s+1|iniciativa\s+(?:foi\s+)?rolada?|o\s+combate\s+come[çc]a|'
+    r'ordem\s+de\s+combate|combate\s+iniciado)\b',
+    re.IGNORECASE,
+)
+_HP_CHANGE_RE = re.compile(
+    r'(?:\d+\s*[→➜▶]\s*-?\d+)'          # "15 → 9"  ou  "7 → -1"
+    r'|(?:(?:perdeu|sofreu|tomou|curou)\s+\d+\s*(?:pontos?\s+de\s+vida|pv\b))',
+    re.IGNORECASE,
+)
+_ATTACK_RESULT_RE = re.compile(
+    r'(?:✅\s*acerto|❌\s*errou?'
+    r'|o\s+(?:ataque|golpe|disparo|virote|flecha)\s+(?:acerta|erra|conecta|atinge|perfura)'
+    r'|\bacertou?\b|\berrou?\b\s+o\s+ataque)',
+    re.IGNORECASE,
+)
+_MANA_CHANGE_RE = re.compile(
+    r'mana[:\s]+\d+\s*[→➜]\s*\d+',
+    re.IGNORECASE,
+)
+# Detecta quando o agente narra que um personagem aprendeu uma magia/habilidade
+# sem ter chamado learn_spell() ou learn_ability()
+_SPELL_LEARNED_RE = re.compile(
+    r'\b(?:'
+    r'aprendeu?\s+(?:a\s+magia|o\s+feitiço|a\s+habilidade|o\s+poder)\b'
+    r'|(?:a\s+magia|o\s+feitiço|a\s+habilidade)\s+.{2,40}\s+(?:foi\s+)?aprendid[ao]'
+    r'|agora\s+(?:conhece|sabe\s+usar|domina)\s+a\s+magia'
+    r'|adicionad[ao]\s+(?:à|ao|as)\s+(?:sua\s+)?(?:lista\s+de\s+)?(?:magias|habilidades|feitiços)'
+    r')',
+    re.IGNORECASE,
+)
+
+
+def _verify_agent_response(
+    text: str,
+    tools_called: set,
+    combat_was_active: bool,
+) -> list[str]:
+    """
+    Verifica se o agente narrou eventos mecânicos sem chamar as ferramentas.
+    Só atua em campanhas com dnd_mode=True.
+    Retorna lista de strings descrevendo cada violação encontrada.
+    """
+    if not memory.campaign.get("dnd_mode", False):
+        return []
+
+    violations = []
+
+    # 1. Início de combate sem roll_initiative
+    if (not combat_was_active
+            and not _INIT_TOOLS.intersection(tools_called)
+            and _COMBAT_START_RE.search(text)):
+        violations.append(
+            "Narrou início de combate ('rodada 1', 'iniciativa rolada', etc.) "
+            "sem chamar roll_initiative(). Chame a ferramenta com TODOS os participantes."
+        )
+
+    # 2. HP modificado narrativamente
+    if (not _HP_TOOLS.intersection(tools_called)
+            and _HP_CHANGE_RE.search(text)):
+        violations.append(
+            "Modificou HP narrativamente (ex: '15 → 9', 'perdeu 6 PV') "
+            "sem chamar modify_hp() ou attack_roll(). "
+            "NUNCA escreva variações de HP — deixe a ferramenta calcular."
+        )
+
+    # 3. Resultado de ataque sem attack_roll
+    if (not _ATCK_TOOLS.intersection(tools_called)
+            and _ATTACK_RESULT_RE.search(text)):
+        violations.append(
+            "Narrou resultado de ataque ('acertou', 'errou o golpe') "
+            "sem chamar attack_roll(). O dado decide — não a narrativa."
+        )
+
+    # 4. Mana modificada narrativamente
+    if (not _MANA_TOOLS.intersection(tools_called)
+            and _MANA_CHANGE_RE.search(text)):
+        violations.append(
+            "Modificou mana narrativamente sem chamar use_ability() ou modify_mana()."
+        )
+
+    # 5. Magia/habilidade narrada como aprendida sem learn_spell() ou learn_ability()
+    if (not _LEARN_TOOLS.intersection(tools_called)
+            and _SPELL_LEARNED_RE.search(text)):
+        violations.append(
+            "Narrou que um personagem aprendeu uma magia ou habilidade "
+            "sem chamar learn_spell() ou learn_ability(). "
+            "A magia NÃO foi adicionada à ficha. "
+            "Chame learn_spell(char_name, spell_name) agora para registrar corretamente."
+        )
+
+    return violations
+
+
+def _check_all_level_ups() -> list[str]:
+    """
+    Safety net: verifica TODOS os personagens do grupo após cada resposta.
+    Se algum tiver XP >= threshold mas o LLM não chamou grant_xp,
+    aplica o level up programaticamente e retorna lista de nomes que subiram.
+
+    Chamado no handler 'done' do SSE loop, antes de salvar.
+    Não duplica work — grant_xp() já aplica level up internamente.
+    Esta função garante que nenhum level up seja perdido por falha do LLM.
+    """
+    from tools_dnd import XP_THRESHOLDS, _proficiency_bonus, _apply_class_features, CLASS_DATA
+    import random
+
+    if not memory.campaign.get("dnd_mode", False):
+        return []
+
+    leveled = []
+    party_keys = {m.get("name", "").lower().strip() for m in memory.campaign.get("party", [])}
+
+    for key, char in memory.campaign.get("characters", {}).items():
+        # Só verifica membros do grupo
+        if key not in party_keys:
+            continue
+        sheet = char.get("sheet")
+        if not sheet:
+            continue
+
+        nivel_atual = sheet.get("nivel", 1)
+        xp_atual    = sheet.get("xp", 0)
+
+        if nivel_atual >= 20:
+            continue
+        if xp_atual < XP_THRESHOLDS[nivel_atual]:
+            continue
+
+        # XP suficiente mas o nível não foi incrementado — aplica agora
+        while sheet.get("nivel", 1) < 20 and sheet.get("xp", 0) >= XP_THRESHOLDS[sheet.get("nivel", 1)]:
+            sheet["nivel"]       += 1
+            sheet["proficiencia"] = _proficiency_bonus(sheet["nivel"])
+
+            info    = CLASS_DATA.get(sheet.get("classe", "").lower(), {"hit_die": 8, "mana_per_level": 0, "mana_stat": None})
+            con_mod = (sheet.get("constituicao", 10) - 10) // 2
+            hp_gain = max(1, random.randint(1, info["hit_die"]) + con_mod)
+            sheet["vida_max"]   += hp_gain
+            sheet["vida_atual"] += hp_gain
+
+            mana_stat      = info.get("mana_stat")
+            mana_per_level = info.get("mana_per_level", 0)
+            if mana_stat and mana_per_level > 0:
+                sheet["mana_max"]  += mana_per_level
+                sheet["mana_atual"] = sheet["mana_max"]
+
+            sheet["xp_proximo"] = XP_THRESHOLDS[sheet["nivel"]] if sheet["nivel"] < 20 else sheet["xp"]
+            _apply_class_features(char, sheet, sheet["nivel"])
+            leveled.append(f"{char.get('name', key)} → Nível {sheet['nivel']}")
+
+    if leveled:
+        memory.save_campaign()
+        print(f"[LEVEL UP AUTO] {', '.join(leveled)}")
+
+    return leveled
+
+
+def _build_correction_prompt(violations: list[str]) -> str:
+    """Monta a mensagem de correção re-injetada no agente."""
+    lines = [
+        "[VERIFICAÇÃO AUTOMÁTICA DO SISTEMA — RESPOSTA ANTERIOR REJEITADA]\n",
+        f"Detectei {len(violations)} violação(ões) das regras obrigatórias:\n",
+    ]
+    for i, v in enumerate(violations, 1):
+        lines.append(f"  {i}. {v}")
+    lines += [
+        "\nCORRIJA AGORA — reescreva a resposta do zero:",
+        "• Chame as ferramentas obrigatórias ANTES de narrar qualquer resultado",
+        "• Use os números EXATOS retornados pelas ferramentas",
+        "• NÃO repita a resposta rejeitada — comece do início com as ferramentas corretas",
+        "• A narrativa imersiva vem DEPOIS dos resultados das ferramentas, nunca antes",
+    ]
+    return "\n".join(lines)
 
 app = Flask(__name__, static_folder="static")
 
@@ -197,6 +386,64 @@ def list_campaigns():
     try:
         result = database.list_campaigns(g.user_id)
         return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/campaigns", methods=["POST"])
+@require_auth
+def create_campaign():
+    """
+    Cria uma campanha nova a partir do wizard do menu.
+    Payload: { name: str, campaign: dict }
+    Mesmo formato do /api/campaigns/import, mas destinado ao wizard de criação.
+    """
+    data          = request.get_json(force=True) or {}
+    name          = "".join(c for c in data.get("name", "") if c.isalnum() or c in " _-").strip()
+    campaign_data = data.get("campaign", {})
+
+    if not name:
+        return jsonify({"error": "Nome inválido"}), 400
+    if not campaign_data:
+        return jsonify({"error": "Dados da campanha ausentes"}), 400
+    if database.campaign_exists(g.user_id, name):
+        return jsonify({"error": f"Já existe uma campanha com o nome '{name}'"}), 409
+
+    # Normaliza chaves de personagens para lowercase + normaliza sheet.classe
+    raw_chars = campaign_data.get("characters", {})
+    normalized_chars = {}
+    for k, v in raw_chars.items():
+        char = dict(v)
+        if char.get("sheet") and isinstance(char["sheet"].get("classe"), str):
+            char["sheet"] = dict(char["sheet"])
+            char["sheet"]["classe"] = char["sheet"]["classe"].lower()
+        normalized_chars[k.lower().strip().replace("_", " ")] = char
+
+    payload = {
+        "name":                 name,
+        "campaign_type":        campaign_data.get("campaign_type", "fantasia"),
+        "dnd_mode":             campaign_data.get("dnd_mode", False),
+        "protagonist":          campaign_data.get("protagonist", ""),
+        "chapter":              campaign_data.get("chapter", 1),
+        "current_location":     campaign_data.get("current_location", ""),
+        "current_scene":        campaign_data.get("current_scene", ""),
+        "story_summary":        campaign_data.get("story_summary", ""),
+        "quest_flags":          campaign_data.get("quest_flags", {}),
+        "party":                campaign_data.get("party", []),
+        "characters":           normalized_chars,
+        "locations":            campaign_data.get("locations", {}),
+        "events":               campaign_data.get("events", []),
+        "diary":                campaign_data.get("diary", []),
+        "conversation_history": [],
+        "combat_state":         campaign_data.get("combat_state", {
+            "is_active": False, "initiative_order": [],
+            "current_turn_index": 0, "round": 1,
+        }),
+    }
+
+    try:
+        database.save_campaign(g.user_id, name, payload)
+        return jsonify({"ok": True, "name": name})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -381,14 +628,48 @@ def _build_recap() -> str:
         f"[{'Jogador' if e['role']=='user' else 'Mestre'}]: {e['text']}"
         for e in hist
     ]
+
+    # Injeta estado de combate explicitamente para evitar que o agente
+    # re-execute turnos já processados ao retomar a sessão.
+    cs = memory.campaign.get("combat_state", {})
+    combat_block = ""
+    if cs.get("is_active"):
+        order   = cs.get("initiative_order", [])
+        idx     = cs.get("current_turn_index", 0)
+        round_n = cs.get("round", 1)
+        current = order[idx] if order and idx < len(order) else "?"
+        vez_msg = (
+            f"Aguarde a ação do jogador — é a vez de {current}."
+            if not _is_npc(current)
+            else f"Anuncie que é a vez de {current} e aguarde o jogador digitar 'continuar'. NÃO execute o ataque ainda."
+        )
+        combat_block = (
+            f"\n\n⚔️  COMBATE ATIVO — ESTADO ATUAL (NÃO RE-EXECUTE TURNOS ANTERIORES):\n"
+            f"   Rodada: {round_n}\n"
+            f"   Ordem: {' → '.join(f'[{n}]' if i == idx else n for i, n in enumerate(order))}\n"
+            f"   Turno atual: {current}\n"
+            f"   INSTRUÇÃO CRÍTICA: o histórico acima já contém ações processadas. {vez_msg}"
+        )
+
     return (
         "Estamos retomando uma aventura em andamento. "
         "Abaixo está o estado completo do mundo e o histórico recente.\n\n"
         f"{contexto}\n\n"
-        f"--- HISTÓRICO RECENTE ---\n{chr(10).join(lines)}\n\n"
+        f"--- HISTÓRICO RECENTE ---\n{chr(10).join(lines)}\n"
+        f"{combat_block}\n\n"
         "Faça um breve recap ao jogador do ponto em que estávamos "
-        "e aguarde a próxima ação dele para continuar a narrativa."
+        "e aguarde a próxima ação dele para continuar a narrativa. "
+        "NÃO tome nenhuma ação de combate por conta própria ao retomar."
     )
+
+
+def _is_npc(name: str) -> bool:
+    """Retorna True se o personagem não é membro do grupo (é NPC/inimigo)."""
+    party_names = {
+        m.get("name", "").lower().strip()
+        for m in memory.campaign.get("party", [])
+    }
+    return name.lower().strip() not in party_names
 
 # ---------------------------------------------------------------------------
 # Chat com SSE
@@ -440,20 +721,21 @@ def chat():
         "update_world_state", "add_party_member", "remove_party_member", "clear_flag",
     }
 
-    async def run_agent():
+    # Estado de combate ANTES desta resposta (para comparação na verificação)
+    _combat_was_active = memory.campaign.get("combat_state", {}).get("is_active", False)
+
+    async def run_agent(texto: str):
         import random
-        msg = gtypes.Content(role="user", parts=[gtypes.Part(text=texto_agente)])
-        
-        # Aumentamos o limite para sobreviver a picos de tráfego na API
-        MAX_RETRIES = 5 
+        msg          = gtypes.Content(role="user", parts=[gtypes.Part(text=texto)])
+        MAX_RETRIES  = 5
 
         for attempt in range(MAX_RETRIES):
-            full = ""
+            full         = ""
+            tools_called = set()
             try:
                 async for event in runner.run_async(
                     user_id=USER_ID, session_id=SESSION_ID, new_message=msg
                 ):
-                    # Captura de chamadas de ferramentas (tool_calls)
                     if event.content and event.content.parts:
                         for part in event.content.parts:
                             fc = getattr(part, "function_call", None)
@@ -461,122 +743,142 @@ def chat():
                                 name = fc.name
                                 args = dict(fc.args) if fc.args else {}
                                 kind = "write" if name in WRITE_TOOLS else "read"
+                                tools_called.add(name)
                                 result_q.put(("tool_call", {"name": name, "args": args, "kind": kind}))
 
-                            # Captura o RETORNO da ferramenta executada pelo backend
                             fr = getattr(part, "function_response", None)
                             if fr and getattr(fr, "name", None):
                                 resp_dict = dict(fr.response) if fr.response else {}
-                                # O ADK injeta a string de retorno do Python na chave "result"
-                                conteudo = resp_dict.get("result", "")
+                                conteudo  = resp_dict.get("result", "")
                                 if conteudo:
                                     result_q.put(("tool_result", {"tool_name": fr.name, "content": str(conteudo)}))
-                                
-                    # Atualização de cota/tokens
+
                     if event.usage_metadata:
                         usage = {
-                            "prompt_tokens": event.usage_metadata.prompt_token_count,
+                            "prompt_tokens":     event.usage_metadata.prompt_token_count,
                             "candidates_tokens": event.usage_metadata.candidates_token_count,
-                            "total_tokens": event.usage_metadata.total_token_count
+                            "total_tokens":      event.usage_metadata.total_token_count,
                         }
                         result_q.put(("quota_update", usage))
-                        
-                    # Captura do texto final com filtragem de pensamentos nativos (ADK/DeepSeek/Gemini Thinking)
+
                     if event.is_final_response() and event.content and event.content.parts:
                         for part in event.content.parts:
-                            if part.text and not getattr(part, 'thought', False):
+                            if part.text and not getattr(part, "thought", False):
                                 full += part.text
 
-                # Proteção contra vácuo: Se o modelo não falar nada, enviamos uma ação narrativa
                 if not full.strip():
                     full = "*(O Mestre observa os registros em silêncio por um momento, parecendo organizar as memórias da aventura...)*"
 
-                result_q.put(("done", full))
+                result_q.put(("done", {
+                    "text":              full,
+                    "tools_called":      tools_called,
+                    "combat_was_active": _combat_was_active,
+                }))
                 return
 
             except Exception as exc:
-                err = str(exc).lower()
-                # Adicionamos 'deadline', '500' e '504' que ocorrem muito no Free Tier
+                err          = str(exc).lower()
                 is_retryable = any(k in err for k in (
-                    "overloaded", "429", "503", "500", "504", 
-                    "rate limit", "quota", "resource exhausted", "deadline"
+                    "overloaded", "429", "503", "500", "504",
+                    "rate limit", "quota", "resource exhausted", "deadline",
                 ))
-                
                 if is_retryable and attempt < MAX_RETRIES - 1:
-                    # Cálculo: 2s, 4s, 8s, 16s... + um pequeno aleatório (jitter) para evitar colisões
                     wait = (2 ** (attempt + 1)) + random.uniform(0, 1)
-                    
                     result_q.put(("retrying", f"Mestre ocupado (Tentativa {attempt + 1}/{MAX_RETRIES}). Retomando em {wait:.1f}s..."))
                     await asyncio.sleep(wait)
                 else:
-                    # Se esgotar as tentativas ou for um erro crítico (como chave inválida)
                     result_q.put(("error", f"O RPG AGENT silenciou: {str(exc)}"))
                     return
 
     # Inicia a thread e atrela um "capturador de desastres" a ela
-    future = asyncio.run_coroutine_threadsafe(run_agent(), _loop)
+    future = asyncio.run_coroutine_threadsafe(run_agent(texto_agente), _loop)
 
     def on_thread_done(fut):
         try:
-            fut.result() # Se a thread explodiu, o erro será revelado aqui
+            fut.result()
         except Exception as e:
             result_q.put(("error", f"Erro fatal interno na thread da IA: {e}"))
 
     future.add_done_callback(on_thread_done)
 
     def generate():
+        correction_attempted = False   # Máximo de 1 correção por resposta
+
         while True:
             try:
-                # O try/except queue.Empty garante que erros de timeout não quebrem o servidor
                 kind, content = result_q.get(timeout=120)
-                
+
                 if kind == "retrying":
-                    # Envia atualização de tentativa do backoff exponencial para o frontend
                     yield f"data: {json.dumps({'type': 'retrying', 'content': content})}\n\n"
 
                 elif kind == "tool_call":
-                    # Registra a chamada de ferramenta (leitura ou escrita)
                     yield f"data: {json.dumps({'type': 'tool_call', 'tool': content})}\n\n"
 
                 elif kind == "tool_result":
-                    # Envia o resultado bruto da ferramenta direto para a interface
                     yield f"data: {json.dumps({'type': 'tool_result', 'tool_name': content['tool_name'], 'content': content['content']})}\n\n"
 
                 elif kind == "quota_update":
-                    # NOVIDADE: Envia os dados de consumo de tokens (RPM/TPM) para o painel de métricas
                     yield f"data: {json.dumps({'type': 'quota', 'content': content})}\n\n"
 
                 elif kind == "error":
-                    # Reporta erro fatal e encerra o stream SSE[cite: 5]
                     yield f"data: {json.dumps({'type': 'error', 'content': content})}\n\n"
                     return
 
                 elif kind == "done":
-                    # Processamento final ao concluir a resposta da IA[cite: 5]
-                    if registrar and content:
-                        memory.campaign["conversation_history"].append({"role": "assistant", "text": content})
+                    response_text      = content["text"]
+                    tools_called       = content.get("tools_called", set())
+                    combat_was_active  = content.get("combat_was_active", False)
+
+                    # ── Loop de verificação pós-resposta ──────────────────
+                    if not correction_attempted:
+                        mech_violations = _verify_agent_response(
+                            response_text, tools_called, combat_was_active
+                        )
+                        if mech_violations:
+                            correction_attempted = True
+                            correction_prompt    = _build_correction_prompt(mech_violations)
+
+                            print(f"[VERIFICADOR] {len(mech_violations)} violação(ões) — re-injetando correção.")
+                            for v in mech_violations:
+                                print(f"  • {v}")
+
+                            # Notifica o frontend que está corrigindo
+                            yield f"data: {json.dumps({'type': 'correction', 'violations': mech_violations})}\n\n"
+
+                            # Re-executa o agente com a mensagem de correção
+                            corr_future = asyncio.run_coroutine_threadsafe(
+                                run_agent(correction_prompt), _loop
+                            )
+                            corr_future.add_done_callback(on_thread_done)
+                            continue   # Continua lendo da fila — a correção vai colocar novo "done"
+
+                    # ── Conclusão normal ───────────────────────────────────
+                    if registrar and response_text:
+                        memory.campaign["conversation_history"].append(
+                            {"role": "assistant", "text": response_text}
+                        )
                         memory.save_campaign()
 
-                    # Executa a validação de fidelidade narrativa e regras[cite: 5]
-                    result = validate(content)
+                    result = validate(response_text)
                     violations = [
                         {"severity": v.severity, "rule": v.rule, "message": v.message, "detail": v.detail}
                         for v in result.violations
                     ]
 
-                    # Envia o texto final da resposta[cite: 5]
-                    yield f"data: {json.dumps({'type': 'text', 'content': content})}\n\n"
+                    yield f"data: {json.dumps({'type': 'text', 'content': response_text})}\n\n"
 
-                    # Se houver violações de validação, envia-as logo em seguida[cite: 5]
                     if violations:
                         yield f"data: {json.dumps({'type': 'violations', 'violations': violations})}\n\n"
 
-                    # Sinaliza ao frontend que o stream terminou com sucesso[cite: 5]
+                    # Safety net: verifica level ups que o LLM pode ter perdido
+                    leveled_up = _check_all_level_ups()
+                    if leveled_up:
+                        yield f"data: {json.dumps({'type': 'level_up', 'characters': leveled_up})}\n\n"
+
                     yield f"data: {json.dumps({'type': 'done'})}\n\n"
                     return
 
             except queue.Empty:
-                # Tratamento de timeout caso a thread da IA trave ou demore demais[cite: 5]
                 yield f"data: {json.dumps({'type': 'error', 'content': 'Timeout: A API da IA não respondeu em 120s. Verifique sua conexão ou se o serviço está operante.'})}\n\n"
                 return
 
@@ -649,6 +951,100 @@ def export_diary():
     )
 
 
+@app.route("/api/campaigns/generate-lore", methods=["POST"])
+@require_auth
+def generate_lore():
+    """
+    Gera resumo, cena, locais E personagens a partir de uma ideia básica.
+    Roteia para Google Gemini, DeepSeek ou Ollama conforme o prefixo do modelo.
+    """
+    data            = request.get_json()
+    user_prompt     = data.get("prompt", "").strip()
+    model           = data.get("model", "").strip()
+    campaign_type   = data.get("campaign_type", "fantasia").strip()
+    api_key         = data.get("google_api_key", "").strip()  or os.environ.get("GOOGLE_API_KEY", "")
+    ds_key          = data.get("deepseek_api_key", "").strip() or os.environ.get("DEEPSEEK_API_KEY", "")
+
+    if not user_prompt:
+        return jsonify({"error": "Prompt vazio."}), 400
+
+    is_deepseek = model.startswith("deepseek:")
+    is_ollama   = model.startswith("ollama:")
+
+    if is_deepseek and not ds_key:
+        return jsonify({"error": "Chave DeepSeek não encontrada. Salve-a nas configurações."}), 400
+    if not is_deepseek and not is_ollama and not api_key:
+        return jsonify({"error": "Chave Google API não encontrada. Salve-a nas configurações."}), 400
+
+    is_dnd = campaign_type == "dnd"
+    char_schema = (
+        '{"name":"","description":"","traits":"","role":"",'
+        '"classe":"<bárbaro|guerreiro|paladino|patrulheiro|bardo|clérigo|druida|monge|ladino|mago|feiticeiro|bruxo>",'
+        '"raca":"<humano|elfo|anão|halfling|draconato|meio-elfo|tiferino>"}'
+        if is_dnd else
+        '{"name":"","description":"","traits":"","role":""}'
+    )
+    char_tip = (
+        "Para D&D inclua classe e raça válidas em cada personagem. "
+        if is_dnd else
+        "Não inclua campos de classe ou raça — apenas name, description, traits e role. "
+    )
+
+    system = (
+        "Você é um Mestre de RPG criativo. Dado uma ideia básica, gere um JSON com EXATAMENTE esta estrutura:\n"
+        '{"story_summary":"<resumo de 5-8 linhas>","current_scene":"<cena inicial vívida>",'
+        '"current_location":"<nome do local inicial>",'
+        '"locations":[{"name":"","description":"","details":"","notes":""}],'
+        f'"characters":[' + char_schema + ']}' + '}\n'
+        "Gere 2-3 locais relevantes. "
+        "Gere TODOS os personagens mencionados na ideia (máximo 4), um por pessoa citada. "
+        f"{char_tip}"
+        "Responda APENAS com JSON válido, sem markdown, sem comentários."
+    )
+    full_prompt = f"{system}\n\nIdeia: {user_prompt}\n\nTipo de campanha: {campaign_type}"
+
+    try:
+        raw = ""
+
+        if is_deepseek:
+            import requests as _req
+            model_id = model.replace("deepseek:", "")
+            resp = _req.post(
+                "https://api.deepseek.com/chat/completions",
+                headers={"Authorization": f"Bearer {ds_key}", "Content-Type": "application/json"},
+                json={"model": model_id, "messages": [{"role": "user", "content": full_prompt}], "max_tokens": 1500},
+                timeout=30,
+            )
+            raw = resp.json()["choices"][0]["message"]["content"].strip()
+
+        elif is_ollama:
+            import requests as _req
+            model_id = model.replace("ollama:", "")
+            resp = _req.post(
+                "http://localhost:11434/api/generate",
+                json={"model": model_id, "prompt": full_prompt, "stream": False},
+                timeout=60,
+            )
+            raw = resp.json().get("response", "").strip()
+
+        else:
+            # Google Gemini — usa o modelo exato escolhido pelo usuário
+            from google import genai as _genai
+            client   = _genai.Client(api_key=api_key)
+            response = client.models.generate_content(model=model, contents=full_prompt)
+            raw      = response.text.strip()
+
+        raw  = re.sub(r'^```(?:json)?\s*', '', raw)
+        raw  = re.sub(r'\s*```$', '', raw)
+        lore = json.loads(raw)
+        return jsonify({"ok": True, "lore": lore})
+
+    except json.JSONDecodeError as e:
+        return jsonify({"error": f"IA retornou JSON inválido: {e}"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/campaigns/import", methods=["POST"])
 @require_auth
 def import_campaign():
@@ -667,10 +1063,14 @@ def import_campaign():
     # Sem isso, uma campanha importada com "Sonael" e o backend buscando "sonael"
     # cria entradas duplicadas a cada chamada de ferramenta.
     raw_chars = campaign_data.get("characters", {})
-    normalized_chars = {
-        k.lower().strip().replace("_", " "): v
-        for k, v in raw_chars.items()
-    }
+    normalized_chars = {}
+    for k, v in raw_chars.items():
+        char = dict(v)
+        # Normaliza sheet.classe para lowercase — o sistema usa "bárbaro", não "Bárbaro"
+        if char.get("sheet") and isinstance(char["sheet"].get("classe"), str):
+            char["sheet"] = dict(char["sheet"])
+            char["sheet"]["classe"] = char["sheet"]["classe"].lower()
+        normalized_chars[k.lower().strip().replace("_", " ")] = char
 
     payload = {
         "name":                 name,
