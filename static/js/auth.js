@@ -67,27 +67,23 @@ async function submitAuth() {
 //  Tela de confirmação pendente
 // ═══════════════════════════════════════
 function showPendingConfirmation(email) {
-  document.querySelector('.login-card').innerHTML = `
-    <div class="login-accent"></div>
-    <div class="login-header">
-      <div class="login-title">RPG AGENT</div>
-    </div>
-    <div style="padding:0 32px 36px;text-align:center;">
-      <div style="font-size:48px;margin-bottom:16px;">📬</div>
-      <div style="font-family:'Cinzel',serif;font-size:16px;color:var(--gold);letter-spacing:0.06em;margin-bottom:12px;">
-        Confirme seu email
+  document.querySelector('.page-right').innerHTML = `
+    <div style="display:flex; flex-direction:column; justify-content:center; align-items:center; height:100%; text-align:center; padding: 40px;">
+      <div style="font-size:56px; margin-bottom:20px;">📬</div>
+      <div style="font-family:'Playfair Display',serif; font-size:22px; color:var(--text-main); margin-bottom:15px;">
+        Confirme o seu email
       </div>
-      <p style="font-size:14px;color:var(--text-dim);line-height:1.7;margin-bottom:8px;">
+      <p style="font-family:'Lora',serif; font-size:15px; color:var(--text-muted); line-height:1.7; margin-bottom:12px;">
         Enviamos um link de confirmação para:
       </p>
-      <div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--gold-bright);background:var(--bg3);border:1px solid var(--border2);border-radius:3px;padding:8px 14px;margin-bottom:20px;word-break:break-all;">
+      <div style="font-family:'Caveat',cursive; font-size:22px; color:var(--ink-user); border-bottom:1px solid var(--page-edge); padding-bottom:10px; margin-bottom:20px; word-break:break-all;">
         ${email}
       </div>
-      <p style="font-size:13px;color:var(--text-muted);line-height:1.6;margin-bottom:24px;">
-        Clique no link do email para ativar sua conta.<br>
+      <p style="font-family:'Lora',serif; font-size:14px; color:var(--text-muted); line-height:1.6; margin-bottom:30px;">
+        Clique no link do email para ativar a sua conta.<br>
         Depois retorne aqui para entrar.
       </p>
-      <button class="btn-ghost" onclick="location.reload()" style="width:100%;">
+      <button class="btn-main" onclick="location.reload()" style="max-width:280px; width:100%;">
         ← Voltar ao login
       </button>
     </div>
@@ -137,15 +133,11 @@ async function handleEmailConfirmation() {
 }
 
 function showConfirmingScreen() {
-  document.querySelector('.login-card').innerHTML = `
-    <div class="login-accent"></div>
-    <div class="login-header" style="padding-bottom:36px;">
-      <div class="login-title">RPG AGENT</div>
-      <div style="margin-top:32px;text-align:center;" id="confirm-msg">
-        <div style="font-size:40px;margin-bottom:14px;">⏳</div>
-        <div style="font-family:'Cinzel',serif;font-size:14px;color:var(--gold);letter-spacing:0.08em;">Confirmando email...</div>
-        <div style="font-size:12px;color:var(--text-muted);margin-top:8px;font-family:'JetBrains Mono',monospace;">Aguarde um momento</div>
-      </div>
+  document.querySelector('.page-right').innerHTML = `
+    <div id="confirm-msg" style="display:flex; flex-direction:column; justify-content:center; align-items:center; height:100%; text-align:center; padding:40px;">
+      <div style="font-size:48px; margin-bottom:18px;">⏳</div>
+      <div style="font-family:'Playfair Display',serif; font-size:20px; color:var(--text-main); margin-bottom:10px;">A confirmar email...</div>
+      <div style="font-family:'Lora',serif; font-size:14px; color:var(--text-muted);">Aguarde um momento</div>
     </div>
   `;
 }

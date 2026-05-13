@@ -977,30 +977,37 @@ def generate_lore():
         return jsonify({"error": "Chave Google API não encontrada. Salve-a nas configurações."}), 400
 
     is_dnd = campaign_type == "dnd"
+    
+    # 🟢 CORREÇÃO 1: Adicionado o campo "notes":"" para forçar a IA a gerar o histórico dos personagens
     char_schema = (
-        '{"name":"","description":"","traits":"","role":"",'
+        '{"name":"","description":"","traits":"","notes":"","role":"",'
         '"classe":"<bárbaro|guerreiro|paladino|patrulheiro|bardo|clérigo|druida|monge|ladino|mago|feiticeiro|bruxo>",'
         '"raca":"<humano|elfo|anão|halfling|draconato|meio-elfo|tiferino>"}'
         if is_dnd else
-        '{"name":"","description":"","traits":"","role":""}'
+        '{"name":"","description":"","traits":"","notes":"","role":""}'
     )
     char_tip = (
         "Para D&D inclua classe e raça válidas em cada personagem. "
         if is_dnd else
-        "Não inclua campos de classe ou raça — apenas name, description, traits e role. "
+        "Não inclua campos de classe ou raça — apenas name, description, traits, notes e role. "
     )
 
+    # 🟢 CORREÇÃO 2: Adicionado a array "events" à estrutura JSON exigida e instruções claras
     system = (
         "Você é um Mestre de RPG criativo. Dado uma ideia básica, gere um JSON com EXATAMENTE esta estrutura:\n"
         '{"story_summary":"<resumo de 5-8 linhas>","current_scene":"<cena inicial vívida>",'
         '"current_location":"<nome do local inicial>",'
         '"locations":[{"name":"","description":"","details":"","notes":""}],'
+        '"events":[{"summary":"","location":"","characters_involved":"","consequence":""}],'
         f'"characters":[' + char_schema + ']}' + '}\n'
         "Gere 2-3 locais relevantes. "
+        "Gere 2-3 eventos iniciais importantes na array 'events'. "
         "Gere TODOS os personagens mencionados na ideia (máximo 4), um por pessoa citada. "
+        "Preencha obrigatoriamente o campo 'notes' dos personagens com o seu histórico ou motivação. "
         f"{char_tip}"
         "Responda APENAS com JSON válido, sem markdown, sem comentários."
     )
+    
     full_prompt = f"{system}\n\nIdeia: {user_prompt}\n\nTipo de campanha: {campaign_type}"
 
     try:

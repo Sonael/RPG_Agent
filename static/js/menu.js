@@ -133,7 +133,16 @@ async function startSession() {
       conversation_history: data.conversation_history || [],
     }));
 
-    window.location.href = '/game.html';
+    // Anima a virada de página antes de navegar
+    const cover = document.querySelector('.tome-cover');
+    if (cover) {
+      cover.classList.remove('animate-open');
+      void cover.offsetWidth;
+      cover.classList.add('animate-close');
+      setTimeout(() => { window.location.href = '/game.html'; }, 900);
+    } else {
+      window.location.href = '/game.html';
+    }
 
   } catch (e) {
     btn.disabled    = false;

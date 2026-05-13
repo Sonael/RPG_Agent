@@ -56,7 +56,7 @@ def _auto_advance_turn() -> str:
     new_round = f"\n   🔔 Nova rodada! Rodada {round_num} começa." if idx == 0 else ""
     order_str = " → ".join(f"[{n}]" if i == idx else n for i, n in enumerate(order))
     return (
-        f"\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"⏭️  TURNO AVANÇADO — Rodada {round_num}{new_round}\n"
         f"🎯 Próxima vez: **{next_name}**\n"
         f"   Ordem: {order_str}"
@@ -2591,7 +2591,10 @@ def roll_initiative(characters_names: str) -> str:
     Args:
         characters_names: Nomes separados por vírgula. Ex: "Aria, Goblin, Orc Líder"
     """
-    names = [n.strip() for n in characters_names.split(",") if n.strip()]
+    names = (
+        characters_names if isinstance(characters_names, list)
+        else [n.strip() for n in characters_names.split(",") if n.strip()]
+    )
     if not names:
         return "⚠️ Informe ao menos um personagem."
 

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-PT">
 
 <head>
   <meta charset="UTF-8">
@@ -7,243 +7,399 @@
   <title>RPG Agent — Sessão</title>
   <link rel="icon"
     href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚔️</text></svg>">
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link
-    href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap"
+    href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;600&family=Lora:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Playfair+Display:ital,wght@0,500;0,700;1,500&display=swap"
     rel="stylesheet">
+
   <script src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js"></script>
-  <link rel="stylesheet" href="/static/css/style.css?v=3">
+  <link rel="stylesheet" href="/static/css/style.css?v=13">
 </head>
 
-<body>
+<body class="game-page">
 
-  <!-- Dialog -->
-  <div id="dialog-overlay" class="hidden">
-    <div id="dialog-box">
-      <div id="dialog-accent"></div>
-      <div id="dialog-inner">
-        <div id="dialog-head">
-          <div id="dialog-icon"></div>
-          <div id="dialog-title"></div>
-        </div>
-        <div id="dialog-message"></div>
+  <div class="scene">
+    <div class="tome">
+      <div class="tome-cover animate-open">
+        <h1 id="cover-title">Aventura</h1>
+        <p>Carregando as suas crónicas...</p>
       </div>
-      <div id="dialog-buttons"></div>
+
+      <div class="tome-spine"></div>
+      <div class="bookmark"></div>
+
+      <div id="sidebar-overlay" onclick="toggleSidebar(true)"></div>
+
+      <aside id="sidebar" class="page-left">
+        <div class="sidebar-header">
+          <div class="sidebar-header-row">
+            <h2 id="sb-campaign" class="book-title">—</h2>
+
+            <div class="world-state" style="margin-bottom: 15px; width: 100%;">
+              <div
+                style="display:flex;justify-content:space-between;font-family: 'Lora', serif; font-size:13px;margin-bottom:5px;">
+                <span style="color:var(--text-main); font-weight: 600;">Local:</span>
+                <span id="sb-location" style="color:var(--text-muted); text-align:right;">—</span>
+              </div>
+            </div>
+
+            <div class="quota-panel"
+              style="width: 100%; padding: 10px; background: rgba(0,0,0,0.03); border-radius: 4px; border: 1px solid var(--page-edge);">
+              <div
+                style="font-family: 'Lora', serif; font-size: 10px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 5px; letter-spacing: 0.05em; font-weight: 600;">
+                Status do Oráculo</div>
+              <div
+                style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-family: 'Lora', serif; font-size: 11px;">
+                <div>REQ: <span id="stat-req">0</span></div>
+                <div>TOK: <span id="stat-tokens">0</span></div>
+              </div>
+              <div
+                style="height: 3px; background: var(--page-edge); margin-top: 8px; border-radius: 2px; overflow: hidden;">
+                <div id="rpm-bar" style="width: 0%; height: 100%; background: var(--ink-user); transition: width 0.4s;">
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="sidebar-tabs" style="margin-top: 15px;">
+          <button class="tab-btn active" data-tab="mundo" onclick="switchTab('mundo')">Mundo</button>
+          <button class="tab-btn" data-tab="enciclopedia" onclick="switchTab('enciclopedia')">Enciclopédia</button>
+          <button class="tab-btn" data-tab="diario" onclick="switchTab('diario')">Diário</button>
+        </div>
+
+        <div class="sidebar-content scroll-area">
+
+          <div id="tab-mundo" class="tab-panel active">
+            <div class="sb-section">
+              <h3 class="sb-section-title">ESTADO</h3>
+              <div
+                style="display:flex;justify-content:space-between;font-family: 'Lora', serif; font-size:13px;margin-bottom:5px;">
+                <span style="color:var(--text-muted);">Capítulo</span>
+                <span id="ws-chapter" style="font-weight:600;">—</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-family: 'Lora', serif; font-size:13px;">
+                <span style="color:var(--text-muted);">Local</span>
+                <span id="ws-location" style="font-weight:600; text-align:right;">—</span>
+              </div>
+            </div>
+
+            <div class="sb-section" style="margin-top: 20px;">
+              <h3 class="sb-section-title" style="display:flex;justify-content:space-between;align-items:center;">
+                VALIDAÇÃO
+                <button onclick="clearAllViolations()" class="clean-button"
+                  style="width:auto; margin:0; padding:2px 8px; font-size:10px;">Limpar Todas</button>
+              </h3>
+              <div id="sb-violations"><span class="empty-state">Nenhuma violação detetada.</span></div>
+            </div>
+
+            <div class="sb-section" style="margin-top: 20px;">
+              <h3 class="sb-section-title">RESUMO <span onclick="openSummaryEdit()"
+                  style="font-family: 'Lora', serif; font-size:12px; font-style: italic; font-weight: normal; cursor:pointer; color:var(--ink-user); text-transform:none; margin-left:5px;">(editar)</span>
+              </h3>
+              <div id="sb-summary"
+                style="font-family: 'Lora', serif; font-size: 14px; line-height: 1.6; text-align: justify; color: var(--text-muted);">
+                —</div>
+            </div>
+
+            <div class="sb-section" style="margin-top: 20px;">
+              <h3 class="sb-section-title" style="display:flex;align-items:center;justify-content:space-between;">
+                OBSERVAÇÕES
+                <button onclick="addNewFlag()" class="clean-button"
+                  style="width:auto; margin:0; padding:2px 8px; font-size:11px; border:none; color:var(--ink-user);">+
+                  Adicionar</button>
+              </h3>
+              <div id="sb-flags"><span class="empty-state">Nenhuma observação.</span></div>
+            </div>
+
+            <div class="sb-section" style="margin-top: 20px;">
+              <h3 class="sb-section-title" style="margin-bottom: 5px;">STATUS DO SISTEMA</h3>
+              <div style="font-family: 'Lora', serif; font-size: 12px; color: var(--text-muted);">
+                Modelo: <span id="sb-model">—</span><br>
+                Tokens em uso: <span id="stat-tokens">0</span>
+              </div>
+            </div>
+          </div>
+
+          <div id="tab-enciclopedia" class="tab-panel">
+            <div class="sb-section">
+              <h3 class="sb-section-title" style="display:flex;align-items:center;justify-content:space-between;">
+                <span id="sb-party-title">GRUPO DE AVENTUREIROS</span>
+                <button onclick="addNewPartyMember()" class="clean-button"
+                  style="width:auto; margin:0; padding:2px 8px; font-size:12px; border:none; color:var(--ink-user);">+
+                  Membro</button>
+              </h3>
+              <div id="sb-party"><span class="empty-state">A carregar...</span></div>
+            </div>
+            <div class="sb-section" style="margin-top: 20px;">
+              <h3 class="sb-section-title" style="display:flex;align-items:center;justify-content:space-between;">
+                PERSONAGENS
+                <button onclick="addNewCharacter()" class="clean-button"
+                  style="width:auto; margin:0; padding:2px 8px; font-size:12px; border:none; color:var(--ink-user);">+
+                  Personagem</button>
+              </h3>
+              <div id="sb-chars"><span class="empty-state">A carregar...</span></div>
+            </div>
+            <div class="sb-section" style="margin-top: 20px;">
+              <h3 class="sb-section-title" style="display:flex;align-items:center;justify-content:space-between;">
+                LOCAIS
+                <button onclick="addNewLocation()" class="clean-button"
+                  style="width:auto; margin:0; padding:2px 8px; font-size:12px; border:none; color:var(--ink-user);">+
+                  Local</button>
+              </h3>
+              <div id="sb-locs"><span class="empty-state">A carregar...</span></div>
+            </div>
+          </div>
+
+          <div id="tab-diario" class="tab-panel">
+            <div class="sb-section">
+              <h3 class="sb-section-title" style="display:flex;align-items:center;justify-content:space-between;">
+                ENTRADAS DO DIÁRIO
+                <button onclick="addNewDiaryEntry()" class="clean-button"
+                  style="width:auto; margin:0; padding:2px 8px; font-size:12px; border:none; color:var(--ink-user);">+
+                  Entrada</button>
+              </h3>
+              <div id="sb-diary"><span class="empty-state">A carregar...</span></div>
+            </div>
+            <button class="clean-button" style="margin-top:10px; width: 100%;" onclick="exportDiary()">Exportar como
+              Ficheiro (.md)</button>
+          </div>
+
+        </div>
+
+        <div class="bottom-actions">
+          <button class="clean-button" onclick="customBackToMenu()">Menu Principal</button>
+          <button class="clean-button" style="color: var(--ink-sys); border-color: var(--ink-sys);"
+            onclick="customLogout()">Sair do Sistema</button>
+        </div>
+        <div class="page-number left">14</div>
+      </aside>
+
+      <main id="chat-area" class="page-right">
+
+        <div id="mobile-header">
+          <button id="mobile-menu-btn" onclick="toggleSidebar()" aria-label="Abrir Menu">
+            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="pena-icon">
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+          <div id="mobile-title"
+            style="font-family: 'Playfair Display', serif; font-weight: 700; font-size: 18px; text-transform: uppercase;">
+            RPG Agent</div>
+          <div style="width: 28px;"></div>
+        </div>
+
+        <div id="turn-tracker" class="hidden"
+          style="padding: 15px 40px; border-bottom: 1px solid var(--page-edge); background: rgba(0,0,0,0.02);">
+          <div id="turn-tracker-inner" style="display:flex;align-items:center;gap:15px;">
+            <div style="font-family:'Playfair Display',serif;font-size:14px;font-weight:700;color:var(--ink-sys);">⚔️
+              <span id="tt-round">Rodada 1</span>
+            </div>
+            <div id="tt-cards" style="display:flex;gap:10px;overflow-x:auto;"></div>
+          </div>
+        </div>
+
+        <div id="chat-history"></div>
+
+        <div id="input-area">
+          <div style="position:relative;">
+
+            <div id="cmd-menu" class="hidden">
+              <div class="cmd-menu-title">Comandos disponíveis:</div>
+              <div id="cmd-menu-items"></div>
+            </div>
+
+            <div class="input-row">
+              <button id="dice-tray-btn" title="Rolar dado (jogador)" onclick="toggleDiceTray()">🎲</button>
+              <textarea id="chat-input" placeholder="O que fará a seguir? (/ para comandos)"
+                onkeydown="handleKey(event)" oninput="onInputChange(this)"></textarea>
+              <button id="send-btn" onclick="sendMessage()">ADICIONAR</button>
+            </div>
+
+            <div id="dice-tray" class="hidden"
+              style="margin-top:15px; padding:20px; background:rgba(0,0,0,0.02); border-radius:6px; border:1px solid var(--page-edge);">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <span
+                  style="font-family: 'Playfair Display', serif; font-size:16px; font-weight:600; color:var(--text-main);">Lançamento
+                  de Dados (Verificado)</span>
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <label
+                    style="font-family: 'Lora', serif; font-size:12px; font-weight: 600; color:var(--text-muted);">Modificador:</label>
+                  <input type="number" id="dice-modifier" value="0"
+                    style="width:50px; font-family: 'Caveat', cursive; font-size:22px; padding:0 5px; text-align:center;">
+                </div>
+              </div>
+              <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <button class="clean-button" style="width:auto; padding:8px 15px; margin:0;"
+                  onclick="rollPlayerDie(4)">d4</button>
+                <button class="clean-button" style="width:auto; padding:8px 15px; margin:0;"
+                  onclick="rollPlayerDie(6)">d6</button>
+                <button class="clean-button" style="width:auto; padding:8px 15px; margin:0;"
+                  onclick="rollPlayerDie(8)">d8</button>
+                <button class="clean-button" style="width:auto; padding:8px 15px; margin:0;"
+                  onclick="rollPlayerDie(10)">d10</button>
+                <button class="clean-button" style="width:auto; padding:8px 15px; margin:0;"
+                  onclick="rollPlayerDie(12)">d12</button>
+                <button class="clean-button"
+                  style="width:auto; padding:8px 15px; margin:0; border-color:var(--ink-user); color:var(--ink-user); font-weight:bold;"
+                  onclick="rollPlayerDie(20)">d20</button>
+                <button class="clean-button" style="width:auto; padding:8px 15px; margin:0;"
+                  onclick="rollPlayerDie(100)">d%</button>
+              </div>
+            </div>
+
+          </div>
+          <div
+            style="font-family: 'Lora', serif; font-size:11px; color:var(--text-muted); margin-top:8px; text-align:center;">
+            / comandos · Enter para enviar · Shift+Enter para nova linha</div>
+        </div>
+
+        <div class="page-number right">15</div>
+      </main>
     </div>
   </div>
 
-  <!-- Edit modal -->
+  <div id="dialog-overlay" class="hidden">
+    <div class="dialog-box" id="dialog-box">
+      <div id="dialog-accent"
+        style="height: 4px; border-radius: 8px 8px 0 0; position: absolute; top: 0; left: 0; right: 0;"></div>
+
+      <div id="dialog-inner">
+        <div id="dialog-head" class="modal-header"
+          style="justify-content: center; margin-bottom: 20px; position: relative; margin-top: 10px;">
+          <div id="dialog-icon"
+            style="position: absolute; left: 0; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: bold;">
+          </div>
+          <div class="modal-title" id="dialog-title" style="margin: 0 auto;"></div>
+        </div>
+
+        <div id="dialog-message"
+          style="font-family: 'Lora', serif; font-size: 16px; margin-bottom: 25px; line-height: 1.5; color: var(--text-muted); text-align: center;">
+        </div>
+      </div>
+
+      <div id="dialog-buttons" style="display: flex; gap: 10px; justify-content: center;"></div>
+    </div>
+  </div>
+
   <div id="edit-overlay" class="hidden">
     <div class="edit-box">
-      <div class="edit-header">
+      <div class="modal-header">
         <div>
-          <div id="edit-type" class="edit-type">Editando</div>
-          <div id="edit-name" class="edit-name">—</div>
+          <div id="edit-type" class="modal-subtitle">Editando</div>
+          <div id="edit-name" class="modal-title">—</div>
         </div>
-        <button class="edit-close" onclick="closeEditModal()">✕</button>
+        <button onclick="closeEditModal()" class="close-btn">✕</button>
       </div>
-      <div id="edit-body" class="edit-body"></div>
-      <div class="edit-footer">
-        <button id="edit-del-btn" class="btn-danger" onclick="deleteCurrentItem()">Deletar</button>
-        <div style="display:flex;gap:8px;">
-          <button class="btn-ghost" onclick="closeEditModal()">Cancelar</button>
-          <button class="btn-save" onclick="saveCurrentItem()">Salvar</button>
+      <div id="edit-body" class="scroll-area" style="max-height: 60vh; padding: 10px 0;"></div>
+      <div
+        style="display:flex; justify-content:space-between; margin-top:20px; border-top: 1px solid var(--page-edge); padding-top: 20px;">
+        <button id="edit-del-btn" class="clean-button"
+          style="width:auto; color:var(--ink-sys); border-color:var(--ink-sys); margin:0;"
+          onclick="deleteCurrentItem()">Deletar Registo</button>
+        <div style="display:flex; gap:10px;">
+          <button class="clean-button" style="width:auto; margin:0;" onclick="closeEditModal()">Cancelar</button>
+          <button class="btn-main" style="width:auto; padding: 10px 25px; font-size: 16px;"
+            onclick="saveCurrentItem()">Salvar</button>
         </div>
       </div>
     </div>
-  </div>
-
-  <!-- Sidebar overlay (mobile) -->
-  <div id="sidebar-overlay"></div>
-
-  <!-- Game layout -->
-  <div class="game-page">
-
-    <!-- ── Sidebar ── -->
-    <aside id="sidebar">
-      <div class="sidebar-header">
-        <div class="sidebar-header-row">
-          <div style="min-width:0;">
-            <div class="sb-campaign" id="sb-campaign">—</div>
-            <div class="sb-model" id="sb-model">—</div>
-            <div class="sb-location" id="sb-location">—</div>
-
-            <!-- Painel de Métricas da API (Quota) -->
-            <div class="quota-panel"
-              style="margin-top: 10px; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 4px; border: 1px solid var(--border);">
-              <div
-                style="font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--gold-dim); text-transform: uppercase; margin-bottom: 5px; letter-spacing: 0.05em;">
-                Status do Oráculo (Sessão)
-              </div>
-              <div
-                style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-family: 'JetBrains Mono', monospace; font-size: 10px;">
-                <div title="Requisições nesta sessão">REQ: <span id="stat-req" style="color: var(--text);">0</span>
-                </div>
-                <div title="Total de tokens processados">TOK: <span id="stat-tokens"
-                    style="color: var(--text);">0</span></div>
-              </div>
-              <!-- Barra visual de proximidade do limite (RPM) -->
-              <div
-                style="height: 3px; background: var(--border2); margin-top: 6px; border-radius: 2px; overflow: hidden;"
-                title="Frequência de requisições por minuto">
-                <div id="rpm-bar"
-                  style="width: 0%; height: 100%; background: var(--gold); transition: width 0.4s, background-color 0.3s;">
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="sb-btn-group">
-            <button class="sb-btn" onclick="backToMenu()" title="Encerrar sessão" style="font-size:18px;">✕</button>
-            <button class="sb-btn" onclick="logout()" title="Sair da conta"
-              style="display: flex; align-items: center; justify-content: center;">
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
-                stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
-                <line x1="12" y1="2" x2="12" y2="12"></line>
-              </svg>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div class="sidebar-tabs">
-        <button class="tab-btn active" data-tab="mundo" onclick="switchTab('mundo')">Mundo</button>
-        <button class="tab-btn" data-tab="enciclopedia" onclick="switchTab('enciclopedia')">Encicl.</button>
-        <button class="tab-btn" data-tab="diario" onclick="switchTab('diario')">Diário</button>
-      </div>
-
-      <div class="sidebar-content">
-
-        <!-- Tab: Mundo -->
-        <div class="tab-panel active" id="tab-mundo">
-          <div class="sb-section">
-            <div class="sb-section-title">Estado</div>
-            <div class="world-state">
-              <div class="world-state-item"><span class="ws-label">Capítulo</span><span class="ws-value"
-                  id="ws-chapter">—</span></div>
-              <div class="world-state-item"><span class="ws-label">Local</span><span class="ws-value"
-                  id="ws-location">—</span></div>
-            </div>
-          </div>
-          <div class="sb-section">
-            <div class="sb-section-title" style="display: flex; justify-content: space-between; align-items: center;">
-              <span>Validação</span>
-              <button onclick="clearAllViolations()" style="background: transparent; border: 1px solid rgba(255,255,255,0.2); color: #aaa; padding: 2px 8px; border-radius: 4px; cursor: pointer; font-size: 0.7rem; transition: background 0.2s;">
-                Limpar Todas
-              </button>
-            </div>
-            <div id="sb-violations"><span class="empty-state">Nenhuma violação detectada.</span></div>
-          </div>
-          <div class="sb-section">
-            <div class="sb-section-title">
-              Resumo
-              <span class="sb-edit-link" onclick="openSummaryEdit()">editar</span>
-            </div>
-            <div class="story-summary" id="sb-summary" onclick="openSummaryEdit()">Nenhum resumo ainda.</div>
-          </div>
-          <div class="sb-section">
-            <div class="sb-section-title" style="display:flex;align-items:center;justify-content:space-between;">
-              <span>Flags</span>
-              <button onclick="addNewFlag()" title="Adicionar flag"
-                style="font-family:'JetBrains Mono',monospace;font-size:10px;background:transparent;border:1px solid var(--border2);border-radius:3px;color:var(--text-muted);padding:2px 7px;cursor:pointer;transition:all 0.15s;"
-                onmouseover="this.style.borderColor='var(--gold-dim)';this.style.color='var(--gold-dim)';"
-                onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--text-muted)';">+ Flag</button>
-            </div>
-            <div id="sb-flags"><span class="empty-state">Nenhuma flag ainda.</span></div>
-          </div>
-        </div>
-
-        <!-- Tab: Enciclopédia -->
-        <div class="tab-panel" id="tab-enciclopedia">
-          <div class="sb-section">
-            <div class="sb-section-title" id="sb-party-title">Grupo</div>
-            <div id="sb-party"><span class="empty-state">Nenhum membro ainda.</span></div>
-          </div>
-          <div class="sb-section">
-            <div class="sb-section-title">Personagens</div>
-            <div id="sb-chars"><span class="empty-state">Nenhum personagem ainda.</span></div>
-          </div>
-          <div class="sb-section">
-            <div class="sb-section-title">Locais</div>
-            <div id="sb-locs"><span class="empty-state">Nenhum local ainda.</span></div>
-          </div>
-        </div>
-
-        <!-- Tab: Diário -->
-        <div class="tab-panel" id="tab-diario">
-          <div class="sb-section">
-            <div class="sb-section-title">Entradas</div>
-            <div id="sb-diary"><span class="empty-state">Diário vazio.</span></div>
-          </div>
-          <button class="btn-export" onclick="exportDiary()">Exportar como .md</button>
-        </div>
-
-      </div>
-    </aside>
-
-    <!-- ── Chat ── -->
-    <main id="chat-area">
-      <div id="mobile-header">
-        <button id="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
-        <div id="mobile-title">RPG AGENT</div>
-      </div>
-
-      <!-- Turn Tracker D&D (visível apenas em combate D&D ativo) -->
-      <div id="turn-tracker" class="hidden">
-        <div id="turn-tracker-inner">
-          <div class="tt-label"><span class="tt-sword">⚔️</span> <span id="tt-round">Rodada 1</span></div>
-          <div id="tt-cards"></div>
-        </div>
-      </div>
-
-      <div id="chat-history"></div>
-
-      <div id="input-area">
-        <div style="position:relative;">
-          <!-- Autocomplete de comandos -->
-          <div id="cmd-menu" style="display:none;" class="cmd-menu-wrap">
-            <div class="cmd-menu-hdr">Comandos disponíveis</div>
-            <div id="cmd-menu-items"></div>
-          </div>
-
-          <div class="input-row">
-            <button id="dice-tray-btn" class="dice-tray-toggle" onclick="toggleDiceTray()" title="Rolar dado (jogador)">
-              🎲
-            </button>
-            <textarea id="chat-input" rows="1" placeholder="O que você faz? (/ para comandos)..."
-              onkeydown="handleKey(event)" oninput="onInputChange(this)"></textarea>
-            <button id="send-btn" onclick="sendMessage()">Enviar</button>
-          </div>
-
-          <!-- Bandeja de dados do jogador -->
-          <div id="dice-tray" class="hidden">
-            <div class="dice-tray-header">
-              <span class="dice-tray-title">Seu Dado — rolagem verificada pelo sistema</span>
-              <div class="dice-mod-wrap">
-                <label>Mod</label>
-                <input type="number" id="dice-modifier" value="0" min="-10" max="30">
-              </div>
-            </div>
-            <div class="dice-tray-dice">
-              <button class="dice-btn" onclick="rollPlayerDie(4)">d4</button>
-              <button class="dice-btn" onclick="rollPlayerDie(6)">d6</button>
-              <button class="dice-btn" onclick="rollPlayerDie(8)">d8</button>
-              <button class="dice-btn" onclick="rollPlayerDie(10)">d10</button>
-              <button class="dice-btn" onclick="rollPlayerDie(12)">d12</button>
-              <button class="dice-btn dice-btn-d20" onclick="rollPlayerDie(20)">d20</button>
-              <button class="dice-btn dice-btn-d100" onclick="rollPlayerDie(100)">d%</button>
-            </div>
-          </div>
-        </div>
-        <div class="input-hint">/ para comandos · Enter para enviar · Shift+Enter para nova linha</div>
-      </div>
-    </main>
-
   </div>
 
   <script src="/static/js/utils.js?v=2"></script>
   <script src="/static/js/game.js?v=3"></script>
+
+  <script>
+    (function() {
+      try {
+        const s = JSON.parse(localStorage.getItem('rpg_session') || '{}');
+        if (s.campaign) document.getElementById('cover-title').textContent = s.campaign;
+      } catch (_) {}
+    })();
+
+    // Wrappers chamados pelos botões da sidebar
+    // AGORA ELES FECHAM A SIDEBAR IMEDIATAMENTE!
+    function customBackToMenu() { 
+      toggleSidebar(true); 
+      exitGame(false); 
+    }
+    function customLogout() { 
+      toggleSidebar(true); 
+      exitGame(true);  
+    }
+
+    function toggleSidebar(forceClose) {
+      const sidebar = document.getElementById('sidebar');
+      const overlay = document.getElementById('sidebar-overlay');
+
+      if (forceClose === true || (forceClose && forceClose.type === 'click')) {
+        sidebar.classList.remove('active');
+        overlay.classList.remove('active');
+      } else {
+        sidebar.classList.toggle('active');
+        overlay.classList.toggle('active');
+      }
+    }
+
+    async function exitGame(isLogout) {
+      if (typeof waiting !== 'undefined' && waiting) {
+        if (typeof showAlert === 'function') await showAlert('Aguarde', 'Espere a narração terminar antes de sair.', 'warning');
+        else alert('Espere a narração terminar antes de sair.');
+        return;
+      }
+
+      const title = isLogout ? 'Sair do Sistema' : 'Voltar ao Menu';
+      const msg = isLogout ? 'Você será desconectado da sua conta.' : 'A sua jornada será salva automaticamente antes de sair.';
+      const btnText = isLogout ? 'Sair' : 'Voltar';
+
+      if (typeof showConfirm === 'function') {
+        const ok = await showConfirm(title, msg, 'warning', btnText);
+        if (!ok) return;
+      } else {
+        if (!confirm(title + '\n' + msg)) return;
+      }
+
+      const cover = document.querySelector('.tome-cover');
+      if (cover) {
+        cover.classList.remove('animate-open');
+        void cover.offsetWidth; 
+        cover.classList.add('animate-close');
+      }
+
+      try {
+        if (typeof authFetch === 'function') {
+          await authFetch('/api/session/end', { method: 'POST' });
+        } else {
+          const token = localStorage.getItem('rpg_access_token') || localStorage.getItem('access_token');
+          await fetch('/api/session/end', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+        }
+      } catch (e) {
+        console.error('Erro ao encerrar sessão no servidor:', e);
+      }
+
+      if (isLogout) {
+        if (typeof clearTokens === 'function') {
+          clearTokens();
+        } else {
+          localStorage.removeItem('rpg_access_token');
+          localStorage.removeItem('rpg_refresh_token');
+        }
+        localStorage.removeItem('rpg_session');
+      }
+
+      setTimeout(() => {
+        window.location.href = isLogout ? '/login.html' : '/menu.html';
+      }, cover ? 1000 : 0);
+    }
+  </script>
 </body>
 
 </html>
