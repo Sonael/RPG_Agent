@@ -7,3 +7,4 @@ campanhas/
 *.md
 !requirements.txt
 .DS_Store
+.claude/

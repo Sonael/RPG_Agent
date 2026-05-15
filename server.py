@@ -35,6 +35,16 @@ _MANA_TOOLS  = {"use_ability", "modify_mana"}
 _INIT_TOOLS  = {"roll_initiative"}
 _ATCK_TOOLS  = {"attack_roll"}
 _LEARN_TOOLS = {"learn_spell", "learn_ability"}  # Ferramentas que ensinam magias/habilidades
+_CONDITION_TOOLS = {"apply_condition"}
+_CONDITION_APPLIED_RE = re.compile(
+    r'\b(?:'
+    r'(?:fica|ficou|está|foi|torna.?se|tornou.?se|recebe|recebeu|sofre|sofreu)\s+'
+    r'(?:a\s+condição\s+(?:de\s+)?)?'
+    r'(?:cego|enfeitiçado|paralisado|envenenado|atordoado|amedrontado|'
+    r'petrificado|invisív[ei]l|ca[ií]do|incapacitado|surdo|exausto|agarrado)'
+    r')',
+    re.IGNORECASE,
+)
 
 # Padrões que indicam que o agente narrou mecânicas sem ferramentas
 _COMBAT_START_RE = re.compile(
@@ -126,6 +136,15 @@ def _verify_agent_response(
             "sem chamar learn_spell() ou learn_ability(). "
             "A magia NÃO foi adicionada à ficha. "
             "Chame learn_spell(char_name, spell_name) agora para registrar corretamente."
+        )
+
+    # 6. Condição aplicada narrativamente sem apply_condition()
+    if (not _CONDITION_TOOLS.intersection(tools_called)
+            and _CONDITION_APPLIED_RE.search(text)):
+        violations.append(
+            "Narrou aplicação de condição (cego, paralisado, envenenado, etc.) "
+            "sem chamar apply_condition(). A condição NÃO foi salva na ficha. "
+            "Chame apply_condition(char_name, 'condição') para registrar o efeito mecânico."
         )
 
     return violations

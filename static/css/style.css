@@ -17,15 +17,18 @@
   
   --red: #c44444;
   --green: #2a8a5b;
+  --ink-main: #2d2d2d;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { overflow-x: hidden; max-width: 100%; }
 
 body {
   margin: 0; padding: 0; background-color: #1a1a1a;
   background-image: radial-gradient(circle at center, #2a2a2a 0%, #111 100%);
   font-family: 'Lora', serif; color: var(--text-main);
-  min-height: 100vh; overflow-x: hidden;
+  min-height: 100vh; overflow-x: hidden; max-width: 100%;
 }
 
 .hidden { display: none !important; }
@@ -99,9 +102,13 @@ button:disabled { opacity: 0.4; cursor: not-allowed !important; }
 .field-group { margin-bottom: 25px; }
 .field-group label { display: block; font-family: 'Lora', serif; font-size: 14px; font-weight: 600; color: var(--text-muted); margin-bottom: 5px; }
 
-input, select, textarea {
+input, textarea {
   width: 100%; background: transparent; border: none; border-bottom: 1px solid var(--page-edge); color: var(--ink-user);
   font-family: 'Caveat', cursive; font-size: 22px; padding: 5px 0; outline: none; transition: border-color 0.3s;
+}
+select {
+  width: 100%; background: transparent; border: none; border-bottom: 1px solid var(--page-edge); color: var(--ink-user);
+  font-family: 'Lora', serif; font-size: 16px; padding: 6px 0; outline: none; transition: border-color 0.3s; cursor: pointer;
 }
 input::placeholder, textarea::placeholder { color: #b3b3b3; font-family: 'Lora', serif; font-size: 14px; font-style: italic; }
 input:focus, select:focus, textarea:focus { border-bottom-color: var(--ink-user); }
@@ -112,7 +119,8 @@ textarea { resize: vertical; min-height: 40px; }
   font-size: 16px; font-weight: 500; letter-spacing: 1px; padding: 10px 20px; cursor: pointer; border-radius: 4px; transition: all 0.3s;
   text-align: center;
 }
-.btn-main:hover:not(:disabled), .btn-save:hover, .btn-danger:hover { background: var(--ink-user); box-shadow: 0 4px 10px rgba(38, 75, 130, 0.2); }
+.btn-main:hover:not(:disabled), .btn-save:hover { background: var(--ink-user); box-shadow: 0 4px 10px rgba(38, 75, 130, 0.2); }
+.btn-danger:hover { background: var(--red); box-shadow: 0 4px 10px rgba(196, 68, 68, 0.2); }
 
 .clean-button, .btn-ghost {
   background: transparent; border: 1px solid var(--page-edge); color: var(--text-main); font-family: 'Lora', serif; 
@@ -153,11 +161,18 @@ textarea { resize: vertical; min-height: 40px; }
 /* =========================================================
    GAME ESPECÍFICO (SIDEBAR DO JOGO)
    ========================================================= */
+.sidebar-header { flex-shrink: 0; }
+.sidebar-header-row { display: flex; flex-direction: column; width: 100%; }
+.sidebar-content { flex: 1; min-height: 0; overflow-y: auto; padding-right: 10px; }
+.sidebar-content::-webkit-scrollbar { width: 4px; }
+.sidebar-content::-webkit-scrollbar-track { background: transparent; }
+.sidebar-content::-webkit-scrollbar-thumb { background: #d0c8b8; border-radius: 2px; }
+
 .tab-panel { display: none; }
 .tab-panel.active { display: block; animation: fadeIn 0.3s ease; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
-.sidebar-tabs { display: flex; gap: 8px; margin-bottom: 25px; }
+.sidebar-tabs { display: flex; gap: 8px; margin-bottom: 25px; flex-shrink: 0; }
 .tab-btn { flex: 1; background: transparent; border: 1px solid var(--page-edge); padding: 8px; font-family: 'Lora', serif; font-size: 13px; cursor: pointer; border-radius: 4px; color: var(--text-muted); transition: 0.2s; }
 .tab-btn.active { background: rgba(0,0,0,0.04); font-weight: 600; color: var(--text-main); border-color: #cbbba0; }
 
@@ -190,7 +205,13 @@ textarea { resize: vertical; min-height: 40px; }
 .diary-entry-title { font-weight: bold; font-size: 14px; margin-bottom: 6px; font-family: 'Playfair Display', serif; }
 .diary-entry-content { font-size: 13px; color: var(--text-muted); line-height: 1.5; }
 
-.tt-card { padding: 4px 10px; border-radius: 4px; border: 1px solid var(--page-edge); font-size: 12px; white-space: nowrap; background: var(--page-right); }
+#turn-tracker { padding: 10px 60px; border-bottom: 1px solid var(--page-edge); background: rgba(0,0,0,0.02); }
+#turn-tracker-inner { display: flex; align-items: center; gap: 15px; }
+#tt-round-label { font-family: 'Playfair Display', serif; font-size: 14px; font-weight: 700; color: var(--ink-sys); white-space: nowrap; flex-shrink: 0; }
+#tt-cards { display: flex; gap: 8px; overflow-x: auto; flex: 1; min-width: 0; }
+#tt-cards::-webkit-scrollbar { height: 0; }
+
+.tt-card { padding: 4px 10px; border-radius: 4px; border: 1px solid var(--page-edge); font-size: 12px; white-space: nowrap; background: var(--page-right); flex-shrink: 0; }
 .tt-active { border-color: var(--ink-sys); font-weight: bold; }
 .tt-past { opacity: 0.6; }
 
@@ -204,10 +225,49 @@ textarea { resize: vertical; min-height: 40px; }
 
 .msg-label { display: none; }
 .msg-row.master .msg-bubble { font-family: 'Lora', serif; font-size: 18px; line-height: 1.7; color: var(--ink-main); text-align: justify; max-width: 95%; }
-.msg-row.master .msg-bubble p:first-of-type::first-letter { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 700; float: left; line-height: 0.8; margin-right: 6px; color: var(--text-main); }
+.msg-row.master .msg-bubble > p:first-of-type::first-letter { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 700; float: left; line-height: 0.8; margin-right: 6px; color: var(--text-main); }
 .msg-row.user { display: flex; justify-content: flex-end; }
 .msg-row.user .msg-bubble { font-family: 'Caveat', cursive; font-size: 28px; line-height: 1.2; color: var(--ink-user); max-width: 80%; text-align: right; transform: rotate(-0.5deg); }
-.msg-row.system .msg-bubble { font-family: 'Lora', serif; font-style: italic; font-size: 14px; color: var(--ink-sys); text-align: center; margin: 10px 0; border-top: 1px solid rgba(0,0,0,0.05); border-bottom: 1px solid rgba(0,0,0,0.05); padding: 5px 0; }
+/* Mensagem de sistema simples — linha divisória com texto ao centro */
+.msg-row.system .msg-bubble {
+  font-family: 'Lora', serif; font-style: italic; font-size: 13px;
+  color: var(--text-muted); display: flex; align-items: center; gap: 12px;
+  margin: 4px 0; padding: 2px 0;
+}
+.msg-row.system .msg-bubble::before,
+.msg-row.system .msg-bubble::after {
+  content: ''; flex: 1; height: 1px; background: var(--page-edge);
+}
+
+/* Cards de resultado de ferramenta (sys-card) */
+.sys-card {
+  margin: 4px auto; width: 95%; max-width: 480px;
+  background: rgba(255,255,255,0.55); border: 1px solid var(--page-edge);
+  border-radius: 8px; padding: 22px 18px 16px; position: relative;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.04);
+}
+.sys-card-badge {
+  position: absolute; top: -11px; left: 50%; transform: translateX(-50%);
+  background: var(--page-left); border: 1px solid;
+  padding: 2px 14px; border-radius: 10px;
+  font-family: 'Playfair Display', serif; font-size: 12px; font-weight: 700;
+  white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.06);
+}
+.sys-card-body {
+  font-family: 'Lora', serif; font-size: 14px; color: var(--text-main);
+  line-height: 1.8; text-align: center;
+}
+.sys-card-body strong { color: var(--ink-sys); }
+.sys-card-body em { color: var(--text-muted); }
+.sys-card-body code { font-family: 'Lora', serif; background: rgba(0,0,0,0.05); padding: 1px 5px; border-radius: 3px; font-size: 13px; }
+.sys-number {
+  font-family: 'Caveat', cursive; font-size: 24px;
+  color: var(--ink-sys); padding: 0 3px; vertical-align: middle; font-style: normal;
+}
+.sys-highlight {
+  font-weight: 700; color: var(--ink-sys);
+  border-bottom: 1px dotted var(--ink-sys); font-style: normal;
+}
 
 .cmd-list-box { text-align: left; padding: 20px; background: rgba(0,0,0,0.02); border: 1px solid var(--page-edge); border-radius: 6px; margin: 10px 0; font-style: normal; }
 .cmd-list-title { font-family: 'Playfair Display', serif; font-size: 18px; font-weight: 700; color: var(--ink-user); margin-bottom: 12px; border-bottom: 1px solid var(--page-edge); padding-bottom: 8px; text-align: center; }
@@ -351,6 +411,7 @@ textarea { resize: vertical; min-height: 40px; }
     min-height: 100dvh;
     height: auto;
     align-items: flex-start;
+    overflow-x: hidden;
   }
 
   .tome {
@@ -358,11 +419,17 @@ textarea { resize: vertical; min-height: 40px; }
     height: auto;
     max-height: none;
     min-height: 100dvh;
-    overflow: visible;
+    overflow-x: hidden;
+    overflow-y: visible;
     box-shadow: none;
     border-radius: 0;
     padding-top: 24px;
     width: 100%;
+  }
+
+  /* Cobre não ultrapassa o viewport (evita overflow horizontal) */
+  .tome-cover {
+    top: 0; left: 0; right: 0; bottom: 0;
   }
 
   /* Lombada no Topo (Fixa) */
@@ -402,8 +469,7 @@ textarea { resize: vertical; min-height: 40px; }
     border-radius: 0;
     padding: 30px 20px 48px;
     box-shadow: none;
-    flex-shrink: 0;
-    flex: none;
+    flex: 1 0 auto;
     overflow-y: visible;
     height: auto;
   }
@@ -479,12 +545,18 @@ textarea { resize: vertical; min-height: 40px; }
     height: 100%; overflow: hidden; position: static;
   }
 
-  /* Cabeçalho do Mobile Fixado no topo do Chat */
+  /* Cabeçalho do Mobile */
   #mobile-header {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 12px 15px 12px 60px; /* 60px empurra o botão para não colidir com o marcador */
+    position: relative; display: flex; align-items: center;
+    padding: 12px 15px 12px 50px; /* 50px: bookmark termina em 39px, 11px de folga */
     background: var(--page-left); border-bottom: 1px solid var(--page-edge);
     flex-shrink: 0; z-index: 10;
+  }
+  #mobile-title {
+    position: absolute; left: 50%; transform: translateX(-50%);
+    font-family: 'Playfair Display', serif; font-weight: 700; font-size: 18px;
+    text-transform: uppercase; white-space: nowrap; pointer-events: none;
+    color: var(--text-main);
   }
 
   #mobile-menu-btn {
@@ -501,12 +573,15 @@ textarea { resize: vertical; min-height: 40px; }
     -webkit-overflow-scrolling: touch;
   }
 
+  /* Turn tracker compacto no mobile */
+  #turn-tracker { padding: 8px 15px; }
+
   /* Caixa de Texto presa em baixo */
   #input-area {
-    flex-shrink: 0; 
-    padding: 10px 15px 70px 15px; /* 45px para evitar a barra de botões do Android */
+    flex-shrink: 0;
+    padding: 10px 15px env(safe-area-inset-bottom, 45px) 15px;
     background: var(--page-right);
-    border-top: 1px solid rgba(0,0,0,0.05); 
+    border-top: 1px solid rgba(0,0,0,0.05);
   }
   #chat-input { font-size: 22px; height: auto; min-height: 40px; padding: 5px; }
 
@@ -514,7 +589,7 @@ textarea { resize: vertical; min-height: 40px; }
      Tipografia e Modais Mobile
   ───────────────────────────────────────── */
   .msg-row.master .msg-bubble { font-size: 16px; line-height: 1.6; }
-  .msg-row.master .msg-bubble p:first-of-type::first-letter { font-size: 36px; margin-right: 4px; }
+  .msg-row.master .msg-bubble > p:first-of-type::first-letter { font-size: 36px; margin-right: 4px; }
   .msg-row.user .msg-bubble { font-size: 24px; max-width: 90%; }
 
   #cmd-menu { max-height: 200px; padding: 10px; }

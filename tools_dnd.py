@@ -34,6 +34,8 @@ def _auto_advance_turn() -> str:
     """
     Avança o turno e retorna o anúncio do próximo como string.
     Injetado no final de attack_roll(), use_ability() e roll_death_save().
+    Pula automaticamente personagens mortos/inconscientes/fugidos.
+    Marca turn_auto_advanced=True para que next_turn() não duplique o avanço.
     Retorna string vazia fora do combate.
     """
     cs = memory.campaign.get("combat_state")
@@ -43,24 +45,50 @@ def _auto_advance_turn() -> str:
     if not order:
         return ""
 
-    idx       = cs.get("current_turn_index", 0) + 1
-    round_num = cs.get("round", 1)
-    if idx >= len(order):
-        idx        = 0
-        round_num += 1
-        cs["round"] = round_num
+    OUT_OF_COMBAT = {"morto", "inconsciente", "estabilizado", "fugiu", "exilado"}
 
-    cs["current_turn_index"] = idx
-    cs["turn_resolved"]      = False
-    next_name = order[idx]
-    new_round = f"\n   🔔 Nova rodada! Rodada {round_num} começa." if idx == 0 else ""
-    order_str = " → ".join(f"[{n}]" if i == idx else n for i, n in enumerate(order))
-    return (
-        f"\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"⏭️  TURNO AVANÇADO — Rodada {round_num}{new_round}\n"
-        f"🎯 Próxima vez: **{next_name}**\n"
-        f"   Ordem: {order_str}"
-    )
+    idx           = cs.get("current_turn_index", 0)
+    round_num     = cs.get("round", 1)
+    initial_round = round_num
+    skipped       = []
+
+    for _ in range(len(order) + 1):
+        idx += 1
+        if idx >= len(order):
+            idx        = 0
+            round_num += 1
+
+        current_name = order[idx]
+        char         = memory.campaign["characters"].get(memory.char_key(current_name))
+        status       = (char.get("status", "") if char else "").lower()
+
+        if status in OUT_OF_COMBAT:
+            skipped.append(f"{current_name} ({status})")
+            continue
+
+        cs["current_turn_index"] = idx
+        cs["round"]              = round_num
+        cs["turn_resolved"]      = False
+        cs["turn_auto_advanced"] = True   # impede next_turn() de avançar de novo
+        memory.save_campaign()
+
+        skip_msg      = f"\n   ⏩ Pulados: {', '.join(skipped)}" if skipped else ""
+        new_round_msg = f"\n   🔔 Nova rodada! Rodada {round_num} começa." if round_num > initial_round else ""
+        order_str     = " → ".join(f"[{n}]" if i == idx else n for i, n in enumerate(order))
+        return (
+            f"\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"⏭️  TURNO AVANÇADO — Rodada {round_num}{new_round_msg}{skip_msg}\n"
+            f"🎯 Próxima vez: **{current_name}**\n"
+            f"   Ordem: {order_str}"
+        )
+
+    # Todos fora de combate — encerra
+    cs["is_active"]          = False
+    cs["initiative_order"]   = []
+    cs["current_turn_index"] = 0
+    cs["round"]              = 1
+    memory.save_campaign()
+    return "\n\n🏳️  Todos os personagens estão fora de combate. Combate encerrado automaticamente."
 
 
 # ---------------------------------------------------------------------------
@@ -508,6 +536,45 @@ ARMOR_TABLE: dict[str, dict] = {
     "escudo reforçado":          {"ca_base": 2,  "dex_bonus": "shield", "slot": "escudo"},
 }
 
+
+def _fetch_armor_data(armor_name: str) -> dict | None:
+    """
+    Busca dados de armadura no Open5e como fallback quando o item não está em ARMOR_TABLE.
+    Retorna dict no mesmo formato de ARMOR_TABLE ou None se não encontrado.
+    """
+    import requests as _req
+    slug = armor_name.lower().strip().replace(" ", "-").replace("'", "")
+    for attempt in [
+        lambda: _req.get(f"https://api.open5e.com/v1/armor/{slug}/", timeout=4),
+        lambda: _req.get("https://api.open5e.com/v1/armor/", params={"search": armor_name, "limit": 5}, timeout=4),
+    ]:
+        try:
+            r = attempt()
+            if not r.ok:
+                continue
+            data = r.json()
+            # Endpoint de lista retorna {"results": [...]}
+            if "results" in data:
+                results = data["results"]
+                if not results:
+                    continue
+                data = results[0]
+            ac_data   = data.get("armor_class", {})
+            ca_base   = int(ac_data.get("base", 10) or 10)
+            dex_bonus = ac_data.get("dex_bonus", True)
+            max_bonus = ac_data.get("max_bonus", None)
+            if not dex_bonus:
+                dex_rule = "none"
+            elif max_bonus is not None and int(max_bonus or 0) == 2:
+                dex_rule = "cap2"
+            else:
+                dex_rule = "full"
+            return {"ca_base": ca_base, "dex_bonus": dex_rule, "slot": "armadura"}
+        except Exception:
+            continue
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Condições D&D 5e com efeitos mecânicos
 # ---------------------------------------------------------------------------
@@ -698,7 +765,7 @@ def _recalculate_ca(char: dict) -> None:
     armor_name  = (equip.get("armadura") or "").lower()
     shield_name = (equip.get("escudo")   or "").lower()
 
-    armor_data  = ARMOR_TABLE.get(armor_name)
+    armor_data  = ARMOR_TABLE.get(armor_name) or _fetch_armor_data(armor_name)
     shield_data = ARMOR_TABLE.get(shield_name)
 
     if armor_data:
@@ -1382,12 +1449,37 @@ def modify_mana(char_name: str, amount: int, reason: str = "") -> str:
 # 5. Testes e combate
 # ---------------------------------------------------------------------------
 
+# Mapa de perícias D&D 5e → atributo correspondente
+SKILL_ATTR_MAP: dict[str, str] = {
+    "atletismo":          "forca",
+    "acrobacia":          "destreza",
+    "furtividade":        "destreza",
+    "prestidigitação":    "destreza",
+    "manusear animais":   "sabedoria",
+    "arcana":             "inteligencia",
+    "história":           "inteligencia",
+    "investigação":       "inteligencia",
+    "natureza":           "inteligencia",
+    "religião":           "inteligencia",
+    "percepção":          "sabedoria",
+    "intuição":           "sabedoria",
+    "medicina":           "sabedoria",
+    "sobrevivência":      "sabedoria",
+    "enganação":          "carisma",
+    "intimidação":        "carisma",
+    "atuação":            "carisma",
+    "persuasão":          "carisma",
+    "lidar com animais":  "sabedoria",
+}
+
+
 def make_skill_check(
     char_name: str,
     attribute: str,
     difficulty: int,
     advantage: bool = False,
     disadvantage: bool = False,
+    skill: str = "",
 ) -> str:
     """
     Realiza um teste de atributo: rola 1d20 + modificador vs Classe de Dificuldade.
@@ -1404,10 +1496,17 @@ def make_skill_check(
         difficulty:   Classe de Dificuldade (CD) a superar.
         advantage:    Se True, rola 2d20 e usa o maior.
         disadvantage: Se True, rola 2d20 e usa o menor.
+        skill:        Nome da perícia (ex: 'atletismo', 'furtividade'). Resolve o atributo automaticamente.
     """
     char, err = _get_char(char_name)
     if not char:
         return err
+
+    # Se skill informada, resolve o atributo automaticamente
+    if skill:
+        resolved = SKILL_ATTR_MAP.get(skill.lower().strip())
+        if resolved:
+            attribute = resolved
 
     s        = char["sheet"]
     attr_key = attribute.lower()
@@ -1428,8 +1527,9 @@ def make_skill_check(
     falha_critica = d20 == 1
     sucesso       = critico or (not falha_critica and total >= difficulty)
 
+    skill_label = f"{skill.capitalize()} ({attribute.capitalize()})" if skill else attribute.capitalize()
     result = (
-        f"🎲 Teste de {attribute.capitalize()} — CD {difficulty}\n"
+        f"🎲 Teste de {skill_label} — CD {difficulty}\n"
         f"   {char['name']}: {roll_log} {sign}{mod}(mod) = **{total}**\n"
     )
     if critico:
@@ -2459,6 +2559,58 @@ def short_rest(char_name: str) -> str:
     )
 
 
+def use_hit_die(char_name: str, count: int = 1) -> str:
+    """
+    Usa dados de vida para recuperar HP durante um descanso curto.
+    Cada dado de vida: 1d[hit_die] + modificador de CON por dado.
+    Os dados gastos se renovam no descanso longo.
+    Rastreia dados disponíveis na ficha (máximo = nível do personagem).
+
+    Use quando o jogador escolhe gastar dados de vida específicos.
+    Prefira short_rest() para descanso curto completo.
+
+    Args:
+        char_name: Nome do personagem.
+        count:     Número de dados de vida a usar (padrão: 1).
+    """
+    char, err = _get_char(char_name)
+    if not char:
+        return err
+
+    s       = char["sheet"]
+    hit_die = CLASS_DATA.get(s.get("classe", "").lower(), {}).get("hit_die", 8)
+    nivel   = s.get("nivel", 1)
+
+    hd_max       = nivel
+    hd_restantes = s.setdefault("hit_dice_remaining", hd_max)
+
+    if hd_restantes <= 0:
+        return (
+            f"❌ {char['name']} não tem dados de vida disponíveis.\n"
+            f"   Faça um descanso longo para recuperar todos os {hd_max} dados."
+        )
+
+    count = max(1, min(int(count), hd_restantes))
+    con_mod   = _modifier(s["constituicao"])
+    rolls     = [random.randint(1, hit_die) for _ in range(count)]
+    total_heal = max(count, sum(rolls) + con_mod * count)
+
+    hp_antes        = s["vida_atual"]
+    s["vida_atual"] = min(s["vida_max"], s["vida_atual"] + total_heal)
+    s["hit_dice_remaining"] = hd_restantes - count
+    hp_ganho        = s["vida_atual"] - hp_antes
+
+    memory.save_campaign()
+
+    con_str    = f" {'+' if con_mod >= 0 else ''}{con_mod * count}(CON×{count})" if con_mod != 0 else ""
+    detail_str = " + ".join(str(r) for r in rolls) if count > 1 else str(rolls[0])
+    return (
+        f"🎲 {char['name']} usa {count}d{hit_die}: [{detail_str}]{con_str} = +{hp_ganho} PV\n"
+        f"   ❤️  {hp_antes} → {s['vida_atual']}/{s['vida_max']}\n"
+        f"   Dados de vida restantes: {s['hit_dice_remaining']}/{hd_max}"
+    )
+
+
 def long_rest(char_name: str) -> str:
     """
     Descanso longo (~8 horas): restaura toda a vida e toda a mana.
@@ -2476,6 +2628,7 @@ def long_rest(char_name: str) -> str:
     s = char["sheet"]
     s["vida_atual"] = s["vida_max"]
     s["mana_atual"] = s["mana_max"]
+    s["hit_dice_remaining"] = s.get("nivel", 1)  # Renova dados de vida no descanso longo
     s["death_saves_sucessos"] = 0
     s["death_saves_falhas"]   = 0
 
@@ -2675,6 +2828,22 @@ def next_turn() -> str:
     order = cs.get("initiative_order", [])
     if not order:
         return "⚠️ Ordem de iniciativa vazia. Rode roll_initiative primeiro."
+
+    # Trava de idempotência: se a ferramenta de ação (attack_roll / use_ability /
+    # roll_death_save) já avançou o turno automaticamente, next_turn() não avança
+    # de novo — apenas confirma quem é a vez atual e limpa a flag.
+    if cs.get("turn_auto_advanced", False):
+        cs["turn_auto_advanced"] = False
+        memory.save_campaign()
+        idx      = cs.get("current_turn_index", 0)
+        current  = order[idx] if idx < len(order) else "?"
+        round_n  = cs.get("round", 1)
+        order_str = " → ".join(f"[{n}]" if i == idx else n for i, n in enumerate(order))
+        return (
+            f"ℹ️  Turno já avançado pela ferramenta de ação.\n"
+            f"⏭️  Rodada {round_n} — vez de: **{current}**\n"
+            f"   Ordem: {order_str}"
+        )
 
     OUT_OF_COMBAT = {"morto", "inconsciente", "estabilizado", "fugiu", "exilado"}
 
@@ -3037,6 +3206,18 @@ def learn_spell(char_name: str, spell_name: str) -> str:
             f"Requer personagem nível {min_char_lv} (magia nível {spell_level})."
         )
 
+    # Valida se a magia pertence à lista da classe do personagem
+    char_class = sheet.get("classe", "").lower()
+    en_class   = _CLASS_SLUG_MAP.get(char_class, "")
+    if en_class and spell:
+        spell_classes = spell.get("dnd_class", "").lower()
+        if spell_classes and en_class not in spell_classes:
+            return (
+                f"❌ **{spell_name}** não está na lista de magias de {char_class.capitalize()}.\n"
+                f"   Disponível para: {spell.get('dnd_class', 'desconhecido')}\n"
+                f"   Use learn_spell() com uma magia adequada para {char_class}."
+            )
+
     existing = [h["nome"].lower() for h in char.get("habilidades", [])]
     if spell_name.lower() in existing:
         return f"ℹ️ {char['name']} já conhece {spell_name}."
@@ -3379,6 +3560,154 @@ def choose_feat(char_name: str, feat_name: str) -> str:
     )
 
 
+# ---------------------------------------------------------------------------
+# Estratégia de NPC — sistema determinístico de combate
+# ---------------------------------------------------------------------------
+
+NPC_STRATEGIES = {
+    "agressivo":  "Ataca o alvo com mais HP (mais ameaçador).",
+    "tático":     "Ataca o alvo com menos HP (terminar logo).",
+    "covarde":    "Foge quando HP < 25%; senão ataca o mais fraco.",
+    "aleatório":  "Escolhe alvo e ação aleatoriamente.",
+    "suporte":    "Cura aliados com HP < 50% se possível; senão ataca.",
+}
+
+
+def set_npc_strategy(npc_name: str, strategy: str) -> str:
+    """
+    Define a estratégia de combate de um NPC para o sistema de turno automático.
+    A estratégia determina como execute_npc_turn() escolhe o alvo.
+
+    Estratégias disponíveis:
+    • agressivo  — ataca o alvo com mais HP (mais ameaçador)
+    • tático     — ataca o alvo com menos HP (eliminar o mais fraco)
+    • covarde    — foge quando HP < 25%; senão ataca o mais fraco
+    • aleatório  — escolhe alvo aleatoriamente
+    • suporte    — cura aliados com HP < 50%; senão ataca
+
+    Args:
+        npc_name: Nome do NPC.
+        strategy: Nome da estratégia (agressivo, tático, covarde, aleatório, suporte).
+    """
+    cs = memory.campaign.get("combat_state", {})
+    if not cs.get("is_active"):
+        return "⚠️ Nenhum combate ativo."
+    strategy = strategy.lower().strip()
+    if strategy not in NPC_STRATEGIES:
+        opts = ", ".join(NPC_STRATEGIES.keys())
+        return f"⚠️ Estratégia '{strategy}' inválida. Opções: {opts}"
+    cs.setdefault("npc_strategies", {})[npc_name.lower()] = strategy
+    memory.save_campaign()
+    return f"🎯 Estratégia de {npc_name} definida: **{strategy}** — {NPC_STRATEGIES[strategy]}"
+
+
+def execute_npc_turn(npc_name: str = "") -> str:
+    """
+    Executa o turno do NPC atual (ou do NPC especificado) de forma totalmente
+    determinística: escolhe alvo com base na estratégia configurada e chama
+    attack_roll() automaticamente. A IA só precisa narrar o resultado.
+
+    Se nenhuma estratégia foi configurada, usa 'agressivo' por padrão.
+    Se o NPC for covarde e estiver com HP < 25%, foge do combate.
+
+    Args:
+        npc_name: Nome do NPC (opcional — se omitido, usa o NPC do turno atual).
+    """
+    cs = memory.campaign.get("combat_state", {})
+    if not cs.get("is_active"):
+        return "⚠️ Nenhum combate ativo."
+
+    order = cs.get("initiative_order", [])
+    if not order:
+        return "⚠️ Ordem de iniciativa vazia."
+
+    # Resolve qual NPC age
+    if not npc_name:
+        idx      = cs.get("current_turn_index", 0)
+        npc_name = order[idx] if idx < len(order) else ""
+    if not npc_name:
+        return "⚠️ Não foi possível determinar o NPC atual."
+
+    npc, err = _get_char(npc_name)
+    if not npc:
+        return f"⚠️ NPC '{npc_name}' não encontrado: {err}"
+
+    # Garante que não é um personagem do grupo
+    party_keys = {memory.char_key(p.get("name", "")) for p in memory.campaign.get("party", [])}
+    if memory.char_key(npc_name) in party_keys:
+        return (
+            f"⚠️ {npc_name} é um personagem do grupo — use attack_roll() "
+            f"conforme instrução do jogador."
+        )
+
+    strategy = cs.get("npc_strategies", {}).get(npc_name.lower(), "agressivo")
+    npc_sheet = npc.get("sheet", {}) or {}
+
+    # Lógica de fuga (covarde)
+    if strategy == "covarde":
+        hp_pct = (npc_sheet.get("vida_atual", 1) /
+                  max(1, npc_sheet.get("vida_max", 1)))
+        if hp_pct <= 0.25:
+            npc["status"] = "fugiu"
+            memory.save_campaign()
+            advance = _auto_advance_turn()
+            return (
+                f"💨 {npc_name} está com {int(hp_pct * 100)}% de HP e FOGE do combate!"
+                f"{advance}"
+            )
+
+    # Monta lista de alvos válidos (membros do grupo vivos)
+    chars     = memory.campaign.get("characters", {})
+    targets   = []
+    for p in memory.campaign.get("party", []):
+        p_name  = p.get("name", "")
+        p_key   = memory.char_key(p_name)
+        p_char  = chars.get(p_key, {})
+        p_stat  = p_char.get("status", "vivo").lower()
+        if p_stat in ("morto", "estabilizado", "fugiu", "exilado"):
+            continue
+        p_sheet = p_char.get("sheet", {}) or {}
+        targets.append({
+            "name":   p_name,
+            "hp":     p_sheet.get("vida_atual", 0),
+            "hp_max": p_sheet.get("vida_max", 1),
+        })
+
+    if not targets:
+        return f"⚔️ {npc_name} não encontra alvos válidos. Verifique se o combate deve encerrar com end_combat()."
+
+    # Seleção de alvo por estratégia
+    if strategy == "agressivo":
+        target = max(targets, key=lambda t: t["hp"])
+    elif strategy in ("tático", "covarde"):
+        target = min(targets, key=lambda t: t["hp"])
+    elif strategy == "aleatório":
+        target = random.choice(targets)
+    else:  # suporte ou padrão
+        target = min(targets, key=lambda t: t["hp"])
+
+    # Determina arma equipada
+    npc_equip = npc_sheet.get("equipamentos", {}) or {}
+    weapon    = npc_equip.get("arma_principal") or "shortsword"
+
+    # Determina atributo de ataque (força por padrão para NPCs)
+    atk_attr = "forca"
+    if any(k in weapon.lower() for k in ("arco", "besta", "dardo", "funda")):
+        atk_attr = "destreza"
+
+    # Executa o ataque (inclui _auto_advance_turn() internamente)
+    return attack_roll(
+        attacker_name    = npc_name,
+        target_name      = target["name"],
+        weapon           = weapon,
+        damage_dice_sides= 6,   # fallback; attack_roll busca via Open5e
+        damage_dice_count= 1,
+        attack_attribute = atk_attr,
+        is_proficient    = True,
+        end_turn         = True,
+    )
+
+
 DND_TOOLS = [
     suggest_encounter,
     learn_spell,
@@ -3406,11 +3735,15 @@ DND_TOOLS = [
     grant_xp,
     short_rest,
     long_rest,
+    use_hit_die,
     set_stat,
     # Sistema de Iniciativa (v3)
     roll_initiative,
     next_turn,
     end_combat,
+    # NPC strategy system
+    set_npc_strategy,
+    execute_npc_turn,
     # Macro-tools (v4)
     resolve_saving_throw,
 ]

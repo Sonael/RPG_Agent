@@ -3,6 +3,18 @@
 // ═══════════════════════════════════════
 let waiting = false;
 let maxRPD = parseInt(localStorage.getItem('rpg_max_rpd') || '500');
+
+// Reseta contadores se o dia mudou (meia-noite no timezone do utilizador)
+(function resetQuotaIfNewDay() {
+  const today = new Date().toLocaleDateString('sv'); // "YYYY-MM-DD" sem depender de locale
+  const stored = localStorage.getItem('rpg_quota_date');
+  if (stored !== today) {
+    localStorage.setItem('rpg_quota_date', today);
+    localStorage.setItem('rpg_daily_reqs', '0');
+    localStorage.setItem('rpg_total_tokens', '0');
+  }
+})();
+
 let sessionRequests = parseInt(localStorage.getItem('rpg_daily_reqs') || '0');
 let sessionTokens = parseInt(localStorage.getItem('rpg_total_tokens') || '0');
 
@@ -215,6 +227,13 @@ async function sendToAgent(text, registrar) {
         const ev = JSON.parse(line.slice(6));
 
         if (ev.type === 'quota') {
+          // Verifica se passou a meia-noite durante a sessão
+          const today = new Date().toLocaleDateString('sv');
+          if (localStorage.getItem('rpg_quota_date') !== today) {
+            localStorage.setItem('rpg_quota_date', today);
+            sessionRequests = 0;
+            sessionTokens = 0;
+          }
           sessionRequests++;
           sessionTokens += (ev.content.total_tokens || 0);
           localStorage.setItem('rpg_daily_reqs', sessionRequests);
@@ -279,10 +298,13 @@ async function sendToAgent(text, registrar) {
 function updateQuotaUI() {
   const reqEl = document.getElementById('stat-req');
   const tokEl = document.getElementById('stat-tokens');
+  const tokElSb = document.getElementById('sb-stat-tokens');
   const barEl = document.getElementById('rpm-bar');
 
   if (reqEl) reqEl.textContent = `${sessionRequests} / ${maxRPD}`;
-  if (tokEl) tokEl.textContent = sessionTokens.toLocaleString();
+  const tokStr = sessionTokens.toLocaleString();
+  if (tokEl) tokEl.textContent = tokStr;
+  if (tokElSb) tokElSb.textContent = tokStr;
 
   if (barEl) {
     const dailyPercent = Math.min((sessionRequests / maxRPD) * 100, 100);
@@ -333,8 +355,13 @@ async function handleSlash(raw) {
     const mem = await (await authFetch(`${API}/api/memory`)).json(); let html = '';
     
     if (cmd === '/personagens') {
-      const list = mem.characters.map(c => `<div class="cmd-list-item"><b>${c.name}</b> (${c.status})<br><span style="color:var(--text-muted);font-size:13px;">${c.description}</span></div>`).join('<hr style="border:none;border-top:1px dashed var(--page-edge);margin:8px 0;">');
-      html = `<div class="cmd-list-box"><div class="cmd-list-title">👥 Personagens na Memória</div>${list || 'Nenhum personagem.'}</div>`;
+      const sep = '<hr style="border:none;border-top:1px dashed var(--page-edge);margin:8px 0;">';
+      const renderChar = c => `<div class="cmd-list-item"><b>${c.name}</b> (${c.status || 'vivo'})<br><span style="color:var(--text-muted);font-size:13px;">${c.description || ''}</span></div>`;
+      const partyList  = (mem.party || []).map(renderChar).join(sep);
+      const npcList    = (mem.characters || []).map(renderChar).join(sep);
+      const partyHtml  = partyList ? `<div class="cmd-list-title" style="font-size:11px;margin-top:10px;border:none;padding:0 0 4px;">🫂 GRUPO</div>${partyList}` : '';
+      const npcHtml    = npcList   ? `<div class="cmd-list-title" style="font-size:11px;margin-top:${partyList?'14px':'0'};border:none;padding:0 0 4px;">👤 OUTROS</div>${npcList}` : '';
+      html = `<div class="cmd-list-box"><div class="cmd-list-title">👥 Personagens na Memória</div>${partyHtml || ''}${npcHtml || ''}${!partyList && !npcList ? 'Nenhum personagem.' : ''}</div>`;
     }
     else if (cmd === '/locais') {
       const list = (mem.locations || []).map(l => `<div class="cmd-list-item"><b>${l.name}</b><br><span style="color:var(--text-muted);font-size:13px;">${l.description}</span></div>`).join('<hr style="border:none;border-top:1px dashed var(--page-edge);margin:8px 0;">');
@@ -378,11 +405,12 @@ async function handleSlash(raw) {
     const allChars = [...(mem.party || []), ...(mem.characters || [])];
     let chars;
     if (targetName) {
-      const c = allChars.find(ch => ch.name?.toLowerCase() === targetName && ch.sheet);
+      // Busca por nome em todos os personagens (grupo + NPCs), com ou sem sheet
+      const c = allChars.find(ch => ch.name?.toLowerCase() === targetName);
       chars = c ? [c] : [];
     } else {
-      chars = (mem.party || []).filter(c => c.sheet);
-      if (!chars.length) chars = allChars.filter(c => c.sheet);
+      // Sem argumento: mostra todos com ficha D&D completa (grupo + inimigos)
+      chars = allChars.filter(c => c.sheet);
     }
     return { mem, chars };
   }
@@ -396,11 +424,21 @@ async function handleSlash(raw) {
     if (!chars.length) { appendSystem(`<p>${target ? `Nenhuma ficha encontrada para '${target}'.` : 'Nenhum membro possui ficha D&D.'}</p>`); return true; }
 
     const text = chars.map(c => {
+      // Personagem sem ficha D&D completa (NPC simples registrado no combate)
+      if (!c.sheet) {
+        const hpAtual = c.vida_atual ?? c.hp ?? '?';
+        const hpMax   = c.vida_max  ?? c.hp_max ?? '?';
+        return `<div class="cmd-sheet">
+          <div class="cmd-sheet-title">👤 ${c.name}</div>
+          <div class="cmd-sheet-sub">${c.description || 'NPC'} · Status: ${c.status || 'vivo'}</div>
+          <div class="cmd-sheet-bars"><span>❤️ ${hpAtual}/${hpMax} HP</span></div>
+        </div>`;
+      }
       const s = c.sheet; const eq = s.equipamentos || {};
       const conds = s.condicoes?.length ? s.condicoes.map(cd => cd.nome || cd).join(', ') : 'Nenhuma';
       const hpBar = s.vida_max > 0 ? Math.round((s.vida_atual / s.vida_max) * 10) : 0;
       const hpVis = `<span class="bar-fill">${'█'.repeat(hpBar)}</span><span class="bar-empty">${'█'.repeat(10-hpBar)}</span>`;
-      
+
       return `<div class="cmd-sheet">
         <div class="cmd-sheet-title">🛡️ Ficha — ${c.name}</div>
         <div class="cmd-sheet-sub">Nível ${s.nivel} ${s.classe} (${s.raca}) · XP: ${s.xp}/${s.xp_proximo}</div>
@@ -527,33 +565,18 @@ async function handleSlash(raw) {
     const rollStr = numDice > 1 ? `[${rolls.join(' + ')}]` : `${rolls[0]}`;
     const isCrit   = sides === 20 && numDice === 1 && rolls[0] === 20;
     const isFumble = sides === 20 && numDice === 1 && rolls[0] === 1;
-    const tag = isCrit ? '<br><b style="color:var(--ink-sys); border-bottom:1px dotted var(--ink-sys);">CRÍTICO NATURAL</b>' : isFumble ? '<br><b style="color:var(--ink-sys); border-bottom:1px dotted var(--ink-sys);">FALHA CRÍTICA</b>' : '';
-    
+    const tag = isCrit ? '<br><span class="sys-highlight">CRÍTICO NATURAL</span>' : isFumble ? '<br><span class="sys-highlight">FALHA CRÍTICA</span>' : '';
     const row = document.createElement('div'); row.className = 'msg-row system';
     row.innerHTML = `
-      <div class="cmd-list-box" style="
-        margin: 15px auto; width: 95%; max-width: 500px; 
-        background: rgba(38, 75, 130, 0.03); 
-        border: 1px solid #cbbba0; border-radius: 8px; 
-        padding: 20px 15px 15px 15px; position: relative;
-      ">
-        <div style="
-          position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
-          background: var(--page-left); border: 1px solid #cbbba0;
-          padding: 2px 15px; border-radius: 12px; font-family: 'Playfair Display', serif; 
-          font-size: 13px; font-weight: 700; color: var(--ink-user); white-space: nowrap;
-        ">
-          🎲 Rolagem Local: ${formula}
+      <div class="sys-card">
+        <div class="sys-card-badge" style="color:var(--ink-user); border-color:var(--ink-user);">🎲 Rolagem Local: ${formula}</div>
+        <div class="sys-card-body">
+          Resultado: <span class="sys-number">${rollStr}</span>${bonStr} = <strong>${total}</strong>${tag}
         </div>
-        <div style="font-family: 'Lora', serif; font-size: 16px; color: var(--text-main); text-align: center;">
-          Resultado: <span style="font-family:'Caveat',cursive; font-size:28px; color:var(--ink-user); padding: 0 6px; vertical-align: middle;">${rollStr}</span> ${bonStr} = <b style="font-size:18px;">${total}</b>
-          ${tag}
-        </div>
-        <div style="font-size:11px; color:var(--text-muted); margin-top:12px; text-align:center;">
+        <div style="font-family:'Lora',serif; font-size:11px; color:var(--text-dim); margin-top:10px; text-align:center; font-style:italic;">
           Não enviado ao Mestre.
         </div>
-      </div>
-    `;
+      </div>`;
     document.getElementById('chat-history').appendChild(row); scrollDown();
     return true;
   }
@@ -658,78 +681,51 @@ function renderDiceFromResponse(text, diceToolNames) {
   }
 }
 
+// Converte markdown básico em HTML (bold, italic, code, listas simples)
+function _parseMd(text) {
+  return escapeHtml(text)
+    .replace(/\*\*(.+?)\*\*/gs, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/gs, '<em>$1</em>')
+    .replace(/`(.+?)`/g, '<code>$1</code>')
+    .replace(/\n/g, '<br>');
+}
+
 function appendDiceResultLog(toolName, content) {
   const labels = {
-    attack_roll: '⚔️ Ação de Combate',
-    make_skill_check: '🎯 Teste de Habilidade',
-    roll_dice: '🎲 Rolagem de Dados',
-    use_ability: '⚡ Uso de Magia/Habilidade',
-    roll_death_save: '💀 Teste de Resistência à Morte',
-    modify_hp: '❤️ Atualização de Pontos de Vida',
-    modify_mana: '✨ Atualização de Mana',
-    grant_xp: '⭐ Pontos de Experiência',
-    short_rest: '🛌 Descanso Curto',
-    long_rest: '🌙 Descanso Longo',
+    attack_roll:      { badge: '⚔️ Ação de Combate',              color: 'var(--ink-sys)' },
+    make_skill_check: { badge: '🎯 Teste de Habilidade',           color: 'var(--ink-user)' },
+    roll_dice:        { badge: '🎲 Rolagem de Dados',              color: 'var(--ink-user)' },
+    use_ability:      { badge: '⚡ Magia / Habilidade',            color: '#7b5ea7' },
+    roll_death_save:  { badge: '💀 Resistência à Morte',           color: 'var(--ink-sys)' },
+    modify_hp:        { badge: '❤️ Pontos de Vida',                color: '#c05858' },
+    modify_mana:      { badge: '✨ Mana',                          color: '#4a6bbf' },
+    grant_xp:         { badge: '⭐ Experiência',                   color: '#a07828' },
+    short_rest:       { badge: '🛌 Descanso Curto',                color: 'var(--green)' },
+    long_rest:        { badge: '🌙 Descanso Longo',                color: 'var(--green)' },
+    advance_turn:     { badge: '⏩ Turno Avançado',                color: 'var(--ink-sys)' },
   };
-  const label = labels[toolName] || '⚙️ Resolução do Sistema';
+  const cfg = labels[toolName] || { badge: '⚙️ Sistema', color: 'var(--text-muted)' };
 
-  let safeContent = escapeHtml(content.trim());
-  
-  // Realce visual imersivo para valores e atributos RPG
-  let formattedContent = safeContent
-    .replace(/\n/g, '<br>')
-    // Destaca Números e Atributos: ex "d20=18", "Dano: 12", "Cura: 4"
-    .replace(/(d20=|Dano:|Cura:|Custo:|Vida:|CA:|Total:|XP:)\s*([+\-]?\d+)/gi, 
-      '<b>$1</b> <span style="font-family:\'Caveat\',cursive; font-size:24px; color:var(--ink-sys); padding: 0 4px; vertical-align: middle;">$2</span>')
-    // Destaca Vantagem / Desvantagem / Crítico
-    .replace(/(Com Vantagem|Com Desvantagem|CRÍTICO NATURAL|FALHA CRÍTICA|Falhou)/gi, 
-      '<b style="color:var(--ink-sys); border-bottom:1px dotted var(--ink-sys);">$1</b>');
+  // Parse markdown + destacar padrões RPG
+  let body = _parseMd(content.trim())
+    .replace(/(d\d+=|Dano:|Cura:|Custo:|Vida:|CA:|Total:|XP:|Mana:)\s*([+\-]?\d+)/gi,
+      '<strong>$1</strong> <span class="sys-number">$2</span>')
+    .replace(/(\d+d\d+(?:[+\-]\d+)?\s*[:=]\s*\[?[^\]<br>]+\]?)/gi,
+      '<span class="sys-number" style="font-size:18px;">$1</span>')
+    .replace(/(CRÍTICO NATURAL|FALHA CRÍTICA|Com Vantagem|Com Desvantagem)/gi,
+      '<span class="sys-highlight">$1</span>');
 
-  const row = document.createElement('div'); 
+  const row = document.createElement('div');
   row.className = 'msg-row system';
-  
   row.innerHTML = `
-    <div class="cmd-list-box" style="
-      margin: 15px auto; 
-      width: 95%; 
-      max-width: 500px; 
-      background: rgba(255, 255, 255, 0.5); 
-      border: 1px solid #cbbba0; 
-      border-radius: 8px; 
-      padding: 20px 15px 15px 15px; 
-      box-shadow: 0 5px 15px rgba(0,0,0,0.03);
-      position: relative;
-    ">
-      <div style="
-        position: absolute; 
-        top: -12px; left: 50%; transform: translateX(-50%);
-        background: var(--page-left); 
-        border: 1px solid #cbbba0;
-        padding: 2px 15px; 
-        border-radius: 12px; 
-        font-family: 'Playfair Display', serif; 
-        font-size: 13px; 
-        font-weight: 700; 
-        color: var(--ink-user);
-        white-space: nowrap;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-      ">
-        ${label}
+    <div class="sys-card">
+      <div class="sys-card-badge" style="color:${cfg.color}; border-color:${cfg.color};">
+        ${cfg.badge}
       </div>
-      
-      <div style="
-        font-family: 'Lora', serif; 
-        font-size: 15px; 
-        color: var(--text-main); 
-        line-height: 1.6; 
-        text-align: center;
-      ">
-        ${formattedContent}
-      </div>
-    </div>
-  `;
-  
-  document.getElementById('chat-history').appendChild(row); 
+      <div class="sys-card-body">${body}</div>
+    </div>`;
+
+  document.getElementById('chat-history').appendChild(row);
   scrollDown();
 }
 
@@ -752,34 +748,20 @@ function rollPlayerDie(sides) {
   if (_diceTrayOpen) toggleDiceTray();
 
   const modStr = modifier !== 0 ? ` ${modifier >= 0 ? '+' : ''}${modifier}` : '';
-  const statusLabel = isCrit ? '<br><b style="color:var(--ink-sys); border-bottom:1px dotted var(--ink-sys);">CRÍTICO NATURAL</b>' : isFumble ? '<br><b style="color:var(--ink-sys); border-bottom:1px dotted var(--ink-sys);">FALHA CRÍTICA</b>' : '';
-  
-  const row = document.createElement('div'); 
+  const statusLabel = isCrit ? '<br><span class="sys-highlight">CRÍTICO NATURAL</span>' : isFumble ? '<br><span class="sys-highlight">FALHA CRÍTICA</span>' : '';
+
+  const row = document.createElement('div');
   row.className = 'msg-row system';
   row.innerHTML = `
-    <div class="cmd-list-box" style="
-      margin: 15px auto; width: 95%; max-width: 500px; 
-      background: rgba(38, 75, 130, 0.03); 
-      border: 1px solid #cbbba0; border-radius: 8px; 
-      padding: 20px 15px 15px 15px; position: relative;
-    ">
-      <div style="
-        position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
-        background: var(--page-left); border: 1px solid #cbbba0;
-        padding: 2px 15px; border-radius: 12px; font-family: 'Playfair Display', serif; 
-        font-size: 13px; font-weight: 700; color: var(--ink-user); white-space: nowrap;
-      ">
-        🎲 Sua Rolagem: 1d${sides}${modStr}
+    <div class="sys-card">
+      <div class="sys-card-badge" style="color:var(--ink-user); border-color:var(--ink-user);">🎲 Sua Rolagem: 1d${sides}${modStr}</div>
+      <div class="sys-card-body">
+        <span class="sys-number">${rawRoll}</span>${modStr ? ` <em>(${modStr})</em>` : ''} = <strong>${total}</strong>${statusLabel}
       </div>
-      <div style="font-family: 'Lora', serif; font-size: 16px; color: var(--text-main); text-align: center;">
-        Resultado: <span style="font-family:'Caveat',cursive; font-size:28px; color:var(--ink-user); padding: 0 6px; vertical-align: middle;">${rawRoll}</span> ${modStr ? `(${modStr})` : ''} = <b style="font-size:18px;">${total}</b>
-        ${statusLabel}
-      </div>
-      <div style="font-size:11px; color:var(--text-muted); margin-top:12px; text-align:center;">
+      <div style="font-family:'Lora',serif; font-size:11px; color:var(--text-dim); margin-top:10px; text-align:center; font-style:italic;">
         Enviado ao Oráculo 🔒
       </div>
-    </div>
-  `;
+    </div>`;
   document.getElementById('chat-history').appendChild(row); scrollDown();
 
   const msg = `[DADO DO JOGADOR — rolado pelo sistema, não editável] 1d${sides}${modStr}: rolei ${rawRoll}, total ${total}`;
@@ -818,7 +800,9 @@ function appendMaster(text) {
 function appendSystem(text) {
   const row = document.createElement('div'); row.className = 'msg-row system';
   const b = document.createElement('div'); b.className = 'msg-bubble';
-  b.innerHTML = text; row.appendChild(b);
+  // Se já for HTML (começa com '<'), usa direto; senão, parseia markdown básico
+  b.innerHTML = text.trimStart().startsWith('<') ? text : _parseMd(text);
+  row.appendChild(b);
   document.getElementById('chat-history').appendChild(row); scrollDown(); return row;
 }
 

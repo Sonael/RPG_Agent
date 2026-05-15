@@ -40,6 +40,8 @@ def _defaults() -> dict:
             "current_turn_index":  0,
             "round":               1,
             "turn_resolved":       False,  # True após attack_roll/use_ability; False ao chamar next_turn
+            "npc_strategies":      {},
+            "turn_auto_advanced":  False,
         },
     }
 
@@ -81,11 +83,47 @@ def _migrate_combat_state() -> None:
         "current_turn_index": 0,
         "round":              1,
         "turn_resolved":      False,
+        "npc_strategies":     {},
+        "turn_auto_advanced": False,
     }
     cs = campaign.setdefault("combat_state", {})
     for key, val in defaults.items():
         if key not in cs:
             cs[key] = val
+
+
+_SPELL_PLACEHOLDER = "Magia inicial da classe. Use learn_spell() para enriquecer com dados do Open5e."
+
+def _migrate_spell_descriptions() -> None:
+    """
+    Substitui descrições placeholder de magias iniciais pelos dados reais de
+    DEFAULT_SPELLS_BY_CLASS. Roda automaticamente ao carregar a campanha,
+    corrigindo personagens criados antes da correção do wizard.
+    """
+    try:
+        from tools_dnd import DEFAULT_SPELLS_BY_CLASS
+    except ImportError:
+        return  # ferramentas não disponíveis ainda
+
+    for char in campaign.get("characters", {}).values():
+        sheet = char.get("sheet")
+        if not sheet:
+            continue
+        classe = sheet.get("classe", "").lower()
+        spell_pool = DEFAULT_SPELLS_BY_CLASS.get(classe, [])
+        if not spell_pool:
+            continue
+        # Índice nome→dados para lookup rápido
+        spell_map = {s["nome"].lower(): s for s in spell_pool}
+
+        for hab in char.get("habilidades", []):
+            if hab.get("descricao") != _SPELL_PLACEHOLDER:
+                continue
+            data = spell_map.get(hab.get("nome", "").lower())
+            if data:
+                hab["descricao"]  = data["descricao"]
+                hab["custo_mana"] = data["custo_mana"]
+                hab["dado"]       = data.get("dado", hab.get("dado", ""))
 
 
 def char_key(name: str) -> str:
@@ -151,6 +189,9 @@ def load_campaign() -> bool:
 
         # Migra estrutura de estado de combate para campanhas antigas
         _migrate_combat_state()
+
+        # Substitui descrições placeholder de magias pelos dados reais
+        _migrate_spell_descriptions()
 
         print(
             f"Campanha carregada: {chars} personagens, {locs} locais, "

@@ -564,16 +564,62 @@ function wzOnBackgroundChange(i, bg) {
 }
 
 
-// ── Magias iniciais por classe — exibidas no wizard para seleção ──────────────
+// ── Magias iniciais por classe — objetos completos espelhando DEFAULT_SPELLS_BY_CLASS (Python) ──
+// Mantido em sincronismo com tools_dnd.py → DEFAULT_SPELLS_BY_CLASS
 const INITIAL_SPELLS_WZ = {
-  mago:        ['Míssil Mágico','Mãos Ardentes','Sono','Prestidigitação','Luz','Raio de Gelo'],
-  feiticeiro:  ['Míssil Mágico','Mãos Ardentes','Bola de Fogo','Chamas Sagradas','Luz','Raio de Gelo'],
-  bruxo:       ['Golpe Místico','Hex','Armadura do Agathys','Ilusão Menor'],
-  clérigo:     ['Cura Ferimentos','Bênção','Guia Divino','Chamas Sagradas','Orientação'],
-  druida:      ['Emaranhar','Cura Ferimentos','Névoa','Produzir Chama','Orientação'],
-  bardo:       ['Palavra Curativa','Encantamento','Sono','Insulto Cruel','Luz'],
-  paladino:    ['Punição Divina','Escudo da Fé','Cura Ferimentos'],
-  patrulheiro: ['Marca do Caçador','Névoa','Cura Ferimentos'],
+  mago: [
+    {nome:'Míssil Mágico',   descricao:'[Evocação] 3 dardos de força, 1d4+1 dano cada. Automático.',             custo_mana:4,  dado:'1d4'},
+    {nome:'Mãos Ardentes',   descricao:'[Evocação] Cone de 4,5m, 3d6 dano de fogo. DEX salva metade.',           custo_mana:4,  dado:'3d6'},
+    {nome:'Sono',            descricao:'[Encantamento] Afeta 5d8 PV de criaturas, começando pelas mais fracas.',  custo_mana:4,  dado:'5d8'},
+    {nome:'Prestidigitação', descricao:'[Truque] Efeitos mágicos menores: acender velas, limpar objetos, sons.',  custo_mana:0,  dado:''},
+    {nome:'Luz',             descricao:'[Truque de evocação] Objeto toca emite luz como tocha por 1 hora.',       custo_mana:0,  dado:''},
+    {nome:'Raio de Gelo',    descricao:'[Truque] Ataque mágico à distância: 1d8 dano de frio + velocidade -3m.', custo_mana:0,  dado:'1d8'},
+  ],
+  feiticeiro: [
+    {nome:'Míssil Mágico',   descricao:'[Evocação] 3 dardos de força, 1d4+1 dano cada. Automático.',             custo_mana:4,  dado:'1d4'},
+    {nome:'Mãos Ardentes',   descricao:'[Evocação] Cone de 4,5m, 3d6 dano de fogo. DEX salva metade.',           custo_mana:4,  dado:'3d6'},
+    {nome:'Bola de Fogo',    descricao:'[Evocação] Esfera de 6m de raio, 8d6 dano de fogo. DEX salva metade.',   custo_mana:12, dado:'8d6'},
+    {nome:'Chamas Sagradas', descricao:'[Truque] Ataque de magia: 1d8 dano radiante (DEX não conta para CA).',   custo_mana:0,  dado:'1d8'},
+    {nome:'Luz',             descricao:'[Truque] Objeto emite luz como tocha por 1 hora.',                        custo_mana:0,  dado:''},
+    {nome:'Raio de Gelo',    descricao:'[Truque] Ataque mágico à distância: 1d8 dano de frio.',                  custo_mana:0,  dado:'1d8'},
+  ],
+  bruxo: [
+    {nome:'Golpe Místico',       descricao:'[Truque] Ataque mágico à distância: 1d10 dano de força.',                          custo_mana:0, dado:'1d10'},
+    {nome:'Hex',                 descricao:'[Encantamento] Amaldiçoa alvo: +1d6 dano necrótico nos ataques. Concentração.',     custo_mana:4, dado:'1d6'},
+    {nome:'Armadura do Agathys', descricao:'[Abjuração] Ganha 5 PV temporários; atacante leva 5 dano de frio.',                custo_mana:4, dado:''},
+    {nome:'Ilusão Menor',        descricao:'[Truque] Cria som ou imagem ilusória por 1 minuto.',                               custo_mana:0, dado:''},
+  ],
+  clérigo: [
+    {nome:'Cura Ferimentos', descricao:'[Evocação] Cura 1d8 + modificador de SAB de PV.',                                     custo_mana:4, dado:'1d8'},
+    {nome:'Bênção',          descricao:'[Encantamento] Até 3 criaturas ganham +1d4 em ataques e salvaguardas. Concentração.',  custo_mana:4, dado:'1d4'},
+    {nome:'Guia Divino',     descricao:'[Evocação] Ataque mágico à distância: 4d6 dano radiante. Vantagem contra alvos.',     custo_mana:4, dado:'4d6'},
+    {nome:'Chamas Sagradas', descricao:'[Truque] Ataque de magia: 1d8 dano radiante (DEX não conta para CA).',                custo_mana:0, dado:'1d8'},
+    {nome:'Orientação',      descricao:'[Truque] Toque: criatura ganha +1d4 em um teste de atributo.',                        custo_mana:0, dado:'1d4'},
+  ],
+  druida: [
+    {nome:'Emaranhar',       descricao:'[Conjuração] Área de 6m quadrada emaranha criaturas. Concentração 1 min.', custo_mana:4, dado:''},
+    {nome:'Cura Ferimentos', descricao:'[Evocação] Cura 1d8 + modificador de SAB de PV.',                          custo_mana:4, dado:'1d8'},
+    {nome:'Névoa',           descricao:'[Conjuração] Nuvem de névoa 6m de raio, bloqueia visão. Concentração.',    custo_mana:4, dado:''},
+    {nome:'Produzir Chama',  descricao:'[Truque] Chama na mão: ilumina 3m ou ataca à distância, 1d8 dano de fogo.',custo_mana:0, dado:'1d8'},
+    {nome:'Orientação',      descricao:'[Truque] Toque: criatura ganha +1d4 em um teste de atributo.',             custo_mana:0, dado:'1d4'},
+  ],
+  bardo: [
+    {nome:'Palavra Curativa', descricao:'[Evocação] Ação bônus: cura 1d4 + modificador de CAR de PV.',                          custo_mana:4, dado:'1d4'},
+    {nome:'Encantamento',     descricao:'[Encantamento] Enfeitiça uma criatura humanóide por 1 hora. Concentração.',             custo_mana:4, dado:''},
+    {nome:'Sono',             descricao:'[Encantamento] Afeta 5d8 PV de criaturas, começando pelas mais fracas.',               custo_mana:4, dado:'5d8'},
+    {nome:'Insulto Cruel',    descricao:'[Truque] Ataque psíquico verbal: 1d4 dano psíquico + desvantagem no próximo ataque.',  custo_mana:0, dado:'1d4'},
+    {nome:'Luz',              descricao:'[Truque] Objeto emite luz como tocha por 1 hora.',                                     custo_mana:0, dado:''},
+  ],
+  paladino: [
+    {nome:'Punição Divina', descricao:'[Evocação] Quando acerta: +2d8 dano radiante. Ação bônus. Concentração.', custo_mana:4, dado:'2d8'},
+    {nome:'Escudo da Fé',   descricao:'[Abjuração] Alvo ganha +2 de CA. Concentração, 10 min.',                  custo_mana:4, dado:''},
+    {nome:'Cura Ferimentos',descricao:'[Evocação] Cura 1d8 + modificador de CAR de PV.',                         custo_mana:4, dado:'1d8'},
+  ],
+  patrulheiro: [
+    {nome:'Marca do Caçador',descricao:'[Adivinhação] Designa inimigo: +1d6 dano nos ataques contra ele. Concentração.', custo_mana:4, dado:'1d6'},
+    {nome:'Névoa',           descricao:'[Conjuração] Nuvem de névoa 6m de raio, bloqueia visão. Concentração.',          custo_mana:4, dado:''},
+    {nome:'Cura Ferimentos', descricao:'[Evocação] Cura 1d8 + modificador de SAB de PV.',                                custo_mana:4, dado:'1d8'},
+  ],
 };
 
 // Classes que têm painel de magias no wizard
@@ -594,11 +640,11 @@ function wzRenderSpellPanel(i) {
       </span>
       <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">
         ${spells.map(spell => {
-          const checked = selected.includes(spell);
+          const checked = selected.includes(spell.nome);
           return `<label style="display:flex;align-items:center;gap:5px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-dim);cursor:pointer;padding:3px 8px;border:1px solid ${checked?'var(--gold-dim)':'var(--border2)'};border-radius:3px;background:${checked?'rgba(200,168,75,0.1)':'transparent'};transition:all 0.15s;">
-            <input type="checkbox" ${checked?'checked':''} onchange="wzToggleSpell(${i},'${spell}',this.checked)"
+            <input type="checkbox" ${checked?'checked':''} onchange="wzToggleSpell(${i},'${spell.nome}',this.checked)"
               style="accent-color:var(--gold);cursor:pointer;">
-            ${spell}
+            ${spell.nome}
           </label>`;
         }).join('')}
       </div>
@@ -1515,21 +1561,27 @@ async function createCampaignFromWizard() {
       // Magias iniciais selecionadas no wizard
       if (CASTER_CLASSES_WZ.has(char.classe)) {
         const spellPool = INITIAL_SPELLS_WZ[char.classe] || [];
-        const chosen    = char.selectedSpells && char.selectedSpells.length > 0
-                          ? char.selectedSpells
-                          : spellPool; // Se nenhuma selecionada, usa todas
+        // Mapa rápido de nome (lowercase) → objeto completo da magia
+        const spellDataMap = {};
+        spellPool.forEach(s => { spellDataMap[s.nome.toLowerCase()] = s; });
+
+        // selectedSpells guarda nomes (strings); se vazio usa todas as magias do pool
+        const chosenNames = char.selectedSpells && char.selectedSpells.length > 0
+                            ? char.selectedSpells
+                            : spellPool.map(s => s.nome);
+
         const existingNames = new Set(charObj.habilidades.map(h => h.nome.toLowerCase()));
-        // Mapa rápido de nome → dados completos (custo_mana, dado, descricao)
-        // Esses dados vêm do DEFAULT_SPELLS_BY_CLASS do backend — aqui só passamos os nomes
-        chosen.forEach(spellName => {
-          if (!existingNames.has(spellName.toLowerCase())) {
+        chosenNames.forEach(spellName => {
+          const lc   = spellName.toLowerCase();
+          const data = spellDataMap[lc];
+          if (!existingNames.has(lc)) {
             charObj.habilidades.push({
-              nome:       spellName,
-              descricao:  'Magia inicial da classe. Use learn_spell() para enriquecer com dados do Open5e.',
-              custo_mana: 4,
-              dado:       '',
+              nome:       data ? data.nome       : spellName,
+              descricao:  data ? data.descricao  : 'Magia inicial da classe.',
+              custo_mana: data ? data.custo_mana : 4,
+              dado:       data ? data.dado       : '',
             });
-            existingNames.add(spellName.toLowerCase());
+            existingNames.add(lc);
           }
         });
       }

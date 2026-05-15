@@ -15,7 +15,7 @@
     rel="stylesheet">
 
   <script src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js"></script>
-  <link rel="stylesheet" href="/static/css/style.css?v=13">
+  <link rel="stylesheet" href="/static/css/style.css?v=16">
 </head>
 
 <body class="game-page">
@@ -118,7 +118,7 @@
               <h3 class="sb-section-title" style="margin-bottom: 5px;">STATUS DO SISTEMA</h3>
               <div style="font-family: 'Lora', serif; font-size: 12px; color: var(--text-muted);">
                 Modelo: <span id="sb-model">—</span><br>
-                Tokens em uso: <span id="stat-tokens">0</span>
+                Tokens em uso: <span id="sb-stat-tokens">0</span>
               </div>
             </div>
           </div>
@@ -188,19 +188,13 @@
               <line x1="3" y1="18" x2="21" y2="18"></line>
             </svg>
           </button>
-          <div id="mobile-title"
-            style="font-family: 'Playfair Display', serif; font-weight: 700; font-size: 18px; text-transform: uppercase;">
-            RPG Agent</div>
-          <div style="width: 28px;"></div>
+          <div id="mobile-title">RPG Agent</div>
         </div>
 
-        <div id="turn-tracker" class="hidden"
-          style="padding: 15px 40px; border-bottom: 1px solid var(--page-edge); background: rgba(0,0,0,0.02);">
-          <div id="turn-tracker-inner" style="display:flex;align-items:center;gap:15px;">
-            <div style="font-family:'Playfair Display',serif;font-size:14px;font-weight:700;color:var(--ink-sys);">⚔️
-              <span id="tt-round">Rodada 1</span>
-            </div>
-            <div id="tt-cards" style="display:flex;gap:10px;overflow-x:auto;"></div>
+        <div id="turn-tracker" class="hidden">
+          <div id="turn-tracker-inner">
+            <div id="tt-round-label">⚔️ <span id="tt-round">Rodada 1</span></div>
+            <div id="tt-cards"></div>
           </div>
         </div>
 
@@ -218,7 +212,7 @@
               <button id="dice-tray-btn" title="Rolar dado (jogador)" onclick="toggleDiceTray()">🎲</button>
               <textarea id="chat-input" placeholder="O que fará a seguir? (/ para comandos)"
                 onkeydown="handleKey(event)" oninput="onInputChange(this)"></textarea>
-              <button id="send-btn" onclick="sendMessage()">ADICIONAR</button>
+              <button id="send-btn" onclick="sendMessage()">Escrever</button>
             </div>
 
             <div id="dice-tray" class="hidden"

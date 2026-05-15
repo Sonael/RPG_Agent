@@ -132,11 +132,19 @@ function _openDlg(title, msg, type, buttons) {
   });
 
   document.getElementById('dialog-overlay').classList.remove('hidden');
+  // Trava scroll do body (evita que overlay fixed fique desalinhado no mobile)
+  if (!document.body.classList.contains('game-page')) {
+    document.body.style.overflow = 'hidden';
+  }
   setTimeout(() => btnsEl.querySelector('button:last-child')?.focus(), 50);
 }
 
 function _closeDlg(val) {
   document.getElementById('dialog-overlay').classList.add('hidden');
+  // Restaura scroll do body
+  if (!document.body.classList.contains('game-page')) {
+    document.body.style.overflow = '';
+  }
   if (_dlgResolve) { _dlgResolve(val); _dlgResolve = null; }
 }
 
