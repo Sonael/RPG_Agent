@@ -30,18 +30,26 @@ from validator import validate
 # ---------------------------------------------------------------------------
 
 # Ferramentas que resolvem cada categoria mecânica
-_HP_TOOLS    = {"modify_hp", "attack_roll"}
+# use_ability está em _HP_TOOLS e _ATCK_TOOLS porque habilidades de dano (ex: Punho Sagrado)
+# modificam HP sem passar por attack_roll. Isso cria um falso negativo teórico: se
+# use_ability for chamada para habilidade não-danosa E o agente narrar mudança de HP,
+# a violação não é detectada. Aceito como trade-off — o cenário é muito improvável e
+# a alternativa (remover use_ability) causa dano duplo, que é pior.
+_HP_TOOLS    = {"modify_hp", "attack_roll", "use_ability"}
 _MANA_TOOLS  = {"use_ability", "modify_mana"}
 _INIT_TOOLS  = {"roll_initiative"}
-_ATCK_TOOLS  = {"attack_roll"}
+_ATCK_TOOLS  = {"attack_roll", "use_ability"}
 _LEARN_TOOLS = {"learn_spell", "learn_ability"}  # Ferramentas que ensinam magias/habilidades
 _CONDITION_TOOLS = {"apply_condition"}
 _CONDITION_APPLIED_RE = re.compile(
     r'\b(?:'
-    r'(?:fica|ficou|está|foi|torna.?se|tornou.?se|recebe|recebeu|sofre|sofreu)\s+'
+    # Apenas verbos de mudança de estado (nova aplicação).
+    # "está"/"fica" são omitidos: descrevem estado já existente e causam falso positivo.
+    # "caído" é omitido: usado para descrever inconscientes, não a condição Prone.
+    r'(?:ficou|foi|torna.?se|tornou.?se|recebeu|sofreu)\s+'
     r'(?:a\s+condição\s+(?:de\s+)?)?'
     r'(?:cego|enfeitiçado|paralisado|envenenado|atordoado|amedrontado|'
-    r'petrificado|invisív[ei]l|ca[ií]do|incapacitado|surdo|exausto|agarrado)'
+    r'petrificado|invisív[ei]l|incapacitado|surdo|exausto|agarrado)'
     r')',
     re.IGNORECASE,
 )
@@ -53,7 +61,11 @@ _COMBAT_START_RE = re.compile(
     re.IGNORECASE,
 )
 _HP_CHANGE_RE = re.compile(
-    r'(?:\d+\s*[→➜▶]\s*-?\d+)'          # "15 → 9"  ou  "7 → -1"
+    # Seta com contexto HP explícito: "vida: 15 → 9", "HP 12 → 7"
+    r'(?:(?:vida|hp|pv)\b.{0,20}\d+\s*[→➜▶]\s*-?\d+)'
+    # Seta com max HP: "15 → 9/12" — formato das ferramentas copiado na narrativa
+    r'|(?:\d+\s*[→➜▶]\s*-?\d+\s*/\s*\d+)'
+    # Forma narrativa explícita: "perdeu 6 PV", "tomou 4 pontos de vida"
     r'|(?:(?:perdeu|sofreu|tomou|curou)\s+\d+\s*(?:pontos?\s+de\s+vida|pv\b))',
     re.IGNORECASE,
 )
@@ -113,8 +125,10 @@ def _verify_agent_response(
             "NUNCA escreva variações de HP — deixe a ferramenta calcular."
         )
 
-    # 3. Resultado de ataque sem attack_roll
-    if (not _ATCK_TOOLS.intersection(tools_called)
+    # 3. Resultado de ataque sem attack_roll (só durante combate ativo)
+    # Fora de combate, "acertou" pode descrever ações não-mecânicas (ex: abrir fechadura).
+    if (combat_was_active
+            and not _ATCK_TOOLS.intersection(tools_called)
             and _ATTACK_RESULT_RE.search(text)):
         violations.append(
             "Narrou resultado de ataque ('acertou', 'errou o golpe') "
@@ -213,7 +227,7 @@ def _check_all_level_ups() -> list[str]:
     return leveled
 
 
-def _build_correction_prompt(violations: list[str]) -> str:
+def _build_correction_prompt(violations: list[str], already_called: set | None = None) -> str:
     """Monta a mensagem de correção re-injetada no agente."""
     lines = [
         "[VERIFICAÇÃO AUTOMÁTICA DO SISTEMA — RESPOSTA ANTERIOR REJEITADA]\n",
@@ -221,13 +235,30 @@ def _build_correction_prompt(violations: list[str]) -> str:
     ]
     for i, v in enumerate(violations, 1):
         lines.append(f"  {i}. {v}")
+
+    # Ferramentas que modificam estado e JÁ foram executadas neste turno.
+    # Re-chamá-las causaria efeitos duplicados (dano duplo, mana dupla, etc.).
+    stateful = {"attack_roll", "modify_hp", "use_ability", "modify_mana",
+                "roll_initiative", "apply_condition", "learn_spell", "learn_ability",
+                "grant_xp", "set_flag", "clear_flag"}
+    already_stateful = (already_called or set()) & stateful
+
     lines += [
         "\nCORRIJA AGORA — reescreva a resposta do zero:",
-        "• Chame as ferramentas obrigatórias ANTES de narrar qualquer resultado",
         "• Use os números EXATOS retornados pelas ferramentas",
-        "• NÃO repita a resposta rejeitada — comece do início com as ferramentas corretas",
         "• A narrativa imersiva vem DEPOIS dos resultados das ferramentas, nunca antes",
     ]
+
+    if already_stateful:
+        tools_str = ", ".join(sorted(already_stateful))
+        lines += [
+            f"\n⚠️  ATENÇÃO: as seguintes ferramentas JÁ foram chamadas neste turno e NÃO devem ser chamadas novamente: {tools_str}",
+            "   Re-chamá-las causaria efeitos duplicados (dano duplo, mana dupla, etc.).",
+            "   Apenas narre o resultado já obtido, corrigindo o formato.",
+        ]
+    else:
+        lines.append("• NÃO repita a resposta rejeitada — comece do início com as ferramentas corretas")
+
     return "\n".join(lines)
 
 app = Flask(__name__, static_folder="static")
@@ -1047,7 +1078,7 @@ def chat():
                         )
                         if mech_violations:
                             correction_attempted = True
-                            correction_prompt    = _build_correction_prompt(mech_violations)
+                            correction_prompt    = _build_correction_prompt(mech_violations, tools_called)
 
                             print(f"[VERIFICADOR] {len(mech_violations)} violação(ões) — re-injetando correção.")
                             for v in mech_violations:
