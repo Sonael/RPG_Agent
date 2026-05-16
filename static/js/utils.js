@@ -4,6 +4,34 @@
 const API = '';
 
 // ═══════════════════════════════════════
+//  Altura real do app (fix mobile)
+//  position:fixed usa o LAYOUT viewport, que no iOS Safari se
+//  estende por trás da barra de URL inferior e no Android pode ir
+//  por baixo da barra de sistema. visualViewport.height devolve
+//  apenas a área realmente visível. Fixamos --app-height nela.
+// ═══════════════════════════════════════
+(function () {
+  var docEl = document.documentElement;
+  function setAppHeight() {
+    var vv = window.visualViewport;
+    var h = vv ? vv.height : window.innerHeight;
+    docEl.style.setProperty('--app-height', Math.round(h) + 'px');
+  }
+  setAppHeight();
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', setAppHeight);
+    window.visualViewport.addEventListener('scroll', setAppHeight);
+  }
+  window.addEventListener('resize', setAppHeight);
+  window.addEventListener('orientationchange', function () {
+    setAppHeight();
+    setTimeout(setAppHeight, 300);
+  });
+  window.addEventListener('load', setAppHeight);
+})();
+
+
+// ═══════════════════════════════════════
 //  Auth token helpers
 // ═══════════════════════════════════════
 function getTokens() {
