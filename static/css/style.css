@@ -631,10 +631,22 @@ textarea { resize: vertical; min-height: 40px; }
     100% { transform: translateY(0) rotate(0deg); opacity: 1; }
   }
 
-  /* Picker de Tema — Mobile */
+  /* Picker de Tema — Mobile (padrão: canto inferior direito) */
   #theme-picker-wrapper { bottom: 16px; right: 16px; }
   #theme-toggle-btn { padding: 8px 12px; font-size: 12px; }
   #theme-panel { width: 190px; }
+
+  /* Game page mobile: sobe para logo abaixo do cabeçalho mobile
+     para não sobrepor a barra de input */
+  body.game-page #theme-picker-wrapper {
+    bottom: auto;
+    top: 35px;
+    right: 10px;
+  }
+  body.game-page #theme-panel {
+    bottom: auto;
+    top: calc(100% + 6px);
+  }
 }
 
 /* =========================================================
@@ -799,12 +811,13 @@ textarea { resize: vertical; min-height: 40px; }
 }
 #theme-toggle-btn svg { flex-shrink: 0; }
 
+/* O painel usa cores FIXAS para garantir legibilidade em qualquer tema */
 #theme-panel {
   position: absolute;
   bottom: calc(100% + 10px);
   right: 0;
-  background: var(--page-right);
-  border: 1px solid var(--page-edge);
+  background: #f5f3eb;
+  border: 1px solid #c8bfae;
   border-radius: 10px;
   padding: 12px;
   width: 210px;
@@ -822,12 +835,12 @@ textarea { resize: vertical; min-height: 40px; }
   font-family: 'Playfair Display', serif;
   font-size: 11px;
   font-weight: 700;
-  color: var(--text-muted);
+  color: #7a7060;
   text-transform: uppercase;
   letter-spacing: 1.5px;
   margin-bottom: 10px;
   padding-bottom: 8px;
-  border-bottom: 1px solid var(--page-edge);
+  border-bottom: 1px solid #d5cfc4;
 }
 
 .theme-option {
@@ -847,11 +860,11 @@ textarea { resize: vertical; min-height: 40px; }
 }
 .theme-option:hover {
   background: rgba(0,0,0,0.06);
-  border-color: var(--page-edge);
+  border-color: #c8bfae;
 }
 .theme-option.active {
-  background: rgba(0,0,0,0.07);
-  border-color: var(--input-border);
+  background: rgba(0,0,0,0.08);
+  border-color: #a89e8c;
 }
 
 .theme-swatch {
@@ -866,7 +879,7 @@ textarea { resize: vertical; min-height: 40px; }
 .theme-label {
   flex: 1;
   font-size: 13px;
-  color: var(--text-main);
+  color: #2d2a24;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -874,7 +887,7 @@ textarea { resize: vertical; min-height: 40px; }
 
 .theme-check {
   font-size: 12px;
-  color: var(--green);
+  color: #2a8a5b;
   opacity: 0;
   transition: opacity 0.12s;
   flex-shrink: 0;
