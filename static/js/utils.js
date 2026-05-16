@@ -157,3 +157,136 @@ document.addEventListener('DOMContentLoaded', () => {
       _closeDlg(false);
   });
 });
+
+// ═══════════════════════════════════════
+//  Sistema de Temas
+// ═══════════════════════════════════════
+const THEMES = [
+  {
+    id: 'pergaminho',
+    label: 'Pergaminho',
+    desc: 'Claro e acolhedor',
+    swatchTop: '#2b303a',
+    swatchBot: '#f5f3eb',
+  },
+  {
+    id: 'noite-tinta',
+    label: 'Noite de Tinta',
+    desc: 'Escuro e misterioso',
+    swatchTop: '#16213e',
+    swatchBot: '#1e1e30',
+  },
+  {
+    id: 'ardosia',
+    label: 'Ardósia',
+    desc: 'Cinza frio e austero',
+    swatchTop: '#2d3142',
+    swatchBot: '#e8eaf2',
+  },
+  {
+    id: 'floresta',
+    label: 'Floresta Antiga',
+    desc: 'Verde musgo e terra',
+    swatchTop: '#1e3020',
+    swatchBot: '#eaf2e8',
+  },
+  {
+    id: 'oceano',
+    label: 'Profundezas',
+    desc: 'Azul do mar profundo',
+    swatchTop: '#0d2845',
+    swatchBot: '#e8f2fc',
+  },
+  {
+    id: 'sangue-dragao',
+    label: 'Sangue de Dragão',
+    desc: 'Carmim e trevas',
+    swatchTop: '#200808',
+    swatchBot: '#1e0e0e',
+  },
+  {
+    id: 'poeira-ouro',
+    label: 'Poeira de Ouro',
+    desc: 'Sépia e nostalgia',
+    swatchTop: '#2e2010',
+    swatchBot: '#f0e8d0',
+  },
+];
+
+/** Aplica um tema e salva no localStorage */
+function applyTheme(id) {
+  document.documentElement.setAttribute('data-theme', id);
+  localStorage.setItem('rpg_theme', id);
+  document.querySelectorAll('.theme-option').forEach(el => {
+    el.classList.toggle('active', el.dataset.theme === id);
+  });
+}
+
+/** Carrega o tema salvo e injeta o picker na página */
+function loadTheme() {
+  const saved = localStorage.getItem('rpg_theme') || 'pergaminho';
+  document.documentElement.setAttribute('data-theme', saved);
+  _injectThemePicker(saved);
+}
+
+function _injectThemePicker(activeId) {
+  if (document.getElementById('theme-picker-wrapper')) return; // já injetado
+
+  const wrapper = document.createElement('div');
+  wrapper.id = 'theme-picker-wrapper';
+
+  const optionsHtml = THEMES.map(t => `
+    <button class="theme-option${t.id === activeId ? ' active' : ''}"
+            data-theme="${t.id}"
+            onclick="applyTheme('${t.id}')"
+            title="${t.desc}">
+      <span class="theme-swatch"
+            style="background:linear-gradient(135deg,${t.swatchTop} 45%,${t.swatchBot} 45%)"></span>
+      <span class="theme-label">${t.label}</span>
+      <span class="theme-check">✓</span>
+    </button>
+  `).join('');
+
+  wrapper.innerHTML = `
+    <button id="theme-toggle-btn" title="Selecionar tema" aria-label="Selecionar tema">
+      <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"
+           fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10
+                 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+        <line x1="2" y1="12" x2="22" y2="12"/>
+      </svg>
+      Tema
+    </button>
+    <div id="theme-panel" class="hidden">
+      <div class="theme-panel-header">Aparência</div>
+      ${optionsHtml}
+    </div>
+  `;
+
+  document.body.appendChild(wrapper);
+
+  // Toggle do painel
+  document.getElementById('theme-toggle-btn').addEventListener('click', e => {
+    e.stopPropagation();
+    document.getElementById('theme-panel').classList.toggle('hidden');
+  });
+
+  // Fechar ao clicar fora
+  document.addEventListener('click', e => {
+    const panel = document.getElementById('theme-panel');
+    if (panel && !wrapper.contains(e.target)) {
+      panel.classList.add('hidden');
+    }
+  });
+
+  // Fechar com Escape
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      document.getElementById('theme-panel')?.classList.add('hidden');
+    }
+  });
+}
+
+document.addEventListener('DOMContentLoaded', loadTheme);

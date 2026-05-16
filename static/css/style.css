@@ -2,22 +2,37 @@
    VARIÁVEIS E RESET
    ========================================================= */
 :root {
-  --cover-bg: #2b303a; 
+  /* Fundo da cena (por trás do livro) */
+  --body-bg:   #1a1a1a;
+  --body-bg-2: #111111;
+
+  /* Capa do livro */
+  --cover-bg: #2b303a;
   --cover-border: #1a1d24;
   --cover-text: #f0f2f5;
-  --page-left: #f5f3eb;  
-  --page-right: #fcfbfa; 
+
+  /* Páginas */
+  --page-left: #f5f3eb;
+  --page-right: #fcfbfa;
   --page-edge: #ddd6c8;
+
+  /* Texto */
   --text-main: #2d2d2d;
   --text-muted: #6b6b6b;
   --text-dim: #999;
-  --ink-user: #264b82; 
-  --ink-sys: #8b3a3a;  
+
+  /* Tinta */
+  --ink-user: #264b82;
+  --ink-sys: #8b3a3a;
+  --ink-main: #2d2d2d;
+
+  /* Estrutura */
   --spine-color: #1a2942;
-  
+  --input-border: var(--input-border);
+
+  /* Cores fixas (sobrescritas em temas escuros) */
   --red: #c44444;
   --green: #2a8a5b;
-  --ink-main: #2d2d2d;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -25,8 +40,9 @@
 html { overflow-x: hidden; max-width: 100%; }
 
 body {
-  margin: 0; padding: 0; background-color: #1a1a1a;
-  background-image: radial-gradient(circle at center, #2a2a2a 0%, #111 100%);
+  margin: 0; padding: 0;
+  background-color: var(--body-bg);
+  background-image: radial-gradient(circle at center, var(--body-bg) 0%, var(--body-bg-2) 100%);
   font-family: 'Lora', serif; color: var(--text-main);
   min-height: 100vh; overflow-x: hidden; max-width: 100%;
 }
@@ -174,7 +190,7 @@ textarea { resize: vertical; min-height: 40px; }
 
 .sidebar-tabs { display: flex; gap: 8px; margin-bottom: 25px; flex-shrink: 0; }
 .tab-btn { flex: 1; background: transparent; border: 1px solid var(--page-edge); padding: 8px; font-family: 'Lora', serif; font-size: 13px; cursor: pointer; border-radius: 4px; color: var(--text-muted); transition: 0.2s; }
-.tab-btn.active { background: rgba(0,0,0,0.04); font-weight: 600; color: var(--text-main); border-color: #cbbba0; }
+.tab-btn.active { background: rgba(0,0,0,0.04); font-weight: 600; color: var(--text-main); border-color: var(--input-border); }
 
 .sb-section { background: transparent; border: none; padding: 0; margin-bottom: 25px; }
 .sb-section-title { font-family: 'Playfair Display', serif; font-size: 14px; font-weight: 700; text-transform: uppercase; margin-bottom: 10px; color: var(--text-main); }
@@ -310,10 +326,10 @@ textarea { resize: vertical; min-height: 40px; }
 #input-area { border-top: 1px solid var(--page-edge); padding: 20px 60px 40px 60px; background: transparent; flex-shrink: 0; }
 .input-row { display: flex; gap: 12px; align-items: flex-end; }
 #dice-tray-btn { background: rgba(0,0,0,0.02); border: 1px solid var(--page-edge); color: var(--text-main); font-size: 20px; padding: 0; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 4px; cursor: pointer; transition: 0.2s; margin: 0; flex-shrink: 0; }
-#dice-tray-btn:hover { background: rgba(0,0,0,0.05); border-color: #cbbba0; }
-#chat-input { flex: 1; background: transparent; border: none; border-bottom: 2px solid #cbbba0; color: var(--ink-user); font-family: 'Caveat', cursive; font-size: 26px; padding: 5px 0; resize: none; outline: none; height: 44px; line-height: 32px; }
+#dice-tray-btn:hover { background: rgba(0,0,0,0.05); border-color: var(--input-border); }
+#chat-input { flex: 1; background: transparent; border: none; border-bottom: 2px solid var(--input-border); color: var(--ink-user); font-family: 'Caveat', cursive; font-size: 26px; padding: 5px 0; resize: none; outline: none; height: 44px; line-height: 32px; }
 #chat-input:focus { border-bottom-color: var(--ink-user); }
-#send-btn { background: transparent; border: 1px solid #cbbba0; color: var(--text-main); font-family: 'Lora', serif; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; padding: 0 20px; height: 44px; border-radius: 4px; cursor: pointer; transition: 0.2s; margin: 0; }
+#send-btn { background: transparent; border: 1px solid var(--input-border); color: var(--text-main); font-family: 'Lora', serif; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; padding: 0 20px; height: 44px; border-radius: 4px; cursor: pointer; transition: 0.2s; margin: 0; }
 #send-btn:hover { background: var(--text-main); color: var(--page-right); border-color: var(--text-main); }
 
 /* =========================================================
@@ -614,4 +630,253 @@ textarea { resize: vertical; min-height: 40px; }
     0%   { transform: translateY(-120%) rotate(-4deg); opacity: 0; visibility: visible; }
     100% { transform: translateY(0) rotate(0deg); opacity: 1; }
   }
+
+  /* Picker de Tema — Mobile */
+  #theme-picker-wrapper { bottom: 16px; right: 16px; }
+  #theme-toggle-btn { padding: 8px 12px; font-size: 12px; }
+  #theme-panel { width: 190px; }
 }
+
+/* =========================================================
+   TEMAS — Substituições de Variáveis
+   ========================================================= */
+
+/* ── Noite de Tinta (dark mode) ── */
+[data-theme="noite-tinta"] {
+  --body-bg:      #0a0a0f;
+  --body-bg-2:    #050508;
+  --cover-bg:     #16213e;
+  --cover-border: #0f172a;
+  --cover-text:   #e0d7ff;
+  --page-left:    #1e1e30;
+  --page-right:   #22223a;
+  --page-edge:    #33334e;
+  --text-main:    #e0deff;
+  --text-muted:   #9090bb;
+  --text-dim:     #6060aa;
+  --ink-user:     #7aa2f7;
+  --ink-sys:      #f7768e;
+  --ink-main:     #e0deff;
+  --spine-color:  #3d3d6b;
+  --input-border: #3d3d6b;
+  --red:          #f7768e;
+  --green:        #9ece6a;
+}
+
+/* ── Ardósia (slate/cinza frio) ── */
+[data-theme="ardosia"] {
+  --body-bg:      #0f1117;
+  --body-bg-2:    #080a0f;
+  --cover-bg:     #2d3142;
+  --cover-border: #1e2235;
+  --cover-text:   #eef0f7;
+  --page-left:    #e8eaf2;
+  --page-right:   #f2f4f8;
+  --page-edge:    #c4c8d8;
+  --text-main:    #2a2d3a;
+  --text-muted:   #5a6070;
+  --text-dim:     #8892a0;
+  --ink-user:     #3a5a9a;
+  --ink-sys:      #7a3a5a;
+  --ink-main:     #2a2d3a;
+  --spine-color:  #2d3142;
+  --input-border: #b0b6c8;
+}
+
+/* ── Floresta Antiga (verde musgo) ── */
+[data-theme="floresta"] {
+  --body-bg:      #080f08;
+  --body-bg-2:    #040804;
+  --cover-bg:     #1e3020;
+  --cover-border: #101e12;
+  --cover-text:   #dff0e0;
+  --page-left:    #eaf2e8;
+  --page-right:   #f3f8f2;
+  --page-edge:    #c0d4b8;
+  --text-main:    #1a2a1c;
+  --text-muted:   #4a6048;
+  --text-dim:     #7a9070;
+  --ink-user:     #2a6a3a;
+  --ink-sys:      #8a4520;
+  --ink-main:     #1a2a1c;
+  --spine-color:  #1e3820;
+  --input-border: #a8c4a0;
+}
+
+/* ── Profundezas (oceano) ── */
+[data-theme="oceano"] {
+  --body-bg:      #060d1a;
+  --body-bg-2:    #030812;
+  --cover-bg:     #0d2845;
+  --cover-border: #071829;
+  --cover-text:   #d0e8ff;
+  --page-left:    #e8f2fc;
+  --page-right:   #f0f7ff;
+  --page-edge:    #b0ccee;
+  --text-main:    #0d2240;
+  --text-muted:   #3a6088;
+  --text-dim:     #6090b0;
+  --ink-user:     #1060a0;
+  --ink-sys:      #8a3060;
+  --ink-main:     #0d2240;
+  --spine-color:  #0d2845;
+  --input-border: #9abcd8;
+}
+
+/* ── Sangue de Dragão (crimson escuro) ── */
+[data-theme="sangue-dragao"] {
+  --body-bg:      #0a0202;
+  --body-bg-2:    #060101;
+  --cover-bg:     #200808;
+  --cover-border: #140404;
+  --cover-text:   #f8e0d8;
+  --page-left:    #1e0e0e;
+  --page-right:   #221212;
+  --page-edge:    #3a1818;
+  --text-main:    #f0d0c8;
+  --text-muted:   #c09090;
+  --text-dim:     #8a6060;
+  --ink-user:     #e08060;
+  --ink-sys:      #ff5050;
+  --ink-main:     #f0d0c8;
+  --spine-color:  #400c0c;
+  --input-border: #5a2020;
+  --red:          #ff5050;
+  --green:        #60aa60;
+}
+
+/* ── Poeira de Ouro (sépia dourada) ── */
+[data-theme="poeira-ouro"] {
+  --body-bg:      #1a1408;
+  --body-bg-2:    #100c04;
+  --cover-bg:     #2e2010;
+  --cover-border: #201408;
+  --cover-text:   #f8e8c0;
+  --page-left:    #f0e8d0;
+  --page-right:   #f8f2e0;
+  --page-edge:    #d8c8a0;
+  --text-main:    #2a1e08;
+  --text-muted:   #6a5030;
+  --text-dim:     #9a8060;
+  --ink-user:     #5a3a10;
+  --ink-sys:      #8a2a10;
+  --ink-main:     #2a1e08;
+  --spine-color:  #4a2e10;
+  --input-border: #c0a878;
+}
+
+/* =========================================================
+   SELETOR DE TEMA — UI Flutuante
+   ========================================================= */
+#theme-picker-wrapper {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 9990;
+  font-family: 'Lora', serif;
+}
+
+#theme-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--cover-bg);
+  color: var(--cover-text);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 20px;
+  padding: 9px 16px 9px 12px;
+  font-family: 'Lora', serif;
+  font-size: 13px;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.45);
+  transition: opacity 0.2s, transform 0.2s;
+  margin: 0;
+  line-height: 1;
+}
+#theme-toggle-btn:hover {
+  opacity: 0.88;
+  transform: translateY(-2px);
+}
+#theme-toggle-btn svg { flex-shrink: 0; }
+
+#theme-panel {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  right: 0;
+  background: var(--page-right);
+  border: 1px solid var(--page-edge);
+  border-radius: 10px;
+  padding: 12px;
+  width: 210px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.45);
+}
+#theme-panel.hidden { display: none; }
+
+@keyframes themePickerIn {
+  from { opacity: 0; transform: translateY(10px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0)   scale(1); }
+}
+#theme-panel:not(.hidden) { animation: themePickerIn 0.15s ease; }
+
+.theme-panel-header {
+  font-family: 'Playfair Display', serif;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--page-edge);
+}
+
+.theme-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 7px 8px;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+  margin: 2px 0;
+  text-align: left;
+  font-family: 'Lora', serif;
+}
+.theme-option:hover {
+  background: rgba(0,0,0,0.06);
+  border-color: var(--page-edge);
+}
+.theme-option.active {
+  background: rgba(0,0,0,0.07);
+  border-color: var(--input-border);
+}
+
+.theme-swatch {
+  width: 26px;
+  height: 18px;
+  border-radius: 4px;
+  border: 1px solid rgba(0,0,0,0.2);
+  flex-shrink: 0;
+  display: block;
+}
+
+.theme-label {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.theme-check {
+  font-size: 12px;
+  color: var(--green);
+  opacity: 0;
+  transition: opacity 0.12s;
+  flex-shrink: 0;
+}
+.theme-option.active .theme-check { opacity: 1; }
