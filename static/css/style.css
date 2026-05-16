@@ -163,12 +163,77 @@ textarea { resize: vertical; min-height: 40px; }
 .campaign-item.selected { background: rgba(38, 75, 130, 0.05); border-left: 4px solid var(--ink-user); padding-left: 8px; }
 .campaign-item-name { font-family: 'Playfair Display', serif; font-size: 16px; color: var(--text-main); font-weight: 700; }
 .campaign-item-meta { font-family: 'Lora', serif; font-size: 13px; color: var(--text-muted); font-style: italic; margin-top: 4px; }
-.campaign-item-del {
+.campaign-item-del, .campaign-item-edit {
   background: transparent; border: 1px solid var(--text-muted); border-radius: 3px; color: var(--text-muted);
   width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;
   cursor: pointer; font-size: 14px; transition: 0.2s; flex-shrink: 0;
 }
 .campaign-item-del:hover { color: var(--ink-sys); border-color: var(--ink-sys); background: rgba(139,58,58,0.05); }
+.campaign-item-edit:hover { color: var(--ink-user); border-color: var(--ink-user); background: rgba(38,75,130,0.05); }
+
+.edit-campaign-box { max-width: 800px; max-height: 90vh; background: var(--page-right); border: 1px solid var(--page-edge); border-radius: 8px; position: relative; width: 90%; box-shadow: 0 20px 50px rgba(0,0,0,0.6); display: flex; flex-direction: column; background-image: radial-gradient(circle at 80% 20%, rgba(139, 69, 19, 0.02) 0%, transparent 60%); }
+
+.ed-dnd-section { border-top: 1px solid var(--page-edge); margin-top: 16px; padding-top: 14px; }
+.ed-dnd-section-title { font-family: 'Playfair Display', serif; font-size: 13px; font-weight: 700; color: var(--text-muted); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.06em; }
+
+.ed-search-result {
+  padding: 8px 10px; border: 1px solid var(--page-edge); border-radius: 4px;
+  margin-bottom: 6px; cursor: pointer; transition: background 0.15s;
+  background: rgba(0,0,0,0.01);
+}
+.ed-search-result:hover { background: rgba(38,75,130,0.06); border-color: rgba(38,75,130,0.3); }
+.ed-search-result-added { opacity: 0.6; cursor: default; }
+.ed-search-result-added:hover { background: rgba(0,0,0,0.01); border-color: var(--page-edge); }
+.ed-spell-badge {
+  font-family: monospace; font-size: 10px; font-weight: 700;
+  background: rgba(38,75,130,0.1); border: 1px solid rgba(38,75,130,0.25);
+  border-radius: 3px; padding: 1px 5px; color: var(--ink-user);
+}
+.ed-type-badge {
+  font-family: monospace; font-size: 10px; font-weight: 700;
+  background: rgba(42,138,91,0.1); border: 1px solid rgba(42,138,91,0.25);
+  border-radius: 3px; padding: 1px 5px; color: var(--green);
+}
+.ed-search-panel {
+  border: 1px solid var(--page-edge); border-radius: 6px;
+  padding: 12px; margin-top: 10px; background: rgba(0,0,0,0.02);
+}
+.ed-search-results-list { max-height: 260px; overflow-y: auto; margin-top: 8px; }
+.ed-search-results-list::-webkit-scrollbar { width: 4px; }
+.ed-search-results-list::-webkit-scrollbar-track { background: transparent; }
+.ed-search-results-list::-webkit-scrollbar-thumb { background: var(--page-edge); border-radius: 2px; }
+
+#edit-overlay .cwc-body {
+  max-height: 70vh;
+  overflow-y: auto;
+  padding-right: 14px;
+}
+#edit-overlay .cwc-body::-webkit-scrollbar { width: 4px; }
+#edit-overlay .cwc-body::-webkit-scrollbar-track { background: transparent; }
+#edit-overlay .cwc-body::-webkit-scrollbar-thumb { background: var(--page-edge); border-radius: 2px; }
+.ed-added-list { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.ed-added-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: rgba(38,75,130,0.08); border: 1px solid rgba(38,75,130,0.2);
+  border-radius: 12px; padding: 2px 8px; font-size: 12px; color: var(--ink-user);
+}
+.ed-added-chip button {
+  background: none; border: none; cursor: pointer; color: var(--text-muted);
+  font-size: 13px; line-height: 1; padding: 0 0 0 2px;
+}
+.ed-added-chip button:hover { color: var(--ink-sys); }
+.ed-free-toggle {
+  display: flex; align-items: center; gap: 8px;
+  font-family: 'Lora', serif; font-size: 13px; color: var(--text-muted);
+  padding: 6px 0; cursor: pointer; user-select: none;
+}
+.ed-free-toggle input[type=checkbox] { width: 15px; height: 15px; cursor: pointer; accent-color: var(--ink-user); }
+.ed-pb-budget {
+  font-size: 12px; color: var(--text-muted); margin-bottom: 8px;
+  font-family: 'Lora', serif;
+}
+.ed-pb-budget span { font-weight: 700; color: var(--text-main); }
+.ed-pb-budget .over { color: var(--ink-sys); }
 
 .bottom-actions { margin-top: auto; padding-top: 20px; border-top: 1px solid var(--page-edge); display: flex; flex-direction: column; gap: 8px; width: 100%; }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-bottom: 30px; }
@@ -891,5 +956,52 @@ textarea { resize: vertical; min-height: 40px; }
   opacity: 0;
   transition: opacity 0.12s;
   flex-shrink: 0;
+}
+
+/* =========================================================
+   WIZARD D&D — CALC ROW (HP / CA / Mana)
+   ========================================================= */
+.dnd-calc-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  background: rgba(0,0,0,0.03);
+  border: 1px solid var(--page-edge);
+  border-radius: 4px;
+  margin: 6px 0;
+}
+
+.dnd-calc-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: 'Lora', serif;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.dnd-calc-item span {
+  font-family: 'Caveat', cursive;
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--ink-user);
+  line-height: 1;
+}
+
+/* =========================================================
+   WIZARD OVERLAY — scrollbar on character card body
+   ========================================================= */
+#wizard-overlay .cwc-body {
+  max-height: 70vh;
+  overflow-y: auto;
+  padding-right: 14px;
+}
+
+#wizard-overlay .cwc-body::-webkit-scrollbar { width: 4px; }
+#wizard-overlay .cwc-body::-webkit-scrollbar-track { background: transparent; }
+#wizard-overlay .cwc-body::-webkit-scrollbar-thumb {
+  background: var(--page-edge);
+  border-radius: 2px;
 }
 .theme-option.active .theme-check { opacity: 1; }

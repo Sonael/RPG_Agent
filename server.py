@@ -467,6 +467,198 @@ def create_campaign():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/campaigns/<name>", methods=["GET"])
+@require_auth
+def get_campaign(name):
+    try:
+        data = database.get_campaign(g.user_id, name)
+        if data is None:
+            return jsonify({"error": "Campanha não encontrada"}), 404
+        return jsonify({"ok": True, "campaign": data})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/campaigns/<name>", methods=["PUT"])
+@require_auth
+def update_campaign(name):
+    """Atualiza os dados de uma campanha existente (sem sobrescrever conversation_history)."""
+    data = request.get_json(force=True) or {}
+    campaign_data = data.get("campaign", {})
+
+    existing = database.get_campaign(g.user_id, name)
+    if existing is None:
+        return jsonify({"error": "Campanha não encontrada"}), 404
+
+    new_name = campaign_data.get("name", name)
+    new_name = "".join(c for c in new_name if c.isalnum() or c in " _-").strip()
+    if not new_name:
+        return jsonify({"error": "Nome inválido"}), 400
+
+    # Preserve fields that should not be overwritten by the editor
+    payload = dict(existing)
+    payload.update({
+        "name":             new_name,
+        "campaign_type":    campaign_data.get("campaign_type", existing.get("campaign_type", "fantasia")),
+        "dnd_mode":         campaign_data.get("dnd_mode", existing.get("dnd_mode", False)),
+        "protagonist":      campaign_data.get("protagonist", existing.get("protagonist", "")),
+        "story_summary":    campaign_data.get("story_summary", existing.get("story_summary", "")),
+        "current_scene":    campaign_data.get("current_scene", existing.get("current_scene", "")),
+        "current_location": campaign_data.get("current_location", existing.get("current_location", "")),
+        "characters":       campaign_data.get("characters", existing.get("characters", {})),
+        "locations":        campaign_data.get("locations", existing.get("locations", {})),
+        "events":           campaign_data.get("events", existing.get("events", [])),
+        "party":            campaign_data.get("party", existing.get("party", [])),
+    })
+
+    try:
+        if new_name != name:
+            if database.campaign_exists(g.user_id, new_name):
+                return jsonify({"error": f"Já existe uma campanha com o nome '{new_name}'"}), 409
+            database.delete_campaign(g.user_id, name)
+        database.save_campaign(g.user_id, new_name, payload)
+        return jsonify({"ok": True, "name": new_name})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/dnd/class-spells")
+@require_auth
+def get_class_spells():
+    """Retorna magias de uma classe até um nível máximo (usa Open5e + fallback local)."""
+    from tools_dnd import _CLASS_SLUG_MAP, SPELL_MANA_COST, DEFAULT_SPELLS_BY_CLASS
+    import requests as _req
+
+    classe    = request.args.get("class", "").lower().strip()
+    max_level = min(int(request.args.get("max_level", 9) or 9), 9)
+    query     = request.args.get("q", "").strip().lower()
+
+    en_class = _CLASS_SLUG_MAP.get(classe, "")
+    spells   = []
+
+    if en_class:
+        try:
+            params = {
+                "dnd_class":       en_class.capitalize(),
+                "spell_level__lte": max_level,
+                "limit":           100,
+                "ordering":        "spell_level",
+            }
+            if query:
+                params["search"] = query
+            r = _req.get("https://api.open5e.com/v1/spells/", params=params, timeout=6)
+            if r.ok:
+                for s in r.json().get("results", []):
+                    lvl  = int(s.get("spell_level", 0) or 0)
+                    dado = ""
+                    dmg  = s.get("damage", {})
+                    if isinstance(dmg, dict):
+                        dado = dmg.get("damage_dice", "") or ""
+                    spells.append({
+                        "nome":          s.get("name", ""),
+                        "nivel_magia":   lvl,
+                        "escola":        s.get("school", ""),
+                        "descricao":     (" ".join((s.get("desc","") or "").split()))[:250],
+                        "custo_mana":    SPELL_MANA_COST.get(lvl, 4),
+                        "dado":          dado,
+                        "ritual":        bool(s.get("ritual")),
+                        "concentracao":  bool(s.get("concentration")),
+                    })
+        except Exception:
+            pass
+
+    if not spells:
+        fallback = DEFAULT_SPELLS_BY_CLASS.get(classe, [])
+        if query:
+            fallback = [s for s in fallback if query in s.get("nome","").lower() or query in s.get("descricao","").lower()]
+        spells = fallback[:50]
+
+    return jsonify({"ok": True, "spells": spells})
+
+
+@app.route("/api/dnd/items/search")
+@require_auth
+def search_dnd_items():
+    """Busca itens D&D no Open5e: armas, armaduras e itens mágicos."""
+    import requests as _req
+
+    q         = request.args.get("q", "").strip()
+    item_type = request.args.get("type", "all")
+
+    if not q or len(q) < 2:
+        return jsonify({"ok": True, "items": []})
+
+    results = []
+    try:
+        if item_type in ("all", "weapon"):
+            r = _req.get("https://api.open5e.com/v1/weapons/", params={"search": q, "limit": 6}, timeout=5)
+            if r.ok:
+                for it in r.json().get("results", []):
+                    props = it.get("properties", [])
+                    prop_str = ", ".join(props) if isinstance(props, list) else str(props or "")
+                    results.append({
+                        "nome":    it.get("name", ""),
+                        "tipo":    "arma",
+                        "descricao": f"Dano: {it.get('damage_dice','?')}. {prop_str}".strip(". "),
+                        "qtd":     1,
+                    })
+
+        if item_type in ("all", "armor"):
+            r = _req.get("https://api.open5e.com/v1/armor/", params={"search": q, "limit": 6}, timeout=5)
+            if r.ok:
+                for it in r.json().get("results", []):
+                    ac = it.get("armor_class", {}) or {}
+                    base = ac.get("base", "?")
+                    results.append({
+                        "nome":    it.get("name", ""),
+                        "tipo":    "armadura",
+                        "descricao": f"CA base: {base}.",
+                        "qtd":     1,
+                    })
+
+        if item_type in ("all", "magic"):
+            r = _req.get("https://api.open5e.com/v1/magicitems/", params={"search": q, "limit": 6}, timeout=5)
+            if r.ok:
+                for it in r.json().get("results", []):
+                    desc = (it.get("desc", "") or "")
+                    results.append({
+                        "nome":    it.get("name", ""),
+                        "tipo":    "mágico",
+                        "descricao": " ".join(desc.split())[:180],
+                        "qtd":     1,
+                    })
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e), "items": []})
+
+    return jsonify({"ok": True, "items": results[:18]})
+
+
+@app.route("/api/dnd/class-features")
+@require_auth
+def get_class_features():
+    """Retorna habilidades de classe disponíveis até o nível informado."""
+    from tools_dnd import CLASS_LEVEL_FEATURES, CLASS_FEATURE_DESCS
+
+    classe = request.args.get("class", "").lower().strip()
+    nivel  = int(request.args.get("level", 1) or 1)
+
+    features_by_level = CLASS_LEVEL_FEATURES.get(classe, {})
+    result = []
+    for lvl in sorted(features_by_level.keys()):
+        if lvl > nivel:
+            break
+        for feat_name in features_by_level[lvl]:
+            desc_data = CLASS_FEATURE_DESCS.get(feat_name, {})
+            result.append({
+                "nome":       feat_name,
+                "nivel":      lvl,
+                "descricao":  desc_data.get("descricao", f"Habilidade de classe — {feat_name}."),
+                "custo_mana": desc_data.get("custo_mana", 0),
+                "dado":       desc_data.get("dado", ""),
+            })
+    return jsonify({"ok": True, "features": result})
+
+
 @app.route("/api/campaigns/<name>", methods=["DELETE"])
 @require_auth
 def delete_campaign(name):

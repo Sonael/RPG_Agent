@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;600&family=Lora:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Playfair+Display:ital,wght@0,500;0,700;1,500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/css/style.css?v=17">
+  <link rel="stylesheet" href="/static/css/style.css?v=22">
 </head>
 <body>
   <div class="scene">
@@ -242,6 +242,109 @@
     </div>
   </div>
 
+  <!-- ═══════════════════════════════════════════ EDITAR CAMPANHA ═══ -->
+  <div id="edit-overlay" class="hidden">
+    <div class="edit-campaign-box">
+
+      <div class="wizard-header">
+        <div class="modal-header" style="margin-bottom:0;">
+          <div class="modal-title">Editar Campanha</div>
+          <button class="close-btn" onclick="closeEditOverlay()">✕</button>
+        </div>
+        <div class="wz-steps">
+          <div class="wz-step-dot active" id="ed-dot-1" onclick="editGoTo(1)"><span>1</span> Mundo & História</div>
+          <div class="wz-line"></div>
+          <div class="wz-step-dot" id="ed-dot-2" onclick="editGoTo(2)"><span>2</span> Personagens</div>
+          <div class="wz-line"></div>
+          <div class="wz-step-dot" id="ed-dot-3" onclick="editGoTo(3)"><span>3</span> Locais & Eventos</div>
+        </div>
+      </div>
+
+      <div class="wizard-body scroll-area" id="edit-scroll">
+
+        <!-- Passo 1: Mundo & História -->
+        <div id="ed-panel-1">
+          <div class="form-grid" style="gap:20px;margin-bottom:20px;">
+            <div class="field-group" style="margin:0;">
+              <label>Nome da Campanha *</label>
+              <input type="text" id="ed-name" placeholder="Nome da campanha">
+            </div>
+            <div class="field-group" style="margin:0;">
+              <label>Estilo de RPG</label>
+              <select id="ed-type">
+                <option value="dnd">D&D / Estruturado</option>
+                <option value="fantasia">Fantasia / Aventura</option>
+                <option value="romance">Romance / Drama</option>
+                <option value="horror">Horror / Suspense</option>
+                <option value="misterio">Mistério / Investigação</option>
+                <option value="scifi">Sci-Fi / Cyberpunk</option>
+                <option value="faroeste">Faroeste</option>
+              </select>
+            </div>
+          </div>
+          <div class="field-group">
+            <label>Resumo da História</label>
+            <textarea id="ed-summary" rows="4" placeholder="O que já aconteceu..."></textarea>
+          </div>
+          <div class="field-group">
+            <label>Cena Atual</label>
+            <textarea id="ed-scene" rows="2" placeholder="Onde a história está agora..."></textarea>
+          </div>
+          <div class="field-group">
+            <label>Local Atual</label>
+            <input type="text" id="ed-location" placeholder="Ex: Pântano dos Sussurros">
+          </div>
+          <div class="field-group">
+            <label>Protagonista</label>
+            <input type="text" id="ed-protagonist" placeholder="Nome do protagonista principal">
+          </div>
+        </div>
+
+        <!-- Passo 2: Personagens -->
+        <div id="ed-panel-2" class="hidden">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+            <div>
+              <div class="modal-title" style="font-size:18px;">Personagens & NPCs</div>
+              <div class="modal-subtitle" style="margin-top:4px;">Edite os personagens existentes ou adicione novos</div>
+            </div>
+            <button class="clean-button" style="width:auto;margin:0;" onclick="addEditChar()">+ Personagem</button>
+          </div>
+          <div id="ed-chars-list"></div>
+          <div id="ed-chars-empty" class="empty-state" style="display:none;">Nenhum personagem.</div>
+        </div>
+
+        <!-- Passo 3: Locais & Eventos -->
+        <div id="ed-panel-3" class="hidden">
+          <div class="field-group">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+              <label style="margin:0;">Locais Importantes</label>
+              <button class="clean-button" style="width:auto;padding:3px 10px;margin:0;" onclick="addEditLoc()">+ Local</button>
+            </div>
+            <div id="ed-locs-list"></div>
+          </div>
+          <div class="field-group" style="margin-top:20px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+              <label style="margin:0;">Eventos</label>
+              <button class="clean-button" style="width:auto;padding:3px 10px;margin:0;" onclick="addEditEvt()">+ Evento</button>
+            </div>
+            <div id="ed-evts-list"></div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="wizard-footer">
+        <button id="ed-back-btn" class="clean-button hidden" style="width:auto;margin:0;" onclick="editBack()">Voltar</button>
+        <div style="display:flex;gap:10px;margin-left:auto;align-items:center;">
+          <div id="ed-err" style="color:var(--ink-sys);font-size:13px;"></div>
+          <button id="ed-next-btn" class="btn-main" style="width:auto;margin:0;" onclick="editNext()">Próximo</button>
+          <button id="ed-save-btn" class="btn-main hidden" style="width:auto;margin:0;" onclick="saveEditedCampaign()">Salvar Alterações</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
   <div id="dialog-overlay" class="hidden">
     <div class="dialog-box" id="dialog-box">
       <div id="dialog-accent" style="height: 4px; border-radius: 8px 8px 0 0; position: absolute; top: 0; left: 0; right: 0;"></div>
@@ -260,7 +363,7 @@
   </div>
 
   <script src="/static/js/utils.js?v=4"></script>
-  <script src="/static/js/menu.js?v=2"></script>
+  <script src="/static/js/menu.js?v=9"></script>
   <script>
     // Animação de volta para a capa quando carregado da cache
     window.addEventListener('pageshow', function(event) {
