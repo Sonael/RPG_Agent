@@ -1042,6 +1042,276 @@ async function exportDiary() {
 }
 
 // ═══════════════════════════════════════
+//  Modal de edição — Habilidades & Magias
+// ═══════════════════════════════════════
+const GAME_CASTER_CLASSES = new Set([
+  'mago','feiticeiro','bruxo','clérigo','druida','bardo','paladino','patrulheiro'
+]);
+
+function gameMaxSpellLevel(nivel) {
+  return Math.min(9, Math.max(1, Math.ceil((parseInt(nivel)||1) / 2)));
+}
+
+let _gameHabState = null;
+
+// Lê classe e nível do formulário (pode ter sido alterado pelo user antes de buscar)
+function _gameGetSheet() {
+  const classeEl = document.getElementById('ef-sheet_classe');
+  const nivelEl  = document.getElementById('ef-sheet_nivel');
+  const classe   = (classeEl?.value || _editCtx?.data?.sheet?.classe || 'guerreiro').toLowerCase().trim();
+  const nivel    = parseInt(nivelEl?.value) || parseInt(_editCtx?.data?.sheet?.nivel) || 1;
+  return { classe, nivel };
+}
+
+function gameRefreshHabSection() {
+  const el = document.getElementById('game-hab-section');
+  if (el) el.innerHTML = gameBuildHabSection();
+}
+
+function gameSetHabTab(tab) {
+  if (!_gameHabState) return;
+  _gameHabState._habTab = tab;
+  if (tab === 'feats' && !_gameHabState._classFeatures?.length && !_gameHabState._featLoading) {
+    _gameHabState._featLoading = true;
+    gameLoadClassFeatures();
+  }
+  if (tab === 'spells' && !_gameHabState._spellResults?.length && !_gameHabState._spellLoading) {
+    gameDoSpellSearch();
+  }
+  gameRefreshHabSection();
+}
+
+const _gameSpellTimer = {};
+function gameTriggerSpellSearch() {
+  clearTimeout(_gameSpellTimer[0]);
+  _gameSpellTimer[0] = setTimeout(() => gameDoSpellSearch(), 420);
+}
+
+async function gameDoSpellSearch() {
+  if (!_gameHabState) return;
+  const { classe, nivel } = _gameGetSheet();
+  const maxLevel = gameMaxSpellLevel(nivel);
+  const q = (_gameHabState._spellQuery || '').trim();
+  _gameHabState._spellLoading = true;
+  const panelEl = document.getElementById('game-spell-panel');
+  if (panelEl) panelEl.innerHTML = '<div style="font-size:12px;color:var(--text-muted);font-style:italic;padding:8px 0;">A carregar magias...</div>';
+  else gameRefreshHabSection();
+  try {
+    const params = new URLSearchParams({ class: classe, max_level: maxLevel });
+    if (q) params.set('q', q);
+    const lvlF = _gameHabState._spellLevelFilter;
+    if (lvlF !== null && lvlF !== undefined) params.set('spell_level', lvlF);
+    const res  = await authFetch(`${API}/api/dnd/class-spells?${params}`);
+    const data = await res.json();
+    _gameHabState._spellResults = data.spells || [];
+  } catch(_) {
+    _gameHabState._spellResults = [];
+  }
+  _gameHabState._spellLoading = false;
+  const el2 = document.getElementById('game-spell-panel');
+  if (el2) el2.innerHTML = gameBuildSpellPanelList();
+  else gameRefreshHabSection();
+}
+
+async function gameLoadClassFeatures() {
+  if (!_gameHabState) return;
+  const { classe, nivel } = _gameGetSheet();
+  _gameHabState._featLoading = true;
+  const el = document.getElementById('game-feat-panel');
+  if (el) el.innerHTML = '<div style="font-size:12px;color:var(--text-muted);font-style:italic;padding:8px 0;">A carregar habilidades de classe...</div>';
+  else gameRefreshHabSection();
+  try {
+    const res  = await authFetch(`${API}/api/dnd/class-features?class=${encodeURIComponent(classe)}&level=${nivel}`);
+    const data = await res.json();
+    _gameHabState._classFeatures = data.features || [];
+  } catch(_) { _gameHabState._classFeatures = []; }
+  _gameHabState._featLoading = false;
+  const el2 = document.getElementById('game-feat-panel');
+  if (el2) el2.innerHTML = gameBuildFeatPanelList();
+  else gameRefreshHabSection();
+}
+
+function gameAddSpell(spell) {
+  if (!_editCtx?.data) return;
+  _editCtx.data.habilidades = _editCtx.data.habilidades || [];
+  if (!_editCtx.data.habilidades.some(h => h.nome.toLowerCase() === spell.nome.toLowerCase())) {
+    _editCtx.data.habilidades.push({
+      nome: spell.nome,
+      descricao: [spell.escola?`[${spell.escola}${spell.ritual?' (ritual)':''}${spell.concentracao?' (conc.)':''}]`:'', spell.descricao||''].filter(Boolean).join(' '),
+      custo_mana: spell.custo_mana ?? 0,
+      dado: spell.dado || '',
+    });
+  }
+  gameRefreshHabSection();
+}
+
+function gameAddFeat(feat) {
+  if (!_editCtx?.data) return;
+  _editCtx.data.habilidades = _editCtx.data.habilidades || [];
+  if (!_editCtx.data.habilidades.some(h => h.nome.toLowerCase() === feat.nome.toLowerCase())) {
+    _editCtx.data.habilidades.push({ nome: feat.nome, descricao: feat.descricao||'', custo_mana: feat.custo_mana||0, dado: feat.dado||'' });
+  }
+  gameRefreshHabSection();
+}
+
+function gameRemoveAbility(j) {
+  if (!_editCtx?.data?.habilidades) return;
+  _editCtx.data.habilidades.splice(j, 1);
+  gameRefreshHabSection();
+}
+
+// Renderiza apenas a lista de resultados do painel de magias (atualização parcial)
+function gameBuildSpellPanelList() {
+  if (!_gameHabState) return '';
+  const results  = _gameHabState._spellResults || [];
+  const rawQuery = (_gameHabState._spellQuery || '').trim();
+  const lvlF     = _gameHabState._spellLevelFilter;
+  const habs     = _editCtx?.data?.habilidades || [];
+  const renderRow = (sp) => {
+    const badge = sp.nivel_magia === 0 ? 'C' : `${sp.nivel_magia}`;
+    const manaTag = sp.custo_mana > 0 ? ` · ${sp.custo_mana} mana` : '';
+    const alreadyHas = habs.some(h => h.nome.toLowerCase() === sp.nome.toLowerCase());
+    const onClick = alreadyHas ? '' : `gameAddSpell(${JSON.stringify(sp).replace(/"/g,'&quot;')})`;
+    return `<div class="ed-search-result ${alreadyHas?'ed-search-result-added':''}" onclick="${onClick}">
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+        <span class="ed-spell-badge" style="min-width:22px;text-align:center;">${badge}</span>
+        <strong style="font-size:13px;">${escapeHtml(sp.nome)}</strong>
+        ${manaTag?`<span style="font-size:10px;color:var(--ink-user);">${manaTag}</span>`:''}
+        ${sp.concentracao?`<span style="font-size:9px;color:var(--text-muted);border:1px solid var(--page-edge);border-radius:2px;padding:0 3px;">conc.</span>`:''}
+        ${sp.ritual?`<span style="font-size:9px;color:var(--text-muted);border:1px solid var(--page-edge);border-radius:2px;padding:0 3px;">ritual</span>`:''}
+        ${alreadyHas?`<span style="font-size:10px;color:var(--green);">✓ já tem</span>`:''}
+      </div>
+      <div style="font-size:11px;color:var(--text-dim);margin-top:3px;">${escapeHtml((sp.descricao||'').slice(0,120))}${(sp.descricao||'').length>120?'…':''}</div>
+    </div>`;
+  };
+  if (results.length === 0) return '<div style="font-size:12px;color:var(--text-muted);font-style:italic;padding:8px 0;">Nenhuma magia encontrada. Busque pelo nome em inglês (ex: "fireball").</div>';
+  if (!rawQuery && lvlF === null) {
+    const groups = {};
+    results.forEach(sp => { const k = sp.nivel_magia; if (!groups[k]) groups[k] = []; groups[k].push(sp); });
+    let html = Object.keys(groups).sort((a,b)=>a-b).map(lvl => {
+      const label = lvl == 0 ? 'Cantrips (Nv. 0)' : `Nível ${lvl}`;
+      return `<div style="margin-bottom:8px;"><div style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;padding:4px 0 4px 2px;border-bottom:1px solid var(--page-edge);margin-bottom:4px;">${label}</div>${groups[lvl].map(renderRow).join('')}</div>`;
+    }).join('');
+    if (results.length >= 100) html += `<div style="font-size:11px;color:var(--text-dim);font-style:italic;padding:6px 0;">Mostrando ${results.length} magias — filtre por nível ou pesquise para ver mais.</div>`;
+    return html;
+  }
+  return results.map(renderRow).join('');
+}
+
+// Renderiza apenas a lista de resultados do painel de feats
+function gameBuildFeatPanelList() {
+  if (!_gameHabState) return '';
+  const feats = _gameHabState._classFeatures || [];
+  const habs  = _editCtx?.data?.habilidades || [];
+  const { classe, nivel } = _gameGetSheet();
+  if (feats.length === 0) return `<div style="font-size:12px;color:var(--text-muted);font-style:italic;padding:8px 0;">Nenhuma habilidade encontrada para ${escapeHtml(classe)} nível ${nivel}.</div>`;
+  return feats.map(feat => {
+    const alreadyHas = habs.some(h => h.nome.toLowerCase() === feat.nome.toLowerCase());
+    const onClick = alreadyHas ? '' : `gameAddFeat(${JSON.stringify(feat).replace(/"/g,'&quot;')})`;
+    return `<div class="ed-search-result ${alreadyHas?'ed-search-result-added':''}" onclick="${onClick}">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <span class="ed-spell-badge" style="min-width:28px;text-align:center;">Nv.${feat.nivel}</span>
+        <strong style="font-size:13px;">${escapeHtml(feat.nome)}</strong>
+        ${alreadyHas?`<span style="font-size:10px;color:var(--green);">✓ já tem</span>`:''}
+      </div>
+      <div style="font-size:11px;color:var(--text-dim);margin-top:4px;">${escapeHtml((feat.descricao||'').slice(0,160))}${(feat.descricao||'').length>160?'…':''}</div>
+    </div>`;
+  }).join('');
+}
+
+function gameBuildHabSection() {
+  if (!_gameHabState || !_editCtx?.data?.sheet) return '';
+  const habs = _editCtx.data.habilidades || [];
+  const { classe, nivel } = _gameGetSheet();
+  const isCaster   = GAME_CASTER_CLASSES.has(classe);
+  const showSpellTab = isCaster;
+  let habTab = _gameHabState._habTab || 'feats';
+  if (habTab === 'spells' && !showSpellTab) habTab = 'feats';
+
+  // Auto-carrega a aba ativa na primeira renderização
+  if (habTab === 'feats' && !_gameHabState._classFeatures?.length && !_gameHabState._featLoading) {
+    _gameHabState._featLoading = true;
+    setTimeout(() => gameLoadClassFeatures(), 20);
+  }
+  if (habTab === 'spells' && showSpellTab && !_gameHabState._spellResults?.length && !_gameHabState._spellLoading) {
+    _gameHabState._spellLoading = true;
+    setTimeout(() => gameDoSpellSearch(), 20);
+  }
+
+  // ── Abas ────────────────────────────────────────────────────────────
+  const tabStyle = (active) =>
+    `padding:7px 16px;border:none;border-bottom:2px solid ${active?'var(--ink-user)':'transparent'};`+
+    `background:none;cursor:pointer;font-family:'Lora',serif;font-size:12px;margin-bottom:-1px;`+
+    `color:${active?'var(--ink-user)':'var(--text-muted)'};font-weight:${active?'700':'400'};`+
+    `transition:color 0.15s,border-color 0.15s;`;
+
+  const tabBar = `
+    <div style="display:flex;border-bottom:1px solid var(--page-edge);margin-bottom:12px;">
+      <button style="${tabStyle(habTab==='feats')}"  onclick="gameSetHabTab('feats')">📜 Habilidades</button>
+      ${showSpellTab ? `<button style="${tabStyle(habTab==='spells')}" onclick="gameSetHabTab('spells')">✨ Magias</button>` : ''}
+    </div>`;
+
+  // ── Conteúdo da aba ──────────────────────────────────────────────────
+  let tabContent = '';
+  if (habTab === 'feats') {
+    tabContent = `
+      <div style="margin-bottom:12px;">
+        <div style="font-size:11px;color:var(--ink-user);margin-bottom:8px;">
+          Habilidades de <strong>${escapeHtml(classe)}</strong> disponíveis até nível ${nivel}
+        </div>
+        <div class="ed-search-results-list" style="max-height:260px;" id="game-feat-panel">${gameBuildFeatPanelList()}</div>
+      </div>`;
+  } else {
+    const maxSl = gameMaxSpellLevel(nivel);
+    const lvlF  = _gameHabState._spellLevelFilter;
+    const lvlBtnStyle = (active) =>
+      `padding:3px 8px;border-radius:3px;border:1px solid ${active?'var(--ink-user)':'var(--page-edge)'};`+
+      `background:${active?'rgba(38,75,130,0.12)':'transparent'};color:${active?'var(--ink-user)':'var(--text-muted)'};`+
+      `cursor:pointer;font-size:10px;font-family:monospace;font-weight:${active?'700':'400'};`;
+    let levelBtns = `<button style="${lvlBtnStyle(lvlF===null)}" onclick="_gameHabState._spellLevelFilter=null;_gameHabState._spellResults=[];gameDoSpellSearch()">Todos</button>`;
+    levelBtns += `<button style="${lvlBtnStyle(lvlF===0)}" onclick="_gameHabState._spellLevelFilter=0;_gameHabState._spellResults=[];gameDoSpellSearch()">C</button>`;
+    for (let n = 1; n <= maxSl; n++) {
+      levelBtns += `<button style="${lvlBtnStyle(lvlF===n)}" onclick="_gameHabState._spellLevelFilter=${n};_gameHabState._spellResults=[];gameDoSpellSearch()">${n}</button>`;
+    }
+    const query = escapeHtml(_gameHabState._spellQuery || '');
+    tabContent = `
+      <div style="margin-bottom:12px;">
+        <div style="font-size:11px;color:var(--ink-user);margin-bottom:8px;">
+          Magias de <strong>${escapeHtml(classe)}</strong> até Nv.${maxSl} · SRD Open5e
+        </div>
+        <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;">${levelBtns}</div>
+        <div style="display:flex;gap:8px;margin-bottom:8px;">
+          <input value="${query}" placeholder="Buscar magia (ex: fireball)..."
+            oninput="_gameHabState._spellQuery=this.value;gameTriggerSpellSearch()" style="flex:1;font-size:13px;">
+          <button class="clean-button" style="width:auto;padding:4px 10px;margin:0;font-size:12px;" onclick="gameDoSpellSearch()">🔍</button>
+        </div>
+        <div class="ed-search-results-list" style="max-height:260px;" id="game-spell-panel">${gameBuildSpellPanelList()}</div>
+      </div>`;
+  }
+
+  // ── Lista de habilidades já adicionadas ──────────────────────────────
+  const habList = habs.length
+    ? habs.map((h, j) => `
+        <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:rgba(0,0,0,0.02);border:1px solid var(--page-edge);border-radius:4px;margin-bottom:4px;">
+          <div style="flex:1;min-width:0;">
+            <span style="font-size:13px;font-weight:600;">${escapeHtml(h.nome||'')}</span>
+            ${h.dado?`<span style="font-family:monospace;font-size:10px;color:var(--text-muted);margin-left:6px;">${escapeHtml(h.dado)}</span>`:''}
+            ${h.custo_mana>0?`<span style="font-size:10px;color:var(--ink-user);margin-left:6px;">${h.custo_mana} mana</span>`:''}
+          </div>
+          <button onclick="gameRemoveAbility(${j})" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:15px;padding:2px 4px;flex-shrink:0;" title="Remover">✕</button>
+        </div>`).join('')
+    : '<div style="font-size:12px;color:var(--text-muted);font-style:italic;padding:4px 0;">Nenhuma habilidade adicionada.</div>';
+
+  return `
+    <div style="border-top:1px solid var(--page-edge);margin-top:16px;padding-top:16px;">
+      <div style="font-family:'Playfair Display',serif;font-size:14px;font-weight:700;color:var(--text-main);margin-bottom:10px;">✨ HABILIDADES & MAGIAS</div>
+      ${tabBar}
+      ${tabContent}
+      <div style="margin-top:4px;">${habList}</div>
+    </div>`;
+}
+
+// ═══════════════════════════════════════
 //  Modal de edição
 // ═══════════════════════════════════════
 let _editCtx = null;
@@ -1049,6 +1319,21 @@ let _editCtx = null;
 function openEditModal(type, key, data, index = null) {
   if (window.innerWidth <= 900) toggleSidebar(true);
   _editCtx = { type, key, data, index };
+  // Inicializa estado das abas de habilidades para personagens D&D
+  if (type === 'character' && data.sheet) {
+    const isCaster = GAME_CASTER_CLASSES.has((data.sheet.classe || '').toLowerCase());
+    _gameHabState = {
+      _habTab:           isCaster ? 'spells' : 'feats',
+      _spellLevelFilter: null,
+      _spellQuery:       '',
+      _spellResults:     [],
+      _spellLoading:     false,
+      _classFeatures:    [],
+      _featLoading:      false,
+    };
+  } else {
+    _gameHabState = null;
+  }
   const labels = { character: 'Personagem', party: 'Grupo', location: 'Local', flag: 'Flag', event: 'Evento', diary: 'Diário', world: 'Resumo' };
   document.getElementById('edit-type').textContent = labels[type] || type;
   document.getElementById('edit-name').textContent = data.name || data.title || data.summary || key || '—';
@@ -1081,6 +1366,7 @@ function buildEditFields(type, data) {
       if (data.sheet) {
         const s = data.sheet;
         html += `<div style="border-top:1px solid var(--page-edge);margin:12px 0 8px;padding-top:14px;"><div style="font-family:'Playfair Display',serif;font-size:14px;color:var(--text-main);margin-bottom:12px;font-weight:700;">⚔️ FICHA D&D</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">${field('sheet_classe','Classe',s.classe??'')}${field('sheet_raca','Raça',s.raca??'')}${field('sheet_nivel','Nível',s.nivel??1)}${field('sheet_xp','XP',s.xp??0)}</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">${field('sheet_vida_atual','HP Atual',s.vida_atual??0)}${field('sheet_vida_max','HP Máx',s.vida_max??0)}${field('sheet_mana_atual','Mana Atual',s.mana_atual??0)}${field('sheet_mana_max','Mana Máx',s.mana_max??0)}${field('sheet_ca','CA',s.ca??0)}${field('sheet_proficiencia','Profic.',s.proficiencia??2)}</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px;">${field('sheet_forca','FOR',s.forca??10)}${field('sheet_destreza','DES',s.destreza??10)}${field('sheet_constituicao','CON',s.constituicao??10)}${field('sheet_inteligencia','INT',s.inteligencia??10)}${field('sheet_sabedoria','SAB',s.sabedoria??10)}${field('sheet_carisma','CAR',s.carisma??10)}</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px;">${field('sheet_ouro','Ouro',s.ouro??0)}${field('sheet_prata','Prata',s.prata??0)}${field('sheet_cobre','Cobre',s.cobre??0)}</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">${field('sheet_eq_armadura','Armadura',(s.equipamentos?.armadura??''))}${field('sheet_eq_escudo','Escudo',(s.equipamentos?.escudo??''))}${field('sheet_eq_arma','Arma Princ.',(s.equipamentos?.arma_principal??''))}${field('sheet_eq_amuleto','Amuleto',(s.equipamentos?.amuleto??''))}</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">${field('sheet_ds_suc','Sucessos Morte',s.death_saves_sucessos??0)}${field('sheet_ds_fail','Falhas Morte',s.death_saves_falhas??0)}</div></div>`;
+        html += `<div id="game-hab-section">${gameBuildHabSection()}</div>`;
       }
       return html;
     }
@@ -1104,6 +1390,7 @@ function getEditValues() {
         const n = id => parseInt(document.getElementById(`ef-${id}`)?.value) || 0;
         const f = id => (document.getElementById(`ef-${id}`)?.value || '').trim();
         base.sheet = { ..._editCtx.data.sheet, classe: f('sheet_classe').toLowerCase() || _editCtx.data.sheet.classe, raca: f('sheet_raca').toLowerCase() || _editCtx.data.sheet.raca, nivel: n('sheet_nivel'), xp: n('sheet_xp'), vida_atual: n('sheet_vida_atual'), vida_max: n('sheet_vida_max'), mana_atual: n('sheet_mana_atual'), mana_max: n('sheet_mana_max'), ca: n('sheet_ca'), proficiencia: n('sheet_proficiencia'), forca: n('sheet_forca'), destreza: n('sheet_destreza'), constituicao: n('sheet_constituicao'), inteligencia: n('sheet_inteligencia'), sabedoria: n('sheet_sabedoria'), carisma: n('sheet_carisma'), ouro: n('sheet_ouro'), prata: n('sheet_prata'), cobre: n('sheet_cobre'), equipamentos: { armadura: f('sheet_eq_armadura') || null, escudo: f('sheet_eq_escudo') || null, arma_principal: f('sheet_eq_arma') || null, amuleto: f('sheet_eq_amuleto') || null }, death_saves_sucessos: n('sheet_ds_suc'), death_saves_falhas: n('sheet_ds_fail') };
+        base.habilidades = _editCtx.data.habilidades || [];
       }
       return base;
     }
