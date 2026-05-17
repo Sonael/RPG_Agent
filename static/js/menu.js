@@ -709,6 +709,7 @@ function wzBuildSpellPanel(i) {
       <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
         <span class="ed-spell-badge" style="min-width:22px;text-align:center;">${badge}</span>
         <strong style="font-size:13px;">${escHtml(sp.nome)}</strong>
+        ${sp.dado?`<span style="font-family:monospace;font-size:10px;color:var(--text-muted);">${escHtml(sp.dado)}</span>`:''}
         ${manaTag?`<span style="font-size:10px;color:var(--ink-user);">${manaTag}</span>`:''}
         ${sp.concentracao?`<span style="font-size:9px;color:var(--text-muted);border:1px solid var(--page-edge);border-radius:2px;padding:0 3px;">conc.</span>`:''}
         ${sp.ritual?`<span style="font-size:9px;color:var(--text-muted);border:1px solid var(--page-edge);border-radius:2px;padding:0 3px;">ritual</span>`:''}

@@ -609,6 +609,29 @@ def get_class_spells():
                 dmg  = s.get("damage", {})
                 if isinstance(dmg, dict):
                     dado = dmg.get("damage_dice", "") or ""
+                    if not dado:
+                        # Cantrips: dado em damage_at_character_level (ex: Fire Bolt → 1d10)
+                        atcl = dmg.get("damage_at_character_level", {})
+                        if isinstance(atcl, dict) and atcl:
+                            dado = (atcl.get("1") or
+                                    next(iter(v for v in
+                                         (atcl[k] for k in sorted(atcl, key=lambda x: int(x) if x.isdigit() else 99))
+                                         if v), ""))
+                    if not dado:
+                        # Magias escaláveis: dado em damage_at_slot_level (ex: Fireball → 8d6)
+                        atsl = dmg.get("damage_at_slot_level", {})
+                        if isinstance(atsl, dict) and atsl:
+                            dado = (atsl.get("3") or
+                                    next(iter(v for v in
+                                         (atsl[k] for k in sorted(atsl, key=lambda x: int(x) if x.isdigit() else 99))
+                                         if v), ""))
+                if not dado:
+                    # Fallback: extrai primeira notação de dados da descrição
+                    # (ex: Magic Missile "1d4 + 1", Healing Word "1d4")
+                    _desc = s.get("desc", "") or ""
+                    _m = re.search(r'\d+d\d+(?:\s*[+\-]\s*\d+)?', _desc)
+                    if _m:
+                        dado = _m.group(0).replace(" ", "")
                 spells.append({
                     "nome":          nome,
                     "nivel_magia":   lvl,
