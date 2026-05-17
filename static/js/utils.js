@@ -190,131 +190,219 @@ document.addEventListener('DOMContentLoaded', () => {
 //  Sistema de Temas
 // ═══════════════════════════════════════
 const THEMES = [
-  {
-    id: 'pergaminho',
-    label: 'Pergaminho',
-    desc: 'Claro e acolhedor',
-    swatchTop: '#2b303a',
-    swatchBot: '#f5f3eb',
-  },
-  {
-    id: 'noite-tinta',
-    label: 'Noite de Tinta',
-    desc: 'Escuro e misterioso',
-    swatchTop: '#16213e',
-    swatchBot: '#1e1e30',
-  },
-  {
-    id: 'ardosia',
-    label: 'Ardósia',
-    desc: 'Cinza frio e austero',
-    swatchTop: '#2d3142',
-    swatchBot: '#e8eaf2',
-  },
-  {
-    id: 'floresta',
-    label: 'Floresta Antiga',
-    desc: 'Verde musgo e terra',
-    swatchTop: '#1e3020',
-    swatchBot: '#eaf2e8',
-  },
-  {
-    id: 'oceano',
-    label: 'Profundezas',
-    desc: 'Azul do mar profundo',
-    swatchTop: '#0d2845',
-    swatchBot: '#e8f2fc',
-  },
-  {
-    id: 'sangue-dragao',
-    label: 'Sangue de Dragão',
-    desc: 'Carmim e trevas',
-    swatchTop: '#200808',
-    swatchBot: '#1e0e0e',
-  },
-  {
-    id: 'poeira-ouro',
-    label: 'Poeira de Ouro',
-    desc: 'Sépia e nostalgia',
-    swatchTop: '#2e2010',
-    swatchBot: '#f0e8d0',
-  },
+  { id: 'pergaminho',    label: 'Pergaminho',       desc: 'Claro e acolhedor',      swatchTop: '#2b303a', swatchBot: '#f5f3eb' },
+  { id: 'noite-tinta',  label: 'Noite de Tinta',   desc: 'Escuro e misterioso',    swatchTop: '#16213e', swatchBot: '#1e1e30' },
+  { id: 'ardosia',      label: 'Ardósia',           desc: 'Cinza frio e austero',   swatchTop: '#2d3142', swatchBot: '#e8eaf2' },
+  { id: 'floresta',     label: 'Floresta Antiga',   desc: 'Verde musgo e terra',    swatchTop: '#1e3020', swatchBot: '#eaf2e8' },
+  { id: 'oceano',       label: 'Profundezas',       desc: 'Azul do mar profundo',   swatchTop: '#0d2845', swatchBot: '#e8f2fc' },
+  { id: 'sangue-dragao',label: 'Sangue de Dragão',  desc: 'Carmim e trevas',        swatchTop: '#200808', swatchBot: '#1e0e0e' },
+  { id: 'poeira-ouro',  label: 'Poeira de Ouro',    desc: 'Sépia e nostalgia',      swatchTop: '#2e2010', swatchBot: '#f0e8d0' },
 ];
 
-/** Aplica um tema e salva no localStorage */
 function applyTheme(id) {
   document.documentElement.setAttribute('data-theme', id);
   localStorage.setItem('rpg_theme', id);
-  document.querySelectorAll('.theme-option').forEach(el => {
+  document.querySelectorAll('.settings-theme-option').forEach(el => {
     el.classList.toggle('active', el.dataset.theme === id);
   });
 }
 
-/** Carrega o tema salvo e injeta o picker na página */
 function loadTheme() {
   const saved = localStorage.getItem('rpg_theme') || 'pergaminho';
   document.documentElement.setAttribute('data-theme', saved);
-  _injectThemePicker(saved);
 }
 
-function _injectThemePicker(activeId) {
-  if (document.getElementById('theme-picker-wrapper')) return; // já injetado
+// ═══════════════════════════════════════
+//  Sistema de Fontes
+// ═══════════════════════════════════════
+const FONT_CATEGORIES = [
+  {
+    id: 'master', label: 'Mestre', cssVar: '--font-master',
+    storageKey: 'rpg_font_master', default: 'Lora',
+    options: [
+      { id: 'Lora',              label: 'Lora',              desc: 'Atual — serifa clássica',  stack: "'Lora', serif" },
+      { id: 'Crimson Text',      label: 'Crimson Text',      desc: 'Serifa elegante',           stack: "'Crimson Text', serif" },
+      { id: 'EB Garamond',       label: 'EB Garamond',       desc: 'Serifa histórica',          stack: "'EB Garamond', serif" },
+      { id: 'Libre Baskerville', label: 'Libre Baskerville', desc: 'Serifa legível',            stack: "'Libre Baskerville', serif" },
+      { id: 'Merriweather',      label: 'Merriweather',      desc: 'Serifa moderna',            stack: "'Merriweather', serif" },
+    ],
+  },
+  {
+    id: 'user', label: 'Jogador', cssVar: '--font-user',
+    storageKey: 'rpg_font_user', default: 'Caveat',
+    options: [
+      { id: 'Caveat',          label: 'Caveat',          desc: 'Caligrafia cursiva',        stack: "'Caveat', cursive" },
+      { id: 'Kalam',           label: 'Kalam',           desc: 'Escrita à mão limpa',       stack: "'Kalam', cursive" },
+      { id: 'Patrick Hand',    label: 'Patrick Hand',    desc: 'Manuscrito casual',          stack: "'Patrick Hand', cursive" },
+      { id: 'Dancing Script',  label: 'Dancing Script',  desc: 'Cursiva elegante',           stack: "'Dancing Script', cursive" },
+      { id: 'Lora',            label: 'Lora',            desc: 'Serifa — estilo do Mestre',  stack: "'Lora', serif" },
+      { id: 'Crimson Text',    label: 'Crimson Text',    desc: 'Serifa elegante formal',     stack: "'Crimson Text', serif" },
+      { id: 'EB Garamond',     label: 'EB Garamond',     desc: 'Serifa histórica formal',    stack: "'EB Garamond', serif" },
+      { id: 'Raleway',         label: 'Raleway',         desc: 'Sem serifa moderno',         stack: "'Raleway', sans-serif" },
+    ],
+  },
+  {
+    id: 'menu', label: 'Títulos', cssVar: '--font-menu',
+    storageKey: 'rpg_font_menu', default: 'Playfair Display',
+    options: [
+      { id: 'Playfair Display',   label: 'Playfair Display',   desc: 'Atual — display serifa',   stack: "'Playfair Display', serif" },
+      { id: 'Cinzel',             label: 'Cinzel',             desc: 'Estilo romano clássico',   stack: "'Cinzel', serif" },
+      { id: 'Cormorant Garamond', label: 'Cormorant Garamond', desc: 'Display elegante',         stack: "'Cormorant Garamond', serif" },
+      { id: 'IM Fell English SC', label: 'IM Fell English',    desc: 'Estilo antigo manuscrito', stack: "'IM Fell English SC', serif" },
+    ],
+  },
+];
 
-  const wrapper = document.createElement('div');
-  wrapper.id = 'theme-picker-wrapper';
+function applyFont(catId, fontId) {
+  const cat = FONT_CATEGORIES.find(c => c.id === catId);
+  if (!cat) return;
+  const opt = cat.options.find(o => o.id === fontId) || cat.options[0];
+  document.documentElement.style.setProperty(cat.cssVar, opt.stack);
+  localStorage.setItem(cat.storageKey, fontId);
+  document.querySelectorAll(`.settings-font-option[data-cat="${catId}"]`).forEach(el => {
+    el.classList.toggle('active', el.dataset.font === fontId);
+  });
+}
 
-  const optionsHtml = THEMES.map(t => `
-    <button class="theme-option${t.id === activeId ? ' active' : ''}"
-            data-theme="${t.id}"
-            onclick="applyTheme('${t.id}')"
-            title="${t.desc}">
-      <span class="theme-swatch"
-            style="background:linear-gradient(135deg,${t.swatchTop} 45%,${t.swatchBot} 45%)"></span>
-      <span class="theme-label">${t.label}</span>
-      <span class="theme-check">✓</span>
-    </button>
-  `).join('');
+function loadFonts() {
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = 'https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&family=Patrick+Hand&family=Dancing+Script:wght@400;600&family=Raleway:wght@400;500;600&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=Libre+Baskerville:ital,wght@0,400;1,400&family=Merriweather:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;600&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=IM+Fell+English+SC&display=swap';
+  document.head.appendChild(link);
+  FONT_CATEGORIES.forEach(cat => {
+    const savedId = localStorage.getItem(cat.storageKey) || cat.default;
+    const opt = cat.options.find(o => o.id === savedId) || cat.options[0];
+    document.documentElement.style.setProperty(cat.cssVar, opt.stack);
+  });
+}
 
-  wrapper.innerHTML = `
-    <button id="theme-toggle-btn" title="Selecionar tema" aria-label="Selecionar tema">
-      <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"
-           fill="none" stroke="currentColor" stroke-width="2"
-           stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="10"/>
-        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10
-                 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-        <line x1="2" y1="12" x2="22" y2="12"/>
-      </svg>
-      Tema
-    </button>
-    <div id="theme-panel" class="hidden">
-      <div class="theme-panel-header">Aparência</div>
-      ${optionsHtml}
+// ═══════════════════════════════════════
+//  Painel de Configurações Unificado
+// ═══════════════════════════════════════
+const _GEAR = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l-.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`;
+
+function toggleSettingsPanel() {
+  const panel    = document.getElementById('settings-panel');
+  const backdrop = document.getElementById('settings-backdrop');
+  if (!panel) return;
+
+  if (panel.classList.contains('open')) {
+    // Fechar: remove classe, espera a transição e então esconde via display:none
+    panel.classList.remove('open');
+    backdrop.classList.remove('open');
+    setTimeout(() => {
+      panel.style.display    = 'none';
+      backdrop.style.display = 'none';
+    }, 290);
+  } else {
+    // Abrir: torna visível primeiro, depois anima na próxima frame
+    panel.style.display    = 'flex';
+    backdrop.style.display = 'block';
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      panel.classList.add('open');
+      backdrop.classList.add('open');
+    }));
+  }
+}
+
+function switchSettingsFontTab(catId) {
+  document.querySelectorAll('.settings-font-tab').forEach(el =>
+    el.classList.toggle('active', el.dataset.cat === catId));
+  document.querySelectorAll('.settings-font-list').forEach(el =>
+    el.classList.toggle('active', el.dataset.cat === catId));
+}
+
+function _injectSettingsPanel() {
+  if (document.getElementById('settings-panel')) return;
+
+  const savedTheme = localStorage.getItem('rpg_theme') || 'pergaminho';
+
+  const themesHtml = THEMES.map(t => `
+    <button class="settings-theme-option${t.id === savedTheme ? ' active' : ''}"
+            data-theme="${t.id}" onclick="applyTheme('${t.id}')" title="${t.desc}">
+      <span class="settings-theme-swatch" style="background:linear-gradient(135deg,${t.swatchTop} 45%,${t.swatchBot} 45%)"></span>
+      <span class="settings-theme-label">${t.label}</span>
+      <span class="settings-theme-check">✓</span>
+    </button>`).join('');
+
+  const fontTabsHtml = FONT_CATEGORIES.map((cat, i) =>
+    `<button class="settings-font-tab${i === 0 ? ' active' : ''}" data-cat="${cat.id}" onclick="switchSettingsFontTab('${cat.id}')">${cat.label}</button>`
+  ).join('');
+
+  const fontListsHtml = FONT_CATEGORIES.map((cat, i) => {
+    const savedId = localStorage.getItem(cat.storageKey) || cat.default;
+    const optsHtml = cat.options.map(opt => `
+      <button class="settings-font-option${opt.id === savedId ? ' active' : ''}"
+              data-cat="${cat.id}" data-font="${opt.id}"
+              onclick="applyFont('${cat.id}','${opt.id}')" title="${opt.desc}">
+        <span class="settings-font-name" style="font-family:${opt.stack}">${opt.label}</span>
+        <span class="settings-font-desc">${opt.desc}</span>
+      </button>`).join('');
+    return `<div class="settings-font-list${i === 0 ? ' active' : ''}" data-cat="${cat.id}">${optsHtml}</div>`;
+  }).join('');
+
+  // Backdrop
+  const backdrop = document.createElement('div');
+  backdrop.id = 'settings-backdrop';
+  backdrop.addEventListener('click', toggleSettingsPanel);
+  document.body.appendChild(backdrop);
+
+  // Painel
+  const panel = document.createElement('div');
+  panel.id = 'settings-panel';
+  panel.innerHTML = `
+    <div class="settings-panel-header">
+      <span class="settings-panel-title">Configurações</span>
+      <button class="settings-close-btn" onclick="toggleSettingsPanel()" aria-label="Fechar">✕</button>
     </div>
-  `;
+    <div class="settings-body">
+      <div class="settings-section">
+        <div class="settings-section-title">Aparência</div>
+        ${themesHtml}
+      </div>
+      <div class="settings-section">
+        <div class="settings-section-title">Tipografia</div>
+        <div class="settings-font-tabs">${fontTabsHtml}</div>
+        ${fontListsHtml}
+      </div>
+    </div>`;
+  document.body.appendChild(panel);
 
-  document.body.appendChild(wrapper);
+  // Botão desktop: fixed no topo-direito, visível apenas em telas largas
+  // (não é adicionado ao #chat-area para não interferir no scroll)
+  if (document.getElementById('chat-area')) {
+    const wrapper = document.createElement('div');
+    wrapper.id = 'settings-desktop-wrapper';
+    const btn = document.createElement('button');
+    btn.className = 'settings-trigger-btn settings-desktop-btn';
+    btn.setAttribute('aria-label', 'Configurações');
+    btn.innerHTML = _GEAR;
+    btn.addEventListener('click', toggleSettingsPanel);
+    wrapper.appendChild(btn);
+    document.body.appendChild(wrapper);
+  }
 
-  // Toggle do painel
-  document.getElementById('theme-toggle-btn').addEventListener('click', e => {
-    e.stopPropagation();
-    document.getElementById('theme-panel').classList.toggle('hidden');
-  });
+  // Botão fixo para páginas sem mobile-header (menu, login)
+  if (!document.getElementById('mobile-header')) {
+    const wrapper = document.createElement('div');
+    wrapper.id = 'settings-fixed-wrapper';
+    const btn = document.createElement('button');
+    btn.className = 'settings-trigger-btn settings-fixed-btn';
+    btn.setAttribute('aria-label', 'Configurações');
+    btn.innerHTML = _GEAR;
+    btn.addEventListener('click', toggleSettingsPanel);
+    wrapper.appendChild(btn);
+    document.body.appendChild(wrapper);
+  }
 
-  // Fechar ao clicar fora
-  document.addEventListener('click', e => {
-    const panel = document.getElementById('theme-panel');
-    if (panel && !wrapper.contains(e.target)) {
-      panel.classList.add('hidden');
-    }
-  });
-
-  // Fechar com Escape
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') {
-      document.getElementById('theme-panel')?.classList.add('hidden');
-    }
+    if (e.key === 'Escape' && document.getElementById('settings-panel')?.classList.contains('open'))
+      toggleSettingsPanel();
   });
 }
 
-document.addEventListener('DOMContentLoaded', loadTheme);
+document.addEventListener('DOMContentLoaded', () => {
+  loadTheme();
+  loadFonts();
+  _injectSettingsPanel();
+});

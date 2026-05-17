@@ -33,6 +33,11 @@
   /* Cores fixas (sobrescritas em temas escuros) */
   --red: #c44444;
   --green: #2a8a5b;
+
+  /* Fontes (personalizáveis) */
+  --font-menu:   'Playfair Display', serif;
+  --font-master: 'Lora', serif;
+  --font-user:   'Caveat', cursive;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -71,7 +76,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed !important; }
   display: flex; flex-direction: column; justify-content: center; align-items: center;
   box-shadow: 20px 20px 40px rgba(0,0,0,0.6); backface-visibility: hidden;
 }
-.tome-cover h1 { font-family: 'Playfair Display', serif; font-size: 52px; color: var(--cover-text); font-weight: 500; letter-spacing: 2px; margin: 0; text-align: center; }
+.tome-cover h1 { font-family: var(--font-menu); font-size: 52px; color: var(--cover-text); font-weight: 500; letter-spacing: 2px; margin: 0; text-align: center; }
 .tome-cover p { color: var(--cover-text); font-family: 'Lora', serif; font-size: 18px; font-style: italic; opacity: 0.7; margin-top: 20px; }
 
 .animate-open { animation: openTomeCover 1s cubic-bezier(0.645, 0.045, 0.355, 1) forwards; }
@@ -101,7 +106,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed !important; }
   background-image: radial-gradient(circle at 80% 20%, rgba(139, 69, 19, 0.02) 0%, transparent 60%);
 }
 .book-title {
-  font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; color: var(--text-main); text-align: center;
+  font-family: var(--font-menu); font-size: 28px; font-weight: 700; color: var(--text-main); text-align: center;
   margin: 0 0 20px 0; border-bottom: 1px solid var(--page-edge); padding-bottom: 15px; letter-spacing: 1px; text-transform: uppercase;
 }
 .page-number { position: absolute; bottom: 20px; font-family: 'Lora', serif; font-size: 12px; color: var(--text-muted); }
@@ -305,10 +310,10 @@ textarea { resize: vertical; min-height: 40px; }
 #chat-history::-webkit-scrollbar-thumb { background: #d0c8b8; border-radius: 3px; }
 
 .msg-label { display: none; }
-.msg-row.master .msg-bubble { font-family: 'Lora', serif; font-size: 18px; line-height: 1.7; color: var(--ink-main); text-align: justify; max-width: 95%; }
-.msg-row.master .msg-bubble > p:first-of-type::first-letter { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 700; float: left; line-height: 0.8; margin-right: 6px; color: var(--text-main); }
+.msg-row.master .msg-bubble { font-family: var(--font-master); font-size: 18px; line-height: 1.7; color: var(--ink-main); text-align: justify; max-width: 95%; }
+.msg-row.master .msg-bubble > p:first-of-type::first-letter { font-family: var(--font-menu); font-size: 42px; font-weight: 700; float: left; line-height: 0.8; margin-right: 6px; color: var(--text-main); }
 .msg-row.user { display: flex; justify-content: flex-end; }
-.msg-row.user .msg-bubble { font-family: 'Caveat', cursive; font-size: 28px; line-height: 1.2; color: var(--ink-user); max-width: 80%; text-align: right; transform: rotate(-0.5deg); }
+.msg-row.user .msg-bubble { font-family: var(--font-user); font-size: 28px; line-height: 1.2; color: var(--ink-user); max-width: 80%; text-align: right; transform: rotate(-0.5deg); }
 /* Mensagem de sistema simples — linha divisória com texto ao centro */
 .msg-row.system .msg-bubble {
   font-family: 'Lora', serif; font-style: italic; font-size: 13px;
@@ -392,7 +397,7 @@ textarea { resize: vertical; min-height: 40px; }
 .input-row { display: flex; gap: 12px; align-items: flex-end; }
 #dice-tray-btn { background: rgba(0,0,0,0.02); border: 1px solid var(--page-edge); color: var(--text-main); font-size: 20px; padding: 0; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 4px; cursor: pointer; transition: 0.2s; margin: 0; flex-shrink: 0; }
 #dice-tray-btn:hover { background: rgba(0,0,0,0.05); border-color: var(--input-border); }
-#chat-input { flex: 1; background: transparent; border: none; border-bottom: 2px solid var(--input-border); color: var(--ink-user); font-family: 'Caveat', cursive; font-size: 26px; padding: 5px 0; resize: none; outline: none; height: 44px; line-height: 32px; }
+#chat-input { flex: 1; background: transparent; border: none; border-bottom: 2px solid var(--input-border); color: var(--ink-user); font-family: var(--font-user); font-size: 26px; padding: 5px 0; resize: none; outline: none; height: 44px; line-height: 32px; }
 #chat-input:focus { border-bottom-color: var(--ink-user); }
 #send-btn { background: transparent; border: 1px solid var(--input-border); color: var(--text-main); font-family: 'Lora', serif; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; padding: 0 20px; height: 44px; border-radius: 4px; cursor: pointer; transition: 0.2s; margin: 0; }
 #send-btn:hover { background: var(--text-main); color: var(--page-right); border-color: var(--text-main); }
@@ -641,6 +646,7 @@ textarea { resize: vertical; min-height: 40px; }
     text-transform: uppercase; white-space: nowrap; pointer-events: none;
     color: var(--text-main);
   }
+  #mobile-header .settings-trigger-btn { margin-left: auto; }
 
   #mobile-menu-btn {
     background: transparent; border: none; cursor: pointer; padding: 0;
@@ -700,22 +706,6 @@ textarea { resize: vertical; min-height: 40px; }
     100% { transform: translateY(0) rotate(0deg); opacity: 1; }
   }
 
-  /* Picker de Tema — Mobile (padrão: canto inferior direito) */
-  #theme-picker-wrapper { bottom: 16px; right: 16px; }
-  #theme-toggle-btn { padding: 8px 12px; font-size: 12px; }
-  #theme-panel { width: 190px; }
-
-  /* Game page mobile: sobe para logo abaixo do cabeçalho mobile
-     para não sobrepor a barra de input */
-  body.game-page #theme-picker-wrapper {
-    bottom: auto;
-    top: 35px;
-    right: 10px;
-  }
-  body.game-page #theme-panel {
-    bottom: auto;
-    top: calc(100% + 6px);
-  }
 }
 
 /* =========================================================
@@ -846,121 +836,6 @@ textarea { resize: vertical; min-height: 40px; }
   --input-border: #c0a878;
 }
 
-/* =========================================================
-   SELETOR DE TEMA — UI Flutuante
-   ========================================================= */
-#theme-picker-wrapper {
-  position: fixed;
-  bottom: 24px;
-  right: 24px;
-  z-index: 9990;
-  font-family: 'Lora', serif;
-}
-
-#theme-toggle-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: var(--cover-bg);
-  color: var(--cover-text);
-  border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 20px;
-  padding: 9px 16px 9px 12px;
-  font-family: 'Lora', serif;
-  font-size: 13px;
-  cursor: pointer;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.45);
-  transition: opacity 0.2s, transform 0.2s;
-  margin: 0;
-  line-height: 1;
-}
-#theme-toggle-btn:hover {
-  opacity: 0.88;
-  transform: translateY(-2px);
-}
-#theme-toggle-btn svg { flex-shrink: 0; }
-
-/* O painel usa cores FIXAS para garantir legibilidade em qualquer tema */
-#theme-panel {
-  position: absolute;
-  bottom: calc(100% + 10px);
-  right: 0;
-  background: #f5f3eb;
-  border: 1px solid #c8bfae;
-  border-radius: 10px;
-  padding: 12px;
-  width: 210px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.45);
-}
-#theme-panel.hidden { display: none; }
-
-@keyframes themePickerIn {
-  from { opacity: 0; transform: translateY(10px) scale(0.97); }
-  to   { opacity: 1; transform: translateY(0)   scale(1); }
-}
-#theme-panel:not(.hidden) { animation: themePickerIn 0.15s ease; }
-
-.theme-panel-header {
-  font-family: 'Playfair Display', serif;
-  font-size: 11px;
-  font-weight: 700;
-  color: #7a7060;
-  text-transform: uppercase;
-  letter-spacing: 1.5px;
-  margin-bottom: 10px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #d5cfc4;
-}
-
-.theme-option {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  padding: 7px 8px;
-  cursor: pointer;
-  transition: background 0.12s, border-color 0.12s;
-  margin: 2px 0;
-  text-align: left;
-  font-family: 'Lora', serif;
-}
-.theme-option:hover {
-  background: rgba(0,0,0,0.06);
-  border-color: #c8bfae;
-}
-.theme-option.active {
-  background: rgba(0,0,0,0.08);
-  border-color: #a89e8c;
-}
-
-.theme-swatch {
-  width: 26px;
-  height: 18px;
-  border-radius: 4px;
-  border: 1px solid rgba(0,0,0,0.2);
-  flex-shrink: 0;
-  display: block;
-}
-
-.theme-label {
-  flex: 1;
-  font-size: 13px;
-  color: #2d2a24;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.theme-check {
-  font-size: 12px;
-  color: #2a8a5b;
-  opacity: 0;
-  transition: opacity 0.12s;
-  flex-shrink: 0;
-}
 
 /* =========================================================
    WIZARD D&D — CALC ROW (HP / CA / Mana)
@@ -1008,4 +883,156 @@ textarea { resize: vertical; min-height: 40px; }
   background: var(--page-edge);
   border-radius: 2px;
 }
-.theme-option.active .theme-check { opacity: 1; }
+/* =========================================================
+   PAINEL DE CONFIGURAÇÕES — Drawer lateral
+   ========================================================= */
+#settings-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.35);
+  z-index: 9991;
+  opacity: 0;
+  display: none;
+  transition: opacity 0.25s;
+}
+#settings-backdrop.open { opacity: 1; }
+
+#settings-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 290px;
+  height: 100vh;
+  background: #f5f3eb;
+  z-index: 9992;
+  overflow: hidden;
+  box-shadow: -6px 0 24px rgba(0,0,0,0.3);
+  transform: translateX(100%);
+  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  display: none;
+  flex-direction: column;
+}
+#settings-panel.open { transform: translateX(0); }
+
+.settings-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px 14px;
+  border-bottom: 1px solid #d5cfc4;
+  flex-shrink: 0;
+  background: #eeebe0;
+}
+.settings-panel-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 16px;
+  font-weight: 700;
+  color: #2d2a24;
+  letter-spacing: 0.5px;
+}
+.settings-close-btn {
+  background: none; border: none; font-size: 18px;
+  color: #7a7060; cursor: pointer; padding: 0; line-height: 1;
+  transition: color 0.15s;
+}
+.settings-close-btn:hover { color: #2d2a24; }
+
+.settings-body {
+  flex: 1; overflow-y: auto; padding: 14px 18px 24px;
+}
+.settings-body::-webkit-scrollbar { width: 4px; }
+.settings-body::-webkit-scrollbar-thumb { background: #d5cfc4; border-radius: 2px; }
+
+.settings-section { margin-bottom: 20px; }
+.settings-section-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 10px; font-weight: 700; color: #7a7060;
+  text-transform: uppercase; letter-spacing: 1.5px;
+  margin-bottom: 10px; padding-bottom: 6px;
+  border-bottom: 1px solid #d5cfc4;
+}
+
+/* Temas */
+.settings-theme-option {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  background: transparent; border: 1px solid transparent;
+  border-radius: 6px; padding: 7px 8px; cursor: pointer;
+  transition: 0.12s; margin: 2px 0; text-align: left;
+  font-family: 'Lora', serif;
+}
+.settings-theme-option:hover { background: rgba(0,0,0,0.06); border-color: #c8bfae; }
+.settings-theme-option.active { background: rgba(0,0,0,0.08); border-color: #a89e8c; }
+.settings-theme-swatch {
+  width: 26px; height: 18px; border-radius: 4px;
+  border: 1px solid rgba(0,0,0,0.2); flex-shrink: 0;
+}
+.settings-theme-label { flex: 1; font-size: 13px; color: #2d2a24; }
+.settings-theme-check { font-size: 12px; color: #2a8a5b; opacity: 0; transition: 0.12s; }
+.settings-theme-option.active .settings-theme-check { opacity: 1; }
+
+/* Fontes */
+.settings-font-tabs { display: flex; gap: 4px; margin-bottom: 10px; }
+.settings-font-tab {
+  flex: 1; background: transparent; border: 1px solid #d5cfc4;
+  border-radius: 4px; padding: 5px 4px;
+  font-family: 'Lora', serif; font-size: 11px; color: #7a7060;
+  cursor: pointer; text-align: center; transition: 0.12s;
+}
+.settings-font-tab.active { background: rgba(0,0,0,0.08); border-color: #a89e8c; color: #2d2a24; font-weight: 600; }
+.settings-font-tab:hover:not(.active) { background: rgba(0,0,0,0.04); }
+
+.settings-font-list { display: none; }
+.settings-font-list.active { display: block; }
+
+.settings-font-option {
+  display: flex; flex-direction: column; width: 100%;
+  background: transparent; border: 1px solid transparent;
+  border-radius: 6px; padding: 8px 10px;
+  cursor: pointer; transition: 0.12s; margin: 2px 0; text-align: left;
+}
+.settings-font-option:hover { background: rgba(0,0,0,0.06); border-color: #c8bfae; }
+.settings-font-option.active { background: rgba(0,0,0,0.08); border-color: #a89e8c; }
+.settings-font-name { font-size: 15px; color: #2d2a24; line-height: 1.3; }
+.settings-font-desc { font-family: 'Lora', serif; font-size: 10px; color: #7a7060; margin-top: 2px; }
+
+/* Botão de engrenagem (nos headers) */
+.settings-trigger-btn {
+  background: transparent; border: none; cursor: pointer; padding: 4px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--ink-user); transition: transform 0.25s; flex-shrink: 0;
+}
+.settings-trigger-btn:hover { transform: rotate(35deg); }
+.settings-trigger-btn:active { transform: scale(0.9) rotate(35deg); }
+
+/* Botão fixo para páginas sem header (menu/login) */
+#settings-fixed-wrapper {
+  position: fixed; top: 20px; right: 20px; z-index: 9990;
+}
+.settings-fixed-btn {
+  background: var(--cover-bg) !important;
+  color: var(--cover-text) !important;
+  border: 1px solid rgba(255,255,255,0.15) !important;
+  border-radius: 50%; width: 40px; height: 40px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+}
+
+/* Botão desktop — fixed no body, fora do #chat-area para não afetar o scroll */
+#settings-desktop-wrapper {
+  position: fixed; top: 14px; right: 18px; z-index: 9990;
+}
+.settings-desktop-btn {
+  color: var(--cover-text);
+  background: var(--cover-bg);
+  border: 1px solid rgba(255,255,255,0.15) !important;
+  border-radius: 50%;
+  width: 36px; height: 36px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+  opacity: 1;
+}
+.settings-desktop-btn:hover { opacity: 0.85; }
+
+@media (max-width: 900px) {
+  #settings-desktop-wrapper { display: none; }
+  #settings-panel { width: 280px; }
+  #settings-fixed-wrapper { top: 14px; right: 14px; }
+}
