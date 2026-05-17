@@ -262,6 +262,7 @@ def _build_correction_prompt(violations: list[str], already_called: set | None =
     return "\n".join(lines)
 
 app = Flask(__name__, static_folder="static")
+app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0   # desativa cache de arquivos estáticos
 
 # ---------------------------------------------------------------------------
 # Asyncio bridge — loop dedicado rodando em thread daemon
@@ -331,7 +332,10 @@ def login_page():
 
 @app.route("/menu.html")
 def menu_page():
-    return send_from_directory("static", "menu.html")
+    resp = send_from_directory("static", "menu.html")
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+    resp.headers["Pragma"] = "no-cache"
+    return resp
 
 @app.route("/game.html")
 def game_page():
@@ -560,45 +564,71 @@ def get_class_spells():
     from tools_dnd import _CLASS_SLUG_MAP, SPELL_MANA_COST, DEFAULT_SPELLS_BY_CLASS
     import requests as _req
 
-    classe    = request.args.get("class", "").lower().strip()
-    max_level = min(int(request.args.get("max_level", 9) or 9), 9)
-    query     = request.args.get("q", "").strip().lower()
+    classe          = request.args.get("class", "").lower().strip()
+    max_level       = min(int(request.args.get("max_level", 9) or 9), 9)
+    query           = request.args.get("q", "").strip().lower()
+    spell_level_str = request.args.get("spell_level")   # filtro de nível exato (opcional)
 
     en_class = _CLASS_SLUG_MAP.get(classe, "")
     spells   = []
 
-    if en_class:
-        try:
-            params = {
-                "dnd_class":       en_class.capitalize(),
-                "spell_level__lte": max_level,
-                "limit":           100,
-                "ordering":        "spell_level",
-            }
+    try:
+        # Sem classe (modo livre): busca em todas as magias. Com classe:
+        # filtra por `dnd_class__icontains` — o filtro exato `dnd_class` casa
+        # só o texto inteiro ("Sorcerer, Wizard" != "Wizard"), excluindo
+        # magias multiclasse, e retorna 0 quando combinado com `search`.
+        # `__icontains` é substring, case-insensitive e funciona com `search`.
+        # Sem query usamos limit maior para obter variedade entre níveis.
+        params = {
+            "spell_level__lte": max_level,
+            "limit":            100 if query else 250,
+            "ordering":         "spell_level",
+        }
+        if en_class:
+            params["dnd_class__icontains"] = en_class
+        if query:
+            params["search"] = query
+        # Filtro de nível exato (substituí lte quando presente)
+        if spell_level_str is not None:
+            try:
+                params["spell_level"] = int(spell_level_str)
+                del params["spell_level__lte"]
+            except (ValueError, TypeError):
+                pass
+        r = _req.get("https://api.open5e.com/v1/spells/", params=params, timeout=6)
+        if r.ok:
+            seen = set()
+            for s in r.json().get("results", []):
+                nome = s.get("name", "")
+                key  = nome.lower().strip()
+                if not nome or key in seen:
+                    continue
+                seen.add(key)
+                lvl  = int(s.get("spell_level", 0) or 0)
+                dado = ""
+                dmg  = s.get("damage", {})
+                if isinstance(dmg, dict):
+                    dado = dmg.get("damage_dice", "") or ""
+                spells.append({
+                    "nome":          nome,
+                    "nivel_magia":   lvl,
+                    "escola":        s.get("school", ""),
+                    "descricao":     (" ".join((s.get("desc","") or "").split()))[:250],
+                    "custo_mana":    SPELL_MANA_COST.get(lvl, 4),
+                    "dado":          dado,
+                    "ritual":        bool(s.get("ritual")),
+                    "concentracao":  bool(s.get("concentration")),
+                })
+            # A busca full-text da Open5e também casa na descrição (ex.:
+            # "fireball" traz "Antimagic Field"). Prioriza nome; sort
+            # estável preserva a ordem por nível dentro de cada grupo.
             if query:
-                params["search"] = query
-            r = _req.get("https://api.open5e.com/v1/spells/", params=params, timeout=6)
-            if r.ok:
-                for s in r.json().get("results", []):
-                    lvl  = int(s.get("spell_level", 0) or 0)
-                    dado = ""
-                    dmg  = s.get("damage", {})
-                    if isinstance(dmg, dict):
-                        dado = dmg.get("damage_dice", "") or ""
-                    spells.append({
-                        "nome":          s.get("name", ""),
-                        "nivel_magia":   lvl,
-                        "escola":        s.get("school", ""),
-                        "descricao":     (" ".join((s.get("desc","") or "").split()))[:250],
-                        "custo_mana":    SPELL_MANA_COST.get(lvl, 4),
-                        "dado":          dado,
-                        "ritual":        bool(s.get("ritual")),
-                        "concentracao":  bool(s.get("concentration")),
-                    })
-        except Exception:
-            pass
+                spells.sort(key=lambda sp: 0 if query in sp["nome"].lower() else 1)
+    except Exception:
+        pass
 
-    if not spells:
+    # Fallback local só quando uma classe foi pedida e a Open5e falhou.
+    if not spells and classe:
         fallback = DEFAULT_SPELLS_BY_CLASS.get(classe, [])
         if query:
             fallback = [s for s in fallback if query in s.get("nome","").lower() or query in s.get("descricao","").lower()]
