@@ -41,6 +41,7 @@ _INIT_TOOLS  = {"roll_initiative"}
 _ATCK_TOOLS  = {"attack_roll", "use_ability"}
 _LEARN_TOOLS = {"learn_spell", "learn_ability"}  # Ferramentas que ensinam magias/habilidades
 _CONDITION_TOOLS = {"apply_condition"}
+_XP_TOOLS        = {"grant_xp"}
 _CONDITION_APPLIED_RE = re.compile(
     r'\b(?:'
     # Apenas verbos de mudança de estado (nova aplicação).
@@ -160,6 +161,25 @@ def _verify_agent_response(
             "sem chamar apply_condition(). A condição NÃO foi salva na ficha. "
             "Chame apply_condition(char_name, 'condição') para registrar o efeito mecânico."
         )
+
+    # 7. end_combat() chamado sem grant_xp() para os membros do grupo
+    if ("end_combat" in tools_called and not _XP_TOOLS.intersection(tools_called)):
+        party = [
+            c["name"]
+            for c in memory.campaign.get("characters", {}).values()
+            if (
+                c.get("sheet", {}).get("classe", "").lower() != "npc"
+                or c.get("party_member")
+            ) and c.get("status") not in ("morto", "fugiu")
+        ]
+        if party:
+            names = ", ".join(party)
+            violations.append(
+                f"Encerrou o combate com end_combat() mas não chamou grant_xp() "
+                f"para nenhum membro do grupo. "
+                f"Chame grant_xp() para CADA personagem jogável: {names}. "
+                f"Use o XP adequado ao inimigo derrotado (25–2000 XP conforme a tabela)."
+            )
 
     return violations
 
@@ -715,6 +735,104 @@ def search_dnd_items():
         return jsonify({"ok": False, "error": str(e), "items": []})
 
     return jsonify({"ok": True, "items": results[:18]})
+
+
+@app.route("/api/dnd/monsters/search")
+@require_auth
+def search_dnd_monsters():
+    """Busca monstros D&D no Open5e e retorna atributos prontos para a ficha."""
+    import requests as _req
+
+    q = request.args.get("q", "").strip()
+    if not q or len(q) < 2:
+        return jsonify({"ok": True, "monsters": []})
+
+    def parse_monster(m):
+        ac_raw = m.get("armor_class", 10)
+        if isinstance(ac_raw, list):
+            ca = ac_raw[0].get("value", 10) if ac_raw else 10
+        else:
+            ca = int(ac_raw or 10)
+
+        # Extrai arma principal (primeiro ataque corpo-a-corpo) e arma secundária
+        # (primeiro ataque à distância) das ações do monstro.
+        arma_principal  = ""
+        arma_secundaria = ""
+        arma_dado       = ""  # dado de dano da arma principal (ex: "1d6")
+        for action in (m.get("actions") or []):
+            desc = (action.get("desc") or "").lower()
+            name = action.get("name") or ""
+            if not name:
+                continue
+            is_melee  = "melee weapon attack"  in desc or "melee attack" in desc
+            is_ranged = "ranged weapon attack" in desc or "ranged attack" in desc
+            # Extrai dado de dano do campo damage_dice ou da descrição
+            dado = action.get("damage_dice", "")
+            if not dado:
+                m_dado = re.search(r'(\d+d\d+)', desc)
+                dado = m_dado.group(1) if m_dado else ""
+            if is_melee and not arma_principal:
+                arma_principal = name.lower()
+                arma_dado = dado
+            elif is_ranged and not arma_secundaria:
+                arma_secundaria = name.lower()
+            if arma_principal and arma_secundaria:
+                break
+
+        return {
+            "nome":           m.get("name", ""),
+            "tipo":           m.get("type", ""),
+            "tamanho":        m.get("size", ""),
+            "cr":             str(m.get("challenge_rating", "?")),
+            "forca":          int(m.get("strength",     10) or 10),
+            "destreza":       int(m.get("dexterity",    10) or 10),
+            "constituicao":   int(m.get("constitution", 10) or 10),
+            "inteligencia":   int(m.get("intelligence", 10) or 10),
+            "sabedoria":      int(m.get("wisdom",       10) or 10),
+            "carisma":        int(m.get("charisma",     10) or 10),
+            "ca":             ca,
+            "vida":           int(m.get("hit_points",   10) or 10),
+            "hit_dice":       m.get("hit_dice", ""),
+            "arma_principal": arma_principal,
+            "arma_secundaria":arma_secundaria,
+            "arma_dado":      arma_dado,
+        }
+
+    try:
+        # 1. Tenta busca direta pelo slug (ex: "goblin" → /v1/monsters/goblin/)
+        slug = q.lower().strip().replace(" ", "-")
+        direct = _req.get(f"https://api.open5e.com/v1/monsters/{slug}/", timeout=5)
+        if direct.ok:
+            data = direct.json()
+            if data.get("name"):
+                return jsonify({"ok": True, "monsters": [parse_monster(data)]})
+
+        # 2. Fallback: busca textual, mas ordena por similaridade de nome
+        r = _req.get(
+            "https://api.open5e.com/v1/monsters/",
+            params={"search": q, "limit": 20},
+            timeout=6,
+        )
+        if not r.ok:
+            return jsonify({"ok": True, "monsters": []})
+
+        q_lower = q.lower()
+        results = r.json().get("results", [])
+
+        # Ordena: nome exato > começa com query > contém query > resto
+        def sort_key(m):
+            name = m.get("name", "").lower()
+            if name == q_lower:            return 0
+            if name.startswith(q_lower):   return 1
+            if q_lower in name:            return 2
+            return 3
+
+        results.sort(key=sort_key)
+        monsters = [parse_monster(m) for m in results[:10]]
+        return jsonify({"ok": True, "monsters": monsters})
+
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e), "monsters": []})
 
 
 @app.route("/api/dnd/class-features")
@@ -1273,21 +1391,25 @@ def generate_lore():
 
     is_dnd = campaign_type == "dnd"
     
-    # 🟢 CORREÇÃO 1: Adicionado o campo "notes":"" para forçar a IA a gerar o histórico dos personagens
+    # Schema D&D: inclui tipo (jogador/aliado/inimigo) e classe apenas para PCs
     char_schema = (
         '{"name":"","description":"","traits":"","notes":"","role":"",'
-        '"classe":"<bárbaro|guerreiro|paladino|patrulheiro|bardo|clérigo|druida|monge|ladino|mago|feiticeiro|bruxo>",'
-        '"raca":"<humano|elfo|anão|halfling|draconato|meio-elfo|tiferino>"}'
+        '"tipo":"<jogador|aliado|inimigo>",'
+        '"classe":"<bárbaro|guerreiro|paladino|patrulheiro|bardo|clérigo|druida|monge|ladino|mago|feiticeiro|bruxo|npc>",'
+        '"raca":"<humano|elfo|anão|halfling|draconato|meio-elfo|tiferino|goblin|orc|draconato|outro>"}'
         if is_dnd else
-        '{"name":"","description":"","traits":"","notes":"","role":""}'
+        '{"name":"","description":"","traits":"","notes":"","role":"","tipo":"<jogador|aliado|inimigo>"}'
     )
     char_tip = (
-        "Para D&D inclua classe e raça válidas em cada personagem. "
+        'Para D&D use o campo "tipo" para classificar cada personagem: '
+        '"jogador" = herói/aventureiro com classe PC (bárbaro, guerreiro, mago, etc.); '
+        '"aliado" = NPC amigável sem classe PC (use classe "npc"); '
+        '"inimigo" = monstro ou antagonista sem classe PC (use classe "npc", raça pode ser goblin/orc/outro). '
+        "Apenas personagens do tipo jogador devem ter classes de PC. "
         if is_dnd else
-        "Não inclua campos de classe ou raça — apenas name, description, traits, notes e role. "
+        'Use "tipo" para classificar: "jogador", "aliado" ou "inimigo". Não inclua classe ou raça. '
     )
 
-    # 🟢 CORREÇÃO 2: Adicionado a array "events" à estrutura JSON exigida e instruções claras
     system = (
         "Você é um Mestre de RPG criativo. Dado uma ideia básica, gere um JSON com EXATAMENTE esta estrutura:\n"
         '{"story_summary":"<resumo de 5-8 linhas>","current_scene":"<cena inicial vívida>",'
@@ -1300,6 +1422,9 @@ def generate_lore():
         "Gere TODOS os personagens mencionados na ideia (máximo 4), um por pessoa citada. "
         "Preencha obrigatoriamente o campo 'notes' dos personagens com o seu histórico ou motivação. "
         f"{char_tip}"
+        "IMPORTANTE: Nos campos dos personagens (description, traits, notes) NÃO mencione nomes de magias, "
+        "habilidades mecânicas, equipamentos ou atributos numéricos — apenas narrativa pura, personalidade e história. "
+        "Magias, habilidades e equipamentos serão aplicados automaticamente pelo sistema com base na classe escolhida. "
         "Responda APENAS com JSON válido, sem markdown, sem comentários."
     )
     

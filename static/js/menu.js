@@ -869,6 +869,24 @@ const RACE_BONUSES_WZ = {
   'tiferino':  { inteligencia:1, carisma:2 },
 };
 
+// Raças de monstros/NPCs: não usam o sistema de bônus de raça de PC.
+// Os atributos são aplicados diretamente como template de stats.
+const MONSTER_RACES_WZ = {
+  'goblin':    { label:'Goblin',    stats:{ forca:8,  destreza:14, constituicao:10, inteligencia:10, sabedoria:8,  carisma:8  } },
+  'orc':       { label:'Orc',       stats:{ forca:16, destreza:12, constituicao:16, inteligencia:7,  sabedoria:11, carisma:10 } },
+  'gnoll':     { label:'Gnoll',     stats:{ forca:14, destreza:12, constituicao:11, inteligencia:6,  sabedoria:10, carisma:7  } },
+  'kobold':    { label:'Kobold',    stats:{ forca:7,  destreza:15, constituicao:9,  inteligencia:8,  sabedoria:7,  carisma:8  } },
+  'esqueleto': { label:'Esqueleto', stats:{ forca:10, destreza:14, constituicao:15, inteligencia:6,  sabedoria:8,  carisma:5  } },
+  'zumbi':     { label:'Zumbi',     stats:{ forca:13, destreza:6,  constituicao:16, inteligencia:3,  sabedoria:6,  carisma:5  } },
+  'lobo':      { label:'Lobo',      stats:{ forca:12, destreza:15, constituicao:12, inteligencia:3,  sabedoria:12, carisma:6  } },
+  'ogro':      { label:'Ogro',      stats:{ forca:19, destreza:8,  constituicao:16, inteligencia:5,  sabedoria:7,  carisma:7  } },
+  'troll':     { label:'Troll',     stats:{ forca:18, destreza:13, constituicao:20, inteligencia:7,  sabedoria:9,  carisma:7  } },
+  'dragão':    { label:'Dragão',    stats:{ forca:19, destreza:10, constituicao:17, inteligencia:12, sabedoria:11, carisma:15 } },
+  'vampiro':   { label:'Vampiro',   stats:{ forca:18, destreza:18, constituicao:18, inteligencia:17, sabedoria:15, carisma:18 } },
+  'demônio':   { label:'Demônio',   stats:{ forca:16, destreza:13, constituicao:18, inteligencia:11, sabedoria:12, carisma:14 } },
+  'humanoide': { label:'Humanoide', stats:{ forca:10, destreza:10, constituicao:10, inteligencia:10, sabedoria:10, carisma:10 } },
+};
+
 // ── Antecedentes D&D 5e SRD — lista para o wizard ────────────────────────────
 const BACKGROUND_LIST_WZ = {
   'acólito':          { skills: ['Perspicácia','Religião'],          items: ['Símbolo sagrado','Livro de orações'] },
@@ -1185,6 +1203,55 @@ const CLASS_DATA_WZ = {
   npc:         { hit_die: 8,  mana_per_level: 0,  mana_stat: null,          label: 'NPC' },
 };
 
+// Atributos padrão por classe usando o array padrão D&D 5e [15,14,13,12,10,8]
+// alocado nas prioridades típicas de cada classe.
+const CLASS_DEFAULT_STATS = {
+  bárbaro:     { forca:15, constituicao:14, destreza:13, sabedoria:12, carisma:10, inteligencia:8 },
+  guerreiro:   { forca:15, constituicao:14, destreza:13, sabedoria:12, carisma:10, inteligencia:8 },
+  paladino:    { forca:15, carisma:14,      constituicao:13, sabedoria:12, destreza:10, inteligencia:8 },
+  patrulheiro: { destreza:15, sabedoria:14, constituicao:13, forca:12,  inteligencia:10, carisma:8 },
+  monge:       { destreza:15, sabedoria:14, constituicao:13, forca:12,  inteligencia:10, carisma:8 },
+  ladino:      { destreza:15, inteligencia:14, constituicao:13, sabedoria:12, carisma:10, forca:8 },
+  mago:        { inteligencia:15, destreza:14, constituicao:13, sabedoria:12, carisma:10, forca:8 },
+  feiticeiro:  { carisma:15, destreza:14,   constituicao:13, inteligencia:12, sabedoria:10, forca:8 },
+  bruxo:       { carisma:15, destreza:14,   constituicao:13, inteligencia:12, sabedoria:10, forca:8 },
+  bardo:       { carisma:15, destreza:14,   constituicao:13, inteligencia:12, sabedoria:10, forca:8 },
+  clérigo:     { sabedoria:15, constituicao:14, forca:13,    carisma:12, destreza:10, inteligencia:8 },
+  druida:      { sabedoria:15, constituicao:14, destreza:13, inteligencia:12, carisma:10, forca:8 },
+  npc:         { forca:10, destreza:10, constituicao:10, inteligencia:10, sabedoria:10, carisma:10 },
+};
+
+// Aplica atributos padrão + magias iniciais a um objeto wzChar.
+// Chamado ao criar chars via IA ou ao trocar de classe/raça.
+function wzApplyClassDefaults(char) {
+  if (char.classe === 'npc') {
+    // NPCs/inimigos: stats vêm do template de raça de monstro, não do array padrão de PC
+    const monsterRace = MONSTER_RACES_WZ[char.raca];
+    char.stats = monsterRace ? { ...monsterRace.stats } : { forca:10, destreza:10, constituicao:10, inteligencia:10, sabedoria:10, carisma:10 };
+  } else {
+    // Personagens jogáveis: array padrão D&D 5e alocado por classe
+    const defStats = CLASS_DEFAULT_STATS[char.classe] || CLASS_DEFAULT_STATS['npc'];
+    char.stats = { ...defStats };
+    // Aplica bônus de raça PC (somente para personagens jogáveis).
+    // O contador de Point Buy subtrai esses bônus antes de calcular o custo,
+    // portanto o PB exibirá 27/27 corretamente mesmo com os stats finais aqui.
+    const raceBon = RACE_BONUSES_WZ[char.raca] || {};
+    Object.entries(raceBon).forEach(([stat, bon]) => {
+      char.stats[stat] = (char.stats[stat] || 10) + bon;
+    });
+  }
+  // Magias iniciais (apenas se ainda não inicializadas)
+  if (!char._spellsInitialized) {
+    char._selectedSpells = (INITIAL_SPELLS_WZ[char.classe] || []).map(s => ({
+      ...s,
+      nivel_magia: s.nivel_magia ?? (s.custo_mana === 0 ? 0 : Math.max(1, Math.round((s.custo_mana || 4) / 4))),
+    }));
+    char._spellsInitialized = true;
+  }
+  // Aba padrão: magias para casters, habilidades para os outros
+  char._habTab = CASTER_CLASSES_WZ.has(char.classe) ? 'spells' : 'feats';
+}
+
 // Point Buy costs: stat value → point cost
 const PB_COST = { 8:0, 9:1, 10:2, 11:3, 12:4, 13:5, 14:7, 15:9 };
 const PB_BUDGET = 27;
@@ -1327,28 +1394,86 @@ async function generateLore() {
       }));
       wzRenderLocs();
     }
+    if (Array.isArray(lore.events) && lore.events.length) {
+      wzEvts = lore.events.map(e => ({
+        summary:     e.summary     || '',
+        location:    e.location    || '',
+        consequence: e.consequence || '',
+      }));
+      wzRenderEvts();
+    }
     // Pré-popula personagens gerados pela IA na etapa 2
     if (Array.isArray(lore.characters) && lore.characters.length) {
-      wzChars = lore.characters.map((c, idx) => ({
-        name:        c.name        || '',
-        description: c.description || '',
-        traits:      c.traits      || '',
-        status:      'vivo',
-        notes:       c.notes       || '',
-        role:        c.role        || '',
-        isParty:     true,
-        classe:      (c.classe || 'guerreiro').toLowerCase().trim(),
-        raca:        (c.raca   || 'humano').toLowerCase().trim(),
-        freeMode:    false,
-        stats: { forca:10, destreza:10, constituicao:10, inteligencia:10, sabedoria:10, carisma:10 },
-        extras:      {},
-        _asiBonus: {}, _habTab: 'feats',
-        _spellLevelFilter: null, _spellQuery: '', _spellResults: [], _spellLoading: false,
-        _classFeatures: [], _featLoading: false,
-        _selectedSpells: [], _selectedFeats: [],
-        _equipChoices: {},
-        _open:       idx === 0,
-      }));
+      wzChars = lore.characters.map((c, idx) => {
+        const tipo    = (c.tipo || 'jogador').toLowerCase().trim();
+        const isPC    = tipo === 'jogador';   // apenas jogadores têm classe PC
+        const isParty = isPC;                 // jogadores entram no grupo; aliados/inimigos não
+        // Inimigos e aliados usam 'npc'; jogadores usam a classe gerada (ou guerreiro por padrão)
+        const classeRaw = isPC ? (c.classe || 'guerreiro') : 'npc';
+        const classe  = classeRaw.toLowerCase().trim();
+        // Para NPCs/inimigos: usa raça de monstro se válida, senão 'humanoide'
+        // Para PCs: usa raça de PC se válida, senão 'humano'
+        const racaRaw = (c.raca || '').toLowerCase().trim();
+        const racaPC_validas = ['humano','elfo','anão','halfling','draconato','gnomo','meio-elfo','meio-orc','tiferino'];
+        const raca = isPC
+          ? (racaPC_validas.includes(racaRaw) ? racaRaw : 'humano')
+          : (MONSTER_RACES_WZ[racaRaw] ? racaRaw : 'humanoide');
+        const char = {
+          name:        c.name        || '',
+          description: c.description || '',
+          traits:      c.traits      || '',
+          status:      'vivo',
+          notes:       c.notes       || '',
+          role:        c.role        || '',
+          isParty,
+          classe,
+          raca,
+          freeMode:    false,
+          nivel:       1,
+          background:  '',
+          stats:       { forca:10, destreza:10, constituicao:10, inteligencia:10, sabedoria:10, carisma:10 },
+          extras:      {},
+          _asiBonus: {}, _habTab: 'feats',
+          _spellLevelFilter: null, _spellQuery: '', _spellResults: [], _spellLoading: false,
+          _classFeatures: [], _featLoading: false,
+          _selectedSpells: [], _selectedFeats: [],
+          _spellsInitialized: false,
+          _equipChoices: {},
+          _monsterQuery: '', _monsterResults: [], _monsterLoading: false,
+          _open: idx === 0,
+        };
+        // Aplica atributos padrão e magias iniciais (para classes PC)
+        wzApplyClassDefaults(char);
+        return char;
+      });
+
+      // Auto-fetch Open5e para NPCs: busca o monstro pelo nome da raça gerada
+      // e aplica CR, HP e CA reais sem precisar de interação do usuário.
+      const npcChars = wzChars.filter(c => c.classe === 'npc' && c.raca && c.raca !== 'humanoide');
+      if (npcChars.length) {
+        await Promise.all(npcChars.map(async c => {
+          try {
+            const res  = await authFetch(`${API}/api/dnd/monsters/search?q=${encodeURIComponent(c.raca)}`);
+            const data = await res.json();
+            if (data.ok && data.monsters?.length) {
+              const qLower = c.raca.toLowerCase();
+              // Prefere match exato de nome, depois começa com, depois qualquer
+              const m = data.monsters.find(x => x.nome.toLowerCase() === qLower)
+                     || data.monsters.find(x => x.nome.toLowerCase().startsWith(qLower))
+                     || data.monsters[0];
+              c.stats           = { forca: m.forca, destreza: m.destreza, constituicao: m.constituicao, inteligencia: m.inteligencia, sabedoria: m.sabedoria, carisma: m.carisma };
+              c.raca            = m.nome.toLowerCase();
+              c._cr             = m.cr;
+              c._monsterHp      = m.vida;
+              c._monsterCa      = m.ca;
+              c._monsterTipo    = m.tipo;
+              c._monsterArma    = m.arma_principal  || '';
+              c._monsterArmaSec = m.arma_secundaria || '';
+            }
+          } catch { /* silencia erros de rede; mantém os dados do template local */ }
+        }));
+      }
+
       const n = wzChars.length;
       status.style.color = 'var(--green)';
       status.textContent = `✓ Lore gerado com ${n} personagem${n > 1 ? 's' : ''}! Revise os campos.`;
@@ -1451,6 +1576,7 @@ function addWzChar() {
     _classFeatures: [], _featLoading: false,
     _selectedSpells: [], _selectedFeats: [],
     _equipChoices: {},
+    _monsterQuery: '', _monsterResults: [], _monsterLoading: false,
     _open: true,
   });
   wzRenderChars();
@@ -1513,19 +1639,22 @@ function wzOnRaceChange(i, newRace) {
   const char = wzChars[i];
   if (!char) return;
 
-  const oldBonuses = RACE_BONUSES_WZ[char.raca] || {};
-  const newBonuses = RACE_BONUSES_WZ[newRace]   || {};
-
-  // Remove bônus antigo e aplica novo em cada atributo
-  Object.keys({ ...oldBonuses, ...newBonuses }).forEach(stat => {
-    const rem = oldBonuses[stat] || 0;
-    const add = newBonuses[stat] || 0;
-    // Base = valor atual - bônus antigo + bônus novo
-    char.stats[stat] = Math.max(1, (char.stats[stat] || 8) - rem + add);
-    // Atualiza exibição do modificador
-    const modEl = document.getElementById(`wz-mod-${i}-${stat}`);
-    if (modEl) modEl.textContent = wzStatMod(char.stats[stat]);
-  });
+  if (char.classe === 'npc') {
+    // NPCs: substitui todos os stats pelo template da nova raça de monstro
+    const monsterRace = MONSTER_RACES_WZ[newRace];
+    if (monsterRace) char.stats = { ...monsterRace.stats };
+  } else {
+    // PCs: remove bônus da raça antiga e aplica o da nova
+    const oldBonuses = RACE_BONUSES_WZ[char.raca] || {};
+    const newBonuses = RACE_BONUSES_WZ[newRace]   || {};
+    Object.keys({ ...oldBonuses, ...newBonuses }).forEach(stat => {
+      const rem = oldBonuses[stat] || 0;
+      const add = newBonuses[stat] || 0;
+      char.stats[stat] = Math.max(1, (char.stats[stat] || 8) - rem + add);
+      const modEl = document.getElementById(`wz-mod-${i}-${stat}`);
+      if (modEl) modEl.textContent = wzStatMod(char.stats[stat]);
+    });
+  }
 
   char.raca = newRace;
 
@@ -1546,14 +1675,162 @@ function wzOnRaceChange(i, newRace) {
 }
 
 
+// ── Busca de monstros Open5e para NPCs ───────────────────────────────────────
+const _wzMonsterTimers = {};
+function wzSearchMonster(i, query) {
+  const char = wzChars[i];
+  if (!char) return;
+  char._monsterQuery = query;
+  clearTimeout(_wzMonsterTimers[i]);
+  if (!query || query.length < 2) {
+    char._monsterResults = [];
+    wzRefreshMonsterSearch(i);
+    return;
+  }
+  char._monsterLoading = true;
+  wzRefreshMonsterSearch(i);
+  _wzMonsterTimers[i] = setTimeout(async () => {
+    try {
+      const res  = await authFetch(`${API}/api/dnd/monsters/search?q=${encodeURIComponent(query)}`);
+      const data = await res.json();
+      char._monsterResults = data.ok ? (data.monsters || []) : [];
+    } catch { char._monsterResults = []; }
+    char._monsterLoading = false;
+    wzRefreshMonsterSearch(i);
+  }, 400);
+}
+
+function wzRefreshMonsterSearch(i) {
+  const el = document.getElementById(`wz-monster-results-${i}`);
+  if (!el) return;
+  const char = wzChars[i];
+  if (char._monsterLoading) { el.innerHTML = '<div style="padding:6px;color:var(--text-muted);font-size:12px;">⏳ Buscando…</div>'; return; }
+  if (!char._monsterResults?.length) { el.innerHTML = ''; return; }
+  el.innerHTML = char._monsterResults.map((m, idx) => {
+    const mJson = JSON.stringify(m).replace(/"/g, '&quot;');
+    return `<div class="ed-search-result" onclick="wzApplyMonster(${i}, ${mJson})" style="cursor:pointer;padding:6px 8px;">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <strong style="font-size:13px;">${escHtml(m.nome)}</strong>
+        <span style="font-size:10px;color:var(--text-muted);">${escHtml(m.tipo)} · CR ${escHtml(m.cr)}</span>
+      </div>
+      <div style="font-size:10px;font-family:monospace;color:var(--text-muted);margin-top:2px;">
+        FOR ${m.forca} DES ${m.destreza} CON ${m.constituicao} INT ${m.inteligencia} SAB ${m.sabedoria} CAR ${m.carisma} · CA ${m.ca} · HP ${m.vida}${m.arma_principal ? ` · ⚔️ ${escHtml(m.arma_principal)}` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function wzApplyMonster(i, monster) {
+  const char = wzChars[i];
+  if (!char) return;
+  // Atributos do bloco do monstro
+  char.stats = {
+    forca:        monster.forca,
+    destreza:     monster.destreza,
+    constituicao: monster.constituicao,
+    inteligencia: monster.inteligencia,
+    sabedoria:    monster.sabedoria,
+    carisma:      monster.carisma,
+  };
+  // Metadados do monstro
+  char.raca             = monster.nome.toLowerCase();
+  char._cr              = monster.cr;
+  char._monsterHp       = monster.vida;
+  char._monsterCa       = monster.ca;
+  char._monsterTipo     = monster.tipo;
+  char._monsterArma     = monster.arma_principal  || '';
+  char._monsterArmaSec  = monster.arma_secundaria || '';
+  // Limpa busca
+  char._monsterQuery   = '';
+  char._monsterResults = [];
+  // Re-renderiza o card completo
+  wzRefreshDndSection(i);
+}
+
+// ── Busca de monstros Open5e para NPCs no modal de edição de campanha ────────
+const _edMonsterTimers = {};
+function edSearchMonster(i, query) {
+  const ch = edChars[i];
+  if (!ch) return;
+  ch._monsterQuery   = query;
+  ch._monsterResults = ch._monsterResults || [];
+  clearTimeout(_edMonsterTimers[i]);
+  if (!query || query.length < 2) {
+    ch._monsterResults = [];
+    edRefreshMonsterSearch(i);
+    return;
+  }
+  ch._monsterLoading = true;
+  edRefreshMonsterSearch(i);
+  _edMonsterTimers[i] = setTimeout(async () => {
+    try {
+      const res  = await authFetch(`${API}/api/dnd/monsters/search?q=${encodeURIComponent(query)}`);
+      const data = await res.json();
+      ch._monsterResults = data.ok ? (data.monsters || []) : [];
+    } catch { ch._monsterResults = []; }
+    ch._monsterLoading = false;
+    edRefreshMonsterSearch(i);
+  }, 400);
+}
+
+function edRefreshMonsterSearch(i) {
+  const el = document.getElementById(`ed-monster-results-${i}`);
+  if (!el) return;
+  const ch = edChars[i];
+  if (ch._monsterLoading) {
+    el.innerHTML = '<div style="padding:6px;color:var(--text-muted);font-size:12px;">⏳ Buscando…</div>';
+    return;
+  }
+  if (!ch._monsterResults?.length) { el.innerHTML = ''; return; }
+  el.innerHTML = ch._monsterResults.map(m => {
+    const mJson = JSON.stringify(m).replace(/"/g, '&quot;');
+    return `<div class="ed-search-result" onclick="edApplyMonster(${i}, ${mJson})" style="cursor:pointer;padding:6px 8px;">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <strong style="font-size:13px;">${escHtml(m.nome)}</strong>
+        <span style="font-size:10px;color:var(--text-muted);">${escHtml(m.tipo)} · CR ${escHtml(m.cr)}</span>
+      </div>
+      <div style="font-size:10px;font-family:monospace;color:var(--text-muted);margin-top:2px;">
+        FOR ${m.forca} DES ${m.destreza} CON ${m.constituicao} INT ${m.inteligencia} SAB ${m.sabedoria} CAR ${m.carisma} · CA ${m.ca} · HP ${m.vida}${m.arma_principal ? ` · ⚔️ ${escHtml(m.arma_principal)}` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function edApplyMonster(i, monster) {
+  const ch = edChars[i];
+  if (!ch) return;
+  // Aplica stats do bloco do monstro na ficha
+  ch.sheet.forca        = monster.forca;
+  ch.sheet.destreza     = monster.destreza;
+  ch.sheet.constituicao = monster.constituicao;
+  ch.sheet.inteligencia = monster.inteligencia;
+  ch.sheet.sabedoria    = monster.sabedoria;
+  ch.sheet.carisma      = monster.carisma;
+  ch.sheet.vida_atual   = monster.vida;
+  ch.sheet.vida_max     = monster.vida;
+  ch.sheet.ca           = monster.ca;
+  ch.sheet.cr           = monster.cr;
+  ch.sheet.raca         = monster.nome.toLowerCase();
+  if (!ch.sheet.equipamentos) ch.sheet.equipamentos = {};
+  ch.sheet.equipamentos.arma_principal  = monster.arma_principal  || '';
+  ch.sheet.equipamentos.arma_secundaria = monster.arma_secundaria || null;
+  // Limpa busca e re-renderiza seção D&D
+  ch._monsterQuery   = '';
+  ch._monsterResults = [];
+  ch._monsterLoading = false;
+  edRefreshDndSections(i);
+}
+
 function wzOnStatChange(i, stat, val) {
   const char = wzChars[i];
   if (!char) return;
   const num = parseInt(val);
-  // Modo livre: sem limites (qualquer inteiro positivo). Modo normal: 8-15 Point Buy.
+  // Modo livre: sem limites (qualquer inteiro positivo).
+  // Modo normal (Point Buy): limites incluem o bônus de raça (base 8–15 + race).
+  const raceBon = char.freeMode ? 0 : wzRaceBonusFor(char, stat);
   const clamped = char.freeMode
     ? (isNaN(num) ? 1 : Math.max(1, num))
-    : Math.max(8, Math.min(15, isNaN(num) ? 8 : num));
+    : Math.max(8 + raceBon, Math.min(15 + raceBon, isNaN(num) ? 8 + raceBon : num));
   char.stats[stat] = clamped;
   // Em modo livre, reflete o clamped no input (garante pelo menos 1)
   if (char.freeMode) {
@@ -1578,15 +1855,14 @@ function wzOnStatChange(i, stat, val) {
 
 function wzOnClassChange(i, val) {
   wzChars[i].classe = val;
-  // reset spell/feat state on class change
-  wzChars[i]._selectedSpells   = [];
+  // Reseta estado de magia/habilidade e aplica defaults da nova classe
   wzChars[i]._selectedFeats    = [];
   wzChars[i]._spellResults     = [];
   wzChars[i]._classFeatures    = [];
   wzChars[i]._spellLevelFilter = null;
-  wzChars[i]._spellsInitialized = false;  // força re-inicialização do kit ao re-renderizar
-  // Casters abrem na aba de magias por padrão; outros na de habilidades
-  wzChars[i]._habTab = CASTER_CLASSES_WZ.has(val) ? 'spells' : 'feats';
+  wzChars[i]._selectedSpells   = [];
+  wzChars[i]._spellsInitialized = false;
+  wzApplyClassDefaults(wzChars[i]);  // atributos + magias da nova classe
   wzOnStatChange(i, 'forca', wzChars[i].stats.forca);
   wzRefreshDndSection(i);
 }
@@ -1611,11 +1887,15 @@ function wzOnFreeMode(i, checked) {
 }
 
 function wzApplyStdArray(i) {
+  const char = wzChars[i];
   const vals = [15,14,13,12,10,8];
-  wzChars[i]._asiBonus = {};
+  char._asiBonus = {};
   STATS_WZ.forEach((stat, j) => {
-    wzChars[i].stats[stat] = vals[j];
-    wzOnStatChange(i, stat, vals[j]);
+    // Array padrão + bônus de raça já aplicado
+    const raceBon = wzRaceBonusFor(char, stat);
+    const finalVal = vals[j] + raceBon;
+    char.stats[stat] = finalVal;
+    wzOnStatChange(i, stat, finalVal);
   });
   const gridEl = document.getElementById(`wz-stat-grid-${i}`);
   if (gridEl) gridEl.innerHTML = wzRenderStatGrid(i);
@@ -1635,12 +1915,20 @@ function wzStatStep(i, stat, delta) {
 }
 
 // ── Wizard: PB+ASI budget (espelha lógica do editor) ─────────────────────────
+// Retorna o bônus de raça de um stat para um char PC (0 para NPC).
+function wzRaceBonusFor(char, stat) {
+  if (!char || char.classe === 'npc') return 0;
+  return (RACE_BONUSES_WZ[char.raca] || {})[stat] || 0;
+}
+
 function wzInitAsiBonus(char) {
   if (char._asiBonus && Object.keys(char._asiBonus).length) return;
   char._asiBonus = {};
   for (const stat of STATS_WZ) {
-    const val = parseInt(char.stats?.[stat]) || 8;
-    char._asiBonus[stat] = Math.max(0, val - 15);
+    const val     = parseInt(char.stats?.[stat]) || 8;
+    const raceBon = wzRaceBonusFor(char, stat);
+    // ASI bonus = tudo acima de 15 EXCLUINDO o bônus de raça
+    char._asiBonus[stat] = Math.max(0, val - raceBon - 15);
   }
 }
 
@@ -1653,8 +1941,10 @@ function wzStatBudgetFull(i) {
   const bonus    = char._asiBonus;
   let pbUsed = 0;
   for (const stat of STATS_WZ) {
-    const val  = parseInt(char.stats[stat]) || 8;
-    const base = Math.max(8, val - (bonus[stat] || 0));
+    const val     = parseInt(char.stats[stat]) || 8;
+    const raceBon = wzRaceBonusFor(char, stat);
+    // Base PB = stat final − bônus ASI − bônus de raça
+    const base = Math.max(8, val - (bonus[stat] || 0) - raceBon);
     pbUsed += PB_COST[Math.min(base, 15)] ?? 9;
   }
   const asiUsed = Object.values(bonus).reduce((a, b) => a + b, 0);
@@ -1666,15 +1956,19 @@ function wzStatStepFull(i, stat, delta) {
   const char = wzChars[i];
   if (!char || char.freeMode) return;
   wzInitAsiBonus(char);
+  const raceBon = wzRaceBonusFor(char, stat);
   const cur  = parseInt(char.stats[stat]) || 8;
   const next = cur + delta;
-  if (next < 8 || next > 20) return;
+  // Limite mínimo = 8 + bônus de raça (base mínima 8); máximo = 20 + bônus de raça
+  if (next < 8 + raceBon || next > 20 + raceBon) return;
   if (delta > 0) {
-    const bud    = wzStatBudgetFull(i);
-    const base   = Math.max(8, cur - (char._asiBonus[stat] || 0));
+    const bud     = wzStatBudgetFull(i);
+    // Base para cálculo de PB = stat final − ASI − bônus de raça
+    const base    = Math.max(8, cur - (char._asiBonus[stat] || 0) - raceBon);
     const pbDelta = (PB_COST[Math.min(base+1,15)]??9) - (PB_COST[Math.min(base,15)]??9);
-    const canUsePb = (char._asiBonus[stat]||0) === 0 && next <= 15 && bud.pbRemain >= pbDelta;
-    if (canUsePb) { /* usa PB */ }
+    // Pode usar PB se: sem ASI neste stat, base ainda < 15, e há orçamento
+    const canUsePb = (char._asiBonus[stat]||0) === 0 && base < 15 && bud.pbRemain >= pbDelta;
+    if (canUsePb) { /* usa PB — sem incremento em _asiBonus */ }
     else if (bud.asiRemain > 0) { char._asiBonus[stat] = (char._asiBonus[stat]||0) + 1; }
     else return;
   } else {
@@ -1840,23 +2134,51 @@ function wzBuildDndSectionHtml(i) {
           ${Object.entries(CLASS_DATA_WZ).map(([k,v])=>`<option value="${k}" ${char.classe===k?'selected':''}>${v.label}</option>`).join('')}
         </select>
       </div>
-      <div><span class="cwc-label">Raça</span>
-        <select onchange="wzOnRaceChange(${i},this.value)">
-          ${['humano','elfo','anão','halfling','draconato','gnomo','meio-elfo','meio-orc','tiferino'].map(r => {
-            const bon = RACE_BONUSES_WZ[r] || {};
-            const str = Object.entries(bon).map(([k,v])=>`${k.slice(0,3).toUpperCase()} +${v}`).join(', ');
-            return `<option value="${r}" ${char.raca===r?'selected':''}>${r.charAt(0).toUpperCase()+r.slice(1)}${str?` (${str})`:''}</option>`;
-          }).join('')}
-        </select>
+      <div>
+        ${char.classe === 'npc' ? `
+          <span class="cwc-label">Monstro / Criatura <span style="color:var(--text-muted);font-size:9px;">(Open5e)</span></span>
+          ${char.raca ? `<div style="font-size:11px;color:var(--ink-user);margin-bottom:4px;">✓ ${char.raca.charAt(0).toUpperCase()+char.raca.slice(1)}</div>` : ''}
+          <input
+            type="text"
+            placeholder="Buscar monstro… (ex: goblin, zombie)"
+            value="${escHtml(char._monsterQuery||'')}"
+            oninput="wzSearchMonster(${i},this.value)"
+            style="width:100%;box-sizing:border-box;"
+          >
+          <div id="wz-monster-results-${i}" style="max-height:200px;overflow-y:auto;border:1px solid var(--page-edge);border-top:none;border-radius:0 0 6px 6px;"></div>
+        ` : `
+          <span class="cwc-label">Raça</span>
+          <select onchange="wzOnRaceChange(${i},this.value)">
+            ${['humano','elfo','anão','halfling','draconato','gnomo','meio-elfo','meio-orc','tiferino'].map(r => {
+              const bon = RACE_BONUSES_WZ[r] || {};
+              const str = Object.entries(bon).map(([k,v])=>`${k.slice(0,3).toUpperCase()} +${v}`).join(', ');
+              return `<option value="${r}" ${char.raca===r?'selected':''}>${r.charAt(0).toUpperCase()+r.slice(1)}${str?` (${str})`:''}</option>`;
+            }).join('')}
+          </select>
+        `}
       </div>
     </div>
+    ${char.classe !== 'npc' ? `
     <div><span class="cwc-label">Antecedente <span style="color:var(--text-muted);font-size:9px;">(opcional)</span></span>
       <select onchange="wzOnBackgroundChange(${i},this.value)">
         <option value="" ${!char.background?'selected':''}>— Nenhum —</option>
         ${Object.keys(BACKGROUND_LIST_WZ).map(b=>`<option value="${b}" ${char.background===b?'selected':''}>${b.charAt(0).toUpperCase()+b.slice(1)}</option>`).join('')}
       </select>
       ${char.background?`<div style="font-family:monospace;font-size:9px;color:var(--text-muted);margin-top:4px;">${wzBgInfo(char.background)}</div>`:''}
-    </div>
+    </div>` : ''}
+    ${char.classe === 'npc' ? `
+    <div class="cwc-row2">
+      <div><span class="cwc-label">Challenge Rating (CR)</span>
+        <div style="font-size:22px;font-weight:700;color:var(--ink-user);padding:4px 0;">
+          ${char._cr != null ? `CR ${char._cr}` : '<span style="color:var(--text-muted);font-size:14px;">— busque um monstro —</span>'}
+        </div>
+      </div>
+      <div><span class="cwc-label">HP / CA do monstro</span>
+        <div style="font-size:13px;color:var(--text-muted);padding:6px 0;">
+          ${char._monsterHp != null ? `❤️ ${char._monsterHp} · 🛡️ ${char._monsterCa}` : '—'}
+        </div>
+      </div>
+    </div>` : `
     <div class="cwc-row2">
       <div><span class="cwc-label">Nível Inicial</span>
         <input type="number" min="1" max="20" value="${nivel}"
@@ -1868,9 +2190,9 @@ function wzBuildDndSectionHtml(i) {
           +${edProfForLevel(nivel)}
         </div>
       </div>
-    </div>`;
+    </div>`}`;
 
-  const budgetRow = char.freeMode ? '' : `
+  const budgetRow = (char.freeMode || char.classe === 'npc') ? '' : `
     <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px;font-size:12px;">
       <div style="padding:6px 10px;border-radius:4px;background:rgba(0,0,0,0.03);">
         <span id="wz-pb-${i}" style="color:var(--text-muted);">Point Buy: ${bud.pbUsed}/${bud.pbBudget}</span>
@@ -1886,23 +2208,24 @@ function wzBuildDndSectionHtml(i) {
     <div>
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
         <span class="cwc-label" style="margin:0;">Atributos</span>
+        ${char.classe !== 'npc' ? `
         <div style="display:flex;gap:6px;align-items:center;">
           <button onclick="wzApplyStdArray(${i})" style="background:none;border:1px solid var(--page-edge);border-radius:3px;color:var(--text-muted);font-size:9px;padding:3px 8px;cursor:pointer;letter-spacing:0.06em;">ARRAY PADRÃO</button>
           <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:10px;color:var(--text-muted);">
             <input type="checkbox" ${char.freeMode?'checked':''} onchange="wzOnFreeMode(${i},this.checked)">
             Modo Livre
           </label>
-        </div>
+        </div>` : `<span style="font-size:10px;color:var(--text-muted);">Do bloco do monstro · editável</span>`}
       </div>
       ${budgetRow}
       <div class="stat-grid" id="wz-stat-grid-${i}">${wzRenderStatGrid(i)}</div>
     </div>
     ${calc ? `
     <div class="dnd-calc-row">
-      <div class="dnd-calc-item">❤️ HP <span id="wz-hp-${i}">${calc.hp}</span></div>
-      <div class="dnd-calc-item">🛡️ CA <span id="wz-ca-${i}">${calc.ca}</span></div>
+      <div class="dnd-calc-item">❤️ HP <span id="wz-hp-${i}">${char._monsterHp ?? calc.hp}</span></div>
+      <div class="dnd-calc-item">🛡️ CA <span id="wz-ca-${i}">${char._monsterCa ?? calc.ca}</span></div>
       ${calc.mana > 0 ? `<div class="dnd-calc-item">✨ Mana <span id="wz-mn-${i}">${calc.mana}</span></div>` : ''}
-      <div class="dnd-calc-item">d${calc.hit_die} hit die · Prof +${edProfForLevel(nivel)}</div>
+      <div class="dnd-calc-item">d${calc.hit_die} hit die${char.classe !== 'npc' ? ` · Prof +${edProfForLevel(nivel)}` : ''}</div>
     </div>` : ''}`;
 
   // ── Habilidades & Magias (interface com abas) ──────────────────────────────
@@ -2005,11 +2328,15 @@ function wzRenderStatGrid(i) {
       wzInitAsiBonus(char);
       const bud      = wzStatBudgetFull(i);
       const asiBonus = char._asiBonus?.[stat] || 0;
-      const base     = Math.max(8, val - asiBonus);
+      const raceBon  = wzRaceBonusFor(char, stat);
+      // Base PB = stat final − ASI − bônus de raça
+      const base     = Math.max(8, val - asiBonus - raceBon);
       const pbDelta  = (PB_COST[Math.min(base+1,15)]??9) - (PB_COST[Math.min(base,15)]??9);
-      const canUsePb = asiBonus === 0 && val < 15 && bud.pbRemain >= pbDelta;
-      const atMin    = val <= 8;
-      const canUp    = val >= 20 ? false : canUsePb ? true : bud.asiRemain > 0;
+      // canUsePb: sem ASI neste stat, base ainda < 15, orçamento disponível
+      const canUsePb = asiBonus === 0 && base < 15 && bud.pbRemain >= pbDelta;
+      // Mínimo exibido = 8 + bônus de raça
+      const atMin    = val <= 8 + raceBon;
+      const canUp    = (val - raceBon) >= 20 ? false : canUsePb ? true : bud.asiRemain > 0;
       return `<div class="stat-cell">
         <span class="stat-cell-name">${name}</span>
         <div class="stat-stepper">
@@ -2410,27 +2737,34 @@ async function createCampaignFromWizard() {
     if (isDnd) {
       const cls     = CLASS_DATA_WZ[char.classe] || CLASS_DATA_WZ['guerreiro'];
       const stats   = char.stats;
-      const nivel   = Math.max(1, parseInt(char.nivel) || 1);
+      const isNpc   = char.classe === 'npc';
+      const nivel   = isNpc ? 1 : Math.max(1, parseInt(char.nivel) || 1);
       const conMod  = Math.floor((parseInt(stats.constituicao) - 10) / 2);
       const dexMod  = Math.floor((parseInt(stats.destreza) - 10) / 2);
-      // HP escalado por nível
+      // HP: monstros usam o HP real do bloco; PCs usam fórmula por nível
       const avgDie  = Math.floor(cls.hit_die / 2) + 1;
-      const hp_max  = Math.max(nivel, (cls.hit_die + conMod) + (nivel - 1) * Math.max(1, avgDie + conMod));
+      const hp_max  = isNpc && char._monsterHp
+        ? char._monsterHp
+        : Math.max(nivel, (cls.hit_die + conMod) + (nivel - 1) * Math.max(1, avgDie + conMod));
       let mana_max  = 0;
-      if (cls.mana_stat && cls.mana_per_level > 0) {
+      if (!isNpc && cls.mana_stat && cls.mana_per_level > 0) {
         const mStatMod = Math.floor((parseInt(stats[cls.mana_stat]) - 10) / 2);
         mana_max = Math.max(0, (cls.mana_per_level + mStatMod) * nivel);
       }
 
-      // Equipamentos: resolve com base nas escolhas feitas no wizard
-      const startEquip  = wzGetResolvedEquip(char);
+      // Equipamentos: NPCs usam armas extraídas do bloco do monstro (Open5e)
+      const startEquip  = isNpc
+        ? { arm:'', esc:false, arma: char._monsterArma || '', arma_sec: char._monsterArmaSec || '', inv:[] }
+        : wzGetResolvedEquip(char);
       const armorDexMod = Math.floor((parseInt(stats.destreza) - 10) / 2);
-      const caFinal     = wzArmorCA(startEquip.arm, armorDexMod);
+      // CA: monstros usam CA real do bloco; PCs calculam pela armadura
+      const caFinal     = isNpc && char._monsterCa ? char._monsterCa : wzArmorCA(startEquip.arm, armorDexMod);
 
       charObj.sheet = {
         classe:      char.classe,
         raca:        char.raca,
         nivel,
+        cr:          isNpc ? (char._cr ?? null) : null,
         xp:          0,
         xp_proximo:  edXpForNextLevel(nivel),
         forca:       parseInt(stats.forca)        || 10,
@@ -2474,13 +2808,22 @@ async function createCampaignFromWizard() {
 
       const hasSelections = !char.freeMode && (selFeats.length || selSpells.length);
 
+      // Helper: converte magia para objeto de habilidade, preservando nivel_magia
+      const spellToHab = s => ({
+        nome:        s.nome,
+        descricao:   s.descricao || '',
+        custo_mana:  s.custo_mana  || 0,
+        dado:        s.dado        || '',
+        nivel_magia: s.nivel_magia ?? (s.custo_mana === 0 ? 0 : Math.max(1, Math.round((s.custo_mana || 4) / 4))),
+      });
+
       if (hasSelections) {
         charObj.habilidades = [
           ...selFeats.map(f => ({ nome: f.nome, descricao: f.descricao || '', custo_mana: 0, dado: '' })),
-          ...spellList.map(s => ({ nome: s.nome, descricao: s.descricao || '', custo_mana: s.custo_mana || 0, dado: s.dado || '' })),
+          ...spellList.map(spellToHab),
         ];
       } else {
-        // Sem seleção: usa habilidades padrão da classe + magias curadas
+        // Sem seleção manual: usa habilidades padrão da classe + magias curadas
         charObj.habilidades = (CLASS_ABILITIES_WZ[char.classe] || []).map(h => ({...h}));
 
         if (CASTER_CLASSES_WZ.has(char.classe)) {
@@ -2488,7 +2831,7 @@ async function createCampaignFromWizard() {
           spellList.forEach(s => {
             const lc = s.nome.toLowerCase();
             if (!existingNames.has(lc)) {
-              charObj.habilidades.push({ nome: s.nome, descricao: s.descricao || 'Magia da classe.', custo_mana: s.custo_mana || 0, dado: s.dado || '' });
+              charObj.habilidades.push(spellToHab(s));
               existingNames.add(lc);
             }
           });
@@ -2910,6 +3253,7 @@ async function openEditCampaign(e, name) {
       inventario:  Array.isArray(ch.inventario)  ? ch.inventario.map(it => ({...it}))  : [],
       habilidades: Array.isArray(ch.habilidades) ? ch.habilidades.map(h  => ({...h})) : [],
       _open:       false,
+      _monsterQuery: '', _monsterResults: [], _monsterLoading: false,
     }));
     edRenderChars();
 
@@ -3278,13 +3622,49 @@ function edBuildDndSections(i) {
             ${Object.entries(CLASS_DATA_WZ).map(([k,v])=>`<option value="${k}" ${s.classe===k?'selected':''}>${v.label}</option>`).join('')}
           </select>
         </div>
+        ${s.classe === 'npc' ? `
+        <div>
+          <span class="cwc-label">Monstro / Criatura <span style="color:var(--text-muted);font-size:9px;">(Open5e)</span></span>
+          ${s.raca ? `<div style="font-size:11px;color:var(--ink-user);margin-bottom:4px;">✓ ${escHtml(s.raca.charAt(0).toUpperCase()+s.raca.slice(1))}</div>` : ''}
+          <input type="text"
+            value="${escHtml(ch._monsterQuery||'')}"
+            placeholder="Buscar monstro… (ex: goblin, zombie)"
+            oninput="edSearchMonster(${i},this.value)"
+            style="width:100%;box-sizing:border-box;">
+          <div id="ed-monster-results-${i}" style="max-height:200px;overflow-y:auto;border:1px solid var(--page-edge);border-top:none;border-radius:0 0 6px 6px;"></div>
+        </div>
+        ` : `
         <div><span class="cwc-label">Raça</span>
           <select onchange="edSheetChange(${i},'raca',this.value)">
             ${['humano','elfo','anão','halfling','draconato','gnomo','meio-elfo','meio-orc','tiferino'].map(r=>
               `<option value="${r}" ${s.raca===r?'selected':''}>${r.charAt(0).toUpperCase()+r.slice(1)}</option>`).join('')}
           </select>
         </div>
+        `}
       </div>
+      ${s.classe === 'npc' ? `
+      <div class="cwc-row2" style="margin-top:10px;">
+        <div>
+          <span class="cwc-label">Challenge Rating (CR)</span>
+          <input type="text" value="${escHtml((s.cr ?? '').toString())}"
+            placeholder="ex: 1/4, 1/2, 1, 5…"
+            onchange="edSheetChange(${i},'cr',this.value.trim()||null)"
+            style="font-size:20px;font-weight:700;color:var(--ink-user);text-align:center;">
+        </div>
+        <div>
+          <span class="cwc-label">HP / CA do bloco</span>
+          <div style="display:flex;gap:8px;">
+            <div><span class="cwc-label" style="font-size:9px;">HP Máx</span>
+              <input type="number" min="1" value="${s.vida_max||1}" onchange="edSheetChange(${i},'vida_max',this.value)" style="font-size:16px;font-weight:700;text-align:center;">
+            </div>
+            <div><span class="cwc-label" style="font-size:9px;">CA</span>
+              <input type="number" min="1" value="${s.ca||10}" onchange="edSheetChange(${i},'ca',this.value)" style="font-size:16px;font-weight:700;text-align:center;">
+            </div>
+          </div>
+        </div>
+      </div>
+      ` : ''}
+      ${s.classe !== 'npc' ? `
       <div class="cwc-row2" style="margin-top:10px;">
         <div><span class="cwc-label">Antecedente</span>
           <select onchange="edSheetChange(${i},'background',this.value)">
@@ -3318,6 +3698,7 @@ function edBuildDndSections(i) {
           <input type="number" min="0" value="${s.xp_proximo||300}" onchange="edSheetChange(${i},'xp_proximo',this.value)">
         </div>
       </div>
+      ` : ''}
     </div>`;
 
   // ─── Atributos ───────────────────────────────────────────────────

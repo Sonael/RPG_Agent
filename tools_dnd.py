@@ -18,6 +18,115 @@ import random
 import re
 import memory
 
+# ---------------------------------------------------------------------------
+# Mapeamento de nomes de magias/habilidades PT-BR → EN (para tolerar o AI
+# chamando use_ability com nomes traduzidos em vez do nome armazenado)
+# ---------------------------------------------------------------------------
+_SPELL_PT_TO_EN: dict[str, str] = {
+    # Cantrips
+    "prestidigitação": "prestidigitation",
+    "luz": "light",
+    "raio de gelo": "ray of frost",
+    "raio de frio": "ray of frost",
+    "choque do trovão": "thunderclap",
+    "choque elétrico": "shocking grasp",
+    "toque gélido": "chill touch",
+    "explosão eldrica": "eldritch blast",
+    "chama sagrada": "sacred flame",
+    "orientação": "guidance",
+    "resistência": "resistance",
+    "palavra de cura": "spare the dying",
+    "produzir chama": "produce flame",
+    "druidcraft": "druidcraft",
+    "veneno aspergido": "poison spray",
+    "amigos": "friends",
+    "mensagem": "message",
+    "ilusão menor": "minor illusion",
+    "mão de mago": "mage hand",
+    "dança das luzes": "dancing lights",
+    "truque": "thaumaturgy",
+    # Nível 1
+    "míssil mágico": "magic missile",
+    "missil magico": "magic missile",
+    "mãos flamejantes": "burning hands",
+    "maos flamejantes": "burning hands",
+    "sono": "sleep",
+    "escudo": "shield",
+    "armadura de mago": "mage armor",
+    "identificar": "identify",
+    "graxa": "grease",
+    "cor em spray": "color spray",
+    "encantamento": "charm person",
+    "enfeitiçar pessoa": "charm person",
+    "criar ou destruir água": "create or destroy water",
+    "cura de ferimentos": "cure wounds",
+    "detectar magia": "detect magic",
+    "disfarçar-se": "disguise self",
+    "falar com animais": "speak with animals",
+    "guia espiritual": "guiding bolt",
+    "raio guia": "guiding bolt",
+    "cura": "healing word",
+    "palavra curativa": "healing word",
+    "inflict wounds": "inflict wounds",
+    "infligir ferimentos": "inflict wounds",
+    "saltar": "jump",
+    "longa passada": "longstrider",
+    "proteção contra o mal e o bem": "protection from evil and good",
+    "punição vingativa": "wrathful smite",
+    "onda trovejante": "thunderwave",
+    "mergulho de bruxa": "witch bolt",
+    "raio de bruxa": "witch bolt",
+    # Nível 2
+    "invisibilidade": "invisibility",
+    "sugestão": "suggestion",
+    "web": "web",
+    "teia": "web",
+    "porta dimensional": "misty step",
+    "passo nebuloso": "misty step",
+    "trevas": "darkness",
+    "bola de fogo": "fireball",
+    "relâmpago": "lightning bolt",
+    "raio de enfraquecimento": "ray of enfeeblement",
+    "segurar pessoa": "hold person",
+    "levitação": "levitate",
+    "imagem espelhada": "mirror image",
+    "nuvem de adormecimento": "sleep",
+    "blindagem": "blur",
+    "flecha ácida de melf": "melf's acid arrow",
+    "toque de aranha": "spider climb",
+    "escuridão": "darkness",
+    # Nível 3
+    "contrafeitiço": "counterspell",
+    "dissipar magia": "dispel magic",
+    "voo": "fly",
+    "bola de fogo": "fireball",
+    "raio relampejante": "lightning bolt",
+    "pressa": "haste",
+    "lentidão": "slow",
+    "hipnose": "hypnotic pattern",
+    "padrão hipnótico": "hypnotic pattern",
+    "animar mortos": "animate dead",
+    # Nível 4+
+    "banimento": "banishment",
+    "muralha de fogo": "wall of fire",
+    "polimorfismo": "polymorph",
+    "mudar forma": "polymorph",
+    "porta dimensional": "dimension door",
+    "teleporte": "teleport",
+    "desejo": "wish",
+    # Habilidades de classe comuns
+    "recuperação arcana": "recuperação arcana",
+    "tradição arcana": "tradição arcana",
+    "segundo fôlego": "second wind",
+    "surto de ação": "action surge",
+    "esquiva astuta": "cunning action",
+    "ataque furtivo": "sneak attack",
+    "cura das mãos": "lay on hands",
+    "sentido divino": "divine sense",
+    "combate com duas armas": "two-weapon fighting",
+    "fúria": "rage",
+}
+
 
 # ---------------------------------------------------------------------------
 # Helpers de controle de turno
@@ -695,13 +804,15 @@ def _normalize_sheet(sheet: dict) -> None:
                 sheet[field] = 0
 
 
-def _get_char(name: str) -> tuple[dict | None, str]:
-    """Retorna (char_dict, erro). char é None se não encontrado ou sem ficha."""
+def _get_char(name: str, allow_dead: bool = False) -> tuple[dict | None, str]:
+    """Retorna (char_dict, erro). char é None se não encontrado, sem ficha ou morto."""
     char = memory.campaign["characters"].get(memory.char_key(name))
     if not char:
         return None, f"Personagem '{name}' não encontrado."
     if not char.get("sheet"):
         return None, f"'{name}' não tem ficha D&D. Use create_character_sheet primeiro."
+    if not allow_dead and char.get("status") == "morto":
+        return None, f"❌ {char['name']} está morto e não pode realizar ações."
     _normalize_sheet(char["sheet"])
     return char, ""
 
@@ -1135,6 +1246,7 @@ def create_character_sheet(
     sabedoria: int,
     carisma: int,
     description: str = "",
+    nivel: int = 1,
     **kwargs,
 ) -> str:
     """
@@ -1152,14 +1264,17 @@ def create_character_sheet(
         sabedoria:     Valor de Sabedoria.
         carisma:       Valor de Carisma.
         description:   Descrição narrativa (aparência, história, personalidade).
+        nivel:         Nível inicial (1–20). Para NPCs de nível alto, passe o valor
+                       correto aqui — HP, mana, proficiência e habilidades de classe
+                       são calculados automaticamente para todos os níveis até este.
     """
+    nivel        = max(1, min(20, int(nivel)))
     classe_lower = classe.lower()
     info         = CLASS_DATA.get(classe_lower, {"hit_die": 8, "mana_per_level": 4, "mana_stat": "inteligencia", "saves": []})
 
     con_mod  = _modifier(constituicao)
     dex_mod  = _modifier(destreza)
     hit_die  = info["hit_die"]
-    hp_max   = max(1, hit_die + con_mod)
 
     stat_map = {
         "forca": forca, "destreza": destreza, "constituicao": constituicao,
@@ -1169,16 +1284,28 @@ def create_character_sheet(
     mana_per_level = info.get("mana_per_level", 0)
     if mana_stat and mana_per_level > 0:
         mana_mod = _modifier(stat_map.get(mana_stat, 10))
-        mana_max = max(0, mana_per_level + mana_mod)
+        base_mana_per_level = max(0, mana_per_level + mana_mod)
     else:
-        mana_max = 0
+        base_mana_per_level = 0
+
+    # Nível 1: dado máximo + CON (regra do Player's Handbook para personagens de nível 1)
+    hp_max = max(1, hit_die + con_mod)
+    # Níveis 2+: rola hit die para cada nível adicional
+    for _ in range(nivel - 1):
+        hp_max += max(1, random.randint(1, hit_die) + con_mod)
+
+    mana_max = base_mana_per_level * nivel if base_mana_per_level > 0 else 0
+
+    prof = _proficiency_bonus(nivel)
+    xp_threshold = XP_THRESHOLDS[nivel] if nivel < 20 else XP_THRESHOLDS[19]
+    xp_start     = XP_THRESHOLDS[nivel - 1] if nivel > 1 else 0
 
     sheet = {
         "classe":       classe,
         "raca":         raca,
-        "nivel":        1,
-        "xp":           0,
-        "xp_proximo":   XP_THRESHOLDS[1],
+        "nivel":        nivel,
+        "xp":           xp_start,
+        "xp_proximo":   xp_threshold,
         "forca":        forca,
         "destreza":     destreza,
         "constituicao": constituicao,
@@ -1190,7 +1317,7 @@ def create_character_sheet(
         "mana_atual":   mana_max,
         "mana_max":     mana_max,
         "ca":           10 + dex_mod,
-        "proficiencia": 2,
+        "proficiencia": prof,
         "hit_die":      hit_die,
         # ── Novos campos v2 ──────────────────────────────
         "ouro":                  0,
@@ -1221,10 +1348,16 @@ def create_character_sheet(
     race_bonuses = _apply_race_bonuses(char_obj, sheet, raca)
     bonus_str = ", ".join(f"{k.upper()[:3]} +{v}" for k, v in race_bonuses.items()) if race_bonuses else "nenhum"
 
+    # Aplica habilidades de classe para TODOS os níveis até o nível inicial
+    all_feats: list[str] = []
+    for lv in range(1, nivel + 1):
+        all_feats.extend(_apply_class_features(char_obj, sheet, lv))
+
     # Aplica magias iniciais para classes conjuradoras (usa chosen_spells se fornecida)
     chosen = kwargs.get("initial_spells")  # lista opcional de nomes escolhidos pelo wizard
     spells_added = _apply_initial_spells(char_obj, classe, chosen_spells=chosen)
     spells_str = f"\n   ✨ Magias iniciais: {', '.join(spells_added)}" if spells_added else ""
+    feats_str  = f"\n   📖 Habilidades de classe: {', '.join(all_feats)}" if all_feats else ""
 
     if not memory.campaign.get("protagonist"):
         memory.campaign["protagonist"] = name
@@ -1232,8 +1365,8 @@ def create_character_sheet(
     memory.save_campaign()
     return (
         f"✅ Ficha criada para {name}!\n"
-        f"   Classe: {classe} | Raça: {raca} | Nível: 1\n"
-        f"   Bônus racial: {bonus_str}{spells_str}\n"
+        f"   Classe: {classe} | Raça: {raca} | Nível: {nivel} | Prof: +{prof}\n"
+        f"   Bônus racial: {bonus_str}{spells_str}{feats_str}\n"
         f"   ❤️  Vida: {sheet['vida_max']}/{sheet['vida_max']} | ✨ Mana: {sheet['mana_max']}/{sheet['mana_max']} | 🛡️  CA: {sheet['ca']}\n"
         f"   FOR {_mod_str(sheet['forca'])}  DES {_mod_str(sheet['destreza'])}  CON {_mod_str(sheet['constituicao'])}\n"
         f"   INT {_mod_str(sheet['inteligencia'])}  SAB {_mod_str(sheet['sabedoria'])}  CAR {_mod_str(sheet['carisma'])}\n"
@@ -1254,7 +1387,7 @@ def get_character_sheet(name: str) -> str:
     Args:
         name: Nome do personagem.
     """
-    char, err = _get_char(name)
+    char, err = _get_char(name, allow_dead=True)
     if not char:
         return err
 
@@ -1544,6 +1677,94 @@ def make_skill_check(
     return result
 
 
+def social_check(
+    char_name: str,
+    skill: str,
+    dc: int,
+    player_roll: int,
+    target_name: str = "",
+) -> str:
+    """
+    Resolve um teste de interação social (Persuasão, Intimidação, Enganação, etc.)
+    após o jogador informar o resultado do dado.
+
+    FLUXO CORRETO:
+      1. Mestre narra a situação e diz: "Role Persuasão (Carisma) — CD X"
+      2. Jogador informa o resultado do d20 (ex: "tirei 14")
+      3. Mestre chama social_check(char_name, 'persuasão', dc, player_roll=14)
+      4. A ferramenta aplica o modificador e retorna sucesso/falha
+
+    Use para: convencer NPCs, intimidar guardas, enganar vilões, barganhar preços,
+    reunir informações, recrutar aliados.
+
+    Args:
+        char_name:   Nome do personagem que está fazendo a ação social.
+        skill:       Perícia: 'persuasão', 'intimidação', 'enganação', 'atuação',
+                     'intuição', 'percepção', 'investigação', 'história', 'arcana'.
+        dc:          Classe de Dificuldade do teste.
+        player_roll: Resultado do dado d20 informado pelo jogador (1–20).
+        target_name: Nome do NPC alvo (opcional — usado para contextualizar o resultado).
+    """
+    char, err = _get_char(char_name)
+    if not char:
+        return err
+
+    skill_lower  = skill.lower().strip()
+    attr_key     = SKILL_ATTR_MAP.get(skill_lower, "carisma")
+    s            = char["sheet"]
+    mod          = _modifier(s.get(attr_key, 10))
+    prof         = s.get("proficiencia", 2)
+
+    # Verifica proficiência na perícia (simplificado: guerreiros têm atletismo/intimidação,
+    # bardos/ladinos têm persuasão/enganação, etc.)
+    PROF_BY_CLASS = {
+        "guerreiro": {"atletismo", "intimidação", "percepção", "sobrevivência", "história", "acrobacia"},
+        "bárbaro":   {"atletismo", "intimidação", "percepção", "sobrevivência", "natureza", "manusear animais"},
+        "ladino":    {"acrobacia", "atletismo", "enganação", "furtividade", "intimidação", "investigação",
+                      "percepção", "atuação", "persuasão", "prestidigitação"},
+        "bardo":     {"acrobacia", "enganação", "história", "intuição", "atuação", "persuasão"},
+        "mago":      {"arcana", "história", "intuição", "investigação", "medicina", "religião"},
+        "clérigo":   {"história", "intuição", "medicina", "persuasão", "religião"},
+        "druida":    {"arcana", "intuição", "manusear animais", "medicina", "natureza", "percepção", "religião", "sobrevivência"},
+        "paladino":  {"atletismo", "intuição", "intimidação", "medicina", "persuasão", "religião"},
+        "patrulheiro": {"atletismo", "furtividade", "investigação", "natureza", "percepção", "sobrevivência"},
+        "monge":     {"acrobacia", "atletismo", "história", "intuição", "religião", "furtividade"},
+        "feiticeiro": {"arcana", "enganação", "intuição", "intimidação", "persuasão", "religião"},
+        "bruxo":     {"arcana", "enganação", "história", "intimidação", "investigação", "natureza"},
+    }
+    classe       = s.get("classe", "").lower()
+    is_proficient = skill_lower in PROF_BY_CLASS.get(classe, set())
+    total_mod    = mod + (prof if is_proficient else 0)
+
+    d20          = max(1, min(20, int(player_roll)))
+    total        = d20 + total_mod
+    sign         = "+" if total_mod >= 0 else ""
+
+    critico      = d20 == 20
+    falha_critica= d20 == 1
+    sucesso      = critico or (not falha_critica and total >= dc)
+
+    target_str   = f" com {target_name}" if target_name else ""
+    prof_tag     = " (com prof.)" if is_proficient else ""
+    skill_cap    = skill.capitalize()
+
+    result = (
+        f"🎭 Teste de {skill_cap}{prof_tag} — CD {dc}\n"
+        f"   {char['name']}{target_str}: d20={d20} {sign}{total_mod}(mod) = **{total}**\n"
+    )
+    if critico:
+        result += "   🌟 CRÍTICO NATURAL! Sucesso total — reação excepcionalmente positiva."
+    elif falha_critica:
+        result += "   💀 FALHA CRÍTICA! Falha total — reação negativa ou hostil."
+    elif sucesso:
+        result += f"   ✅ SUCESSO! ({total} ≥ CD {dc})"
+    else:
+        result += f"   ❌ FALHA. ({total} < CD {dc})"
+
+    memory.save_campaign()
+    return result
+
+
 def attack_roll(
     attacker_name: str,
     target_name: str,
@@ -1586,6 +1807,8 @@ def attack_roll(
 
     if not attacker or not attacker.get("sheet"):
         return f"Atacante '{attacker_name}' não encontrado ou sem ficha D&D."
+    if attacker.get("status") == "morto":
+        return f"❌ {attacker_name} está morto e não pode atacar."
     if not target or not target.get("sheet"):
         return f"Alvo '{target_name}' não encontrado ou sem ficha D&D."
 
@@ -1785,7 +2008,13 @@ def use_ability(
         return err
 
     habs = char.get("habilidades", [])
+    # Exact match (case-insensitive)
     hab  = next((h for h in habs if h["nome"].lower() == ability_name.lower()), None)
+    # Fallback: try PT-BR → EN translation
+    if not hab:
+        en_name = _SPELL_PT_TO_EN.get(ability_name.lower())
+        if en_name:
+            hab = next((h for h in habs if h["nome"].lower() == en_name.lower()), None)
     if not hab:
         available = ", ".join(h["nome"] for h in habs) if habs else "nenhuma"
         return f"'{char_name}' não conhece '{ability_name}'. Habilidades disponíveis: {available}."
@@ -2079,7 +2308,7 @@ def modify_currency(char_name: str, currency_type: str, amount: int) -> str:
         currency_type: Tipo de moeda: 'ouro', 'prata' ou 'cobre'.
         amount:        Quantidade (positivo = recebe, negativo = gasta).
     """
-    char, err = _get_char(char_name)
+    char, err = _get_char(char_name, allow_dead=True)
     if not char:
         return err
 
@@ -2473,7 +2702,7 @@ def grant_xp(char_name: str, amount: int, reason: str = "") -> str:
         amount:    Quantidade de XP a conceder.
         reason:    Motivo (ex: 'goblin derrotado', 'missão da aldeia completada').
     """
-    char, err = _get_char(char_name)
+    char, err = _get_char(char_name, allow_dead=True)
     if not char:
         return err
 
@@ -2535,7 +2764,7 @@ def short_rest(char_name: str) -> str:
     Args:
         char_name: Nome do personagem.
     """
-    char, err = _get_char(char_name)
+    char, err = _get_char(char_name, allow_dead=True)
     if not char:
         return err
 
@@ -2573,7 +2802,7 @@ def use_hit_die(char_name: str, count: int = 1) -> str:
         char_name: Nome do personagem.
         count:     Número de dados de vida a usar (padrão: 1).
     """
-    char, err = _get_char(char_name)
+    char, err = _get_char(char_name, allow_dead=True)
     if not char:
         return err
 
@@ -2625,6 +2854,14 @@ def long_rest(char_name: str) -> str:
     if not char:
         return err
 
+    # Bloqueia descanso longo durante combate ativo
+    cs = memory.campaign.get("combat_state", {})
+    if cs.get("is_active"):
+        return (
+            f"❌ Impossível descansar — {char_name} está em combate!\n"
+            f"   Encerre o combate com end_combat() antes de descansar."
+        )
+
     s = char["sheet"]
     s["vida_atual"] = s["vida_max"]
     s["mana_atual"] = s["mana_max"]
@@ -2673,7 +2910,7 @@ def set_stat(char_name: str, stat_name: str, value: int) -> str:
                    vida_atual, mana_atual, proficiencia, ouro, prata, cobre.
         value:     Novo valor inteiro.
     """
-    char, err = _get_char(char_name)
+    char, err = _get_char(char_name, allow_dead=True)
     if not char:
         return err
 
@@ -2899,6 +3136,124 @@ def end_combat() -> str:
     cs["round"]               = 1
     memory.save_campaign()
     return "🏳️  Combate encerrado. Iniciativa e rastreador de turnos limpos."
+
+
+# ---------------------------------------------------------------------------
+# Recrutamento de NPC para o grupo
+# ---------------------------------------------------------------------------
+
+def recruit_character(npc_name: str, role: str = "aliado") -> str:
+    """
+    Recruta um NPC para o grupo do jogador, transformando-o em aliado ativo.
+    Use quando um NPC convencido, salvo ou contratado passa a acompanhar o grupo.
+
+    O personagem é marcado como 'aliado' e passa a:
+    • Receber XP junto com o grupo após combates
+    • Aparecer no painel de personagens como membro do grupo
+    • Participar de combates como aliado (não inimigo)
+    • Ganhar turnos automáticos via execute_npc_turn() se o mestre quiser
+
+    Se o NPC ainda não tem uma ficha D&D completa (tem apenas ficha padrão
+    com classe='npc'), o sistema preserva a ficha genérica mas muda o status.
+    Para um aliado importante, crie a ficha completa antes com
+    create_character_sheet() se quiser regras de classe reais.
+
+    Args:
+        npc_name: Nome exato do NPC a recrutar.
+        role:     'aliado' (padrão) — membro do grupo.
+                  'neutro' — acompanha mas não é aliado de combate.
+    """
+    key  = memory.char_key(npc_name)
+    char = memory.campaign["characters"].get(key)
+
+    if not char:
+        return (
+            f"❌ '{npc_name}' não encontrado na campanha. "
+            f"Crie a ficha primeiro com create_character_sheet() ou roll_initiative()."
+        )
+
+    # ── Verificação de disparidade de nível ─────────────────────────────────
+    npc_sheet   = char.get("sheet", {})
+    npc_nivel   = npc_sheet.get("nivel", 1)
+
+    # Calcula nível médio do grupo:
+    # 1. party_member=True explícito (recrutados / aliados), OU
+    # 2. É o protagonista (personagem principal do jogador)
+    # Exclui NPCs soltos na campanha que têm classe real mas não são do grupo
+    protagonist_name = (memory.campaign.get("protagonist") or "").lower().strip()
+    party_chars = [
+        c for c in memory.campaign.get("characters", {}).values()
+        if (
+            c.get("party_member")
+            or c.get("name", "").lower().strip() == protagonist_name
+        )
+        and c.get("status") not in ("morto", "inimigo", "fugiu")
+        and memory.char_key(c["name"]) != key
+    ]
+    if party_chars:
+        avg_nivel = sum(c.get("sheet", {}).get("nivel", 1) for c in party_chars) / len(party_chars)
+    else:
+        avg_nivel = 1
+
+    level_gap = npc_nivel - avg_nivel
+
+    # Bloqueia recrutamento de NPCs muito mais poderosos — narrativamente impossível
+    if level_gap >= 10:
+        return (
+            f"🚫 RECRUTAMENTO BLOQUEADO — disparidade de poder extrema.\n"
+            f"   {char['name']} é Nível {npc_nivel}; grupo em torno de Nível {avg_nivel:.0f}.\n"
+            f"   Um personagem {int(level_gap)} níveis acima não tem motivo narrativo para "
+            f"se juntar como subordinado a um grupo iniciante.\n"
+            f"   ALTERNATIVAS VÁLIDAS:\n"
+            f"   • Mentor: {char['name']} oferece treinamento ou informação ao grupo.\n"
+            f"   • Missão: aceita ajudar SE o grupo completar uma tarefa para ele.\n"
+            f"   • Aliança temporária: coopera em uma situação específica sem sair com o grupo.\n"
+            f"   • Promessa futura: 'Quando forem dignos, voltem me ver.'\n"
+            f"   Não chame recruit_character() — narre uma dessas alternativas."
+        )
+
+    # Aviso para disparidade moderada (5-9 níveis) — possível com justificativa forte
+    if level_gap >= 5:
+        warning = (
+            f"⚠️  AVISO: {char['name']} é Nível {npc_nivel}, "
+            f"{int(level_gap)} níveis acima do grupo (Nível ~{avg_nivel:.0f}).\n"
+            f"   Recrutamento só faz sentido com justificativa narrativa muito forte\n"
+            f"   (dívida de vida, missão pessoal urgente, único capaz de ajudar, etc.).\n"
+        )
+    else:
+        warning = ""
+    # ────────────────────────────────────────────────────────────────────────
+
+    old_status   = char.get("status", "desconhecido")
+    valid_roles  = {"aliado", "neutro"}
+    role_clean   = role.strip().lower() if role.strip().lower() in valid_roles else "aliado"
+
+    char["status"] = role_clean
+
+    # Garante que o personagem apareça na lista do grupo (campo party_member)
+    char["party_member"] = True
+
+    sheet  = char.get("sheet", {})
+    classe = sheet.get("classe", "npc")
+    nivel  = sheet.get("nivel", 1)
+    hp     = sheet.get("vida_atual", "?")
+    hp_max = sheet.get("vida_max", "?")
+
+    memory.save_campaign()
+
+    role_label = "membro do grupo" if role_clean == "aliado" else "acompanhante neutro"
+    classe_note = (
+        " (ficha genérica — use create_character_sheet() para dar classe real)"
+        if classe.lower() == "npc" else f" | Classe: {classe} | Nível: {nivel}"
+    )
+    return (
+        f"{warning}"
+        f"🤝 {char['name']} agora é {role_label}!\n"
+        f"   Status anterior: {old_status} → {role_clean}\n"
+        f"   ❤️  Vida: {hp}/{hp_max} | CA: {sheet.get('ca', '?')}{classe_note}\n"
+        f"   {char['name']} passará a receber XP junto com o grupo e participará "
+        f"de combates como aliado."
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -3561,6 +3916,197 @@ def choose_feat(char_name: str, feat_name: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Spawn de monstro com dados reais do Open5e
+# ---------------------------------------------------------------------------
+
+def spawn_monster(
+    monster_name: str,
+    display_name: str = "",
+    quantity: int = 1,
+) -> str:
+    """
+    Busca um monstro no Open5e e cria a ficha com os stats reais (HP, CA, atributos,
+    ataques). Use SEMPRE que um monstro conhecido aparecer durante o jogo — assim
+    o goblin tem HP 7 e CA 15 reais, não os valores genéricos do roll_initiative().
+
+    Para múltiplos exemplares (ex: 3 goblins), passe quantity=3. Os personagens
+    serão criados como "Goblin 1", "Goblin 2", "Goblin 3".
+
+    Após spawn_monster(), chame roll_initiative() com os nomes gerados.
+
+    Args:
+        monster_name:  Nome do monstro em inglês (ex: 'goblin', 'orc', 'zombie',
+                       'bandit', 'wolf', 'skeleton', 'hobgoblin', 'bugbear').
+        display_name:  Nome de exibição no jogo (ex: 'Goblin Batedouro'). Se vazio,
+                       usa o nome do Open5e.
+        quantity:      Quantos exemplares criar (1–10). Se > 1, cria "Nome 1", "Nome 2"…
+    """
+    import requests as _req
+    import re as _re
+
+    quantity = max(1, min(10, int(quantity)))
+
+    # Busca no Open5e pelo nome
+    slug = monster_name.strip().lower().replace(" ", "-").replace("'", "")
+    monster_data = None
+
+    # Tentativa 1: slug direto
+    try:
+        r = _req.get(f"https://api.open5e.com/v1/monsters/{slug}/", timeout=5)
+        if r.ok:
+            monster_data = r.json()
+    except Exception:
+        pass
+
+    # Tentativa 2: busca por texto
+    if not monster_data:
+        try:
+            r = _req.get(
+                "https://api.open5e.com/v1/monsters/",
+                params={"search": monster_name.strip(), "limit": 5},
+                timeout=5,
+            )
+            if r.ok:
+                results = r.json().get("results", [])
+                # Preferência: nome exato, depois nome que começa com a busca
+                exact = [m for m in results if m.get("name", "").lower() == monster_name.lower()]
+                monster_data = exact[0] if exact else (results[0] if results else None)
+        except Exception:
+            pass
+
+    if not monster_data:
+        return (
+            f"⚠️ Monstro '{monster_name}' não encontrado no Open5e. "
+            f"Usando ficha padrão via roll_initiative() ou crie manualmente com "
+            f"create_character_sheet(). Verifique o nome em inglês "
+            f"(ex: 'goblin', 'orc', 'zombie', 'bandit', 'wolf')."
+        )
+
+    # Extrai stats
+    m          = monster_data
+    base_name  = display_name.strip() if display_name.strip() else m.get("name", monster_name)
+    hp_max     = int(m.get("hit_points", 10))
+    ac         = int(m.get("armor_class", 12))
+    str_       = int(m.get("strength",    10))
+    dex        = int(m.get("dexterity",   10))
+    con        = int(m.get("constitution",10))
+    int_       = int(m.get("intelligence",10))
+    wis        = int(m.get("wisdom",      10))
+    cha        = int(m.get("charisma",    10))
+    cr_raw     = m.get("challenge_rating", "?")
+    cr_label   = str(cr_raw)
+    monster_type = m.get("type", "").lower()
+    prof       = 2  # CR 0–4; ajusta para CRs maiores
+    cr_float   = _cr_str_to_float(cr_raw)
+    if cr_float >= 17: prof = 6
+    elif cr_float >= 13: prof = 5
+    elif cr_float >= 9: prof = 4
+    elif cr_float >= 5: prof = 3
+
+    # Extrai arma principal das ações
+    arma_principal = ""
+    arma_dado      = ""
+    arma_secundaria = ""
+    for action in (m.get("actions") or []):
+        desc  = (action.get("desc") or "").lower()
+        aname = action.get("name") or ""
+        is_melee  = "melee weapon attack" in desc or "melee attack" in desc
+        is_ranged = "ranged weapon attack" in desc or "ranged attack" in desc
+        dado  = action.get("damage_dice", "")
+        if not dado:
+            _m = _re.search(r'(\d+d\d+)', desc)
+            dado = _m.group(1) if _m else ""
+        if is_melee and not arma_principal:
+            arma_principal  = aname.lower()
+            arma_dado       = dado
+        elif is_ranged and not arma_secundaria:
+            arma_secundaria = aname.lower()
+        if arma_principal and arma_secundaria:
+            break
+
+    created_names = []
+    for i in range(quantity):
+        name = base_name if quantity == 1 else f"{base_name} {i + 1}"
+        key  = memory.char_key(name)
+
+        sheet = {
+            "classe":               "npc",
+            "raca":                 base_name.lower(),
+            "nivel":                max(1, int(cr_float)) if cr_float >= 1 else 1,
+            "xp":                   0,
+            "xp_proximo":           100,
+            "forca":                str_,
+            "destreza":             dex,
+            "constituicao":         con,
+            "inteligencia":         int_,
+            "sabedoria":            wis,
+            "carisma":              cha,
+            "vida_atual":           hp_max,
+            "vida_max":             hp_max,
+            "mana_atual":           0,
+            "mana_max":             0,
+            "ca":                   ac,
+            "proficiencia":         prof,
+            "hit_die":              8,
+            "ouro":                 0,
+            "prata":                0,
+            "cobre":                0,
+            "equipamentos":         {
+                "armadura":      None,
+                "escudo":        None,
+                "arma_principal": arma_principal or None,
+                "amuleto":       None,
+            },
+            "arma_dado":            arma_dado,
+            "arma_secundaria":      arma_secundaria or None,
+            "condicoes":            [],
+            "death_saves_sucessos": 0,
+            "death_saves_falhas":   0,
+            "cr":                   cr_label,
+        }
+
+        # Extrai habilidades especiais (special abilities) do Open5e
+        habilidades = []
+        for sa in (m.get("special_abilities") or [])[:3]:
+            sa_name = sa.get("name", "")
+            sa_desc = (sa.get("desc", "") or "")[:200]
+            if sa_name:
+                habilidades.append({
+                    "nome":       sa_name,
+                    "descricao":  sa_desc,
+                    "custo_mana": 0,
+                    "dado":       "",
+                })
+
+        memory.campaign["characters"][key] = {
+            "name":        name,
+            "description": f"{m.get('size','')} {monster_type} — CR {cr_label}.",
+            "traits":      "",
+            "status":      "inimigo",
+            "notes":       "",
+            "sheet":       sheet,
+            "inventario":  [],
+            "habilidades": habilidades,
+        }
+        created_names.append(name)
+
+    memory.save_campaign()
+
+    names_str  = ", ".join(created_names)
+    atk_info   = f" | ⚔️ {arma_principal} ({arma_dado})" if arma_principal else ""
+    sec_info   = f" + {arma_secundaria}" if arma_secundaria else ""
+    qty_label  = f"{quantity}×" if quantity > 1 else ""
+
+    return (
+        f"👹 {qty_label}{base_name} criado(s) com stats reais (Open5e)!\n"
+        f"   CR {cr_label} | ❤️ HP {hp_max} | 🛡️ CA {ac}{atk_info}{sec_info}\n"
+        f"   FOR {str_}  DES {dex}  CON {con}  INT {int_}  SAB {wis}  CAR {cha}\n"
+        f"   Personagens: {names_str}\n"
+        f"   → Agora chame roll_initiative() incluindo: {names_str}"
+    )
+
+
+# ---------------------------------------------------------------------------
 # Estratégia de NPC — sistema determinístico de combate
 # ---------------------------------------------------------------------------
 
@@ -3718,6 +4264,7 @@ DND_TOOLS = [
     modify_hp,
     modify_mana,
     make_skill_check,
+    social_check,
     attack_roll,
     learn_ability,
     use_ability,
@@ -3741,6 +4288,10 @@ DND_TOOLS = [
     roll_initiative,
     next_turn,
     end_combat,
+    # Recrutamento de NPC
+    recruit_character,
+    # Spawn de monstro com stats reais
+    spawn_monster,
     # NPC strategy system
     set_npc_strategy,
     execute_npc_turn,

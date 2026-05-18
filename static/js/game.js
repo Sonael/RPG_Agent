@@ -441,7 +441,9 @@ async function handleSlash(raw) {
 
       return `<div class="cmd-sheet">
         <div class="cmd-sheet-title">🛡️ Ficha — ${c.name}</div>
-        <div class="cmd-sheet-sub">Nível ${s.nivel} ${s.classe} (${s.raca}) · XP: ${s.xp}/${s.xp_proximo}</div>
+        <div class="cmd-sheet-sub">${s.classe === 'npc'
+          ? `${s.raca ? s.raca.charAt(0).toUpperCase()+s.raca.slice(1) : 'NPC'} · CR ${s.cr ?? '—'} · HP ${s.vida_max}`
+          : `Nível ${s.nivel} ${s.classe} (${s.raca}) · XP: ${s.xp}/${s.xp_proximo}`}</div>
         <div class="cmd-sheet-bars">
           <span>❤️ ${hpVis} ${s.vida_atual}/${s.vida_max} HP</span>
           <span>✨ ${s.mana_atual}/${s.mana_max} Mana</span>
@@ -1669,10 +1671,80 @@ function gameBuildHabSection() {
 //  Modal de edição
 // ═══════════════════════════════════════
 let _editCtx = null;
+// Estado de busca de monstro no modal de edição do jogo
+let _gameMonsterState = { query: '', results: [], loading: false };
+let _gameMonsterTimer = null;
+
+function gameSearchMonster(query) {
+  _gameMonsterState.query = query;
+  clearTimeout(_gameMonsterTimer);
+  if (!query || query.length < 2) {
+    _gameMonsterState.results = [];
+    gameRefreshMonsterSearch();
+    return;
+  }
+  _gameMonsterState.loading = true;
+  gameRefreshMonsterSearch();
+  _gameMonsterTimer = setTimeout(async () => {
+    try {
+      const res  = await authFetch(`${API}/api/dnd/monsters/search?q=${encodeURIComponent(query)}`);
+      const data = await res.json();
+      _gameMonsterState.results = data.ok ? (data.monsters || []) : [];
+    } catch { _gameMonsterState.results = []; }
+    _gameMonsterState.loading = false;
+    gameRefreshMonsterSearch();
+  }, 400);
+}
+
+function gameRefreshMonsterSearch() {
+  const el = document.getElementById('game-monster-results');
+  if (!el) return;
+  if (_gameMonsterState.loading) {
+    el.innerHTML = '<div style="padding:6px;color:var(--text-muted);font-size:12px;">⏳ Buscando…</div>';
+    return;
+  }
+  if (!_gameMonsterState.results?.length) { el.innerHTML = ''; return; }
+  el.innerHTML = _gameMonsterState.results.map(m => {
+    const mJson = JSON.stringify(m).replace(/"/g, '&quot;');
+    return `<div class="ed-search-result" onclick="gameApplyMonster(${mJson})" style="cursor:pointer;padding:6px 8px;">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <strong style="font-size:13px;">${(m.nome||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')}</strong>
+        <span style="font-size:10px;color:var(--text-muted);">${(m.tipo||'')} · CR ${m.cr}</span>
+      </div>
+      <div style="font-size:10px;font-family:monospace;color:var(--text-muted);margin-top:2px;">
+        FOR ${m.forca} DES ${m.destreza} CON ${m.constituicao} INT ${m.inteligencia} SAB ${m.sabedoria} CAR ${m.carisma} · CA ${m.ca} · HP ${m.vida}${m.arma_principal ? ` · ⚔️ ${(m.arma_principal).replace(/&/g,'&amp;').replace(/</g,'&lt;')}` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function gameApplyMonster(monster) {
+  if (!_editCtx?.data?.sheet) return;
+  const s = _editCtx.data.sheet;
+  s.forca        = monster.forca;
+  s.destreza     = monster.destreza;
+  s.constituicao = monster.constituicao;
+  s.inteligencia = monster.inteligencia;
+  s.sabedoria    = monster.sabedoria;
+  s.carisma      = monster.carisma;
+  s.vida_atual   = monster.vida;
+  s.vida_max     = monster.vida;
+  s.ca           = monster.ca;
+  s.cr           = monster.cr;
+  s.raca         = monster.nome.toLowerCase();
+  if (!s.equipamentos) s.equipamentos = {};
+  s.equipamentos.arma_principal  = monster.arma_principal  || '';
+  s.equipamentos.arma_secundaria = monster.arma_secundaria || null;
+  // Limpa busca e re-renderiza o formulário
+  _gameMonsterState = { query: '', results: [], loading: false };
+  document.getElementById('edit-body').innerHTML = buildEditFields('character', _editCtx.data);
+}
 
 function openEditModal(type, key, data, index = null) {
   if (window.innerWidth <= 900) toggleSidebar(true);
   _editCtx = { type, key, data, index };
+  // Reinicia estado de busca de monstro
+  _gameMonsterState = { query: '', results: [], loading: false };
   // Inicializa estado das abas de habilidades para personagens D&D
   if (type === 'character' && data.sheet) {
     const isCaster = GAME_CASTER_CLASSES.has((data.sheet.classe || '').toLowerCase());
@@ -1741,26 +1813,52 @@ function buildEditFields(type, data) {
       if (data.sheet) {
         const s = data.sheet;
         const classeVal = (s.classe || 'guerreiro').toLowerCase().trim();
-        const racaVal   = (s.raca   || 'humano').toLowerCase().trim();
+        const racaVal   = (s.raca   || '').toLowerCase().trim();
+        const isNpc     = classeVal === 'npc';
 
-        // ── Classe & Raça (selects) ──────────────────────────────────────
+        // ── Classe & Raça / Monstro (selects / inputs) ──────────────────
         const classeOpts = Object.entries(GAME_CLASS_DATA).map(([k,v]) => ({ value: k, label: v.label }));
         const racaOpts   = GAME_RACES;
         const levelOpts  = Array.from({length:20}, (_,i) => ({ value: String(i+1), label: `Nível ${i+1}` }));
         const profOpts   = [2,3,4,5,6].map(n => ({ value: String(n), label: `+${n}` }));
+
+        // Campo raça: select para PCs, busca Open5e para NPCs/monstros
+        const racaEsc = racaVal.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+        const racaCapitalized = racaEsc ? racaEsc.charAt(0).toUpperCase()+racaEsc.slice(1) : '';
+        const racaField = isNpc
+          ? `<div class="field-group">
+               <label>Monstro / Criatura <span style="font-size:10px;color:var(--text-muted);font-weight:400;">(Open5e)</span></label>
+               <input type="hidden" id="ef-sheet_raca" value="${racaEsc}">
+               ${racaVal ? `<div style="font-size:11px;color:var(--ink-user);margin-bottom:4px;">✓ ${racaCapitalized}</div>` : ''}
+               <input type="text"
+                 placeholder="Buscar monstro… (ex: goblin, zombie)"
+                 oninput="gameSearchMonster(this.value)"
+                 style="text-align:left;font-size:14px;font-weight:400;width:100%;box-sizing:border-box;background:transparent;border:none;border-bottom:1px solid var(--page-edge);padding:4px 0;">
+               <div id="game-monster-results" style="max-height:200px;overflow-y:auto;border:1px solid var(--page-edge);border-top:none;border-radius:0 0 6px 6px;"></div>
+             </div>`
+          : selField('sheet_raca', 'Raça', racaVal || 'humano', racaOpts);
 
         html += `<div style="border-top:1px solid var(--page-edge);margin:12px 0 8px;padding-top:14px;">
           <div style="font-family:'Playfair Display',serif;font-size:14px;color:var(--text-main);margin-bottom:12px;font-weight:700;">⚔️ FICHA D&D</div>
 
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
             ${selField('sheet_classe','Classe', classeVal, classeOpts, { onchange: 'gameOnClassChange(this.value)' })}
-            ${selField('sheet_raca','Raça', racaVal, racaOpts)}
+            ${racaField}
           </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;">
-            ${selField('sheet_nivel','Nível', String(s.nivel??1), levelOpts, { onchange: 'gameOnLevelChange(this.value)' })}
-            ${numField('sheet_xp','XP', s.xp??0, 0, 999999)}
-            ${selField('sheet_proficiencia','Proficiência', String(s.proficiencia??2), profOpts)}
-          </div>
+          ${isNpc
+            ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+                <div class="field-group"><label>Challenge Rating (CR)</label>
+                  <input id="ef-sheet_cr" type="text" value="${(s.cr ?? '').toString().replace(/"/g,'&quot;')}"
+                    placeholder="ex: 1/4, 1, 5…"
+                    style="text-align:left;font-size:14px;font-weight:700;color:var(--ink-user);">
+                </div>
+              </div>`
+            : `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;">
+                ${selField('sheet_nivel','Nível', String(s.nivel??1), levelOpts, { onchange: 'gameOnLevelChange(this.value)' })}
+                ${numField('sheet_xp','XP', s.xp??0, 0, 999999)}
+                ${selField('sheet_proficiencia','Proficiência', String(s.proficiencia??2), profOpts)}
+              </div>`
+          }
 
           <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">Pontos de Vida & Defesa</div>
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:10px;">
@@ -1826,9 +1924,14 @@ function getEditValues() {
       const base = { name: v('name'), description: v('description'), traits: v('traits'), status: v('status'), notes: v('notes') };
       if (_editCtx.data.role !== undefined) base.role = v('role');
       if (_editCtx.data.sheet) {
-        const n = id => parseInt(document.getElementById(`ef-${id}`)?.value) || 0;
+        const orig = _editCtx.data.sheet;
+        // n(): lê número do input; se o elemento não existir (ex: campos omitidos p/ NPC), preserva o valor original
+        const n = (id, fallback) => { const el = document.getElementById(`ef-${id}`); return el ? (parseInt(el.value) || 0) : (fallback ?? 0); };
         const f = id => (document.getElementById(`ef-${id}`)?.value || '').trim();
-        base.sheet = { ..._editCtx.data.sheet, classe: f('sheet_classe').toLowerCase() || _editCtx.data.sheet.classe, raca: f('sheet_raca').toLowerCase() || _editCtx.data.sheet.raca, nivel: n('sheet_nivel'), xp: n('sheet_xp'), vida_atual: n('sheet_vida_atual'), vida_max: n('sheet_vida_max'), mana_atual: n('sheet_mana_atual'), mana_max: n('sheet_mana_max'), ca: n('sheet_ca'), proficiencia: n('sheet_proficiencia'), forca: n('sheet_forca'), destreza: n('sheet_destreza'), constituicao: n('sheet_constituicao'), inteligencia: n('sheet_inteligencia'), sabedoria: n('sheet_sabedoria'), carisma: n('sheet_carisma'), ouro: n('sheet_ouro'), prata: n('sheet_prata'), cobre: n('sheet_cobre'), equipamentos: { armadura: f('sheet_eq_armadura') || null, escudo: f('sheet_eq_escudo') || null, arma_principal: f('sheet_eq_arma') || null, arma_secundaria: f('sheet_eq_arma_sec') || null, amuleto: f('sheet_eq_amuleto') || null }, death_saves_sucessos: n('sheet_ds_suc'), death_saves_falhas: n('sheet_ds_fail') };
+        // CR: campo de texto para NPCs (pode ser "1/4", "1", etc.); preserva original se elemento não existir
+        const crEl  = document.getElementById('ef-sheet_cr');
+        const crVal = crEl ? (crEl.value.trim() || null) : (orig.cr ?? null);
+        base.sheet = { ...orig, classe: f('sheet_classe').toLowerCase() || orig.classe, raca: f('sheet_raca').toLowerCase() || orig.raca, cr: crVal, nivel: n('sheet_nivel', orig.nivel), xp: n('sheet_xp', orig.xp), vida_atual: n('sheet_vida_atual'), vida_max: n('sheet_vida_max'), mana_atual: n('sheet_mana_atual'), mana_max: n('sheet_mana_max'), ca: n('sheet_ca'), proficiencia: n('sheet_proficiencia', orig.proficiencia), forca: n('sheet_forca'), destreza: n('sheet_destreza'), constituicao: n('sheet_constituicao'), inteligencia: n('sheet_inteligencia'), sabedoria: n('sheet_sabedoria'), carisma: n('sheet_carisma'), ouro: n('sheet_ouro'), prata: n('sheet_prata'), cobre: n('sheet_cobre'), equipamentos: { armadura: f('sheet_eq_armadura') || null, escudo: f('sheet_eq_escudo') || null, arma_principal: f('sheet_eq_arma') || null, arma_secundaria: f('sheet_eq_arma_sec') || null, amuleto: f('sheet_eq_amuleto') || null }, death_saves_sucessos: n('sheet_ds_suc'), death_saves_falhas: n('sheet_ds_fail') };
         base.habilidades = _editCtx.data.habilidades || [];
       }
       return base;
