@@ -909,11 +909,20 @@ function buildDndCharCard(c, idx, type) {
   const dataRef = type === 'party' ? `window._lastMem.party[${idx}]` : `window._lastMem.characters[${idx}]`;
   const modalType = (type === 'party' && sheet) ? 'character' : type;
 
+  // Detecta se o personagem tem XP suficiente para upar de nível
+  const canLevelUp = sheet
+    && typeof sheet.xp === 'number'
+    && typeof sheet.xp_proximo === 'number'
+    && sheet.xp >= sheet.xp_proximo
+    && (sheet.nivel || 1) < 20;
+
   let html = `<div class="char-card editable" onclick="openEditModal('${modalType}','${keyEsc}',${dataRef})">`;
   html += `<div class="char-name">${escapeHtml(c.name || '')}`;
+  html += `<div style="display:flex;align-items:center;gap:6px;">`;
+  if (canLevelUp) html += `<span class="levelup-badge" onclick="gameLevelUpClick(event,'${keyEsc}','${type}',${idx})" title="XP suficiente para upar!">⬆️ NÍVEL!</span>`;
   if (c.status) html += `<span class="char-status ${stCls}">${escapeHtml(c.status)}</span>`;
   if (ca !== null) html += `<span class="dnd-ca">🛡️ ${ca}</span>`;
-  html += `</div>`;
+  html += `</div></div>`;
 
   if (sheet) {
     html += `<div class="stat-bar-wrap"><div class="stat-bar-label"><span>❤️ HP</span><span>${hpCur}/${hpMax}</span></div><div class="stat-bar-track"><div class="stat-bar-fill" style="width:${hpPct}%;background:var(--ink-sys);"></div></div></div>`;
@@ -1042,6 +1051,333 @@ async function exportDiary() {
 }
 
 // ═══════════════════════════════════════
+//  Dados D&D — replicados de menu.js para uso exclusivo em game.html
+// ═══════════════════════════════════════
+const GAME_CLASS_DATA = {
+  bárbaro:     { hit_die:12, label:'Bárbaro' },
+  guerreiro:   { hit_die:10, label:'Guerreiro' },
+  paladino:    { hit_die:10, label:'Paladino' },
+  patrulheiro: { hit_die:8,  label:'Patrulheiro' },
+  bardo:       { hit_die:8,  label:'Bardo' },
+  clérigo:     { hit_die:8,  label:'Clérigo' },
+  druida:      { hit_die:8,  label:'Druida' },
+  monge:       { hit_die:8,  label:'Monge' },
+  ladino:      { hit_die:8,  label:'Ladino' },
+  mago:        { hit_die:6,  label:'Mago' },
+  feiticeiro:  { hit_die:6,  label:'Feiticeiro' },
+  bruxo:       { hit_die:8,  label:'Bruxo' },
+  npc:         { hit_die:8,  label:'NPC' },
+};
+
+const GAME_RACES = [
+  'humano','elfo','anão','halfling','draconato','gnomo','meio-elfo','meio-orc','tiferino'
+];
+
+// ── Tabelas de limites de magias D&D 5e ──────────────────────────────────────
+const SPELL_CANTRIPS_TABLE = {
+  bardo:[2,2,2,3,3,3,3,3,3,4,4,4,4,4,4,4,4,4,4,4],
+  clérigo:[3,3,3,4,4,4,4,4,4,5,5,5,5,5,5,5,5,5,5,5],
+  druida:[2,2,2,3,3,3,3,3,3,4,4,4,4,4,4,4,4,4,4,4],
+  feiticeiro:[4,4,4,5,5,5,6,6,6,6,6,6,6,6,6,6,6,6,6,6],
+  bruxo:[2,2,2,3,3,3,4,4,4,4,4,4,4,4,4,4,4,4,4,4],
+  mago:[3,3,3,4,4,4,4,4,4,5,5,5,5,5,5,5,5,5,5,5],
+};
+const SPELL_KNOWN_TABLE = {
+  mago:       [6,8,10,12,14,16,18,20,22,24,26,28,30,32,34,36,38,40,42,44],
+  clérigo:    [3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22],
+  druida:     [3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22],
+  paladino:   [0,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12],
+  bardo:      [4,5,6,7,8,9,10,11,12,14,15,15,16,18,19,19,20,22,22,22],
+  feiticeiro: [2,3,4,5,6,7,8,9,10,11,12,12,13,13,14,14,15,15,15,15],
+  bruxo:      [2,3,4,5,6,7,8,9,10,10,11,11,12,12,13,13,14,14,14,15],
+  patrulheiro:[0,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11],
+};
+function getSpellLimit(classe, nivel, sheet) {
+  const nv=Math.min(Math.max(parseInt(nivel)||1,1),20), idx=nv-1;
+  const maxCantrips = SPELL_CANTRIPS_TABLE[classe]?.[idx] ?? 0;
+  if (SPELL_KNOWN_TABLE[classe]===undefined) return null;
+  const maxSpells = SPELL_KNOWN_TABLE[classe][idx] ?? 0;
+  return {maxCantrips, maxSpells};
+}
+
+// XP total necessário para atingir o próximo nível (D&D 5e)
+const GAME_XP_THRESHOLDS = [0, 300, 900, 2700, 6500, 14000, 23000, 34000,
+                             48000, 64000, 85000, 100000, 120000, 140000,
+                             165000, 195000, 225000, 265000, 305000, 355000];
+function gameXpForNextLevel(nivel) {
+  const n = Math.min(Math.max(parseInt(nivel)||1, 1), 19);
+  return GAME_XP_THRESHOLDS[n];
+}
+
+// Níveis com ASI (Ability Score Improvement) — padrão para todas as classes
+const GAME_ASI_LEVELS = new Set([4, 8, 12, 16, 19]);
+
+// Bônus de proficiência D&D 5e por nível (índice 0 = nível 1)
+const GAME_PROF_BY_LEVEL = [2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,6,6,6,6];
+function gameProfForLevel(nivel) {
+  const n = Math.min(Math.max(parseInt(nivel)||1, 1), 20);
+  return GAME_PROF_BY_LEVEL[n - 1];
+}
+// Constrói os botões de filtro de nível refletindo o filtro atual
+function gameBuildLvlBtnsHtml(maxSl, lvlF) {
+  const s = (active) =>
+    `padding:3px 8px;border-radius:3px;border:1px solid ${active?'var(--ink-user)':'var(--page-edge)'};`+
+    `background:${active?'rgba(38,75,130,0.12)':'transparent'};color:${active?'var(--ink-user)':'var(--text-muted)'};`+
+    `cursor:pointer;font-size:10px;font-family:monospace;font-weight:${active?'700':'400'};`;
+  let html = `<button style="${s(lvlF===null)}" onclick="gameSetSpellLvlFilter(null)">Todos</button>`;
+  html    += `<button style="${s(lvlF===0)}"    onclick="gameSetSpellLvlFilter(0)">C</button>`;
+  for (let n = 1; n <= maxSl; n++)
+    html  += `<button style="${s(lvlF===n)}"    onclick="gameSetSpellLvlFilter(${n})">${n}</button>`;
+  return html;
+}
+
+// Troca o filtro de nível, atualiza os botões visualmente e busca
+function gameSetSpellLvlFilter(val) {
+  if (!_gameHabState) return;
+  _gameHabState._spellLevelFilter = val;
+  _gameHabState._spellResults     = [];
+  // Atualiza só os botões de filtro imediatamente (sem re-renderizar tudo)
+  const { nivel } = _gameGetSheet();
+  const maxSl = gameMaxSpellLevel(nivel);
+  const btnsEl = document.getElementById('game-lvl-btns');
+  if (btnsEl) btnsEl.innerHTML = gameBuildLvlBtnsHtml(maxSl, val);
+  gameDoSpellSearch();
+}
+
+function gameOnLevelChange(val) {
+  const prof = gameProfForLevel(val);
+  const profEl = document.getElementById('ef-sheet_proficiencia');
+  if (profEl) profEl.value = String(prof);
+  // Atualiza nível nas buscas e recarrega habilidades/magias
+  if (_gameHabState) {
+    _gameHabState._classFeatures = [];
+    _gameHabState._spellResults  = [];
+    _gameHabState._featLoading   = false;
+    _gameHabState._spellLoading  = false;
+    gameRefreshHabSection();
+  }
+}
+
+function gameOnClassChange(val) {
+  if (!_gameHabState) return;
+  const isCaster = GAME_CASTER_CLASSES.has((val || '').toLowerCase().trim());
+  _gameHabState._isCaster        = isCaster;
+  _gameHabState._habTab          = isCaster ? 'spells' : 'feats';
+  _gameHabState._classFeatures   = [];
+  _gameHabState._spellResults    = [];
+  _gameHabState._spellLevelFilter = null;
+  _gameHabState._spellQuery      = '';
+  _gameHabState._featLoading     = false;
+  _gameHabState._spellLoading    = false;
+  gameRefreshHabSection();
+}
+
+// ── Level-Up ─────────────────────────────────────────────────────────────────
+
+function gameLevelUpClick(event, charKey, type, idx) {
+  event.stopPropagation();
+  document.getElementById('levelup-popup')?.remove();
+
+  const data = type === 'party'
+    ? window._lastMem?.party?.[idx]
+    : window._lastMem?.characters?.[idx];
+  if (!data?.sheet) return;
+
+  const sheet     = data.sheet;
+  const novoNivel = (sheet.nivel || 1) + 1;
+  const classeKey = (sheet.classe || 'guerreiro').toLowerCase();
+  const cls       = GAME_CLASS_DATA[classeKey] || { hit_die: 8, label: sheet.classe };
+  const conMod    = Math.floor(((sheet.constituicao || 10) - 10) / 2);
+  const hpGain    = Math.max(1, Math.floor(cls.hit_die / 2) + 1 + conMod);
+  const novaProf  = gameProfForLevel(novoNivel);
+  const profMudou = novaProf !== gameProfForLevel(sheet.nivel || 1);
+  const temASI    = GAME_ASI_LEVELS.has(novoNivel);
+  const isCaster  = GAME_CASTER_CLASSES.has(classeKey);
+  const maxSpell  = gameMaxSpellLevel(novoNivel);
+
+  const popup = document.createElement('div');
+  popup.id = 'levelup-popup';
+  popup.style.cssText =
+    'position:fixed;z-index:10001;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);';
+
+  popup.innerHTML = `
+    <div style="background:var(--page-bg);border:2px solid #f0c030;border-radius:14px;
+                box-shadow:0 20px 60px rgba(0,0,0,0.35);padding:28px;max-width:380px;
+                width:calc(100vw - 32px);font-family:'Lora',serif;position:relative;">
+      <div style="text-align:center;margin-bottom:20px;">
+        <div style="font-size:36px;margin-bottom:6px;">⬆️</div>
+        <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:var(--text-main);">
+          ${escapeHtml(data.name)} sobe para<br>Nível ${novoNivel}!
+        </div>
+      </div>
+
+      <div style="background:rgba(255,243,196,0.5);border:1px solid #f0c030;border-radius:8px;padding:14px;margin-bottom:18px;">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#7a4f00;margin-bottom:10px;">Ganhos automáticos</div>
+        <div style="display:flex;flex-direction:column;gap:7px;">
+          <div style="font-size:13px;">❤️ <strong>+${hpGain} HP máximo</strong>
+            <span style="font-size:11px;color:var(--text-muted);">(${cls.hit_die/2|0}+1 + CON ${conMod>=0?'+':''}${conMod})</span></div>
+          ${profMudou ? `<div style="font-size:13px;">🛡️ <strong>Proficiência: +${novaProf}</strong> <span style="font-size:11px;color:var(--text-muted);">(era +${gameProfForLevel(sheet.nivel||1)})</span></div>` : ''}
+        </div>
+      </div>
+
+      ${(temASI || isCaster) ? `
+      <div style="background:rgba(38,75,130,0.06);border:1px solid rgba(38,75,130,0.2);border-radius:8px;padding:14px;margin-bottom:18px;">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--ink-user);margin-bottom:10px;">Requer sua escolha</div>
+        <div style="display:flex;flex-direction:column;gap:7px;font-size:13px;">
+          ${temASI ? `<div>🎯 <strong>Melhoria de Atributo (ASI)</strong> — aumente 2 atributos em +1, ou um em +2</div>` : ''}
+          ${isCaster ? `<div>✨ <strong>Novos slots de magia</strong> até Nível ${maxSpell} — escolha novas magias na aba Magias</div>` : ''}
+          <div>📜 <strong>Novas habilidades de classe</strong> — veja na aba Habilidades</div>
+        </div>
+      </div>` : ''}
+
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <button onclick="gameConfirmLevelUp('${charKey}','${type}',${idx},${novoNivel},${hpGain},${novaProf})"
+          style="width:100%;padding:11px;background:#f0c030;color:#3a2800;border:none;border-radius:7px;
+                 cursor:pointer;font-size:14px;font-family:'Lora',serif;font-weight:700;letter-spacing:0.02em;">
+          ✅ Confirmar Nível ${novoNivel}
+        </button>
+        <button onclick="document.getElementById('levelup-popup').remove();openEditModal('${type === 'party' ? 'character' : type}','${charKey}',window._lastMem.${type === 'party' ? 'party' : 'characters'}[${idx}])"
+          style="width:100%;padding:9px;background:none;color:var(--ink-user);border:1px solid var(--page-edge);
+                 border-radius:7px;cursor:pointer;font-size:13px;font-family:'Lora',serif;">
+          📝 Editar Ficha Completa
+        </button>
+        <button onclick="document.getElementById('levelup-popup').remove()"
+          style="width:100%;padding:7px;background:none;color:var(--text-muted);border:none;cursor:pointer;font-size:12px;">
+          Cancelar
+        </button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(popup);
+  popup.addEventListener('click', e => { if (e.target === popup) popup.remove(); });
+}
+
+async function gameConfirmLevelUp(charKey, type, idx, novoNivel, hpGain, novaProf) {
+  document.getElementById('levelup-popup')?.remove();
+
+  const data = type === 'party'
+    ? window._lastMem?.party?.[idx]
+    : window._lastMem?.characters?.[idx];
+  if (!data?.sheet) return;
+
+  const sheet = data.sheet;
+  const newSheet = {
+    ...sheet,
+    nivel:        novoNivel,
+    vida_max:     (sheet.vida_max  || 0) + hpGain,
+    vida_atual:   (sheet.vida_atual || 0) + hpGain,
+    proficiencia: novaProf,
+    xp_proximo:   gameXpForNextLevel(novoNivel),
+  };
+
+  const url = `${API}/api/memory/characters/${encodeURIComponent(charKey)}`;
+  try {
+    const res = await authFetch(url, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...data, sheet: newSheet }),
+    });
+    if (res.ok) {
+      showToast(`⬆️ ${data.name} agora é nível ${novoNivel}! +${hpGain} HP`);
+      await refreshMemory();
+      // Abre modal para o usuário escolher magias / ASI
+      const newIdx = type === 'party'
+        ? window._lastMem.party.findIndex(p => p.name.toLowerCase() === charKey)
+        : window._lastMem.characters.findIndex(c => c.name.toLowerCase() === charKey);
+      if (newIdx !== -1) {
+        const newData = type === 'party' ? window._lastMem.party[newIdx] : window._lastMem.characters[newIdx];
+        openEditModal('character', charKey, newData);
+      }
+    } else {
+      const e = await res.json();
+      await showAlert('Erro', e.error || 'Não foi possível salvar.', 'danger');
+    }
+  } catch (_) {
+    await showAlert('Erro', 'Falha de conexão ao salvar.', 'danger');
+  }
+}
+
+const GAME_STATUS_OPTS = [
+  'vivo','morto','ferido','desaparecido','preso','aliado','inimigo','exilado'
+];
+
+// ── Popup de detalhes de magia / habilidade (in-game) ────────────────────────
+const _habInfoRegistry = [];
+
+function showHabInfo(event, sp, regIdx, alreadyHas, limitReached) {
+  event.stopPropagation();
+  document.getElementById('hab-info-popup')?.remove();
+
+  const addFn = (typeof regIdx === 'number') ? _habInfoRegistry[regIdx] : null;
+  if (alreadyHas === undefined) alreadyHas = !addFn;
+  if (limitReached === undefined) limitReached = false;
+
+  const nivel = sp.nivel_magia === 0 ? 'Cantrip'
+              : sp.nivel_magia > 0   ? `Nível ${sp.nivel_magia}`
+              : sp.nivel > 0         ? `Nível ${sp.nivel}` : '';
+
+  const popup = document.createElement('div');
+  popup.id = 'hab-info-popup';
+
+  let left = event.clientX + 10;
+  let top  = event.clientY + 10;
+  if (left + 348 > window.innerWidth)  left = event.clientX - 358;
+  if (top  + 340 > window.innerHeight) top  = event.clientY - 350;
+  left = Math.max(8, left);
+  top  = Math.max(8, top);
+
+  popup.style.cssText =
+    `position:fixed;z-index:10000;left:${left}px;top:${top}px;` +
+    `background:var(--page-bg,#fff);border:1px solid var(--page-edge,#ccc);border-radius:10px;` +
+    `box-shadow:0 12px 40px rgba(0,0,0,0.22);padding:18px;` +
+    `max-width:340px;width:min(340px,calc(100vw - 16px));font-family:'Lora',serif;`;
+
+  const badges = [
+    nivel           ? `<span style="font-size:11px;background:rgba(38,75,130,0.1);color:var(--ink-user);padding:2px 8px;border-radius:10px;">${escapeHtml(nivel)}</span>` : '',
+    sp.escola       ? `<span style="font-size:11px;color:var(--text-muted);">${escapeHtml(sp.escola)}</span>` : '',
+    sp.ritual       ? `<span style="font-size:10px;border:1px solid var(--page-edge);border-radius:3px;padding:1px 5px;color:var(--text-muted);">ritual</span>` : '',
+    sp.concentracao ? `<span style="font-size:10px;border:1px solid var(--page-edge);border-radius:3px;padding:1px 5px;color:var(--text-muted);">conc.</span>` : '',
+  ].filter(Boolean).join(' ');
+
+  popup.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:15px;font-weight:700;color:var(--text-main);margin-bottom:5px;">${escapeHtml(sp.nome||'')}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:5px;align-items:center;">${badges}</div>
+      </div>
+      <button onclick="document.getElementById('hab-info-popup').remove()"
+        style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--text-muted);padding:0 0 0 10px;line-height:1;flex-shrink:0;">✕</button>
+    </div>
+    ${(sp.dado || sp.custo_mana > 0) ? `
+    <div style="display:flex;gap:20px;margin-bottom:10px;padding:8px 10px;background:rgba(0,0,0,0.03);border-radius:6px;">
+      ${sp.dado           ? `<div><div style="font-size:9px;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:2px;">Dado</div><div style="font-family:monospace;font-size:16px;font-weight:700;">${escapeHtml(sp.dado)}</div></div>` : ''}
+      ${sp.custo_mana > 0 ? `<div><div style="font-size:9px;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:2px;">Mana</div><div style="font-size:16px;font-weight:700;color:var(--ink-user);">${sp.custo_mana}</div></div>` : ''}
+    </div>` : ''}
+    ${sp.descricao ? `<div style="font-size:12px;line-height:1.65;color:var(--text-dim);max-height:160px;overflow-y:auto;border-top:1px solid var(--page-edge);padding-top:8px;margin-bottom:14px;">${escapeHtml(sp.descricao)}</div>` : ''}
+    ${alreadyHas
+      ? `<div style="text-align:center;font-size:12px;color:var(--green,#2d8a4e);padding:6px 0;">✓ Já adicionada</div>`
+      : limitReached
+        ? `<div style="text-align:center;font-size:12px;color:var(--ink-sys,#8b3a3a);padding:6px 0;">⚠️ Limite de cantrips/magias atingido (use a aba de habilidades)</div>`
+        : `<button onclick="_habInfoRegistry[${regIdx}]()"
+             style="width:100%;padding:9px;background:var(--ink-user,#264b82);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-family:'Lora',serif;font-weight:600;letter-spacing:0.02em;">
+             + Adicionar
+           </button>`
+    }`;
+
+  document.body.appendChild(popup);
+
+  setTimeout(() => {
+    function outsideClick(e) {
+      if (!popup.contains(e.target)) {
+        popup.remove();
+        document.removeEventListener('click', outsideClick);
+      }
+    }
+    document.addEventListener('click', outsideClick);
+  }, 50);
+}
+
+// ═══════════════════════════════════════
 //  Modal de edição — Habilidades & Magias
 // ═══════════════════════════════════════
 const GAME_CASTER_CLASSES = new Set([
@@ -1136,10 +1472,11 @@ function gameAddSpell(spell) {
   _editCtx.data.habilidades = _editCtx.data.habilidades || [];
   if (!_editCtx.data.habilidades.some(h => h.nome.toLowerCase() === spell.nome.toLowerCase())) {
     _editCtx.data.habilidades.push({
-      nome: spell.nome,
-      descricao: [spell.escola?`[${spell.escola}${spell.ritual?' (ritual)':''}${spell.concentracao?' (conc.)':''}]`:'', spell.descricao||''].filter(Boolean).join(' '),
-      custo_mana: spell.custo_mana ?? 0,
-      dado: spell.dado || '',
+      nome:        spell.nome,
+      descricao:   [spell.escola?`[${spell.escola}${spell.ritual?' (ritual)':''}${spell.concentracao?' (conc.)':''}]`:'', spell.descricao||''].filter(Boolean).join(' '),
+      custo_mana:  spell.custo_mana ?? 0,
+      dado:        spell.dado || '',
+      nivel_magia: spell.nivel_magia ?? 0,
     });
   }
   gameRefreshHabSection();
@@ -1167,12 +1504,20 @@ function gameBuildSpellPanelList() {
   const rawQuery = (_gameHabState._spellQuery || '').trim();
   const lvlF     = _gameHabState._spellLevelFilter;
   const habs     = _editCtx?.data?.habilidades || [];
+  const { classe, nivel } = _gameGetSheet();
+  const _gameLimit      = _editCtx?.data?.freeMode ? null : getSpellLimit(classe, nivel, _editCtx?.data?.sheet);
+  const _gameCantripCnt = habs.filter(h => typeof h.nivel_magia === 'number' && h.nivel_magia === 0).length;
+  const _gameLeveledCnt = habs.filter(h => typeof h.nivel_magia === 'number' && h.nivel_magia > 0).length;
   const renderRow = (sp) => {
-    const badge = sp.nivel_magia === 0 ? 'C' : `${sp.nivel_magia}`;
-    const manaTag = sp.custo_mana > 0 ? ` · ${sp.custo_mana} mana` : '';
+    const badge      = sp.nivel_magia === 0 ? 'C' : `${sp.nivel_magia}`;
+    const manaTag    = sp.custo_mana > 0 ? ` · ${sp.custo_mana} mana` : '';
     const alreadyHas = habs.some(h => h.nome.toLowerCase() === sp.nome.toLowerCase());
-    const onClick = alreadyHas ? '' : `gameAddSpell(${JSON.stringify(sp).replace(/"/g,'&quot;')})`;
-    return `<div class="ed-search-result ${alreadyHas?'ed-search-result-added':''}" onclick="${onClick}">
+    const isCantrip  = sp.nivel_magia === 0;
+    const limitReached = !alreadyHas && _gameLimit && (isCantrip ? _gameCantripCnt >= _gameLimit.maxCantrips : _gameLeveledCnt >= _gameLimit.maxSpells);
+    const regIdx     = _habInfoRegistry.length;
+    _habInfoRegistry.push((alreadyHas || limitReached) ? null : () => { gameAddSpell(sp); document.getElementById('hab-info-popup')?.remove(); });
+    const spJson     = JSON.stringify(sp).replace(/"/g,'&quot;');
+    return `<div class="ed-search-result ${alreadyHas?'ed-search-result-added':''}" onclick="showHabInfo(event,${spJson},${regIdx},${alreadyHas},${limitReached})" style="cursor:pointer;">
       <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
         <span class="ed-spell-badge" style="min-width:22px;text-align:center;">${badge}</span>
         <strong style="font-size:13px;">${escapeHtml(sp.nome)}</strong>
@@ -1181,8 +1526,9 @@ function gameBuildSpellPanelList() {
         ${sp.concentracao?`<span style="font-size:9px;color:var(--text-muted);border:1px solid var(--page-edge);border-radius:2px;padding:0 3px;">conc.</span>`:''}
         ${sp.ritual?`<span style="font-size:9px;color:var(--text-muted);border:1px solid var(--page-edge);border-radius:2px;padding:0 3px;">ritual</span>`:''}
         ${alreadyHas?`<span style="font-size:10px;color:var(--green);">✓ já tem</span>`:''}
+        ${limitReached&&!alreadyHas?`<span style="font-size:9px;color:var(--ink-sys);border:1px solid currentColor;border-radius:2px;padding:0 3px;opacity:0.7;">limite</span>`:''}
       </div>
-      <div style="font-size:11px;color:var(--text-dim);margin-top:3px;">${escapeHtml((sp.descricao||'').slice(0,120))}${(sp.descricao||'').length>120?'…':''}</div>
+      <div style="font-size:11px;color:var(--text-dim);margin-top:3px;">${escapeHtml((sp.descricao||'').slice(0,100))}${(sp.descricao||'').length>100?'…':''}</div>
     </div>`;
   };
   if (results.length === 0) return '<div style="font-size:12px;color:var(--text-muted);font-style:italic;padding:8px 0;">Nenhuma magia encontrada. Busque pelo nome em inglês (ex: "fireball").</div>';
@@ -1208,14 +1554,16 @@ function gameBuildFeatPanelList() {
   if (feats.length === 0) return `<div style="font-size:12px;color:var(--text-muted);font-style:italic;padding:8px 0;">Nenhuma habilidade encontrada para ${escapeHtml(classe)} nível ${nivel}.</div>`;
   return feats.map(feat => {
     const alreadyHas = habs.some(h => h.nome.toLowerCase() === feat.nome.toLowerCase());
-    const onClick = alreadyHas ? '' : `gameAddFeat(${JSON.stringify(feat).replace(/"/g,'&quot;')})`;
-    return `<div class="ed-search-result ${alreadyHas?'ed-search-result-added':''}" onclick="${onClick}">
+    const regIdx     = _habInfoRegistry.length;
+    _habInfoRegistry.push(alreadyHas ? null : () => { gameAddFeat(feat); document.getElementById('hab-info-popup')?.remove(); });
+    const featJson   = JSON.stringify(feat).replace(/"/g,'&quot;');
+    return `<div class="ed-search-result ${alreadyHas?'ed-search-result-added':''}" onclick="showHabInfo(event,${featJson},${regIdx})" style="cursor:pointer;">
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
         <span class="ed-spell-badge" style="min-width:28px;text-align:center;">Nv.${feat.nivel}</span>
         <strong style="font-size:13px;">${escapeHtml(feat.nome)}</strong>
         ${alreadyHas?`<span style="font-size:10px;color:var(--green);">✓ já tem</span>`:''}
       </div>
-      <div style="font-size:11px;color:var(--text-dim);margin-top:4px;">${escapeHtml((feat.descricao||'').slice(0,160))}${(feat.descricao||'').length>160?'…':''}</div>
+      <div style="font-size:11px;color:var(--text-dim);margin-top:4px;">${escapeHtml((feat.descricao||'').slice(0,120))}${(feat.descricao||'').length>120?'…':''}</div>
     </div>`;
   }).join('');
 }
@@ -1224,8 +1572,10 @@ function gameBuildHabSection() {
   if (!_gameHabState || !_editCtx?.data?.sheet) return '';
   const habs = _editCtx.data.habilidades || [];
   const { classe, nivel } = _gameGetSheet();
-  const isCaster   = GAME_CASTER_CLASSES.has(classe);
-  const showSpellTab = isCaster;
+  // Usa _isCaster fixo (definido na inicialização) para que a aba Magias
+  // apareça corretamente no primeiro render, antes do DOM estar disponível.
+  // Quando a classe muda via select, gameOnClassChange() atualiza _isCaster.
+  const showSpellTab = _gameHabState._isCaster ?? GAME_CASTER_CLASSES.has(classe);
   let habTab = _gameHabState._habTab || 'feats';
   if (habTab === 'spells' && !showSpellTab) habTab = 'feats';
 
@@ -1269,18 +1619,21 @@ function gameBuildHabSection() {
       `padding:3px 8px;border-radius:3px;border:1px solid ${active?'var(--ink-user)':'var(--page-edge)'};`+
       `background:${active?'rgba(38,75,130,0.12)':'transparent'};color:${active?'var(--ink-user)':'var(--text-muted)'};`+
       `cursor:pointer;font-size:10px;font-family:monospace;font-weight:${active?'700':'400'};`;
-    let levelBtns = `<button style="${lvlBtnStyle(lvlF===null)}" onclick="_gameHabState._spellLevelFilter=null;_gameHabState._spellResults=[];gameDoSpellSearch()">Todos</button>`;
-    levelBtns += `<button style="${lvlBtnStyle(lvlF===0)}" onclick="_gameHabState._spellLevelFilter=0;_gameHabState._spellResults=[];gameDoSpellSearch()">C</button>`;
+    let levelBtns = `<button style="${lvlBtnStyle(lvlF===null)}" onclick="gameSetSpellLvlFilter(null)">Todos</button>`;
+    levelBtns += `<button style="${lvlBtnStyle(lvlF===0)}" onclick="gameSetSpellLvlFilter(0)">C</button>`;
     for (let n = 1; n <= maxSl; n++) {
-      levelBtns += `<button style="${lvlBtnStyle(lvlF===n)}" onclick="_gameHabState._spellLevelFilter=${n};_gameHabState._spellResults=[];gameDoSpellSearch()">${n}</button>`;
+      levelBtns += `<button style="${lvlBtnStyle(lvlF===n)}" onclick="gameSetSpellLvlFilter(${n})">${n}</button>`;
     }
     const query = escapeHtml(_gameHabState._spellQuery || '');
+    const _gHabLimit      = getSpellLimit(classe, nivel, _editCtx?.data?.sheet);
+    const _gHabCantripCnt = (_editCtx?.data?.habilidades||[]).filter(h => typeof h.nivel_magia === 'number' && h.nivel_magia === 0).length;
+    const _gHabLeveledCnt = (_editCtx?.data?.habilidades||[]).filter(h => typeof h.nivel_magia === 'number' && h.nivel_magia > 0).length;
     tabContent = `
       <div style="margin-bottom:12px;">
         <div style="font-size:11px;color:var(--ink-user);margin-bottom:8px;">
-          Magias de <strong>${escapeHtml(classe)}</strong> até Nv.${maxSl} · SRD Open5e
+          Magias de <strong>${escapeHtml(classe)}</strong> até Nv.${maxSl} · SRD Open5e${_gHabLimit ? `<span style="font-size:10px;font-family:monospace;color:var(--text-muted);margin-left:8px;">| C: ${_gHabCantripCnt}/${_gHabLimit.maxCantrips} ✨ ${_gHabLeveledCnt}/${_gHabLimit.maxSpells}</span>` : ''}
         </div>
-        <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;">${levelBtns}</div>
+        <div id="game-lvl-btns" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;">${levelBtns}</div>
         <div style="display:flex;gap:8px;margin-bottom:8px;">
           <input value="${query}" placeholder="Buscar magia (ex: fireball)..."
             oninput="_gameHabState._spellQuery=this.value;gameTriggerSpellSearch()" style="flex:1;font-size:13px;">
@@ -1324,6 +1677,7 @@ function openEditModal(type, key, data, index = null) {
   if (type === 'character' && data.sheet) {
     const isCaster = GAME_CASTER_CLASSES.has((data.sheet.classe || '').toLowerCase());
     _gameHabState = {
+      _isCaster:         isCaster,          // fixo na inicialização, não depende do DOM
       _habTab:           isCaster ? 'spells' : 'feats',
       _spellLevelFilter: null,
       _spellQuery:       '',
@@ -1355,6 +1709,26 @@ function field(id, label, value, type = 'input', opts = {}) {
   return `<div class="field-group"><label>${label}</label><input id="ef-${id}" type="text" value="${v}"></div>`;
 }
 
+// Select com entries {value, label} ou strings simples
+function selField(id, label, value, entries, opts = {}) {
+  const style    = opts.style    || '';
+  const onchange = opts.onchange ? ` onchange="${opts.onchange}"` : '';
+  const options = entries.map(e => {
+    const v = typeof e === 'string' ? e : e.value;
+    const l = typeof e === 'string' ? (e.charAt(0).toUpperCase() + e.slice(1)) : e.label;
+    return `<option value="${v}" ${v === String(value) ? 'selected' : ''}>${l}</option>`;
+  }).join('');
+  return `<div class="field-group" ${style ? `style="${style}"` : ''}><label>${label}</label><select id="ef-${id}"${onchange}>${options}</select></div>`;
+}
+
+// Input numérico com min/max e estilo compacto
+function numField(id, label, value, min, max, opts = {}) {
+  const style = opts.style || '';
+  return `<div class="field-group" ${style ? `style="${style}"` : ''}><label>${label}</label>`+
+    `<input id="ef-${id}" type="number" min="${min}" max="${max}" value="${parseInt(value)||0}" `+
+    `style="text-align:center;font-size:16px;font-weight:700;"></div>`;
+}
+
 function buildEditFields(type, data) {
   switch (type) {
     case 'character': {
@@ -1366,7 +1740,71 @@ function buildEditFields(type, data) {
         + field('notes', 'Notas', data.notes, 'textarea', { rows: 2 });
       if (data.sheet) {
         const s = data.sheet;
-        html += `<div style="border-top:1px solid var(--page-edge);margin:12px 0 8px;padding-top:14px;"><div style="font-family:'Playfair Display',serif;font-size:14px;color:var(--text-main);margin-bottom:12px;font-weight:700;">⚔️ FICHA D&D</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">${field('sheet_classe','Classe',s.classe??'')}${field('sheet_raca','Raça',s.raca??'')}${field('sheet_nivel','Nível',s.nivel??1)}${field('sheet_xp','XP',s.xp??0)}</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">${field('sheet_vida_atual','HP Atual',s.vida_atual??0)}${field('sheet_vida_max','HP Máx',s.vida_max??0)}${field('sheet_mana_atual','Mana Atual',s.mana_atual??0)}${field('sheet_mana_max','Mana Máx',s.mana_max??0)}${field('sheet_ca','CA',s.ca??0)}${field('sheet_proficiencia','Profic.',s.proficiencia??2)}</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px;">${field('sheet_forca','FOR',s.forca??10)}${field('sheet_destreza','DES',s.destreza??10)}${field('sheet_constituicao','CON',s.constituicao??10)}${field('sheet_inteligencia','INT',s.inteligencia??10)}${field('sheet_sabedoria','SAB',s.sabedoria??10)}${field('sheet_carisma','CAR',s.carisma??10)}</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px;">${field('sheet_ouro','Ouro',s.ouro??0)}${field('sheet_prata','Prata',s.prata??0)}${field('sheet_cobre','Cobre',s.cobre??0)}</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">${field('sheet_eq_armadura','Armadura',(s.equipamentos?.armadura??''))}${field('sheet_eq_escudo','Escudo',(s.equipamentos?.escudo??''))}${field('sheet_eq_arma','Arma Princ.',(s.equipamentos?.arma_principal??''))}${field('sheet_eq_amuleto','Amuleto',(s.equipamentos?.amuleto??''))}</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">${field('sheet_ds_suc','Sucessos Morte',s.death_saves_sucessos??0)}${field('sheet_ds_fail','Falhas Morte',s.death_saves_falhas??0)}</div></div>`;
+        const classeVal = (s.classe || 'guerreiro').toLowerCase().trim();
+        const racaVal   = (s.raca   || 'humano').toLowerCase().trim();
+
+        // ── Classe & Raça (selects) ──────────────────────────────────────
+        const classeOpts = Object.entries(GAME_CLASS_DATA).map(([k,v]) => ({ value: k, label: v.label }));
+        const racaOpts   = GAME_RACES;
+        const levelOpts  = Array.from({length:20}, (_,i) => ({ value: String(i+1), label: `Nível ${i+1}` }));
+        const profOpts   = [2,3,4,5,6].map(n => ({ value: String(n), label: `+${n}` }));
+
+        html += `<div style="border-top:1px solid var(--page-edge);margin:12px 0 8px;padding-top:14px;">
+          <div style="font-family:'Playfair Display',serif;font-size:14px;color:var(--text-main);margin-bottom:12px;font-weight:700;">⚔️ FICHA D&D</div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+            ${selField('sheet_classe','Classe', classeVal, classeOpts, { onchange: 'gameOnClassChange(this.value)' })}
+            ${selField('sheet_raca','Raça', racaVal, racaOpts)}
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;">
+            ${selField('sheet_nivel','Nível', String(s.nivel??1), levelOpts, { onchange: 'gameOnLevelChange(this.value)' })}
+            ${numField('sheet_xp','XP', s.xp??0, 0, 999999)}
+            ${selField('sheet_proficiencia','Proficiência', String(s.proficiencia??2), profOpts)}
+          </div>
+
+          <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">Pontos de Vida & Defesa</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:10px;">
+            ${numField('sheet_vida_atual','HP Atual', s.vida_atual??0, 0, 999)}
+            ${numField('sheet_vida_max','HP Máx', s.vida_max??0, 1, 999)}
+            ${numField('sheet_mana_atual','Mana Atual', s.mana_atual??0, 0, 999)}
+            ${numField('sheet_mana_max','Mana Máx', s.mana_max??0, 0, 999)}
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
+            ${numField('sheet_ca','CA (Classe de Armadura)', s.ca??10, 1, 30)}
+            <div class="field-group"><label>Morte (Suc. / Falh.)</label>
+              <div style="display:flex;gap:6px;">
+                <input id="ef-sheet_ds_suc" type="number" min="0" max="3" value="${s.death_saves_sucessos??0}" style="text-align:center;font-size:16px;font-weight:700;">
+                <input id="ef-sheet_ds_fail" type="number" min="0" max="3" value="${s.death_saves_falhas??0}" style="text-align:center;font-size:16px;font-weight:700;">
+              </div>
+            </div>
+          </div>
+
+          <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">Atributos</div>
+          <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-bottom:12px;">
+            ${numField('sheet_forca','FOR', s.forca??10, 1, 30)}
+            ${numField('sheet_destreza','DES', s.destreza??10, 1, 30)}
+            ${numField('sheet_constituicao','CON', s.constituicao??10, 1, 30)}
+            ${numField('sheet_inteligencia','INT', s.inteligencia??10, 1, 30)}
+            ${numField('sheet_sabedoria','SAB', s.sabedoria??10, 1, 30)}
+            ${numField('sheet_carisma','CAR', s.carisma??10, 1, 30)}
+          </div>
+
+          <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">Moedas</div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;">
+            ${numField('sheet_ouro','🟡 Ouro', s.ouro??0, 0, 999999)}
+            ${numField('sheet_prata','⚪ Prata', s.prata??0, 0, 999999)}
+            ${numField('sheet_cobre','🟤 Cobre', s.cobre??0, 0, 999999)}
+          </div>
+
+          <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">Equipamentos</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            ${field('sheet_eq_armadura','Armadura', s.equipamentos?.armadura??'')}
+            ${field('sheet_eq_escudo','Escudo', s.equipamentos?.escudo??'')}
+            ${field('sheet_eq_arma','Arma Principal', s.equipamentos?.arma_principal??'')}
+            ${field('sheet_eq_arma_sec','Arma Secundária / Distância', s.equipamentos?.arma_secundaria??'')}
+            ${field('sheet_eq_amuleto','Amuleto', s.equipamentos?.amuleto??'')}
+          </div>
+        </div>`;
         html += `<div id="game-hab-section">${gameBuildHabSection()}</div>`;
       }
       return html;
@@ -1390,7 +1828,7 @@ function getEditValues() {
       if (_editCtx.data.sheet) {
         const n = id => parseInt(document.getElementById(`ef-${id}`)?.value) || 0;
         const f = id => (document.getElementById(`ef-${id}`)?.value || '').trim();
-        base.sheet = { ..._editCtx.data.sheet, classe: f('sheet_classe').toLowerCase() || _editCtx.data.sheet.classe, raca: f('sheet_raca').toLowerCase() || _editCtx.data.sheet.raca, nivel: n('sheet_nivel'), xp: n('sheet_xp'), vida_atual: n('sheet_vida_atual'), vida_max: n('sheet_vida_max'), mana_atual: n('sheet_mana_atual'), mana_max: n('sheet_mana_max'), ca: n('sheet_ca'), proficiencia: n('sheet_proficiencia'), forca: n('sheet_forca'), destreza: n('sheet_destreza'), constituicao: n('sheet_constituicao'), inteligencia: n('sheet_inteligencia'), sabedoria: n('sheet_sabedoria'), carisma: n('sheet_carisma'), ouro: n('sheet_ouro'), prata: n('sheet_prata'), cobre: n('sheet_cobre'), equipamentos: { armadura: f('sheet_eq_armadura') || null, escudo: f('sheet_eq_escudo') || null, arma_principal: f('sheet_eq_arma') || null, amuleto: f('sheet_eq_amuleto') || null }, death_saves_sucessos: n('sheet_ds_suc'), death_saves_falhas: n('sheet_ds_fail') };
+        base.sheet = { ..._editCtx.data.sheet, classe: f('sheet_classe').toLowerCase() || _editCtx.data.sheet.classe, raca: f('sheet_raca').toLowerCase() || _editCtx.data.sheet.raca, nivel: n('sheet_nivel'), xp: n('sheet_xp'), vida_atual: n('sheet_vida_atual'), vida_max: n('sheet_vida_max'), mana_atual: n('sheet_mana_atual'), mana_max: n('sheet_mana_max'), ca: n('sheet_ca'), proficiencia: n('sheet_proficiencia'), forca: n('sheet_forca'), destreza: n('sheet_destreza'), constituicao: n('sheet_constituicao'), inteligencia: n('sheet_inteligencia'), sabedoria: n('sheet_sabedoria'), carisma: n('sheet_carisma'), ouro: n('sheet_ouro'), prata: n('sheet_prata'), cobre: n('sheet_cobre'), equipamentos: { armadura: f('sheet_eq_armadura') || null, escudo: f('sheet_eq_escudo') || null, arma_principal: f('sheet_eq_arma') || null, arma_secundaria: f('sheet_eq_arma_sec') || null, amuleto: f('sheet_eq_amuleto') || null }, death_saves_sucessos: n('sheet_ds_suc'), death_saves_falhas: n('sheet_ds_fail') };
         base.habilidades = _editCtx.data.habilidades || [];
       }
       return base;
@@ -1409,7 +1847,7 @@ function addNewFlag() { openEditModal('flag', 'nova', { key: '', value: '' }); }
 function addNewCharacter() {
   const isDnd = window._lastMem?.dnd_mode === true || window._lastMem?.campaign_type === 'dnd';
   const base = { name: '', description: '', traits: '', status: 'vivo', notes: '' };
-  if (isDnd) base.sheet = { classe: '', raca: '', nivel: 1, xp: 0, forca: 10, destreza: 10, constituicao: 10, inteligencia: 10, sabedoria: 10, carisma: 10, vida_atual: 10, vida_max: 10, mana_atual: 0, mana_max: 0, ca: 10, proficiencia: 2, hit_die: 8, ouro: 0, prata: 0, cobre: 0, equipamentos: { armadura: null, escudo: null, arma_principal: null, amuleto: null }, condicoes: [], death_saves_sucessos: 0, death_saves_falhas: 0 };
+  if (isDnd) base.sheet = { classe: '', raca: '', nivel: 1, xp: 0, forca: 10, destreza: 10, constituicao: 10, inteligencia: 10, sabedoria: 10, carisma: 10, vida_atual: 10, vida_max: 10, mana_atual: 0, mana_max: 0, ca: 10, proficiencia: 2, hit_die: 8, ouro: 0, prata: 0, cobre: 0, equipamentos: { armadura: null, escudo: null, arma_principal: null, arma_secundaria: null, amuleto: null }, condicoes: [], death_saves_sucessos: 0, death_saves_falhas: 0 };
   openEditModal('character', '__novo__', base);
 }
 function addNewPartyMember() { openEditModal('party', '__novo__', { name: '', role: '', notes: '' }); }
