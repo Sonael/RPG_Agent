@@ -20,7 +20,7 @@ import memory
 import database
 from auth import require_auth, register as auth_register, login as auth_login, refresh_session
 from agent import create_agent, get_campaign_config
-from session import APP_NAME, USER_ID, SESSION_ID, create_runner
+from session import APP_NAME, create_runner
 from validator import validate
 
 
@@ -943,9 +943,8 @@ def start_session():
     google_key        = user_google_key
     deepseek_key      = user_deepseek_key
 
-    # Define identidade da sessão no memory
-    memory.CURRENT_USER_ID = user_id
-    memory.CAMPAIGN_NAME   = campaign_name
+    # Vincula o contexto à campanha DESTE usuário (estado por sessão).
+    memory.bind(user_id, campaign_name)
     has_history = memory.load_campaign()
 
     memory.campaign["name"] = campaign_name
@@ -983,15 +982,22 @@ def start_session():
 
     agent = create_agent(model, campaign_type)
     runner, session_service = create_runner(agent)
+
+    # Identidade ADK POR USUÁRIO/CAMPANHA (antes era fixa "jogador1"/"sessao1"
+    # → o histórico de conversa do LLM vazava entre todos os usuários).
+    adk_user    = str(user_id)
+    adk_session = f"{user_id}::{campaign_name}"
     run_async(session_service.create_session(
-        app_name=APP_NAME, user_id=USER_ID, session_id=SESSION_ID
+        app_name=APP_NAME, user_id=adk_user, session_id=adk_session
     ))
 
     _sessions[user_id] = {
     "runner":          runner,
     "session_service": session_service,
     "is_ollama":       is_ollama,
-    "model_id":        model_id,  # ADICIONE ESTA LINHA AQUI
+    "model_id":        model_id,
+    "adk_user":        adk_user,
+    "adk_session":     adk_session,
     }
 
     if has_history:
@@ -1136,8 +1142,17 @@ def chat():
     # Estado de combate ANTES desta resposta (para comparação na verificação)
     _combat_was_active = memory.campaign.get("combat_state", {}).get("is_active", False)
 
+    adk_user    = sess.get("adk_user", str(user_id))
+    adk_session = sess.get("adk_session", f"{user_id}::sessao")
+
     async def run_agent(texto: str):
         import random
+        # Re-vincula o contexto de memória DENTRO da corrotina do agente.
+        # O ContextVar definido na thread Flask (via require_auth) NÃO
+        # propaga para a Task no loop de fundo — então fixamos aqui, no
+        # contexto desta Task, garantindo que as tools operem na campanha
+        # do usuário correto.
+        memory.bind_request(user_id)
         msg          = gtypes.Content(role="user", parts=[gtypes.Part(text=texto)])
         MAX_RETRIES  = 5
 
@@ -1146,7 +1161,7 @@ def chat():
             tools_called = set()
             try:
                 async for event in runner.run_async(
-                    user_id=USER_ID, session_id=SESSION_ID, new_message=msg
+                    user_id=adk_user, session_id=adk_session, new_message=msg
                 ):
                     if event.content and event.content.parts:
                         for part in event.content.parts:
@@ -1538,9 +1553,7 @@ def end_session():
             return jsonify({"ok": False, "error": "Falha ao persistir dados"}), 500
 
     _sessions.pop(user_id, None)
-    memory.reset_campaign()
-    memory.CURRENT_USER_ID = None
-    memory.CAMPAIGN_NAME   = None
+    memory.unbind(user_id)
     return jsonify({"ok": True})
 
 

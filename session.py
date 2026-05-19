@@ -9,9 +9,9 @@ O fluxo de envio de mensagens, recap e abertura vive em server.py.
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 
-APP_NAME   = "rpg_app"
-USER_ID    = "jogador1"
-SESSION_ID = "sessao1"
+APP_NAME = "rpg_app"
+# Identidade ADK (user_id / session_id) agora é POR USUÁRIO/CAMPANHA,
+# definida em server.py. Não há mais constantes globais fixas.
 
 
 def create_runner(agent) -> tuple[Runner, InMemorySessionService]:

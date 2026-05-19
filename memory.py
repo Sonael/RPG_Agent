@@ -1,20 +1,149 @@
 """
 memory.py
-Estado global da campanha e funções de persistência via Supabase.
+Estado da campanha (por sessão) e persistência via Supabase.
+
+ARQUITETURA (multiusuário, sem estado global compartilhado):
+  • Cada (user_id, campanha) tem seu próprio dict de campanha em `_STORE`.
+  • Um ContextVar (`_active_key`) define qual campanha está ativa no
+    contexto de execução atual (request Flask OU corrotina do agente).
+  • `memory.campaign` é um PROXY que resolve para a campanha do contexto
+    ativo — então tools, validator e endpoints continuam usando
+    `memory.campaign[...]` sem saber que o estado é por sessão.
+
+Vínculo de contexto:
+  • server.start_session  → memory.bind(user_id, nome)         (cria/ativa)
+  • require_auth (auth.py) → memory.bind_request(user_id)        (reativa)
+  • chat()/run_agent       → memory.bind_request(user_id)        (na corrotina)
+  • session/end            → memory.unbind(user_id)
 """
 
 import json
-from pathlib import Path
+import contextvars
 
 # ---------------------------------------------------------------------------
-# Estado global de sessão (definido pelo server.py ao iniciar uma sessão)
+# Estado por sessão — substitui o antigo dict global único
 # ---------------------------------------------------------------------------
 
-CURRENT_USER_ID: str = None   # type: ignore  — user_id do Supabase Auth
-CAMPAIGN_NAME:   str = None   # type: ignore  — nome da campanha ativa
+# session_key -> dict de campanha
+_STORE: dict[str, dict] = {}
+# session_key -> (user_id, campaign_name)
+_META: dict[str, tuple] = {}
+# user_id -> session_key atualmente ativo para aquele usuário
+_ACTIVE_BY_USER: dict[str, str] = {}
 
-# Dict de trabalho em memória — todos os módulos (tools.py, etc.) operam aqui.
-campaign: dict = {}
+# Chave da campanha ativa NO CONTEXTO atual (thread/corrotina-safe)
+_active_key: "contextvars.ContextVar[str | None]" = contextvars.ContextVar(
+    "rpg_active_campaign_key", default=None
+)
+
+_FALLBACK_KEY = "__no_session__"
+
+
+def _session_key(user_id: str, campaign_name: str) -> str:
+    return f"{user_id or '?'}::{campaign_name or '?'}"
+
+
+def _active_campaign() -> dict:
+    """Retorna o dict da campanha do contexto ativo (cria se necessário)."""
+    key = _active_key.get() or _FALLBACK_KEY
+    camp = _STORE.get(key)
+    if camp is None:
+        camp = _defaults()
+        _STORE[key] = camp
+    return camp
+
+
+def bind(user_id: str, campaign_name: str) -> str:
+    """
+    Vincula o contexto atual à campanha (user_id, nome), criando o slot
+    se ainda não existir. Marca como a campanha ativa do usuário.
+    Chamado por server.start_session.
+    """
+    key = _session_key(user_id, campaign_name)
+    _META[key] = (user_id, campaign_name)
+    _ACTIVE_BY_USER[user_id] = key
+    _STORE.setdefault(key, _defaults())
+    _active_key.set(key)
+    return key
+
+
+def bind_request(user_id: str) -> str | None:
+    """
+    Reativa, no contexto atual, a campanha que o usuário tem aberta.
+    Usado por require_auth e pela corrotina do agente — garante que cada
+    request/execução opere na campanha do SEU usuário.
+    """
+    key = _ACTIVE_BY_USER.get(user_id)
+    if key is None:
+        # Usuário autenticado sem sessão de jogo ativa: usa um slot
+        # próprio e vazio (nunca o de outro usuário).
+        key = _session_key(user_id, "__none__")
+        _STORE.setdefault(key, _defaults())
+    _active_key.set(key)
+    return key
+
+
+def unbind(user_id: str) -> None:
+    """Encerra a sessão de jogo do usuário: remove o slot da memória."""
+    key = _ACTIVE_BY_USER.pop(user_id, None)
+    if key:
+        _STORE.pop(key, None)
+        _META.pop(key, None)
+    _active_key.set(None)
+
+
+def current_user_id() -> str | None:
+    key = _active_key.get()
+    return _META.get(key, (None, None))[0] if key else None
+
+
+def current_campaign_name() -> str | None:
+    key = _active_key.get()
+    return _META.get(key, (None, None))[1] if key else None
+
+
+# Compatibilidade de leitura: memory.CURRENT_USER_ID / memory.CAMPAIGN_NAME
+# continuam funcionando, mas agora são DERIVADOS do contexto ativo
+# (read-only — escrever neles não tem efeito; use bind()/unbind()).
+def __getattr__(name: str):
+    if name == "CURRENT_USER_ID":
+        return current_user_id()
+    if name == "CAMPAIGN_NAME":
+        return current_campaign_name()
+    raise AttributeError(f"module 'memory' has no attribute {name!r}")
+
+
+# ---------------------------------------------------------------------------
+# Proxy: memory.campaign → campanha do contexto ativo
+# ---------------------------------------------------------------------------
+
+class _CampaignProxy:
+    """
+    Faz `memory.campaign` se comportar como o dict da campanha ativa.
+    Implementa o subconjunto do protocolo de dict usado no código.
+    """
+    def __getitem__(self, k):            return _active_campaign()[k]
+    def __setitem__(self, k, v):         _active_campaign()[k] = v
+    def __delitem__(self, k):            del _active_campaign()[k]
+    def __contains__(self, k):           return k in _active_campaign()
+    def __iter__(self):                  return iter(_active_campaign())
+    def __len__(self):                   return len(_active_campaign())
+    def __bool__(self):                  return bool(_active_campaign())
+    def __eq__(self, other):             return _active_campaign() == other
+    def get(self, k, d=None):            return _active_campaign().get(k, d)
+    def setdefault(self, k, d=None):     return _active_campaign().setdefault(k, d)
+    def pop(self, *a):                   return _active_campaign().pop(*a)
+    def update(self, *a, **k):           return _active_campaign().update(*a, **k)
+    def keys(self):                      return _active_campaign().keys()
+    def values(self):                    return _active_campaign().values()
+    def items(self):                     return _active_campaign().items()
+    def clear(self):                     return _active_campaign().clear()
+    def copy(self):                      return _active_campaign().copy()
+    def __repr__(self):                  return f"<CampaignProxy {self.get('name','?')!r}>"
+
+
+# `campaign` agora é um proxy resolvido por contexto (não um dict global).
+campaign = _CampaignProxy()
 
 
 def _defaults() -> dict:
@@ -180,17 +309,19 @@ def load_campaign() -> bool:
     """
     import database
 
-    if not CURRENT_USER_ID or not CAMPAIGN_NAME:
+    uid  = current_user_id()
+    name = current_campaign_name()
+    if not uid or not name:
         reset_campaign()
         return False
 
     try:
-        data = database.get_campaign(CURRENT_USER_ID, CAMPAIGN_NAME)
+        data = database.get_campaign(uid, name)
 
         if data is None:
             # Campanha nova — ainda não existe no banco
             reset_campaign()
-            campaign["name"] = CAMPAIGN_NAME
+            campaign["name"] = name
             return False
 
         defaults = _defaults()
@@ -211,7 +342,7 @@ def load_campaign() -> bool:
                 campaign[key] = loaded if loaded is not None else default_val
 
         # Garante que o nome está sempre preenchido
-        campaign["name"] = CAMPAIGN_NAME
+        campaign["name"] = name
 
         chars = len(campaign["characters"])
         locs  = len(campaign["locations"])
@@ -239,7 +370,7 @@ def load_campaign() -> bool:
     except Exception as e:
         print(f"Aviso: erro ao carregar campanha ({e}). Iniciando do zero.")
         reset_campaign()
-        campaign["name"] = CAMPAIGN_NAME or ""
+        campaign["name"] = name or ""
         return False
 
 
@@ -257,9 +388,11 @@ def save_campaign() -> None:
         return
 
     # TRAVA 2: Protege contra sobrescrever dados existentes com memória vazia
-    if CURRENT_USER_ID and CAMPAIGN_NAME:
+    uid  = current_user_id()
+    name = current_campaign_name()
+    if uid and name:
         try:
-            existing = database.get_campaign(CURRENT_USER_ID, CAMPAIGN_NAME)
+            existing = database.get_campaign(uid, name)
             if existing:
                 has_history = len(campaign.get("conversation_history", [])) > 0
                 has_summary = len(campaign.get("story_summary", "")) > 0
@@ -275,8 +408,12 @@ def save_campaign() -> None:
     if len(hist) > MAX_HISTORY_SAVED:
         campaign["conversation_history"] = hist[-MAX_HISTORY_SAVED:]
 
+    if not uid or not name:
+        print("⚠️ [ALERTA] Save abortado: contexto de sessão não vinculado.")
+        return
+
     try:
-        database.save_campaign(CURRENT_USER_ID, CAMPAIGN_NAME, dict(campaign))
+        database.save_campaign(uid, name, dict(campaign))
         print(f"✅ Campanha '{campaign['name']}' persistida no Supabase.")
     except Exception as e:
         print(f"❌ Erro crítico ao salvar no Supabase: {e}")

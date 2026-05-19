@@ -100,6 +100,12 @@ def require_auth(f):
             g.email   = user.email
             g.token   = token
 
+            # 5. Vincula o contexto de memória À CAMPANHA DESTE USUÁRIO.
+            # Centralizado aqui → todo endpoint autenticado opera no
+            # estado do seu próprio usuário (isolamento multiusuário).
+            import memory
+            memory.bind_request(user.id)
+
         except Exception as e:
             # Útil para debug local, mas você pode simplificar a mensagem no Render
             return jsonify({"error": f"Falha na verificação: {str(e)}"}), 401
