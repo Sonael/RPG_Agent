@@ -364,6 +364,13 @@ EXEMPLO CORRETO — Sonael usa Magic Missile, depois dois NPCs agem:
 ANTI-METAGAMING: se for vez do inimigo e jogador tentar atacar
 → "Ainda não é sua vez!" e execute o turno do inimigo.
 
+SE UMA FERRAMENTA RETORNAR "❌ FORA DE ORDEM": o motor RECUSOU a ação
+(nada mudou, nenhum dado rolado). NÃO repita a mesma chamada. Leia de
+quem é a vez na própria mensagem e aja por esse combatente:
+  • turno de um NPC → execute_npc_turn()
+  • turno do jogador → narre "ainda não é a vez de X" e siga o turno correto.
+Insistir na chamada recusada só vai gerar a mesma recusa.
+
 INÍCIO: encontro hostil → roll_initiative() com todos.
 FIM:    todos inimigos derrotados → sequência OBRIGATÓRIA:
   1. end_combat()

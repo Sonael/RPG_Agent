@@ -171,6 +171,9 @@ def _defaults() -> dict:
             "turn_resolved":       False,  # True após attack_roll/use_ability; False ao chamar next_turn
             "npc_strategies":      {},
             "turn_auto_advanced":  False,
+            # Token monotônico: +1 a cada avanço REAL de turno. Base da
+            # idempotência (impede duplo-avanço) e dos invariantes de teste.
+            "turn_token":          0,
         },
     }
 
@@ -214,6 +217,7 @@ def _migrate_combat_state() -> None:
         "turn_resolved":      False,
         "npc_strategies":     {},
         "turn_auto_advanced": False,
+        "turn_token":         0,
     }
     cs = campaign.setdefault("combat_state", {})
     for key, val in defaults.items():

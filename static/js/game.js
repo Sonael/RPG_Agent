@@ -31,6 +31,9 @@ const STATE_TOOLS = new Set([
   'apply_condition', 'remove_condition', 'short_rest', 'long_rest',
   'roll_death_save', 'equip_item', 'unequip_item', 'set_stat',
   'modify_currency', 'grant_xp',
+  // Faltavam: mudam turno/HP/status mas não atualizavam a barra/sidebar
+  'execute_npc_turn', 'spawn_monster', 'recruit_character',
+  'resolve_saving_throw',
 ]);
 
 const COND_ICONS = {

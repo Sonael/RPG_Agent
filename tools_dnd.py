@@ -133,6 +133,64 @@ _SPELL_PT_TO_EN: dict[str, str] = {
 # Helpers de controle de turno
 # ---------------------------------------------------------------------------
 
+# Status que tiram o combatente da ordem de turno (fonte única de verdade).
+OUT_OF_COMBAT_STATUSES = {
+    "morto", "inconsciente", "estabilizado", "fugiu", "exilado",
+}
+
+
+def _is_out_of_combat(name: str) -> bool:
+    ch = memory.campaign["characters"].get(memory.char_key(name))
+    return (ch.get("status", "") if ch else "").lower() in OUT_OF_COMBAT_STATUSES
+
+
+def _heal_current_turn() -> None:
+    """
+    AUTO-CURA do ponteiro de turno: se o combatente do turno atual estiver
+    fora de combate (morto/inconsciente/fugiu/etc.), avança para o próximo
+    combatente válido — incrementando rodada no wrap e o token. Encerra o
+    combate se ninguém restar. Idempotente se o atual já for válido.
+
+    Chamada no INÍCIO de toda tool de turno → nenhuma ferramenta opera
+    com o ponteiro preso num combatente fora de combate.
+    """
+    cs = memory.campaign.get("combat_state")
+    if not cs or not cs.get("is_active"):
+        return
+    order = cs.get("initiative_order", [])
+    if not order:
+        return
+
+    idx = cs.get("current_turn_index", 0)
+    if not isinstance(idx, int) or not (0 <= idx < len(order)):
+        idx = 0
+        cs["current_turn_index"] = 0
+
+    if not _is_out_of_combat(order[idx]):
+        return  # atual já é válido
+
+    round_num = cs.get("round", 1)
+    for _ in range(len(order) + 1):
+        idx += 1
+        if idx >= len(order):
+            idx = 0
+            round_num += 1
+        if not _is_out_of_combat(order[idx]):
+            cs["current_turn_index"] = idx
+            cs["round"]              = round_num
+            cs["turn_resolved"]      = False
+            cs["turn_token"]         = cs.get("turn_token", 0) + 1
+            memory.save_campaign()
+            return
+
+    # Ninguém em combate — encerra
+    cs["is_active"]          = False
+    cs["initiative_order"]   = []
+    cs["current_turn_index"] = 0
+    cs["round"]              = 1
+    memory.save_campaign()
+
+
 def _mark_turn_resolved() -> None:
     """Marca o turno como mecanicamente resolvido."""
     cs = memory.campaign.get("combat_state")
@@ -140,13 +198,18 @@ def _mark_turn_resolved() -> None:
         cs["turn_resolved"] = True
 
 
-def _auto_advance_turn() -> str:
+def _auto_advance_turn(actor_name: str = "") -> str:
     """
     Avança o turno e retorna o anúncio do próximo como string.
     Injetado no final de attack_roll(), use_ability() e roll_death_save().
     Pula automaticamente personagens mortos/inconscientes/fugidos.
     Marca turn_auto_advanced=True para que next_turn() não duplique o avanço.
     Retorna string vazia fora do combate.
+
+    actor_name: quem REALMENTE agiu. O avanço é ancorado na posição do ator
+      na ordem de iniciativa — não no ponteiro global. Isso impede que ações
+      fora de ordem (jogador agindo na vez de um NPC) corrompam o ponteiro e
+      inflem o número da rodada (ex.: pular de Rodada 3 para 5).
     """
     cs = memory.campaign.get("combat_state")
     if not cs or not cs.get("is_active"):
@@ -157,10 +220,19 @@ def _auto_advance_turn() -> str:
 
     OUT_OF_COMBAT = {"morto", "inconsciente", "estabilizado", "fugiu", "exilado"}
 
-    idx           = cs.get("current_turn_index", 0)
     round_num     = cs.get("round", 1)
     initial_round = round_num
-    skipped       = []
+
+    # Âncora: posição de quem agiu (se estiver na ordem). Senão, o ponteiro atual.
+    idx = cs.get("current_turn_index", 0)
+    if actor_name:
+        akey = memory.char_key(actor_name)
+        for i, n in enumerate(order):
+            if memory.char_key(n) == akey:
+                idx = i
+                break
+
+    skipped = []
 
     for _ in range(len(order) + 1):
         idx += 1
@@ -180,6 +252,7 @@ def _auto_advance_turn() -> str:
         cs["round"]              = round_num
         cs["turn_resolved"]      = False
         cs["turn_auto_advanced"] = True   # impede next_turn() de avançar de novo
+        cs["turn_token"]         = cs.get("turn_token", 0) + 1  # avanço real
         memory.save_campaign()
 
         skip_msg      = f"\n   ⏩ Pulados: {', '.join(skipped)}" if skipped else ""
@@ -199,6 +272,53 @@ def _auto_advance_turn() -> str:
     cs["round"]              = 1
     memory.save_campaign()
     return "\n\n🏳️  Todos os personagens estão fora de combate. Combate encerrado automaticamente."
+
+
+def _combat_current_actor() -> str:
+    """Nome do combatente cujo turno é AGORA (string vazia se não houver)."""
+    cs = memory.campaign.get("combat_state", {})
+    if not cs.get("is_active"):
+        return ""
+    order = cs.get("initiative_order", [])
+    if not order:
+        return ""
+    idx = cs.get("current_turn_index", 0)
+    if not isinstance(idx, int) or not (0 <= idx < len(order)):
+        return ""
+    return order[idx]
+
+
+def _combat_turn_violation(actor_name: str) -> str | None:
+    """
+    Retorna mensagem de erro se `actor_name` tentar agir FORA do seu turno,
+    ou None se a ação é permitida.
+
+    Regras (a tool é a AUTORIDADE — não confia no LLM seguir a ordem):
+      • Fora de combate ativo → permitido (sem ordem a impor).
+      • Ator não está na iniciativa → permitido (ex.: invocação não listada;
+        não dá pra impor ordem a quem não está na lista).
+      • Ator está na iniciativa mas NÃO é o atual → BLOQUEADO.
+    """
+    cs = memory.campaign.get("combat_state", {})
+    if not cs.get("is_active"):
+        return None
+    order = cs.get("initiative_order", [])
+    if not order:
+        return None
+    akey = memory.char_key(actor_name)
+    if not any(memory.char_key(n) == akey for n in order):
+        return None
+    cur = _combat_current_actor()
+    if not cur or memory.char_key(cur) == akey:
+        return None
+    return (
+        f"❌ FORA DE ORDEM: não é o turno de {actor_name}. "
+        f"É a vez de **{cur}**.\n"
+        f"   • Se {cur} é um NPC inimigo → chame execute_npc_turn().\n"
+        f"   • Se o jogador tentou agir adiantado → diga 'ainda não é sua vez' "
+        f"e resolva o turno de {cur} primeiro.\n"
+        f"   Nenhum dado foi rolado e nada mudou."
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1879,6 +1999,7 @@ def attack_roll(
     advantage: bool = False,
     disadvantage: bool = False,
     end_turn: bool = True,
+    _skip_turn_check: bool = False,
 ) -> str:
     """
     Realiza um ataque completo: testa d20 contra a CA do alvo e, se acertar,
@@ -1915,6 +2036,16 @@ def attack_roll(
     if not target or not target.get("sheet"):
         return f"Alvo '{target_name}' não encontrado ou sem ficha D&D."
 
+    # Auto-cura: nunca operar com o ponteiro preso num combatente fora de combate.
+    _heal_current_turn()
+
+    # AUTORIDADE DE TURNO: recusa ação fora de ordem antes de qualquer
+    # mutação/dado. (_skip_turn_check=True só para chamadas internas do motor.)
+    if not _skip_turn_check:
+        _viol = _combat_turn_violation(attacker_name)
+        if _viol:
+            return _viol
+
     sa = attacker["sheet"]
     st = target["sheet"]
 
@@ -1924,7 +2055,8 @@ def attack_roll(
         hab_dado = matched_hab.get("dado", "")
         hab_mana = matched_hab.get("custo_mana", 0)
         if hab_mana > 0:
-            return use_ability(attacker_name, weapon, target_name)
+            return use_ability(attacker_name, weapon, target_name,
+                               _skip_turn_check=_skip_turn_check)
         if hab_dado:
             n_dice_hab, sides_hab, bonus_hab = _parse_dice(hab_dado)
             damage_dice_count = n_dice_hab
@@ -2024,7 +2156,7 @@ def attack_roll(
         result += f"   ❌ ERROU! ({attack_total} < CA {target_ca})"
 
     if end_turn:
-        result += _auto_advance_turn()
+        result += _auto_advance_turn(attacker_name)
     else:
         result += "\n   ↩️  Ação bônus disponível — ataque extra pendente neste turno."
     memory.save_campaign()
@@ -2087,6 +2219,7 @@ def use_ability(
     saving_throw_stat: str = "",
     saving_throw_dc: int = 0,
     end_turn: bool = True,
+    _skip_turn_check: bool = False,
 ) -> str:
     """
     Usa uma habilidade do personagem: verifica mana, desconta o custo,
@@ -2113,6 +2246,15 @@ def use_ability(
     char, err = _get_char(char_name)
     if not char:
         return err
+
+    # Auto-cura do ponteiro de turno antes de validar/gastar mana.
+    _heal_current_turn()
+
+    # AUTORIDADE DE TURNO: recusa uso fora de ordem antes de gastar mana/dado.
+    if not _skip_turn_check:
+        _viol = _combat_turn_violation(char_name)
+        if _viol:
+            return _viol
 
     habs = char.get("habilidades", [])
     # Exact match (case-insensitive)
@@ -2284,7 +2426,7 @@ def use_ability(
 
     memory.save_campaign()
     if end_turn:
-        result += _auto_advance_turn()
+        result += _auto_advance_turn(char_name)
     else:
         result += "\n   ↩️  Ação bônus disponível — próxima habilidade/ataque neste turno."
     memory.save_campaign()
@@ -2617,7 +2759,7 @@ def roll_death_save(char_name: str) -> str:
         result += f"\n   ☠️  {char['name']} MORREU. Narre a cena de forma dramática e definitiva."
 
     memory.save_campaign()
-    result += _auto_advance_turn()
+    result += _auto_advance_turn(char_name)
     memory.save_campaign()
     return result
 
@@ -3266,6 +3408,10 @@ def roll_initiative(characters_names: str) -> str:
     cs["initiative_order"]   = [r["name"] for r in results]
     cs["current_turn_index"] = 0
     cs["round"]              = 1
+    # Combate NOVO: zera o rastreamento de turno (não herdar do anterior).
+    cs["turn_resolved"]      = False
+    cs["turn_auto_advanced"] = False
+    cs["turn_token"]         = cs.get("turn_token", 0) + 1
 
     memory.save_campaign()
 
@@ -3298,6 +3444,32 @@ def next_turn() -> str:
     order = cs.get("initiative_order", [])
     if not order:
         return "⚠️ Ordem de iniciativa vazia. Rode roll_initiative primeiro."
+
+    # Auto-cura: se o atual morreu/fugiu "no lugar", desencalha o ponteiro
+    # ANTES da trava de idempotência (senão ela reportaria um morto).
+    _tk_before_heal = cs.get("turn_token", 0)
+    _heal_current_turn()
+    cs = memory.campaign.get("combat_state", {})
+    if not cs.get("is_active"):
+        return "🏳️  Combate encerrado — nenhum combatente restante."
+    order = cs.get("initiative_order", [])
+    if not order:
+        return "🏳️  Combate encerrado."
+
+    # Se a auto-cura JÁ avançou o ponteiro (o atual havia saído de combate),
+    # ESSE foi o avanço deste next_turn() — não avançar de novo (senão pula
+    # um combatente vivo). Apenas reporta.
+    if cs.get("turn_token", 0) != _tk_before_heal:
+        cs["turn_auto_advanced"] = False
+        memory.save_campaign()
+        idx = cs.get("current_turn_index", 0)
+        cur = order[idx] if 0 <= idx < len(order) else "?"
+        round_n = cs.get("round", 1)
+        order_str = " → ".join(f"[{n}]" if i == idx else n for i, n in enumerate(order))
+        return (
+            f"⏭️  Turno avançado (combatente anterior saiu de combate) — "
+            f"Rodada {round_n}\n🎯 Vez de: **{cur}**\n   Ordem: {order_str}"
+        )
 
     # Trava de idempotência: se a ferramenta de ação (attack_roll / use_ability /
     # roll_death_save) já avançou o turno automaticamente, next_turn() não avança
@@ -3339,6 +3511,8 @@ def next_turn() -> str:
 
         cs["current_turn_index"] = idx
         cs["round"]              = round_num
+        cs["turn_resolved"]      = False
+        cs["turn_token"]         = cs.get("turn_token", 0) + 1  # avanço real
         memory.save_campaign()
 
         skip_msg  = f"\n⏩ Pulados: {', '.join(skipped)}" if skipped else ""
@@ -3541,6 +3715,8 @@ def resolve_saving_throw(
     elif pct <= 0.25:
         result += " ⚠️  Estado crítico!"
 
+    # O save ocorre durante o turno do CONJURADOR (use_ability pausou sem
+    # avançar). O ponteiro ainda aponta para ele → avança a partir do atual.
     memory.save_campaign()
     result += _auto_advance_turn()
     memory.save_campaign()
@@ -4391,14 +4567,20 @@ def execute_npc_turn(npc_name: str = "") -> str:
     if not cs.get("is_active"):
         return "⚠️ Nenhum combate ativo."
 
+    # Auto-cura: desencalha o ponteiro se o atual saiu de combate.
+    _heal_current_turn()
+    cs = memory.campaign.get("combat_state", {})
+    if not cs.get("is_active"):
+        return "🏳️  Combate encerrado — nenhum combatente restante."
+
     order = cs.get("initiative_order", [])
     if not order:
         return "⚠️ Ordem de iniciativa vazia."
 
-    # Resolve qual NPC age
-    if not npc_name:
-        idx      = cs.get("current_turn_index", 0)
-        npc_name = order[idx] if idx < len(order) else ""
+    # O motor é a autoridade: age SEMPRE pelo combatente do turno atual,
+    # ignorando um npc_name divergente que o LLM possa ter passado.
+    idx      = cs.get("current_turn_index", 0)
+    npc_name = order[idx] if 0 <= idx < len(order) else ""
     if not npc_name:
         return "⚠️ Não foi possível determinar o NPC atual."
 
@@ -4426,7 +4608,7 @@ def execute_npc_turn(npc_name: str = "") -> str:
         if hp_pct <= 0.25:
             npc["status"] = "fugiu"
             memory.save_campaign()
-            advance = _auto_advance_turn()
+            advance = _auto_advance_turn(npc_name)
             return (
                 f"💨 {npc_name} está com {int(hp_pct * 100)}% de HP e FOGE do combate!"
                 f"{advance}"
@@ -4471,7 +4653,9 @@ def execute_npc_turn(npc_name: str = "") -> str:
     if any(k in weapon.lower() for k in ("arco", "besta", "dardo", "funda")):
         atk_attr = "destreza"
 
-    # Executa o ataque (inclui _auto_advance_turn() internamente)
+    # Executa o ataque (inclui _auto_advance_turn() internamente).
+    # _skip_turn_check=True: o motor já garante que está agindo pelo NPC
+    # correto do turno — a checagem de ordem não se aplica aqui.
     return attack_roll(
         attacker_name    = npc_name,
         target_name      = target["name"],
@@ -4481,6 +4665,7 @@ def execute_npc_turn(npc_name: str = "") -> str:
         attack_attribute = atk_attr,
         is_proficient    = True,
         end_turn         = True,
+        _skip_turn_check = True,
     )
 
 
