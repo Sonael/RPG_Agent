@@ -213,18 +213,20 @@ async function sendToAgent(text, registrar) {
     const dec = new TextDecoder();
     let buf = '';
 
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
+    const processLine = (line) => {
+      if (!line.startsWith('data: ')) return;
+      let ev;
+      try {
+        ev = JSON.parse(line.slice(6));
+      } catch (_) {
+        // Linha SSE truncada/malformada — ignora e continua o stream
+        // em vez de abortar toda a resposta com "Erro de conexão".
+        return;
+      }
+      handleEvent(ev);
+    };
 
-      buf += dec.decode(value, { stream: true });
-      const lines = buf.split('\n');
-      buf = lines.pop();
-
-      for (const line of lines) {
-        if (!line.startsWith('data: ')) continue;
-
-        const ev = JSON.parse(line.slice(6));
+    const handleEvent = (ev) => {
 
         if (ev.type === 'quota') {
           // Verifica se passou a meia-noite durante a sessão
@@ -263,7 +265,7 @@ async function sendToAgent(text, registrar) {
             _pendingDiceTools = [];
             removeTyping(typId);
             renderDiceFromResponse(ev.content, diceNames);
-            continue; 
+            return;
           }
           removeTyping(typId);
           appendMaster(ev.content);
@@ -274,6 +276,15 @@ async function sendToAgent(text, registrar) {
         else if (ev.type === 'violations') {
           renderViolations(ev.violations);
         }
+        else if (ev.type === 'level_up') {
+          const list = (ev.characters || []).join(', ');
+          if (list) {
+            appendSystem(`<div class="cmd-list-box" style="text-align:center;">`
+              + `<div class="cmd-list-title" style="border:none;margin:0;">⬆️ Subiu de Nível</div>`
+              + `<div style="font-size:13px;color:var(--ink-user);">${escapeHtml(list)}</div></div>`);
+            if (typeof showToast === 'function') showToast('⬆️ ' + list);
+          }
+        }
         else if (ev.type === 'error') {
           removeTyping(typId);
           appendSystem(`<p>Erro: ${ev.content}</p>`);
@@ -282,7 +293,23 @@ async function sendToAgent(text, registrar) {
           removeTyping(typId);
           refreshMemory();
         }
-      }
+    };
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+
+      buf += dec.decode(value, { stream: true });
+      const lines = buf.split('\n');
+      buf = lines.pop();   // mantém a última linha (possivelmente parcial)
+
+      for (const line of lines) processLine(line);
+    }
+
+    // Processa o que sobrou no buffer (último evento sem '\n' final)
+    const tail = buf + dec.decode();
+    if (tail.trim()) {
+      for (const line of tail.split('\n')) processLine(line);
     }
   } catch (e) {
     removeTyping(typId);
@@ -353,6 +380,9 @@ async function handleSlash(raw) {
 
   if (['/personagens', '/locais', '/flags', '/grupo', '/eventos', '/contexto'].includes(cmd)) {
     const mem = await (await authFetch(`${API}/api/memory`)).json(); let html = '';
+    mem.quest_flags = mem.quest_flags || {};
+    mem.party = mem.party || []; mem.characters = mem.characters || [];
+    mem.events = mem.events || []; mem.locations = mem.locations || [];
     
     if (cmd === '/personagens') {
       const sep = '<hr style="border:none;border-top:1px dashed var(--page-edge);margin:8px 0;">';
@@ -388,6 +418,7 @@ async function handleSlash(raw) {
 
   if (cmd === '/diario') {
     const mem = await (await authFetch(`${API}/api/memory`)).json();
+    mem.diary = mem.diary || [];
     const list = [...mem.diary].reverse().slice(0, 5).map(d => `<div class="cmd-list-item"><b>Cap.${d.chapter} — ${d.title}</b><br><span style="color:var(--text-muted);font-size:13px;">${d.content}</span></div>`).join('<hr style="border:none;border-top:1px dashed var(--page-edge);margin:8px 0;">');
     appendSystem(`<div class="cmd-list-box"><div class="cmd-list-title">🔖 Diário (Últimas Entradas)</div>${list || 'Diário vazio.'}</div>`);
     return true;
@@ -981,6 +1012,14 @@ async function refreshMemory() {
 }
 
 function renderMemory(mem) {
+  // Normaliza campos que podem faltar em dados antigos/parciais — sem isso,
+  // um Object.keys(undefined) abortaria toda a renderização da sidebar.
+  mem.quest_flags = mem.quest_flags || {};
+  mem.party       = mem.party       || [];
+  mem.characters  = mem.characters  || [];
+  mem.diary       = mem.diary       || [];
+  mem.locations   = mem.locations   || [];
+  mem.events      = mem.events      || [];
   window._lastMem = mem;
   document.getElementById('sb-location').textContent = mem.current_location || '—';
   document.getElementById('ws-chapter').textContent = mem.chapter || 1;

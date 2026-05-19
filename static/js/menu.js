@@ -47,18 +47,29 @@ async function loadCampaigns() {
       return;
     }
 
-    list.innerHTML = data.map(c => `
-      <div class="campaign-item" onclick="selectCampaign('${c.name}', false)" id="ci-${CSS.escape(c.name)}">
+    // Escapa o nome para uso seguro como argumento de string JS dentro
+    // de um atributo onclick="" (apóstrofo/aspas/<>& quebravam o handler).
+    const jsAttr = s => String(s)
+      .replace(/\\/g, '\\\\').replace(/'/g, "\\'")
+      .replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const txt = s => String(s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    list.innerHTML = data.map(c => {
+      const nA = jsAttr(c.name), nT = txt(c.name);
+      return `
+      <div class="campaign-item" onclick="selectCampaign('${nA}', false)" id="ci-${CSS.escape(c.name)}">
         <div>
-          <div class="campaign-item-name">${c.name}</div>
+          <div class="campaign-item-name">${nT}</div>
           <div class="campaign-item-meta">Cap.${c.chapter||1} · ${c.characters||0} personagens · ${c.events||0} eventos</div>
         </div>
         <div style="display:flex;gap:5px;flex-shrink:0;">
-          <button class="campaign-item-edit" onclick="openEditCampaign(event,'${c.name}')" title="Editar campanha">✎</button>
-          <button class="campaign-item-del" onclick="deleteCampaign(event,'${c.name}')" title="Deletar">✕</button>
+          <button class="campaign-item-edit" onclick="openEditCampaign(event,'${nA}')" title="Editar campanha">✎</button>
+          <button class="campaign-item-del" onclick="deleteCampaign(event,'${nA}')" title="Deletar">✕</button>
         </div>
-      </div>
-    `).join('');
+      </div>`;
+    }).join('');
 
   } catch (e) {
     list.innerHTML = '<div style="padding:12px;color:var(--red);font-size:12px;">Erro ao conectar com o servidor.</div>';
@@ -160,6 +171,9 @@ async function startSession() {
 async function loadOllamaModels() {
   const group  = document.getElementById('ollama-optgroup');
   const status = document.getElementById('ollama-status');
+  // A UI de Ollama foi removida do menu (não há optgroup). Sem o destino
+  // dos modelos, abortar evita TypeError em group.innerHTML a cada load.
+  if (!group) return;
   try {
     const res  = await fetch(`${API}/api/ollama/models`);
     const data = await res.json();

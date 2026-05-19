@@ -58,6 +58,7 @@ _SPELL_PT_TO_EN: dict[str, str] = {
     "cor em spray": "color spray",
     "encantamento": "charm person",
     "enfeitiçar pessoa": "charm person",
+    "emaranhar": "entangle",
     "criar ou destruir água": "create or destroy water",
     "cura de ferimentos": "cure wounds",
     "detectar magia": "detect magic",
@@ -584,6 +585,62 @@ HEALING_KEYWORDS = {
     "bênção vital", "toque do curandeiro", "word of healing",
 }
 
+# ---------------------------------------------------------------------------
+# Magias de controle/condição — NÃO causam dano, aplicam condições.
+# "pool": True → o resultado do dado é um pool de HP (ex: Sleep):
+#     o alvo dorme se HP_atual ≤ pool; pool é decrementado pelo HP do alvo.
+# "pool": False → aplica a condição diretamente (Hold Person, Charm, etc.)
+# ---------------------------------------------------------------------------
+CONTROL_SPELL_EFFECTS: dict[str, dict] = {
+    # Nível 1
+    "sleep":                 {"condition": "Inconsciente", "pool": True},
+    "color spray":           {"condition": "Cego",         "pool": True},
+    # Nível 2
+    "hold person":           {"condition": "Paralisado",   "pool": False},
+    "blindness/deafness":    {"condition": "Cego",         "pool": False},
+    "blindness deafness":    {"condition": "Cego",         "pool": False},
+    "silence":               {"condition": "Silenciado",   "pool": False},
+    "entangle":              {"condition": "Imobilizado",  "pool": False},
+    # Nível 2–3
+    "web":                   {"condition": "Imobilizado",  "pool": False},
+    "hypnotic pattern":      {"condition": "Incapacitado", "pool": False},
+    "fear":                  {"condition": "Amedrontado",  "pool": False},
+    "slow":                  {"condition": "Lentidão",     "pool": False},
+    "stinking cloud":        {"condition": "Envenenado",   "pool": False},
+    # Encantamento
+    "charm person":          {"condition": "Enfeitiçado",  "pool": False},
+    "charm monster":         {"condition": "Enfeitiçado",  "pool": False},
+    # Nível 4+
+    "hold monster":          {"condition": "Paralisado",   "pool": False},
+    "confusion":             {"condition": "Confuso",      "pool": False},
+    "dominate person":       {"condition": "Dominado",     "pool": False},
+    "dominate monster":      {"condition": "Dominado",     "pool": False},
+    "banishment":            {"condition": "Banido",       "pool": False},
+    "polymorph":             {"condition": "Transformado", "pool": False},
+    "contagion":             {"condition": "Envenenado",   "pool": False},
+    # Nível 5+
+    "hold person (level 5)": {"condition": "Paralisado",   "pool": False},
+    "wall of force":         {"condition": "Imobilizado",  "pool": False},
+    "feeblemind":            {"condition": "Incapacitado", "pool": False},
+    "power word stun":       {"condition": "Atordoado",    "pool": False},
+    "power word kill":       {"condition": "Morto",        "pool": False},
+}
+
+
+def _get_control_effect(hab: dict) -> dict | None:
+    """
+    Retorna o efeito de controle se a habilidade for uma magia de condição, ou None.
+    Aceita o nome em inglês (como armazenado) OU em português (magias do kit
+    padrão / aprendidas com nome PT, ex: "Sono" → "sleep").
+    """
+    name_lower = hab.get("nome", "").lower().strip()
+    eff = CONTROL_SPELL_EFFECTS.get(name_lower)
+    if eff is None:
+        en = _SPELL_PT_TO_EN.get(name_lower)
+        if en:
+            eff = CONTROL_SPELL_EFFECTS.get(en)
+    return eff
+
 def _weapon_attr(weapon_name: str, sheet: dict) -> tuple[str, int]:
     """Ranged→DEX. Finesse→max(FOR,DEX). Melee→FOR."""
     w = weapon_name.lower().strip()
@@ -731,6 +788,16 @@ CONDITION_EFFECTS: dict[str, dict] = {
     "surdo":       {},
     "assustado":   {"attack_disadvantage": True, "check_disadvantage": True},
     "exausto":     {"attack_disadvantage": True, "check_disadvantage": True},
+    # Inconsciente (Sleep, 0 HP): não age; ataques contra ele têm vantagem e
+    # acertos corpo-a-corpo a até 1,5m são CRÍTICOS automáticos (regra 5e).
+    "inconsciente":{"attack_disadvantage": True, "defense_disadvantage": True, "auto_crit": True},
+    "imobilizado": {"attack_disadvantage": True, "defense_disadvantage": True},
+    "lentidão":    {"attack_disadvantage": True},
+    "silenciado":  {},
+    "confuso":     {},
+    "dominado":    {},
+    "banido":      {},
+    "transformado":{},
 }
 
 
@@ -999,31 +1066,59 @@ def _apply_race_bonuses(char: dict, sheet: dict, race_name: str) -> dict[str, in
     if race_data:
         # Bônus de atributo da API
         for bonus_entry in race_data.get("ability_bonuses", []):
+            if not isinstance(bonus_entry, dict):
+                continue
             attr_name = bonus_entry.get("ability_score", {}).get("name", "").lower()                         if isinstance(bonus_entry.get("ability_score"), dict)                         else bonus_entry.get("attribute", "")
             bonus_val = bonus_entry.get("bonus", 0)
             stat = _ATTR_MAP.get(attr_name.lower(), "")
             if stat and bonus_val:
                 bonuses[stat] = bonuses.get(stat, 0) + bonus_val
 
-        # Traços raciais como habilidades
-        for trait in race_data.get("traits", []):
-            t_name = trait.get("name", "")
-            t_desc = " ".join(trait.get("desc", "").split())[:200] if trait.get("desc") else ""
-            if t_name:
-                traits.append({"nome": t_name, "descricao": t_desc, "custo_mana": 0, "dado": ""})
+        # Traços raciais — a API v1 retorna "traits" como STRING (texto markdown),
+        # mas outras coleções podem trazer lista de dicts ou de strings.
+        raw_traits = race_data.get("traits", [])
+        if isinstance(raw_traits, list):
+            for trait in raw_traits:
+                if isinstance(trait, dict):
+                    t_name = trait.get("name", "")
+                    t_desc = " ".join((trait.get("desc") or "").split())[:200]
+                    if t_name:
+                        traits.append({"nome": t_name, "descricao": t_desc,
+                                        "custo_mana": 0, "dado": ""})
+                elif isinstance(trait, str) and trait.strip():
+                    traits.append({"nome": trait.strip()[:60], "descricao": "",
+                                    "custo_mana": 0, "dado": ""})
+
+        # Se a API não trouxe bônus de atributo, usa a tabela offline canônica
+        # (sem isso, raças como anão perdem o +CON racial e o HP fica errado).
+        if not bonuses:
+            bonuses = dict(_RACE_BONUS_FALLBACK.get(en_key, {}))
     else:
         # Fallback offline
-        bonuses = _RACE_BONUS_FALLBACK.get(en_key, {})
+        bonuses = dict(_RACE_BONUS_FALLBACK.get(en_key, {}))
+
+    # Captura o modificador de CON ANTES dos bônus raciais para ajustar o HP
+    # pelo delta sem destruir o HP acumulado nível-a-nível.
+    con_before = _modifier(sheet.get("constituicao", 10))
 
     # Aplica bônus aos atributos da ficha
     for stat, bonus in bonuses.items():
         if stat in sheet:
             sheet[stat] += bonus
 
-    # Recalcula stats derivados após os bônus
-    sheet["vida_max"] = max(1, sheet["hit_die"] + _modifier(sheet["constituicao"]))
-    sheet["vida_atual"] = sheet["vida_max"]
-    sheet["ca"]        = 10 + _modifier(sheet["destreza"])
+    # Ajusta stats derivados pelo DELTA do bônus racial.
+    # CRÍTICO: NÃO recalcular vida_max pela fórmula de nível 1 — isso apagaria
+    # todo o HP acumulado de personagens/NPCs de nível alto. Em D&D, cada nível
+    # soma o modificador de CON ao HP, então um +1 de CON racial = +nivel de HP.
+    con_after = _modifier(sheet.get("constituicao", 10))
+    con_delta = con_after - con_before
+    if con_delta:
+        nivel     = sheet.get("nivel", 1)
+        hp_adjust = con_delta * nivel
+        sheet["vida_max"]   = max(1, sheet.get("vida_max", 1) + hp_adjust)
+        sheet["vida_atual"] = sheet["vida_max"]
+    # CA base (ainda sem equipamento na criação) — usa DES já com bônus racial
+    sheet["ca"] = 10 + _modifier(sheet["destreza"])
 
     # Adiciona traços raciais como habilidades (sem duplicar)
     existing_names = {h.get("nome","").lower() for h in char.get("habilidades", [])}
@@ -1347,6 +1442,14 @@ def create_character_sheet(
     # Aplica bônus de raça (Open5e) — modifica sheet e adiciona traços raciais
     race_bonuses = _apply_race_bonuses(char_obj, sheet, raca)
     bonus_str = ", ".join(f"{k.upper()[:3]} +{v}" for k, v in race_bonuses.items()) if race_bonuses else "nenhum"
+
+    # Recalcula a mana com o atributo de conjuração JÁ com bônus racial
+    # (mana_max foi calculada antes dos bônus; um +CAR/+INT racial deve contar).
+    if mana_stat and mana_per_level > 0:
+        mana_mod_final  = _modifier(sheet.get(mana_stat, 10))
+        base_final      = max(0, mana_per_level + mana_mod_final)
+        sheet["mana_max"]   = base_final * nivel
+        sheet["mana_atual"] = sheet["mana_max"]
 
     # Aplica habilidades de classe para TODOS os níveis até o nível inicial
     all_feats: list[str] = []
@@ -1847,7 +1950,7 @@ def attack_roll(
         if weapon_data:
             damage_dice_count, damage_dice_sides = weapon_data
 
-    prof = sa["proficiencia"] if is_proficient else 0
+    prof = sa.get("proficiencia", _proficiency_bonus(sa.get("nivel", 1))) if is_proficient else 0
 
     # ── Verificação automática de condições ─────────────────────────────────
     cond_notes = []
@@ -1950,7 +2053,7 @@ def learn_ability(
         mana_cost:    Custo em mana por uso (0 = sem custo, usável à vontade).
         damage_dice:  Dado de efeito (ex: '2d6', '3d8', '1d4'). Padrão: '1d6'.
     """
-    char = memory.campaign["characters"].get(char_name.lower())
+    char = memory.campaign["characters"].get(memory.char_key(char_name))
     if not char:
         return f"Personagem '{char_name}' não encontrado."
 
@@ -1996,8 +2099,12 @@ def use_ability(
 
     Args:
         char_name:         Nome do personagem usando a habilidade.
-        ability_name:      Nome exato da habilidade.
-        target_name:       Nome do alvo (opcional). Se houver, aplica dano automaticamente.
+        ability_name:      Nome exato da habilidade (sempre em inglês, como armazenado na ficha).
+        target_name:       Alvo(s). Para magias de área com pool (Sleep, Color Spray):
+                           passe nomes separados por vírgula ("Goblin A, Goblin B, Goblin C").
+                           A magia ordena automaticamente por HP crescente e drena o pool.
+                           Para dano/cura/condição direta: apenas um nome.
+                           Se vazio em magias de pool, auto-detecta inimigos do combate.
         saving_throw_stat: Atributo do alvo para resistência (ex: 'destreza', 'constituicao').
         saving_throw_dc:   CD do saving throw (ex: 14). Ignorado se saving_throw_stat vazio.
         end_turn:          Se True (padrão), avança o turno ao final.
@@ -2046,40 +2153,129 @@ def use_ability(
     )
 
     # ── Aplica efeito ao alvo ────────────────────────────────────────────────
-    if target_name:
-        target = memory.campaign["characters"].get(memory.char_key(target_name))
+    ctrl_effect = _get_control_effect(hab)
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # POOL SPELLS (Sleep, Color Spray, …)
+    # Mechanic D&D 5e: rola dado → pool de HP.
+    # Ordena alvos por HP crescente; vai "gastando" o pool do menor para o maior.
+    # Nenhum dano é aplicado — criaturas apenas adormecem/ficam cegas.
+    # target_name: nomes separados por vírgula OU vazio (auto-detecta inimigos).
+    # ══════════════════════════════════════════════════════════════════════════
+    if ctrl_effect is not None and ctrl_effect["pool"]:
+        pool = total_dano
+        cond = ctrl_effect["condition"]
+        caster_key = memory.char_key(char_name)
+
+        # Monta lista de nomes de alvos potenciais
+        if target_name:
+            raw_names = [t.strip() for t in target_name.split(",") if t.strip()]
+        else:
+            # Auto: usa ordem de turno, exclui conjurador e aliados
+            cs        = memory.campaign.get("combat_state", {})
+            raw_names = [
+                k for k in cs.get("turn_order", [])
+                if k != caster_key
+                and not memory.campaign["characters"].get(k, {}).get("party_member")
+            ]
+
+        # Resolve personagens válidos (vivos, com sheet)
+        candidates: list[dict] = []
+        for raw in raw_names:
+            key   = memory.char_key(raw)
+            tchar = memory.campaign["characters"].get(key) \
+                    or memory.campaign["characters"].get(raw)
+            if (tchar and tchar.get("sheet")
+                    and memory.char_key(tchar.get("name", "")) != caster_key
+                    and tchar.get("status") not in ("morto", "inconsciente", "fugiu")):
+                candidates.append(tchar)
+
+        # Ordena por HP atual crescente (mais fraco dorme primeiro)
+        candidates.sort(key=lambda c: c["sheet"]["vida_atual"])
+
+        slept: list[str] = []
+        remaining = pool
+        for tchar in candidates:
+            if remaining <= 0:
+                break
+            hp = tchar["sheet"]["vida_atual"]
+            if hp <= remaining:
+                remaining -= hp
+                tconds = tchar["sheet"].setdefault("condicoes", [])
+                if not any(c["nome"].lower() == cond.lower() for c in tconds):
+                    tconds.append({"nome": cond.capitalize(), "duracao": None})
+                tchar["status"] = "inconsciente"
+                slept.append(f"{tchar['name']} ({hp} HP)")
+
+        # Monta linha de resultado do pool
+        result += f"\n   🎯 Pool: **{pool} HP**"
+        if slept:
+            result += f"\n   💤 Dormindo: {', '.join(slept)}"
+            result += f"\n   Pool usado: {pool - remaining} HP | Restante: {remaining} HP"
+        else:
+            result += "\n   ⚪ Nenhum alvo foi afetado — todos têm HP alto demais."
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # EFEITOS DE ALVO ÚNICO (cura / condição direta / dano)
+    # ══════════════════════════════════════════════════════════════════════════
+    elif target_name:
+        # Para condições diretas e dano, pega o primeiro nome (ignora vírgulas extras)
+        primary_target = target_name.split(",")[0].strip()
+        target = memory.campaign["characters"].get(memory.char_key(primary_target))
         if target and target.get("sheet"):
             st = target["sheet"]
 
-            # ── MODO INTERATIVO: saving throw exigido → PAUSA, não aplica dano ──
+            # ── MODO INTERATIVO: saving throw → PAUSA, não aplica efeito ──────
             if saving_throw_stat and saving_throw_dc > 0:
                 memory.save_campaign()
-                return (
-                    result +
-                    f"\n\n⏸️  **AGUARDANDO TESTE DE RESISTÊNCIA**\n"
-                    f"   Alvo: {target['name']}\n"
-                    f"   Atributo: {saving_throw_stat.capitalize()} | CD: {saving_throw_dc}\n"
-                    f"   Dano potencial (falha): **{total_dano}** | Dano reduzido (sucesso): **{total_dano // 2}**\n"
-                    f"\n💬 Mestre: Role um teste de {saving_throw_stat.capitalize()} CD {saving_throw_dc}!\n"
-                    f"   Após o resultado, use make_skill_check para validar e modify_hp para aplicar o dano."
-                )
+                if ctrl_effect is not None:
+                    cond_nome = ctrl_effect["condition"]
+                    efeito_falha   = f"{cond_nome.upper()} aplicado"
+                    efeito_sucesso = "sem efeito"
+                    return (
+                        result +
+                        f"\n\n⏸️  **AGUARDANDO TESTE DE RESISTÊNCIA**\n"
+                        f"   Alvo: {target['name']}\n"
+                        f"   Atributo: {saving_throw_stat.capitalize()} | CD: {saving_throw_dc}\n"
+                        f"   Efeito (falha): **{efeito_falha}** | Efeito (sucesso): **{efeito_sucesso}**\n"
+                        f"\n💬 Mestre: Role {saving_throw_stat.capitalize()} CD {saving_throw_dc}!\n"
+                        f"   Se falhar: use apply_condition('{target['name']}', '{cond_nome}')."
+                    )
+                else:
+                    return (
+                        result +
+                        f"\n\n⏸️  **AGUARDANDO TESTE DE RESISTÊNCIA**\n"
+                        f"   Alvo: {target['name']}\n"
+                        f"   Atributo: {saving_throw_stat.capitalize()} | CD: {saving_throw_dc}\n"
+                        f"   Dano (falha): **{total_dano}** | Dano reduzido (sucesso): **{total_dano // 2}**\n"
+                        f"\n💬 Mestre: Role {saving_throw_stat.capitalize()} CD {saving_throw_dc}!\n"
+                        f"   Após resultado, use modify_hp para aplicar o dano correto."
+                    )
 
-            # ── MODO AUTOMÁTICO: sem saving throw → aplica cura ou dano ────────
+            # ── MODO AUTOMÁTICO: aplica efeito imediatamente ─────────────────
             hp_antes = st["vida_atual"]
+
             if _is_healing_ability(hab):
-                # Habilidade de cura: soma HP sem ultrapassar o máximo
                 st["vida_atual"] = min(st["vida_max"], st["vida_atual"] + total_dano)
                 result += f"\n   {target['name']}: ❤️  {hp_antes} → {st['vida_atual']}/{st['vida_max']}"
                 if hp_antes == 0:
-                    # Estava inconsciente — estabiliza
                     target["status"] = "vivo"
                     st["death_saves_sucessos"] = 0
                     st["death_saves_falhas"]   = 0
                     result += " ✨ Estabilizado!"
                 elif st["vida_atual"] == st["vida_max"]:
                     result += " ✨ Vida plena!"
+
+            elif ctrl_effect is not None:
+                # Condição direta (Hold Person, Charm, Web, etc.) — sem dano
+                cond  = ctrl_effect["condition"]
+                conds = st.setdefault("condicoes", [])
+                if not any(c["nome"].lower() == cond.lower() for c in conds):
+                    conds.append({"nome": cond.capitalize(), "duracao": None})
+                result += f"\n   🔴 {target['name']}: {cond.upper()}! (sem dano)"
+
             else:
-                # Habilidade de dano: subtrai HP
+                # Dano direto
                 st["vida_atual"] = max(0, st["vida_atual"] - total_dano)
                 result += f"\n   {target['name']}: ❤️  {hp_antes} → {st['vida_atual']}/{st['vida_max']}"
                 if st["vida_atual"] == 0:
@@ -2410,8 +2606,9 @@ def roll_death_save(char_name: str) -> str:
     if s.get("death_saves_sucessos", 0) >= 3:
         s["death_saves_sucessos"] = 0
         s["death_saves_falhas"]   = 0
-        char["status"]            = "vivo"
-        result += f"\n   🏥 {char['name']} ESTABILIZOU! Permanece inconsciente mas não morrerá."
+        char["status"]            = "estabilizado"
+        result += (f"\n   🏥 {char['name']} ESTABILIZOU! Permanece inconsciente (0 HP) "
+                   f"mas não morrerá. Precisa de cura para voltar a agir.")
 
     elif s.get("death_saves_falhas", 0) >= 3:
         s["death_saves_sucessos"] = 0
@@ -2923,10 +3120,46 @@ def set_stat(char_name: str, stat_name: str, value: int) -> str:
     if stat_name.lower() not in VALID:
         return f"Atributo '{stat_name}' inválido. Válidos: {', '.join(sorted(VALID))}."
 
-    old_val             = s.get(stat_name.lower(), "?")
-    s[stat_name.lower()] = value
+    key     = stat_name.lower()
+    old_val = s.get(key, "?")
+
+    # Se for um atributo (ability score), recalcula os derivados:
+    # CON → HP por nível | DES → CA | atributo de conjuração → mana.
+    extra = ""
+    if key in STAT_NAMES and isinstance(old_val, int):
+        old_mod = _modifier(old_val)
+        s[key]  = value
+        new_mod = _modifier(value)
+        delta   = new_mod - old_mod
+        nivel   = s.get("nivel", 1)
+
+        if key == "constituicao" and delta:
+            hp_adj          = delta * nivel
+            s["vida_max"]   = max(1, s.get("vida_max", 1) + hp_adj)
+            s["vida_atual"] = max(0, min(s["vida_max"], s.get("vida_atual", 0) + hp_adj))
+            extra += f"\n   ❤️  Vida máx: {hp_adj:+d} → {s['vida_max']}"
+
+        if key == "destreza":
+            ca_antes = s.get("ca", 10)
+            _recalculate_ca(char)
+            if s.get("ca", ca_antes) != ca_antes:
+                extra += f"\n   🛡️  CA: {ca_antes} → {s['ca']}"
+
+        info      = CLASS_DATA.get(s.get("classe", "").lower(), {})
+        mana_stat = info.get("mana_stat")
+        mpl       = info.get("mana_per_level", 0)
+        if mana_stat == key and mpl > 0 and delta:
+            old_mana_max    = s.get("mana_max", 0)
+            base            = max(0, mpl + new_mod)
+            s["mana_max"]   = base * nivel
+            d_mana          = s["mana_max"] - old_mana_max
+            s["mana_atual"] = max(0, min(s["mana_max"], s.get("mana_atual", 0) + d_mana))
+            extra += f"\n   ✨ Mana máx: {d_mana:+d} → {s['mana_max']}"
+    else:
+        s[key] = value
+
     memory.save_campaign()
-    return f"✅ {char['name']}: {stat_name} {old_val} → {value}."
+    return f"✅ {char['name']}: {stat_name} {old_val} → {value}.{extra}"
 
 
 # ---------------------------------------------------------------------------
@@ -3176,17 +3409,12 @@ def recruit_character(npc_name: str, role: str = "aliado") -> str:
     npc_sheet   = char.get("sheet", {})
     npc_nivel   = npc_sheet.get("nivel", 1)
 
-    # Calcula nível médio do grupo:
-    # 1. party_member=True explícito (recrutados / aliados), OU
-    # 2. É o protagonista (personagem principal do jogador)
-    # Exclui NPCs soltos na campanha que têm classe real mas não são do grupo
-    protagonist_name = (memory.campaign.get("protagonist") or "").lower().strip()
+    # Calcula nível médio do grupo usando a definição canônica de grupo
+    # (memory.is_party_member: party_member, protagonista ou campaign["party"]).
+    # Exclui NPCs soltos, mortos/inimigos/fugidos e o próprio NPC sendo recrutado.
     party_chars = [
         c for c in memory.campaign.get("characters", {}).values()
-        if (
-            c.get("party_member")
-            or c.get("name", "").lower().strip() == protagonist_name
-        )
+        if memory.is_party_member(c)
         and c.get("status") not in ("morto", "inimigo", "fugiu")
         and memory.char_key(c["name"]) != key
     ]
@@ -4178,9 +4406,11 @@ def execute_npc_turn(npc_name: str = "") -> str:
     if not npc:
         return f"⚠️ NPC '{npc_name}' não encontrado: {err}"
 
-    # Garante que não é um personagem do grupo
-    party_keys = {memory.char_key(p.get("name", "")) for p in memory.campaign.get("party", [])}
-    if memory.char_key(npc_name) in party_keys:
+    # Definição canônica de grupo (memory.is_party_member): party_member,
+    # protagonista ou campaign["party"].
+    chars = memory.campaign.get("characters", {})
+
+    if memory.is_party_member(npc):
         return (
             f"⚠️ {npc_name} é um personagem do grupo — use attack_roll() "
             f"conforme instrução do jogador."
@@ -4202,19 +4432,19 @@ def execute_npc_turn(npc_name: str = "") -> str:
                 f"{advance}"
             )
 
-    # Monta lista de alvos válidos (membros do grupo vivos)
-    chars     = memory.campaign.get("characters", {})
-    targets   = []
-    for p in memory.campaign.get("party", []):
-        p_name  = p.get("name", "")
-        p_key   = memory.char_key(p_name)
-        p_char  = chars.get(p_key, {})
-        p_stat  = p_char.get("status", "vivo").lower()
-        if p_stat in ("morto", "estabilizado", "fugiu", "exilado"):
+    # Monta lista de alvos válidos: membros do grupo vivos e em pé.
+    OUT = ("morto", "estabilizado", "inconsciente", "fugiu", "exilado")
+    targets = []
+    for p_char in chars.values():
+        if not memory.is_party_member(p_char):
+            continue
+        if p_char.get("status", "vivo").lower() in OUT:
             continue
         p_sheet = p_char.get("sheet", {}) or {}
+        if p_sheet.get("vida_atual", 0) <= 0:
+            continue
         targets.append({
-            "name":   p_name,
+            "name":   p_char.get("name", ""),
             "hp":     p_sheet.get("vida_atual", 0),
             "hp_max": p_sheet.get("vida_max", 1),
         })

@@ -167,10 +167,8 @@ def _verify_agent_response(
         party = [
             c["name"]
             for c in memory.campaign.get("characters", {}).values()
-            if (
-                c.get("sheet", {}).get("classe", "").lower() != "npc"
-                or c.get("party_member")
-            ) and c.get("status") not in ("morto", "fugiu")
+            if memory.is_party_member(c)
+            and c.get("status") not in ("morto", "fugiu")
         ]
         if party:
             names = ", ".join(party)
@@ -201,11 +199,12 @@ def _check_all_level_ups() -> list[str]:
         return []
 
     leveled = []
-    party_keys = {m.get("name", "").lower().strip() for m in memory.campaign.get("party", [])}
 
     for key, char in memory.campaign.get("characters", {}).items():
-        # Só verifica membros do grupo
-        if key not in party_keys:
+        # Definição canônica de grupo (memory.is_party_member): party_member,
+        # protagonista ou em campaign["party"]. Antes dependia só de
+        # campaign["party"] e PULAVA o protagonista criado via ficha D&D.
+        if not memory.is_party_member(char):
             continue
         sheet = char.get("sheet")
         if not sheet:

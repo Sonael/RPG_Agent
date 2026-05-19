@@ -56,8 +56,11 @@ class ValidationResult:
 _DEAD_STATUSES = {"morto", "falecido", "assassinado", "eliminado", "destruído"}
 _GONE_STATUSES = {"desaparecido", "preso", "capturado", "exilado", "partido"}
 
-def _normalize(text: str) -> str:
-    """Lowercase sem acentos para comparação fuzzy simples."""
+def _normalize(text) -> str:
+    """Lowercase sem acentos para comparação fuzzy simples.
+    Aceita não-string (ex: flag importada como bool/número) sem quebrar."""
+    if not isinstance(text, str):
+        text = "" if text is None else str(text)
     replacements = str.maketrans(
     "áàãâäéèêëíìîïóòõôöúùûüçñ",
     "aaaaaeeeeiiiiooooouuuucn"
@@ -308,15 +311,4 @@ def validate(response: str) -> ValidationResult:
     result.violations.extend(_check_flag_contradictions(response, c))
     result.violations.extend(_check_new_characters_unsaved(response, c))
 
-    return result
-
-
-def validate_and_log(response: str) -> ValidationResult:
-    """
-    Valida e imprime um resumo no stdout (útil no modo terminal).
-    """
-    result = validate(response)
-    if result.violations:
-        print("\n[Validador]")
-        print(result.summary())
     return result

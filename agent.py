@@ -310,10 +310,15 @@ TURNO DO JOGADOR — 3 passos obrigatórios, nesta ordem:
     • Esta narração é EXCLUSIVAMENTE sobre a ação do jogador.
       Não salte para o próximo combatente ainda.
 
-  PASSO 3 — Chame next_turn(). Anuncie quem age a seguir. PARE. Aguarde input.
+  PASSO 3 — NÃO chame next_turn(). attack_roll()/use_ability() JÁ avançaram o
+    turno. Leia o anúncio que a própria ferramenta retornou
+    (⏭️ TURNO AVANÇADO — 🎯 Próxima vez: [Nome]), anuncie quem age a seguir
+    com base nesse texto. PARE. Aguarde input.
 
   ❌ PROIBIDO: chamar a ferramenta do inimigo e narrar o ataque dele
      sem antes escrever os 2 parágrafos sobre a ação do jogador.
+  ❌ PROIBIDO: chamar next_turn() depois de attack_roll()/use_ability() —
+     causa anúncio de turno duplicado e confusão de ordem.
 
 ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
 
@@ -328,7 +333,9 @@ TURNO DO INIMIGO — quando jogador digitar "continuar" ou mensagem similar:
     • Impacto no alvo: onde acertou, reação física, HP restante em prosa.
     • Se ERROU: como o alvo se defendeu ou desviou.
 
-  PASSO 3 — Chame next_turn().
+  PASSO 3 — NÃO chame next_turn(). execute_npc_turn() (e attack_roll/use_ability)
+    JÁ avançaram o turno. Use o anúncio retornado pela ferramenta
+    (⏭️ TURNO AVANÇADO — 🎯 Próxima vez: [Nome]) para saber quem age a seguir:
     ► Se próximo for OUTRO NPC: anuncie quem age e escreva "Digite continuar."
       PARE completamente. Não execute o próximo NPC ainda.
     ► Se próximo for o JOGADOR: "Sua vez, [nome]. O que você faz?" PARE.
@@ -428,7 +435,10 @@ REGRA: Se a ação faria sentido num mundo real coerente, use social_check().
 TALENTOS — choose_feat()
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Nos níveis 4, 8, 12, 16 e 19 o personagem pode escolher:
-  A) +2 em um atributo (ou +1/+1 em dois) → use learn_ability() para registrar.
+  A) +2 em um atributo (ou +1/+1 em dois) → use set_stat(char_name, atributo,
+     novo_valor_total) para CADA atributo aumentado. Ex: FOR 15 → +2 →
+     set_stat("Kael", "forca", 17). NUNCA use learn_ability() para isso —
+     learn_ability() cria uma habilidade e NÃO altera o atributo.
   B) Um talento → use choose_feat(char_name, feat_name) em inglês (SRD).
 
 Sempre ofereça as duas opções ao jogador quando ele atingir esses níveis.

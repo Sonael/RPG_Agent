@@ -135,6 +135,37 @@ def char_key(name: str) -> str:
     return name.lower().strip().replace("_", " ")
 
 
+def is_party_member(char: dict) -> bool:
+    """
+    Definição ÚNICA e canônica de "pertence ao grupo do jogador".
+    Usada por server.py (rede de level-up / verificação de XP) e
+    tools_dnd.py (recrutamento / turno de NPC) para evitar três
+    definições divergentes de grupo espalhadas pelo código.
+
+    Um personagem é do grupo se QUALQUER um for verdadeiro:
+      • char["party_member"] == True  (recrutado via recruit_character)
+      • char["name"] == campaign["protagonist"]  (personagem principal)
+      • o nome está em campaign["party"]  (add_party_member)
+
+    Não filtra por status (morto/fugiu) — cada chamador aplica o
+    filtro de status que precisar.
+    """
+    if not isinstance(char, dict):
+        return False
+    if char.get("party_member"):
+        return True
+    name_norm = (char.get("name") or "").lower().strip()
+    if not name_norm:
+        return False
+    protagonist = (campaign.get("protagonist") or "").lower().strip()
+    if protagonist and name_norm == protagonist:
+        return True
+    for m in campaign.get("party", []):
+        if (m.get("name") or "").lower().strip() == name_norm:
+            return True
+    return False
+
+
 def reset_campaign() -> None:
     """Reseta o estado para os valores padrão."""
     campaign.clear()
@@ -168,11 +199,16 @@ def load_campaign() -> bool:
         for key, default_val in defaults.items():
             loaded = data.get(key, default_val)
             if isinstance(default_val, dict):
-                campaign[key].update(loaded)
+                # Um campo gravado como null no banco viria como None e
+                # quebraria .update(None), abortando TODA a carga (e resetando
+                # a campanha). Ignora valores de tipo inesperado.
+                if isinstance(loaded, dict):
+                    campaign[key].update(loaded)
             elif isinstance(default_val, list):
-                campaign[key].extend(loaded)
+                if isinstance(loaded, list):
+                    campaign[key].extend(loaded)
             else:
-                campaign[key] = loaded
+                campaign[key] = loaded if loaded is not None else default_val
 
         # Garante que o nome está sempre preenchido
         campaign["name"] = CAMPAIGN_NAME
