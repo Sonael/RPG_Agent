@@ -52,7 +52,10 @@ def _mk(name, npc):
                              "arma_principal": "espada longa", "amuleto": None},
             "condicoes": [], "death_saves_sucessos": 0, "death_saves_falhas": 0,
         },
-        "habilidades": [], "inventario": [],
+        "habilidades": [],
+        "inventario": ([] if npc else [
+            {"nome": "Poção de Cura", "qtd": random.randint(1, 3), "descricao": "2d4+2"},
+        ]),
     }
 
 
@@ -87,13 +90,17 @@ def _check_invariants(prev, label, fails):
 
     advanced = (tk == pt + 1)
 
-    if advanced:
+    # Fim de combate (is_active True→False) é uma transição TERMINAL legítima:
+    # end_combat() reseta round=1. Não aplicar invariantes de rodada nela.
+    combat_ended = (pa and not active)
+
+    if advanced and not combat_ended:
         # Um avanço real: rodada sobe no máximo 1 e nunca regride
         if r < pr:
             bad(f"rodada regrediu num avanço ({pr}→{r})")
         if r - pr not in (0, 1):
             bad(f"rodada subiu >1 num único avanço ({pr}→{r})")
-    else:
+    elif not advanced:
         # Sem avanço: rodada/índice não podem ter mudado sozinhos
         if active and pa and (r != pr or i != pi):
             bad(f"estado mudou SEM avanço de token (r {pr}→{r}, i {pi}→{i})")
@@ -243,8 +250,113 @@ def run(n_combates=10000, seed=1234):
     return True
 
 
+def run_screen(n_combates=5000, seed=4321):
+    """
+    Fuzz da TELA TÁTICA: dirige o combate SÓ via combat_action()/combat_snapshot()
+    — exatamente como o frontend fará. Verifica, a cada passo:
+      • snapshot é JSON-serializável e consistente
+      • invariantes de turno (reaproveita _check_invariants)
+      • log é limitado (<= 300)
+      • o combate SEMPRE termina (sem loop infinito)
+    """
+    import json as _json
+    rng = random.Random(seed)
+    fails = []
+    calls = 0
+
+    for c in range(n_combates):
+        random.seed(rng.random())
+        memory.bind(f"scr_{c % 5}", f"Tela {c}")
+        memory.campaign["characters"] = {}
+        memory.campaign["combat_mode"] = "tela"
+        n = rng.randint(2, 5)
+        names = []
+        for k in range(n):
+            npc = (k % 2 == 1)
+            nm = f"{'Goblin' if npc else 'Herói'} {k}"
+            names.append(nm)
+            memory.campaign["characters"][memory.char_key(nm)] = _mk(nm, npc)
+        memory.campaign["protagonist"] = names[0]
+        T.roll_initiative(", ".join(names))
+        prev = _snap()
+
+        terminated = False
+        for _step in range(300):  # teto rígido: tem que acabar antes
+            snap = T.combat_snapshot()
+            try:
+                _json.dumps(snap)  # precisa serializar
+            except (TypeError, ValueError) as e:
+                fails.append(f"[scr] snapshot não-serializável: {e}")
+                break
+            if not snap["is_active"]:
+                terminated = True
+                break
+            cur = snap["current"]
+            cur_party = snap["current_is_party"]
+            cur_obj = next((x for x in snap["combatants"] if x["name"] == cur), None) or {}
+            if cur_party:
+                # jogador: ataca, usa item (poção), ou passa
+                enemies = [x["name"] for x in snap["combatants"]
+                           if not x["is_party"] and x["status"] not in OUT]
+                itens = (cur_obj.get("itens_combate") or [])
+                # usa item ~15% das vezes se houver, senão ataca/passa
+                if itens and rng.random() < 0.15:
+                    it = rng.choice(itens)
+                    # heal alvo = atual; outros = sem alvo
+                    if it["kind"] == "heal":
+                        res = T.combat_action("item", cur, item=it["nome"], target=cur)
+                    else:
+                        res = T.combat_action("item", cur, item=it["nome"])
+                elif enemies and rng.random() < 0.85:
+                    res = T.combat_action("attack", cur, rng.choice(enemies))
+                else:
+                    res = T.combat_action("pass", cur)
+            else:
+                res = T.combat_action("enemy")
+            calls += 1
+            # snapshot sempre presente e serializável
+            try:
+                _json.dumps(res.get("snapshot"))
+            except (TypeError, ValueError) as e:
+                fails.append(f"[scr] resp.snapshot não-serializável: {e}")
+                break
+            _check_invariants(prev, "scr", fails)
+            prev = _snap()
+            # log limitado
+            lg = memory.campaign.get("combat_state", {}).get("log", [])
+            if len(lg) > 300:
+                fails.append(f"[scr] log estourou o teto: {len(lg)}")
+                break
+            # encerra se só restou um lado
+            alive_party = [x for x in snap["combatants"]
+                           if x["is_party"] and x["status"] not in OUT]
+            alive_foe = [x for x in snap["combatants"]
+                         if not x["is_party"] and x["status"] not in OUT]
+            if not alive_party or not alive_foe:
+                T.combat_action("end")
+                terminated = True
+                break
+        if not terminated:
+            fails.append(f"[scr] combate #{c} NÃO terminou em 300 passos (loop?)")
+        memory.unbind(f"scr_{c % 5}")
+
+    print(f"\n[TELA] Combates : {n_combates} | chamadas combat_action : {calls}")
+    print(f"[TELA] Violações : {len(fails)}")
+    if fails:
+        for f in fails[:15]:
+            print("  " + f)
+        return False
+    print("[TELA] ✅ 0 violações — combat_action/snapshot íntegros e sempre terminam.")
+    return True
+
+
 if __name__ == "__main__":
-    n = int(sys.argv[1]) if len(sys.argv) > 1 else 10000
-    s = int(sys.argv[2]) if len(sys.argv) > 2 else 1234
-    ok = run(n, s)
+    mode = sys.argv[1] if len(sys.argv) > 1 else "both"
+    n = int(sys.argv[2]) if len(sys.argv) > 2 else 10000
+    s = int(sys.argv[3]) if len(sys.argv) > 3 else 1234
+    ok = True
+    if mode in ("engine", "both"):
+        ok &= run(n, s)
+    if mode in ("screen", "both"):
+        ok &= run_screen(max(1, n // 2), s + 1)
     sys.exit(0 if ok else 1)

@@ -15,7 +15,7 @@
     rel="stylesheet">
 
   <script src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js"></script>
-  <link rel="stylesheet" href="/static/css/style.css?v=24">
+  <link rel="stylesheet" href="/static/css/style.css?v=27">
 </head>
 
 <body class="game-page">
@@ -112,6 +112,20 @@
                   Adicionar</button>
               </h3>
               <div id="sb-flags"><span class="empty-state">Nenhuma observação.</span></div>
+            </div>
+
+            <div class="sb-section" style="margin-top: 20px;">
+              <h3 class="sb-section-title" style="margin-bottom: 5px;">MODO DE COMBATE</h3>
+              <div style="font-family: 'Lora', serif; font-size: 12px; color: var(--text-muted); margin-bottom: 8px;">
+                Como as lutas são resolvidas nesta campanha.
+              </div>
+              <div id="combat-mode-toggle" class="combat-mode-toggle">
+                <button type="button" data-mode="narrado" class="cm-opt active"
+                  onclick="setCombatMode('narrado')">📖 Narrado pela IA</button>
+                <button type="button" data-mode="tela" class="cm-opt"
+                  onclick="setCombatMode('tela')">⚔️ Tela tática</button>
+              </div>
+              <div id="combat-mode-hint" style="font-family:'Lora',serif;font-size:11px;color:var(--text-dim);margin-top:6px;font-style:italic;"></div>
             </div>
 
             <div class="sb-section" style="margin-top: 20px;">
@@ -313,7 +327,8 @@
   </div>
 
   <script src="/static/js/utils.js?v=6"></script>
-  <script src="/static/js/game.js?v=18"></script>
+  <script src="/static/js/game.js?v=19"></script>
+  <script src="/static/js/combat.js?v=4"></script>
 
   <script>
     (function() {

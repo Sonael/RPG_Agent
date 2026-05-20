@@ -163,6 +163,9 @@ def _defaults() -> dict:
         "quest_flags":          {},
         "party":                [],
         "diary":                [],
+        # "narrado" = LLM narra turno a turno (padrão, comportamento atual).
+        # "tela"    = combate resolvido na tela tática; LLM só emoldura.
+        "combat_mode":          "narrado",
         "combat_state": {
             "is_active":           False,
             "initiative_order":    [],
@@ -174,6 +177,15 @@ def _defaults() -> dict:
             # Token monotônico: +1 a cada avanço REAL de turno. Base da
             # idempotência (impede duplo-avanço) e dos invariantes de teste.
             "turn_token":          0,
+            # Log estruturado de eventos do combate (para a tela tática e
+            # para a narração final da LLM). Limitado a _MAX_COMBAT_LOG.
+            "log":                 [],
+            # Resultado do último combate (painel de fim na tela). None = nenhum.
+            "result":              None,
+            # Economia de ações DO TURNO ATUAL (regra 5e).
+            # Resetada a cada avanço de turno. Em 5e cada turno tem 1 Ação +
+            # 1 Ação Bônus + 1 Reação. A tela tática rastreia Ação/Bônus.
+            "turn_economy":        {"acao_usada": False, "bonus_usada": False},
         },
     }
 
@@ -218,11 +230,17 @@ def _migrate_combat_state() -> None:
         "npc_strategies":     {},
         "turn_auto_advanced": False,
         "turn_token":         0,
+        "log":                [],
+        "result":             None,
+        "turn_economy":       {"acao_usada": False, "bonus_usada": False},
     }
     cs = campaign.setdefault("combat_state", {})
     for key, val in defaults.items():
         if key not in cs:
             cs[key] = val
+    # Campanhas antigas sem o modo de combate → padrão narrado.
+    if "combat_mode" not in campaign:
+        campaign["combat_mode"] = "narrado"
 
 
 _SPELL_PLACEHOLDER = "Magia inicial da classe. Use learn_spell() para enriquecer com dados do Open5e."

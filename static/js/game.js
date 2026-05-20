@@ -1081,6 +1081,9 @@ function renderMemory(mem) {
     const locs = mem.locations || [];
     lEl.innerHTML = !locs.length ? '<span class="empty-state">Nenhum local ainda.</span>' : locs.map((l, i) => `<div class="char-card editable" onclick="openEditModal('location','${l.name.toLowerCase().replace(/'/g, "\\'")}',window._lastMem.locations[${i}])"><div class="char-name">${l.name}</div><div class="char-desc">${(l.description || '').substring(0, 100)}${(l.description || '').length > 100 ? '…' : ''}</div></div>`).join('');
   }
+
+  // Sincroniza a tela de combate tática (módulo isolado em combat.js).
+  try { if (window.Combat) window.Combat.sync(); } catch (_) {}
 }
 
 async function openSummaryEdit() {

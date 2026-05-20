@@ -606,6 +606,26 @@ def create_agent(model, campaign_type: str = "fantasia") -> Agent:
     # Marca o modo D&D na memória para que get_scene_context exiba os stats
     _memory.campaign["dnd_mode"] = (campaign_type == "dnd")
 
+    # Modo de combate TELA: a luta é resolvida na interface tática, não pela
+    # narração. O agente NÃO deve narrar turno a turno nem chamar
+    # attack_roll/use_ability/execute_npc_turn/next_turn durante o combate.
+    if _memory.campaign.get("combat_mode") == "tela":
+        instruction += (
+            "\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            "MODO DE COMBATE: TELA TÁTICA (não narrado)\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            "• Quando um combate começar: descreva a CENA inicial (terreno, "
+            "inimigos, clima de tensão), chame roll_initiative() com TODOS os "
+            "participantes e PARE. A luta acontece na tela tática — você NÃO "
+            "narra turnos nem chama attack_roll/use_ability/execute_npc_turn/"
+            "next_turn. NÃO descreva golpes nem resultados ainda.\n"
+            "• Você será chamado de novo com '[COMBATE RESOLVIDO NA TELA "
+            "TÁTICA]' e um log: aí narre a luta INTEIRA de forma "
+            "cinematográfica e contínua e gere o saque dos derrotados.\n"
+            "• Ações criativas no meio da luta (improviso, perícia, ambiente) "
+            "podem chegar como texto normal — aí sim arbitre com make_skill_check."
+        )
+
     return Agent(
         name="rpg_master_agent",
         model=model,

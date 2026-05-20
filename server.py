@@ -1712,6 +1712,57 @@ def update_world():
     memory.save_campaign()
     return jsonify({"ok": True})
 
+
+# ---------------------------------------------------------------------------
+# COMBATE NA TELA (sem LLM) — wrappers finos sobre tools_dnd (motor fuzzado).
+# require_auth já faz memory.bind_request(g.user_id) → isolado por usuário.
+# ---------------------------------------------------------------------------
+
+@app.route("/api/combat/state", methods=["GET"])
+@require_auth
+def combat_state_route():
+    import tools_dnd
+    return jsonify(tools_dnd.combat_snapshot())
+
+
+@app.route("/api/combat/action", methods=["POST"])
+@require_auth
+def combat_action_route():
+    import tools_dnd
+    d = request.json or {}
+    action = (d.get("action") or "").strip()
+    if not action:
+        return jsonify({"ok": False, "message": "Ação ausente."}), 400
+    res = tools_dnd.combat_action(
+        action,
+        actor=(d.get("actor") or "").strip(),
+        target=(d.get("target") or "").strip(),
+        weapon=(d.get("weapon") or "").strip(),
+        ability=(d.get("ability") or "").strip(),
+        item=(d.get("item") or "").strip(),
+    )
+    return jsonify(res)
+
+
+@app.route("/api/combat/recap", methods=["GET"])
+@require_auth
+def combat_recap_route():
+    import tools_dnd
+    return jsonify({"text": tools_dnd.combat_recap_payload()})
+
+
+@app.route("/api/combat/mode", methods=["GET", "POST"])
+@require_auth
+def combat_mode_route():
+    if request.method == "GET":
+        return jsonify({"mode": memory.campaign.get("combat_mode", "narrado")})
+    mode = ((request.json or {}).get("mode") or "").strip().lower()
+    if mode not in ("narrado", "tela"):
+        return jsonify({"ok": False, "error": "mode inválido"}), 400
+    memory.campaign["combat_mode"] = mode
+    memory.save_campaign()
+    return jsonify({"ok": True, "mode": mode})
+
 # ---------------------------------------------------------------------------
 # Inicialização
 # ---------------------------------------------------------------------------

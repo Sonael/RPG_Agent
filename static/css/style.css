@@ -1052,3 +1052,177 @@ textarea { resize: vertical; min-height: 40px; }
   #settings-panel { width: 280px; }
   #settings-fixed-wrapper { top: 14px; right: 14px; }
 }
+/* ═══════════════════════════════════════════════════════════════════
+   Tela de Combate Tática (combat.js)
+   ═══════════════════════════════════════════════════════════════════ */
+.combat-mode-toggle { display: flex; gap: 6px; }
+.combat-mode-toggle .cm-opt {
+  flex: 1; padding: 7px 6px; font-family: 'Lora', serif; font-size: 12px;
+  cursor: pointer; border: 1px solid var(--page-edge); border-radius: 4px;
+  background: transparent; color: var(--text-muted); transition: all .15s;
+}
+.combat-mode-toggle .cm-opt.active {
+  background: rgba(38,75,130,0.12); color: var(--ink-user);
+  border-color: var(--ink-user); font-weight: 600;
+}
+.combat-mode-toggle .cm-opt:hover { color: var(--text-main); }
+
+#combat-overlay {
+  position: fixed; inset: 0; z-index: 9000;
+  background: rgba(8,8,12,0.92); backdrop-filter: blur(3px);
+  display: flex; align-items: center; justify-content: center;
+}
+#combat-overlay.hidden { display: none; }
+body.combat-on { overflow: hidden; }
+
+#cbt-frame {
+  width: min(960px, 96vw); height: min(92vh, 760px);
+  background: var(--page-bg, #f5f3eb);
+  border: 2px solid var(--ink-sys, #8b3a3a); border-radius: 12px;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.6);
+  display: flex; flex-direction: column; overflow: hidden;
+  font-family: 'Lora', serif;
+}
+#cbt-top {
+  display: flex; align-items: center; gap: 14px; padding: 10px 16px;
+  border-bottom: 1px solid var(--page-edge);
+  background: rgba(139,58,58,0.08);
+}
+#cbt-round {
+  font-family: 'Playfair Display', serif; font-weight: 700;
+  color: var(--ink-sys); font-size: 16px; flex-shrink: 0;
+}
+#cbt-order { display: flex; flex-wrap: wrap; gap: 4px; font-size: 12px; color: var(--text-muted); }
+.cbt-ord.on { color: var(--ink-user); font-weight: 700; }
+.cbt-ord-sep { color: var(--text-dim); }
+
+#cbt-enemies, #cbt-party {
+  display: flex; gap: 10px; padding: 14px 16px; flex-wrap: wrap;
+  justify-content: center; overflow-y: auto;
+}
+#cbt-enemies { background: rgba(139,58,58,0.05); }
+#cbt-party   { background: rgba(38,75,130,0.05); }
+#cbt-stage {
+  flex: 0 0 auto; text-align: center; font-size: 22px;
+  color: var(--text-dim); padding: 2px;
+}
+.cbt-empty { color: var(--text-dim); font-style: italic; }
+
+.cbt-card {
+  width: 150px; padding: 8px 10px; border-radius: 8px;
+  border: 1px solid var(--page-edge); background: rgba(255,255,255,0.04);
+}
+.cbt-card.cbt-cur { border-color: var(--gold, #c8a84b); box-shadow: 0 0 0 2px rgba(200,168,75,0.35); }
+.cbt-card.cbt-out { opacity: 0.45; filter: grayscale(0.6); }
+.cbt-name { font-weight: 700; font-size: 13px; color: var(--text-main); }
+.cbt-arrow { color: var(--gold, #c8a84b); }
+.cbt-meta { font-size: 10px; color: var(--text-muted); margin: 1px 0 5px; }
+.cbt-hpline { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+.cbt-bar { height: 7px; background: var(--page-edge); border-radius: 4px; overflow: hidden; margin-top: 2px; }
+.cbt-bar-fill { height: 100%; transition: width .35s; }
+.cbt-bar-fill.hp { background: var(--ink-sys, #8b3a3a); }
+.cbt-bar-fill.mp { background: var(--ink-user, #264b82); }
+.cbt-conds { margin-top: 5px; display: flex; flex-wrap: wrap; gap: 3px; }
+.cbt-cond {
+  font-size: 9px; padding: 1px 5px; border-radius: 8px;
+  background: rgba(139,58,58,0.15); color: var(--ink-sys);
+}
+.cbt-status-tag {
+  margin-top: 5px; font-size: 10px; text-transform: uppercase;
+  letter-spacing: .05em; color: var(--ink-sys); font-weight: 700;
+}
+
+#cbt-log {
+  flex: 1; min-height: 60px; overflow-y: auto;
+  padding: 8px 16px; border-top: 1px solid var(--page-edge);
+  background: rgba(0,0,0,0.03); font-size: 12px; color: var(--text-muted);
+}
+.cbt-logline { padding: 2px 0; }
+
+#cbt-actionbar {
+  border-top: 1px solid var(--page-edge); padding: 12px 16px;
+  background: var(--page-bg);
+}
+#cbt-prompt { font-size: 14px; color: var(--text-main); margin-bottom: 8px; text-align: center; }
+#cbt-buttons { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+#cbt-buttons button, #cbt-targets button {
+  padding: 9px 16px; font-family: 'Lora', serif; font-size: 13px;
+  cursor: pointer; border: 1px solid var(--ink-user); border-radius: 6px;
+  background: transparent; color: var(--ink-user); transition: all .15s;
+}
+#cbt-buttons button:hover, #cbt-targets button:hover {
+  background: var(--ink-user); color: #fff;
+}
+#cbt-buttons button:disabled { opacity: .4; cursor: not-allowed; }
+#cbt-targets {
+  display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;
+  margin-top: 10px; align-items: center;
+}
+#cbt-targets.hidden { display: none; }
+.cbt-tgt-title { font-size: 12px; color: var(--text-muted); margin-right: 4px; }
+#cbt-targets .cbt-cancel { border-color: var(--text-dim); color: var(--text-dim); }
+#cbt-targets .cbt-cancel:hover { background: var(--text-dim); color: #fff; }
+
+@media (max-width: 900px) {
+  #cbt-frame { height: 96vh; width: 98vw; }
+  .cbt-card { width: 44%; }
+}
+
+/* Painel de fim do combate */
+.cbt-result-title {
+  font-family: 'Playfair Display', serif; font-weight: 700;
+  font-size: 22px; text-align: center; margin-bottom: 12px;
+}
+.cbt-result-title.win  { color: var(--green, #4aaa80); }
+.cbt-result-title.lose { color: var(--ink-sys, #8b3a3a); }
+.cbt-result-cols {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+  max-width: 720px; margin: 0 auto 6px;
+}
+.cbt-result-cols ul {
+  list-style: none; padding: 0; margin: 4px 0;
+  font-size: 12px; line-height: 1.7; color: var(--text-main);
+}
+.cbt-result-cols li { padding: 2px 0; }
+.cbt-res-h {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--text-muted); border-bottom: 1px solid var(--page-edge);
+  padding-bottom: 3px;
+}
+.cbt-res-lado {
+  display: inline-block; font-size: 9px; padding: 1px 5px;
+  border-radius: 8px; margin-right: 4px; text-transform: uppercase;
+}
+.cbt-res-grp { background: rgba(38,75,130,0.15);  color: var(--ink-user); }
+.cbt-res-foe { background: rgba(139,58,58,0.15); color: var(--ink-sys); }
+.cbt-res-st  { color: var(--text-muted); font-style: italic; margin-left: 4px; }
+.cbt-res-hp  { color: var(--text-dim); font-family: monospace; margin-left: 6px; }
+
+#cbt-buttons .cbt-primary {
+  background: var(--ink-user); color: #fff; border-color: var(--ink-user);
+  font-weight: 700;
+}
+#cbt-buttons .cbt-primary:hover {
+  background: var(--ink-sys); border-color: var(--ink-sys);
+}
+
+/* Economia de ações (Ação / Bônus) na tela tática */
+.cbt-econ { display: inline-flex; gap: 8px; margin-left: 10px; font-size: 12px; }
+.cbt-slot {
+  padding: 2px 8px; border-radius: 10px; font-family: 'Lora', serif;
+  border: 1px solid var(--page-edge); background: rgba(0,0,0,0.03);
+  color: var(--text-muted);
+}
+.cbt-slot.used { color: var(--ink-sys, #8b3a3a); border-color: var(--ink-sys, #8b3a3a);
+                 background: rgba(139,58,58,0.08); }
+
+#cbt-buttons button small,
+#cbt-targets button small { color: var(--text-dim); font-style: italic; margin-left: 2px; }
+
+.cbt-eco-tag {
+  font-style: normal; font-size: 9px; padding: 1px 6px; border-radius: 8px;
+  margin-left: 6px; vertical-align: middle; letter-spacing: .03em;
+  text-transform: uppercase;
+}
+.cbt-eco-tag.eco-acao  { background: rgba(38,75,130,0.12);  color: var(--ink-user); }
+.cbt-eco-tag.eco-bonus { background: rgba(74,170,128,0.15); color: var(--green, #4aaa80); }

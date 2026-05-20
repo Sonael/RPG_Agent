@@ -138,6 +138,33 @@ OUT_OF_COMBAT_STATUSES = {
     "morto", "inconsciente", "estabilizado", "fugiu", "exilado",
 }
 
+_MAX_COMBAT_LOG = 300
+
+
+def _log_combat_event(etype: str, actor: str = "", target: str = "",
+                      msg: str = "", **extra) -> None:
+    """
+    Acrescenta um evento estruturado ao log do combate.
+    Usado pela tela tática (feed) e pela narração final da LLM.
+    Falha de forma silenciosa fora de combate — nunca quebra uma ação.
+    """
+    cs = memory.campaign.get("combat_state")
+    if not isinstance(cs, dict):
+        return
+    log = cs.setdefault("log", [])
+    ev = {
+        "round":  cs.get("round", 1),
+        "type":   etype,
+        "actor":  actor,
+        "target": target,
+        "msg":    msg,
+    }
+    if extra:
+        ev.update(extra)
+    log.append(ev)
+    if len(log) > _MAX_COMBAT_LOG:
+        del log[:-_MAX_COMBAT_LOG]
+
 
 def _is_out_of_combat(name: str) -> bool:
     ch = memory.campaign["characters"].get(memory.char_key(name))
@@ -180,6 +207,7 @@ def _heal_current_turn() -> None:
             cs["round"]              = round_num
             cs["turn_resolved"]      = False
             cs["turn_token"]         = cs.get("turn_token", 0) + 1
+            _reset_turn_economy(cs)
             memory.save_campaign()
             return
 
@@ -253,6 +281,7 @@ def _auto_advance_turn(actor_name: str = "") -> str:
         cs["turn_resolved"]      = False
         cs["turn_auto_advanced"] = True   # impede next_turn() de avançar de novo
         cs["turn_token"]         = cs.get("turn_token", 0) + 1  # avanço real
+        _reset_turn_economy(cs)
         memory.save_campaign()
 
         skip_msg      = f"\n   ⏩ Pulados: {', '.join(skipped)}" if skipped else ""
@@ -2127,6 +2156,14 @@ def attack_roll(
 
     if falha_critica:
         result += "   💀 ERRO CRÍTICO! O ataque falha miseravelmente."
+        _log_combat_event("attack_fumble", attacker["name"], target["name"],
+                          msg=(f"{attacker['name']} → {target['name']} ({weapon}): "
+                               f"🎲 d20=1 → ERRO CRÍTICO"),
+                          weapon=weapon, d20=1, atk_total=attack_total,
+                          ca=target_ca)
+        if end_turn:
+            result += _auto_advance_turn(attacker_name)
+        memory.save_campaign()
         return result
 
     if critico or attack_total >= target_ca:
@@ -2145,15 +2182,35 @@ def attack_roll(
         pct            = hp_depois / st["vida_max"] if st["vida_max"] > 0 else 0
 
         result += f"   {target['name']}: ❤️  {hp_antes} → {hp_depois}/{st['vida_max']}"
+        _dmg_expr = f"[{detail}] +{mod}(mod){bonus_str} = {dmg}"
+        _log_combat_event(
+            "attack_crit" if critico else "attack_hit",
+            attacker["name"], target["name"],
+            msg=(f"{attacker['name']} → {target['name']} ({weapon}): "
+                 f"🎲 d20={d20} +{mod}+{prof} = {attack_total} vs CA {target_ca} • "
+                 f"{'🌟 CRÍTICO ' if critico else ''}ACERTO • "
+                 f"💥 dano {_dmg_expr} → HP {hp_antes}→{hp_depois}/{st['vida_max']}"),
+            weapon=weapon, d20=d20, atk_total=attack_total, ca=target_ca,
+            dmg=dmg, dmg_dice=detail, hp=hp_depois, hp_max=st["vida_max"],
+            crit=bool(critico),
+        )
         if hp_depois == 0:
             target["status"] = "inconsciente"
             result += " ⚠️  INCONSCIENTE!"
+            _log_combat_event("down", attacker["name"], target["name"],
+                              msg=f"{target['name']} caiu inconsciente")
         elif pct <= 0.25:
             result += " ⚠️  Estado crítico!"
 
         memory.save_campaign()
     else:
         result += f"   ❌ ERROU! ({attack_total} < CA {target_ca})"
+        _log_combat_event("attack_miss", attacker["name"], target["name"],
+                          msg=(f"{attacker['name']} → {target['name']} ({weapon}): "
+                               f"🎲 d20={d20} +{mod}+{prof} = {attack_total} "
+                               f"vs CA {target_ca} • ERROU"),
+                          weapon=weapon, d20=d20, atk_total=attack_total,
+                          ca=target_ca)
 
     if end_turn:
         result += _auto_advance_turn(attacker_name)
@@ -2423,7 +2480,21 @@ def use_ability(
                 if st["vida_atual"] == 0:
                     target["status"] = "inconsciente"
                     result += " ⚠️  INCONSCIENTE!"
+                    _log_combat_event("down", char["name"], target["name"],
+                                      msg=f"{target['name']} caiu inconsciente")
 
+    _abil_dice = ""
+    if hab.get("dado"):
+        _abil_dice = (f" • 🎲 {n_dice}d{sides}: [{detail}]{bonus_str} "
+                      f"= {total_dano}")
+    _log_combat_event(
+        "ability", char["name"], target_name,
+        msg=(f"{char['name']} usou {hab['nome']}"
+             + (f" em {target_name}" if target_name else "")
+             + _abil_dice),
+        ability=hab["nome"], dado=hab.get("dado", ""),
+        rolls=list(rolls), total=total_dano,
+    )
     memory.save_campaign()
     if end_turn:
         result += _auto_advance_turn(char_name)
@@ -2752,11 +2823,16 @@ def roll_death_save(char_name: str) -> str:
         result += (f"\n   🏥 {char['name']} ESTABILIZOU! Permanece inconsciente (0 HP) "
                    f"mas não morrerá. Precisa de cura para voltar a agir.")
 
+        _log_combat_event("stabilize", char["name"], "",
+                          msg=f"{char['name']} estabilizou (🎲 d20={roll}, inconsciente)",
+                          d20=roll)
     elif s.get("death_saves_falhas", 0) >= 3:
         s["death_saves_sucessos"] = 0
         s["death_saves_falhas"]   = 0
         char["status"]            = "morto"
         result += f"\n   ☠️  {char['name']} MORREU. Narre a cena de forma dramática e definitiva."
+        _log_combat_event("death", char["name"], "",
+                          msg=f"{char['name']} morreu (🎲 d20={roll})", d20=roll)
 
     memory.save_campaign()
     result += _auto_advance_turn(char_name)
@@ -3412,6 +3488,10 @@ def roll_initiative(characters_names: str) -> str:
     cs["turn_resolved"]      = False
     cs["turn_auto_advanced"] = False
     cs["turn_token"]         = cs.get("turn_token", 0) + 1
+    cs["log"]                = []     # log limpo a cada combate
+    cs["result"]             = None   # resultado do combate anterior limpo
+    _log_combat_event("combat_start", msg="Combate iniciado",
+                      order=[r["name"] for r in results])
 
     memory.save_campaign()
 
@@ -3513,6 +3593,7 @@ def next_turn() -> str:
         cs["round"]              = round_num
         cs["turn_resolved"]      = False
         cs["turn_token"]         = cs.get("turn_token", 0) + 1  # avanço real
+        _reset_turn_economy(cs)
         memory.save_campaign()
 
         skip_msg  = f"\n⏩ Pulados: {', '.join(skipped)}" if skipped else ""
@@ -3537,6 +3618,7 @@ def end_combat() -> str:
     Chame após a derrota de todos os inimigos ou fuga do combate.
     """
     cs = memory.campaign.get("combat_state", {})
+    _log_combat_event("combat_end", msg="Combate encerrado")
     cs["is_active"]           = False
     cs["initiative_order"]    = []
     cs["current_turn_index"]  = 0
@@ -4607,6 +4689,8 @@ def execute_npc_turn(npc_name: str = "") -> str:
                   max(1, npc_sheet.get("vida_max", 1)))
         if hp_pct <= 0.25:
             npc["status"] = "fugiu"
+            _log_combat_event("flee", npc_name, "",
+                              msg=f"{npc_name} fugiu do combate")
             memory.save_campaign()
             advance = _auto_advance_turn(npc_name)
             return (
@@ -4667,6 +4751,569 @@ def execute_npc_turn(npc_name: str = "") -> str:
         end_turn         = True,
         _skip_turn_check = True,
     )
+
+
+# ===========================================================================
+# API de COMBATE NA TELA (sem LLM)
+# ---------------------------------------------------------------------------
+# Funções puras sobre memory.campaign. O server.py só faz wrapper JSON.
+# TODA a mecânica continua no motor já fuzzado (attack_roll/use_ability/
+# execute_npc_turn/next_turn/roll_death_save) — estas funções NÃO recalculam
+# nada: só orquestram intents e fotografam o estado para a tela.
+# ===========================================================================
+
+# ── Economia de ações 5e: o que é Ação Bônus por nome ──────────────────────
+# Heurística por substring (case/acento-insensível). Default = Ação.
+# Regras combinam SRD 2014 + revisão 2024 (poção como Bônus).
+_ABILITY_BONUS_PATTERNS = (
+    "healing word", "palavra curativa", "palavra de cura",
+    "misty step", "passo brumoso",
+    "second wind", "segunda folego", "segundo folego",
+    "action surge", "surto de acao",
+    "cunning action", "acao astuta",
+    "bardic inspiration", "inspiracao de bardo",
+    "spiritual weapon", "arma espiritual",
+    "shillelagh", "shillelah",
+    "healing spirit", "espirito curativo",
+    "hex",  # cast inicial é Bônus
+    "mass healing word",
+)
+
+
+def _ability_action_type(name: str) -> str:
+    """'bonus' se a habilidade é Ação Bônus pela regra 5e; senão 'acao'."""
+    n = _norm_txt(name)
+    if not n:
+        return "acao"
+    for p in _ABILITY_BONUS_PATTERNS:
+        if _norm_txt(p) in n:
+            return "bonus"
+    return "acao"
+
+
+def _item_action_type(name: str) -> str:
+    """
+    'bonus' para itens que custam Ação Bônus pela regra (2024).
+    Atualmente: Poção de Cura e variantes. Outros consumíveis → 'acao'.
+    """
+    n = _norm_txt(name)
+    if not n:
+        return "acao"
+    if ("pocao de cura" in n or "potion of healing" in n or
+            "healing potion" in n or "pocao de vida" in n):
+        return "bonus"
+    return "acao"
+
+
+def _reset_turn_economy(cs: dict) -> None:
+    """Zera Ação/Bônus do novo combatente que entra em seu turno."""
+    if isinstance(cs, dict):
+        cs["turn_economy"] = {"acao_usada": False, "bonus_usada": False}
+
+
+# Marcadores de habilidade PASSIVA (não aparecem como botão de ação na tela).
+_ABILITY_PASSIVE_NAME_PREFIX = (
+    "proficiencia", "proficiência", "idioma", "resistencia a", "resistência a",
+    "imunidade", "visao no escuro", "visão no escuro", "sentido", "tamanho",
+    "deslocamento", "estilo de combate",
+)
+_ABILITY_PASSIVE_DESC_MARKERS = (
+    "proficiencia de pericia", "proficiência de perícia",
+    "concedida pelo antecedente", "proficiência concedida",
+    "habilidade de classe —", "habilidade de classe -",
+    "passiv",  # "passiva", "passivo"
+)
+
+
+def _norm_txt(t: str) -> str:
+    import unicodedata
+    t = (t or "").lower().strip()
+    return "".join(c for c in unicodedata.normalize("NFD", t)
+                   if unicodedata.category(c) != "Mn")
+
+
+def _ability_is_passive(hab: dict) -> bool:
+    """
+    True quando a 'habilidade' é passiva/proficiência e NÃO deve virar botão
+    de ação na tela tática (ex: 'Proficiência: Atletismo', 'Estilo de Combate').
+    Conservador: na dúvida, considera USÁVEL (mantém magias/ataques/curas).
+    """
+    nome = _norm_txt(hab.get("nome", ""))
+    if not nome:
+        return True
+    for p in _ABILITY_PASSIVE_NAME_PREFIX:
+        if nome.startswith(_norm_txt(p)):
+            return True
+    # Tem efeito ativo claro → usável (dado de dano/cura ou custo de mana).
+    if hab.get("dado") or int(hab.get("custo_mana", 0) or 0) > 0:
+        return False
+    desc = _norm_txt(hab.get("descricao", ""))
+    for m in _ABILITY_PASSIVE_DESC_MARKERS:
+        if _norm_txt(m) in desc:
+            return True
+    return False
+
+
+# Itens consumíveis usáveis EM COMBATE (palavras no nome).
+_CONSUMABLE_KEYWORDS = (
+    "poção", "pocao", "potion", "elixir", "frasco", "ampola",
+    "pergaminho", "scroll", "óleo", "oleo",
+    "ácido", "acido", "fogo alquímico", "fogo alquimico", "água benta",
+    "agua benta", "bomba", "granada", "explosivo", "tônico", "tonico",
+    "veneno", "antídoto", "antidoto", "remédio", "remedio",
+)
+# Itens que claramente NÃO são consumíveis (filtro extra para evitar falso positivo).
+_NON_CONSUMABLE_KEYWORDS = (
+    "espada", "arco", "besta", "adaga", "lança", "lanca", "machado",
+    "armadura", "escudo", "capa", "amuleto", "anel", "elmo", "bota",
+    "luva", "gibão", "gibao", "cota", "calça", "calca", "túnica", "tunica",
+    "manopla", "virote", "flecha", "munição", "municao", "tocha", "corda",
+    "pacote", "saco", "mochila",
+)
+
+# Padrões de poções de cura conhecidos → (n_dice, sides, bonus). 5e SRD.
+_HEAL_POTIONS = [
+    ("suprema",    (10, 4, 20)),   # 10d4+20
+    ("superior",   (8,  4,  8)),   # 8d4+8
+    ("greater",    (4,  4,  4)),   # 4d4+4
+    ("maior",      (4,  4,  4)),
+]
+_HEAL_BASE = (2, 4, 2)             # poção de cura básica → 2d4+2
+
+
+def _item_combat_kind(item_name: str):
+    """
+    Classifica um item para uso em combate.
+    Retorna: ("heal", n_dice, sides, bonus)  |  ("generic", 0, 0, 0)  |  None.
+    None = item não é consumível de combate (não vira botão).
+    """
+    if not item_name:
+        return None
+    n = _norm_txt(item_name)
+    if not n:
+        return None
+    if any(kw in n for kw in (_norm_txt(k) for k in _NON_CONSUMABLE_KEYWORDS)):
+        return None
+    if not any(kw in n for kw in (_norm_txt(k) for k in _CONSUMABLE_KEYWORDS)):
+        return None
+    # Poções de cura: detecta nível pelo qualificador.
+    if "pocao de cura" in n or "potion of healing" in n or "healing potion" in n \
+            or "pocao de vida" in n:
+        for tag, dice in _HEAL_POTIONS:
+            if _norm_txt(tag) in n:
+                return ("heal",) + dice
+        return ("heal",) + _HEAL_BASE
+    return ("generic", 0, 0, 0)
+
+
+_WEAPON_KEYWORDS = (
+    "espada", "arco", "besta", "adaga", "lança", "lanca", "machado", "maça",
+    "maca", "martelo", "cajado", "bordão", "bordao", "clava", "porrete",
+    "rapieira", "florete", "sabre", "cimitarra", "foice", "chicote", "funda",
+    "tridente", "alabarda", "azagaia", "dardo", "zarabatana", "varinha",
+)
+
+
+def _combatant_weapons(ch: dict) -> list[dict]:
+    """Armas que o combatente pode usar: equipadas + inventário + desarmado."""
+    s = ch.get("sheet") or {}
+    eq = s.get("equipamentos", {}) or {}
+    out, seen = [], set()
+
+    def _add(nm, origem):
+        n = (nm or "").strip()
+        k = n.lower()
+        if not n or k in seen:
+            return
+        seen.add(k)
+        out.append({"nome": n, "origem": origem})
+
+    _add(eq.get("arma_principal"), "equipada")
+    _add(eq.get("arma_secundaria"), "equipada")
+    for it in (ch.get("inventario") or []):
+        if not isinstance(it, dict):
+            continue
+        inm = (it.get("nome") or "")
+        if any(kw in inm.lower() for kw in _WEAPON_KEYWORDS):
+            _add(inm, "inventário")
+    _add("Ataque desarmado", "desarmado")
+    return out
+
+
+def _combatant_snapshot(name: str) -> dict | None:
+    ch = memory.campaign["characters"].get(memory.char_key(name))
+    if not ch:
+        return None
+    s = ch.get("sheet") or {}
+    conds = []
+    for c in (s.get("condicoes") or []):
+        conds.append(c.get("nome", "") if isinstance(c, dict) else str(c))
+    habs = []        # só ATIVAS (viram botão)
+    passivas = []    # exibição informativa
+    for h in (ch.get("habilidades") or []):
+        if not isinstance(h, dict):
+            continue
+        entry = {
+            "nome":       h.get("nome", ""),
+            "custo_mana": int(h.get("custo_mana", 0) or 0),
+            "dado":       h.get("dado", ""),
+            "descricao":  h.get("descricao", ""),
+            "tipo_acao":  _ability_action_type(h.get("nome", "")),
+        }
+        if _ability_is_passive(h):
+            passivas.append(entry["nome"])
+        else:
+            habs.append(entry)
+    itens = []
+    itens_combate = []   # subconjunto consumível (usável na tela tática)
+    for it in (ch.get("inventario") or []):
+        if not isinstance(it, dict):
+            continue
+        entry = {
+            "nome": it.get("nome", ""),
+            "qtd":  int(it.get("qtd", 1) or 1),
+            "descricao": it.get("descricao", ""),
+        }
+        itens.append(entry)
+        kind = _item_combat_kind(entry["nome"])
+        if kind and entry["qtd"] > 0:
+            itens_combate.append({
+                **entry,
+                "kind": kind[0],
+                "tipo_acao": _item_action_type(entry["nome"]),
+                "dice": f"{kind[1]}d{kind[2]}+{kind[3]}" if kind[0] == "heal" else "",
+            })
+    return {
+        "name":       ch.get("name", name),
+        "status":     (ch.get("status", "vivo") or "vivo"),
+        "is_party":   bool(memory.is_party_member(ch)),
+        "hp":         int(s.get("vida_atual", 0) or 0),
+        "hp_max":     int(s.get("vida_max", 0) or 0),
+        "mp":         int(s.get("mana_atual", 0) or 0),
+        "mp_max":     int(s.get("mana_max", 0) or 0),
+        "ca":         int(s.get("ca", 10) or 10),
+        "nivel":      int(s.get("nivel", 1) or 1),
+        "classe":     s.get("classe", ""),
+        "arma":       (s.get("equipamentos", {}) or {}).get("arma_principal") or "",
+        "armas":      _combatant_weapons(ch),
+        "condicoes":  conds,
+        "habilidades": habs,
+        "passivas":   passivas,
+        "inventario": itens,
+        "itens_combate": itens_combate,
+    }
+
+
+def combat_snapshot() -> dict:
+    """Estado completo do combate para a tela tática (JSON-serializável)."""
+    camp = memory.campaign
+    cs   = camp.get("combat_state", {}) or {}
+    order = list(cs.get("initiative_order", []) or [])
+    idx   = cs.get("current_turn_index", 0)
+    if not isinstance(idx, int) or not (0 <= idx < len(order)):
+        idx = 0
+    combatants = []
+    for nm in order:
+        snap = _combatant_snapshot(nm)
+        if snap:
+            snap["is_current"] = (order.index(nm) == idx) if nm in order else False
+            combatants.append(snap)
+    current = order[idx] if order else ""
+    return {
+        "combat_mode": camp.get("combat_mode", "narrado"),
+        "is_active":   bool(cs.get("is_active")),
+        "round":       int(cs.get("round", 1) or 1),
+        "turn_index":  idx,
+        "turn_token":  int(cs.get("turn_token", 0) or 0),
+        "current":     current,
+        "current_is_party": bool(
+            memory.is_party_member(
+                memory.campaign["characters"].get(memory.char_key(current), {})
+            )
+        ) if current else False,
+        "order":       order,
+        "combatants":  combatants,
+        "log":         list(cs.get("log", []) or [])[-60:],
+        "result":      cs.get("result"),   # painel de fim (None até acabar)
+        "turn_economy": dict(cs.get("turn_economy") or
+                             {"acao_usada": False, "bonus_usada": False}),
+    }
+
+
+def combat_action(action: str, actor: str = "", target: str = "",
+                  weapon: str = "", ability: str = "", item: str = "") -> dict:
+    """
+    Aplica UMA intenção de combate vinda da tela, delegando ao motor
+    determinístico já fuzzado. Retorna {ok, message, snapshot}.
+
+    actions: attack | ability | enemy | pass | defend | flee | death_save | end
+    """
+    cs = memory.campaign.get("combat_state", {}) or {}
+    if action not in ("end",) and not cs.get("is_active"):
+        return {"ok": False, "message": "Nenhum combate ativo.",
+                "snapshot": combat_snapshot()}
+
+    msg = ""
+    a = (action or "").lower().strip()
+
+    # Helper local: tenta marcar slot ("acao"|"bonus") na economia do turno.
+    # Retorna mensagem de erro (string) ou None se ok.
+    def _use_slot(eco: dict, slot: str) -> str | None:
+        key = slot + "_usada"
+        if eco.get(key):
+            rotulo = "Ação" if slot == "acao" else "Ação Bônus"
+            return (f"❌ {actor} já usou sua {rotulo} neste turno. "
+                    f"Use 'Encerrar Turno' ou a outra parte da economia.")
+        eco[key] = True
+        return None
+
+    # Caminhos que NÃO usam a economia do jogador (o motor cuida do avanço):
+    if a == "enemy":
+        msg = execute_npc_turn()
+
+    elif a == "death_save":
+        if not actor:
+            return {"ok": False, "message": "Teste de morte exige actor.",
+                    "snapshot": combat_snapshot()}
+        msg = roll_death_save(actor)
+
+    elif a == "end":
+        msg = end_combat()
+
+    else:
+        # Daqui pra baixo: ações DE JOGADOR. Aplicam a economia 5e (Ação,
+        # Bônus). Engine NÃO avança turno por conta própria (end_turn=False)
+        # — esta função decide o avanço com base na economia.
+        if not actor:
+            return {"ok": False, "message": f"Ação '{a}' exige actor.",
+                    "snapshot": combat_snapshot()}
+        v = _combat_turn_violation(actor)
+        if v:
+            return {"ok": False, "message": v, "snapshot": combat_snapshot()}
+        eco = cs.setdefault("turn_economy",
+                            {"acao_usada": False, "bonus_usada": False})
+        force_end = False  # se True ao final, encerra o turno (flee/pass)
+
+        if a == "attack":
+            if not target:
+                return {"ok": False, "message": "Ataque exige target.",
+                        "snapshot": combat_snapshot()}
+            err = _use_slot(eco, "acao")
+            if err:
+                return {"ok": False, "message": err, "snapshot": combat_snapshot()}
+            if not weapon:
+                ch = memory.campaign["characters"].get(memory.char_key(actor), {})
+                weapon = ((ch.get("sheet", {}) or {}).get("equipamentos", {}) or {}
+                          ).get("arma_principal") or "ataque desarmado"
+            msg = attack_roll(actor, target, weapon, 6, end_turn=False)
+
+        elif a == "ability":
+            if not ability:
+                return {"ok": False, "message": "Habilidade exige ability.",
+                        "snapshot": combat_snapshot()}
+            slot = "bonus" if _ability_action_type(ability) == "bonus" else "acao"
+            err = _use_slot(eco, slot)
+            if err:
+                return {"ok": False, "message": err, "snapshot": combat_snapshot()}
+            msg = use_ability(actor, ability, target, end_turn=False)
+
+        elif a == "item":
+            item_name = (item or weapon or "").strip()
+            if not item_name:
+                return {"ok": False, "message": "Especifique o item.",
+                        "snapshot": combat_snapshot()}
+            ch = memory.campaign["characters"].get(memory.char_key(actor))
+            if not ch:
+                return {"ok": False, "message": f"'{actor}' não encontrado.",
+                        "snapshot": combat_snapshot()}
+            inv = ch.get("inventario") or []
+            slot_inv = next((it for it in inv
+                             if isinstance(it, dict)
+                             and (it.get("nome") or "").strip().lower() == item_name.lower()
+                             and int(it.get("qtd", 1) or 1) > 0), None)
+            if not slot_inv:
+                return {"ok": False,
+                        "message": f"'{actor}' não tem '{item_name}' utilizável.",
+                        "snapshot": combat_snapshot()}
+            kind = _item_combat_kind(slot_inv.get("nome", ""))
+            if not kind:
+                return {"ok": False,
+                        "message": f"'{item_name}' não é consumível de combate.",
+                        "snapshot": combat_snapshot()}
+            # Custo de ação do ITEM (poção de cura = Bônus pela 5e 2024).
+            slot = ("bonus" if _item_action_type(slot_inv["nome"]) == "bonus"
+                    else "acao")
+            err = _use_slot(eco, slot)
+            if err:
+                return {"ok": False, "message": err, "snapshot": combat_snapshot()}
+            # Aplica efeito
+            if kind[0] == "heal":
+                _, n_d, sides, bonus = kind
+                rolls = [random.randint(1, sides) for _ in range(n_d)]
+                heal  = sum(rolls) + bonus
+                recv_name = (target or actor).strip() or actor
+                recv = memory.campaign["characters"].get(memory.char_key(recv_name))
+                if not recv or not recv.get("sheet"):
+                    # devolve o slot consumido (alvo inválido) — segurança extra
+                    eco[slot + "_usada"] = False
+                    return {"ok": False, "message": f"Alvo '{recv_name}' inválido.",
+                            "snapshot": combat_snapshot()}
+                st = recv["sheet"]
+                hp_antes = int(st.get("vida_atual", 0) or 0)
+                hp_max   = int(st.get("vida_max", 0) or 0)
+                st["vida_atual"] = max(0, min(hp_max, hp_antes + heal))
+                hp_depois = st["vida_atual"]
+                if hp_antes == 0 and hp_depois > 0 and (recv.get("status", "") or "").lower() in ("inconsciente", "estabilizado"):
+                    recv["status"] = "vivo"
+                    st["death_saves_sucessos"] = 0
+                    st["death_saves_falhas"]   = 0
+                detail = " + ".join(str(r) for r in rolls)
+                tag_eco = "Bônus" if slot == "bonus" else "Ação"
+                _log_combat_event(
+                    "item_heal", actor, recv["name"],
+                    msg=(f"{actor} usou {slot_inv['nome']} em {recv['name']} "
+                         f"[{tag_eco}]: 🎲 {n_d}d{sides}: [{detail}] +{bonus} = "
+                         f"{heal} cura • HP {hp_antes}→{hp_depois}/{hp_max}"),
+                    item=slot_inv["nome"], rolls=list(rolls), heal=heal,
+                    hp=hp_depois, hp_max=hp_max, slot=slot,
+                )
+                msg = (f"🧪 {actor} usou {slot_inv['nome']} em {recv['name']} "
+                       f"[{tag_eco}]: +{heal} HP ({hp_antes}→{hp_depois}/{hp_max}).")
+            else:
+                _log_combat_event("item_use", actor, target,
+                                  msg=f"{actor} usou {slot_inv['nome']}",
+                                  item=slot_inv["nome"], slot=slot)
+                msg = f"🧪 {actor} usou {slot_inv['nome']}."
+            slot_inv["qtd"] = int(slot_inv.get("qtd", 1) or 1) - 1
+            if slot_inv["qtd"] <= 0:
+                try: inv.remove(slot_inv)
+                except ValueError: pass
+            memory.save_campaign()
+
+        elif a == "defend":
+            err = _use_slot(eco, "acao")  # Dodge = Ação
+            if err:
+                return {"ok": False, "message": err, "snapshot": combat_snapshot()}
+            _log_combat_event("defend", actor, "",
+                              msg=f"{actor} defendeu-se (Esquivar — Ação)")
+            msg = f"🛡️ {actor} esquiva-se (Dodge)."
+
+        elif a == "flee":
+            err = _use_slot(eco, "acao")
+            if err:
+                return {"ok": False, "message": err, "snapshot": combat_snapshot()}
+            ch = memory.campaign["characters"].get(memory.char_key(actor))
+            if not ch:
+                return {"ok": False, "message": f"'{actor}' não encontrado.",
+                        "snapshot": combat_snapshot()}
+            ch["status"] = "fugiu"
+            _log_combat_event("flee", actor, "", msg=f"{actor} fugiu do combate")
+            memory.save_campaign()
+            msg = f"💨 {actor} fugiu do combate!"
+            force_end = True
+
+        elif a in ("pass", "end_turn"):
+            # Encerrar o turno explicitamente (sem ação especial).
+            _log_combat_event("pass", actor, "",
+                              msg=f"{actor} encerrou o turno")
+            msg = ""
+            force_end = True
+
+        else:
+            return {"ok": False, "message": f"Ação '{action}' desconhecida.",
+                    "snapshot": combat_snapshot()}
+
+        # ── Decisão de AVANÇO de turno (regra 5e) ────────────────────────
+        cs_now  = memory.campaign.get("combat_state", {}) or {}
+        eco_now = cs_now.get("turn_economy", {}) or {}
+        if force_end or (eco_now.get("acao_usada") and eco_now.get("bonus_usada")):
+            msg += _auto_advance_turn(actor)
+
+    # FIM AUTOMÁTICO: na tela tática, se um lado foi todo derrotado/fugiu,
+    # encerra o combate (o motor só encerrava se TODOS estavam fora).
+    cs2 = memory.campaign.get("combat_state", {}) or {}
+    if a != "end" and cs2.get("is_active"):
+        order = cs2.get("initiative_order", []) or []
+        party_alive = enemy_alive = party_seen = enemy_seen = False
+        for nm in order:
+            ch = memory.campaign["characters"].get(memory.char_key(nm))
+            if not ch:
+                continue
+            is_p = bool(memory.is_party_member(ch))
+            out  = (ch.get("status", "") or "").lower() in OUT_OF_COMBAT_STATUSES
+            if is_p:
+                party_seen = True
+                party_alive = party_alive or (not out)
+            else:
+                enemy_seen = True
+                enemy_alive = enemy_alive or (not out)
+        if (enemy_seen and not enemy_alive) or (party_seen and not party_alive):
+            party_win = enemy_seen and not enemy_alive
+            quem = "inimigos" if party_win else "o grupo"
+            # Captura o RESULTADO antes de end_combat() limpar a ordem,
+            # para a tela mostrar um painel de fim (sem fechar bruscamente).
+            sobrev, caidos = [], []
+            for nm in order:
+                snp = _combatant_snapshot(nm)
+                if not snp:
+                    continue
+                linha = {"name": snp["name"], "is_party": snp["is_party"],
+                         "hp": snp["hp"], "hp_max": snp["hp_max"],
+                         "status": snp["status"]}
+                if snp["status"].lower() in OUT_OF_COMBAT_STATUSES:
+                    caidos.append(linha)
+                else:
+                    sobrev.append(linha)
+            cs2["result"] = {
+                "outcome":      "vitoria" if party_win else "derrota",
+                "title":        "Vitória!" if party_win else "Derrota…",
+                "sobreviventes": sobrev,
+                "caidos":        caidos,
+            }
+            _log_combat_event("side_wiped", msg=f"Combate decidido — {quem} fora de ação")
+            msg += "\n" + end_combat()
+
+    # Se chegou até aqui, a ação foi aceita pelo motor. "❌" pode aparecer
+    # na narrativa de um ataque que ERROU — ainda é sucesso da ação.
+    # Recusas reais retornam ok=False mais cedo (early returns).
+    return {"ok": True, "message": msg, "snapshot": combat_snapshot()}
+
+
+def combat_recap_payload() -> str:
+    """
+    Texto compacto do combate (do log estruturado) para a LLM narrar a luta
+    inteira de uma vez e gerar o saque. Usado quando o combate acaba na tela.
+    """
+    cs  = memory.campaign.get("combat_state", {}) or {}
+    log = cs.get("log", []) or []
+    linhas = []
+    for ev in log:
+        r = ev.get("round", "?")
+        linhas.append(f"[R{r}] {ev.get('msg', ev.get('type',''))}")
+
+    # Estado final vem do RESULTADO capturado (a ordem já foi limpa por
+    # end_combat). Inclui quem caiu (alvos de saque) e quem sobreviveu.
+    res = cs.get("result") or {}
+    desfecho = res.get("outcome", "fim")
+    finais = []
+    for c in (res.get("sobreviventes", []) + res.get("caidos", [])):
+        lado = "grupo" if c.get("is_party") else "inimigo"
+        finais.append(f"{c.get('name')} [{lado}]: {c.get('status')} "
+                      f"({c.get('hp')}/{c.get('hp_max')} HP)")
+
+    payload = (
+        "[COMBATE RESOLVIDO NA TELA TÁTICA]\n"
+        f"Desfecho: {desfecho}. "
+        "Narre a luta INTEIRA de forma cinematográfica e contínua (não turno a "
+        "turno) com base no log abaixo, e gere o SAQUE dos inimigos derrotados "
+        "(use add_item/modify_currency se houver). Depois siga a história.\n\n"
+        "— Eventos —\n" + "\n".join(linhas) +
+        "\n\n— Estado final —\n" + "\n".join(finais)
+    )
+    # Acknowledged: limpa o resultado para não reabrir o painel de fim.
+    if isinstance(cs, dict):
+        cs["result"] = None
+    return payload
 
 
 DND_TOOLS = [
