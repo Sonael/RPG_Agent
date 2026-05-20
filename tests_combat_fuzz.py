@@ -295,22 +295,31 @@ def run_screen(n_combates=5000, seed=4321):
             cur_party = snap["current_is_party"]
             cur_obj = next((x for x in snap["combatants"] if x["name"] == cur), None) or {}
             if cur_party:
-                # jogador: ataca, usa item (poção), ou passa
+                # Fuzzer respeita a economia de ações 5e (Ação + Bônus).
+                eco        = snap.get("turn_economy") or {}
+                acao_used  = bool(eco.get("acao_usada"))
+                bonus_used = bool(eco.get("bonus_usada"))
                 enemies = [x["name"] for x in snap["combatants"]
                            if not x["is_party"] and x["status"] not in OUT]
                 itens = (cur_obj.get("itens_combate") or [])
-                # usa item ~15% das vezes se houver, senão ataca/passa
-                if itens and rng.random() < 0.15:
+                pocoes = [i for i in itens if i["kind"] == "heal"]
+
+                # Se ambos slots usados, espera o auto-avanço (segue iteração).
+                # Tenta usar o que sobrou; se não sobrou opção útil, encerra o turno.
+                if not acao_used and enemies and rng.random() < 0.75:
+                    res = T.combat_action("attack", cur, rng.choice(enemies))
+                elif not bonus_used and pocoes and rng.random() < 0.5:
+                    it = rng.choice(pocoes)
+                    res = T.combat_action("item", cur, item=it["nome"], target=cur)
+                elif not acao_used and itens and rng.random() < 0.2:
                     it = rng.choice(itens)
-                    # heal alvo = atual; outros = sem alvo
                     if it["kind"] == "heal":
                         res = T.combat_action("item", cur, item=it["nome"], target=cur)
                     else:
                         res = T.combat_action("item", cur, item=it["nome"])
-                elif enemies and rng.random() < 0.85:
-                    res = T.combat_action("attack", cur, rng.choice(enemies))
                 else:
-                    res = T.combat_action("pass", cur)
+                    # Sem opção útil OU já gastou o que ia gastar → encerra.
+                    res = T.combat_action("end_turn", cur)
             else:
                 res = T.combat_action("enemy")
             calls += 1

@@ -6,5 +6,6 @@ campanhas/
 *.json
 *.md
 !requirements.txt
+!README.md
 .DS_Store
 .claude/
