@@ -282,6 +282,32 @@ def _migrate_spell_descriptions() -> None:
                 hab["dado"]       = data.get("dado", hab.get("dado", ""))
 
 
+def _migrate_mana_pool() -> None:
+    """
+    Recalcula o pool de mana das fichas para a tabela oficial de Pontos de
+    Magia (DMG p.288), corrigindo personagens criados com a fórmula homebrew
+    antiga (que dependia do atributo e crescia errado no level-up). Roda no
+    load_campaign. Só afeta classes de PC reconhecidas; NPCs e classes
+    desconhecidas ficam intactos. `mana_atual` é apenas limitada ao novo
+    máximo (não recarrega mana gasta).
+    """
+    try:
+        from tools_dnd import _max_mana_for, CLASS_DATA
+    except ImportError:
+        return
+    for char in campaign.get("characters", {}).values():
+        sheet = char.get("sheet")
+        if not sheet:
+            continue
+        classe = (sheet.get("classe", "") or "").lower().strip()
+        if classe not in CLASS_DATA:
+            continue                       # NPC / classe não-PC: não mexe
+        novo_max = _max_mana_for(classe, int(sheet.get("nivel", 1) or 1))
+        sheet["mana_max"]   = novo_max
+        atual               = int(sheet.get("mana_atual", 0) or 0)
+        sheet["mana_atual"] = max(0, min(atual, novo_max))
+
+
 def char_key(name: str) -> str:
     """
     Normaliza o nome de um personagem para uso como chave no dict `characters`.
@@ -386,6 +412,9 @@ def load_campaign() -> bool:
 
         # Substitui descrições placeholder de magias pelos dados reais
         _migrate_spell_descriptions()
+
+        # Recalcula o pool de mana pela tabela oficial de Pontos de Magia
+        _migrate_mana_pool()
 
         print(
             f"Campanha carregada: {chars} personagens, {locs} locais, "

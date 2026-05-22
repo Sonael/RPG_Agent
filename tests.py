@@ -82,6 +82,16 @@ m.campaign = {
 }
 m.save_campaign = lambda: None
 m.char_key = lambda n: n.lower().strip().replace('_', ' ')
+# Definição canônica de "está no grupo" (espelha memory.is_party_member),
+# usada pelas ferramentas de combate.
+m.is_party_member = lambda c: (
+    bool(c.get('party_member'))
+    or (c.get('name', '') or '').lower().strip()
+        == (m.campaign.get('protagonist', '') or '').lower().strip()
+    or any((p.get('name', '') or '').lower().strip()
+           == (c.get('name', '') or '').lower().strip()
+           for p in m.campaign.get('party', []))
+)
 sys.modules['memory'] = m
 sys.path.insert(0, '.')
 

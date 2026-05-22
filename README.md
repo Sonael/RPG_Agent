@@ -84,10 +84,10 @@ abre o loop **percepção → deliberação → ação → verificação** em de
 3. [Estilos de campanha](#estilos-de-campanha)
 4. [Sistema de memória (estado por sessão)](#sistema-de-memória-estado-por-sessão)
 5. [Persistência (Supabase) e autenticação](#persistência-supabase-e-autenticação)
-6. [Modo D&D, mecânicas](#modo-dd--mecânicas)
+6. [Modo D&D, mecânicas](#modo-dd-mecânicas)
 7. [Sistema de combate](#sistema-de-combate)
 8. [Tela de combate tática (Pergaminho Épico)](#tela-de-combate-tática-pergaminho-épico)
-9. [Tools, o catálogo do agente](#tools--o-catálogo-do-agente)
+9. [Tools, o catálogo do agente](#tools-o-catálogo-do-agente)
 10. [Endpoints HTTP](#endpoints-http)
 11. [Frontend](#frontend)
 12. [Testes e garantias](#testes-e-garantias)
@@ -400,7 +400,8 @@ navegador. `static/js/utils.js:authFetch` tenta refresh silencioso em 401.
 ## Modo D&D, mecânicas
 
 `tools_dnd.py` (~6900 linhas, 38 ferramentas + helpers) é o motor de regras D&D 5e
-simplificado (mana em vez de slots, casos comuns cobertos). Resumo:
+(usa a variante oficial de Pontos de Magia do DMG p.288 no lugar de spell
+slots; casos comuns cobertos). Resumo:
 
 ### Criação de personagem
 

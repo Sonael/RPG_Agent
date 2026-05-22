@@ -445,8 +445,54 @@ CLASS_DATA: dict[str, dict] = {
 }
 
 STAT_NAMES = {"forca", "destreza", "constituicao", "inteligencia", "sabedoria", "carisma"}
-# ── Custo de mana por nível de magia ────────────────────────────────────────
-SPELL_MANA_COST = {0: 0, 1: 4, 2: 8, 3: 12, 4: 16, 5: 20, 6: 24, 7: 28, 8: 32, 9: 36}
+# ── Sistema de mana: variante oficial Spell Points do D&D 5e (DMG p.288) ────
+# Custo de cada magia em Pontos de Magia (mana), por nível da magia.
+# Truques (nível 0) são gratuitos. Substitui o antigo custo homebrew (nível×4).
+SPELL_MANA_COST = {0: 0, 1: 2, 2: 3, 3: 5, 4: 6, 5: 7, 6: 9, 7: 10, 8: 11, 9: 13}
+
+# Pool de mana por NÍVEL DE CONJURADOR — tabela oficial da variante Spell
+# Points (DMG p.288). O pool depende SÓ do nível: todo conjurador de um dado
+# nível tem o mesmo pool, independentemente do atributo de conjuração.
+SPELL_POINTS_BY_LEVEL = {
+    1: 4,    2: 6,    3: 14,   4: 17,   5: 27,
+    6: 32,   7: 38,   8: 44,   9: 57,   10: 64,
+    11: 73,  12: 73,  13: 83,  14: 83,  15: 94,
+    16: 94,  17: 107, 18: 114, 19: 123, 20: 133,
+}
+
+# Fração de conjuração por classe → define o nível de conjurador efetivo.
+# Chaves SEM acento — a comparação normaliza acentos (ver _max_mana_for).
+_FULL_CASTERS  = {"mago", "feiticeiro", "clerigo", "druida", "bardo",
+                  "bruxo", "arcanista"}
+_HALF_CASTERS  = {"paladino", "patrulheiro"}             # metade do progresso
+_THIRD_CASTERS = {"guerreiro", "ladino"}                 # Cav. Élditch / Trapaceiro Arcano
+
+
+def _max_mana_for(classe: str, char_level: int) -> int:
+    """
+    Pool máximo de mana de um personagem pela tabela oficial de Pontos de
+    Magia (DMG p.288). NÃO depende do atributo de conjuração, depende só do
+    nível de conjurador efetivo:
+
+      • Conjurador pleno  → nível de conjurador = nível do personagem.
+      • Meio-conjurador   → ceil(nível / 2); nada antes do nível 2.
+      • Terço-conjurador  → ceil(nível / 3); nada antes do nível 3.
+      • Monge             → Ki = 1 ponto por nível (regra real do monge).
+      • Bárbaro / demais  → 0.
+    """
+    c   = _norm_txt(classe)   # minúsculas, sem acento (clérigo → clerigo)
+    lvl = max(1, min(20, int(char_level or 1)))
+    if c in _FULL_CASTERS:
+        cl = lvl
+    elif c in _HALF_CASTERS:
+        cl = (lvl + 1) // 2 if lvl >= 2 else 0          # ceil(lvl/2)
+    elif c in _THIRD_CASTERS:
+        cl = (lvl + 2) // 3 if lvl >= 3 else 0          # ceil(lvl/3)
+    elif c == "monge":
+        return lvl                                       # pool de Ki = nível
+    else:
+        return 0                                         # bárbaro / não-conjuradores
+    return SPELL_POINTS_BY_LEVEL.get(cl, 0)
 
 # ── Tradução PT → EN para busca no Open5e ───────────────────────────────────
 # ── Níveis reais de magias comuns para validar/corrigir respostas da API ────
@@ -2602,25 +2648,15 @@ def create_character_sheet(
     dex_mod  = _modifier(destreza)
     hit_die  = info["hit_die"]
 
-    stat_map = {
-        "forca": forca, "destreza": destreza, "constituicao": constituicao,
-        "inteligencia": inteligencia, "sabedoria": sabedoria, "carisma": carisma,
-    }
-    mana_stat      = info.get("mana_stat")
-    mana_per_level = info.get("mana_per_level", 0)
-    if mana_stat and mana_per_level > 0:
-        mana_mod = _modifier(stat_map.get(mana_stat, 10))
-        base_mana_per_level = max(0, mana_per_level + mana_mod)
-    else:
-        base_mana_per_level = 0
-
     # Nível 1: dado máximo + CON (regra do Player's Handbook para personagens de nível 1)
     hp_max = max(1, hit_die + con_mod)
     # Níveis 2+: rola hit die para cada nível adicional
     for _ in range(nivel - 1):
         hp_max += max(1, random.randint(1, hit_die) + con_mod)
 
-    mana_max = base_mana_per_level * nivel if base_mana_per_level > 0 else 0
+    # Pool de mana pela tabela oficial de Pontos de Magia (DMG p.288):
+    # depende só do nível de conjurador, nunca do atributo de conjuração.
+    mana_max = _max_mana_for(classe_lower, nivel)
 
     prof = _proficiency_bonus(nivel)
     xp_threshold = XP_THRESHOLDS[nivel] if nivel < 20 else XP_THRESHOLDS[19]
@@ -2674,13 +2710,8 @@ def create_character_sheet(
     race_bonuses = _apply_race_bonuses(char_obj, sheet, raca)
     bonus_str = ", ".join(f"{k.upper()[:3]} +{v}" for k, v in race_bonuses.items()) if race_bonuses else "nenhum"
 
-    # Recalcula a mana com o atributo de conjuração JÁ com bônus racial
-    # (mana_max foi calculada antes dos bônus; um +CAR/+INT racial deve contar).
-    if mana_stat and mana_per_level > 0:
-        mana_mod_final  = _modifier(sheet.get(mana_stat, 10))
-        base_final      = max(0, mana_per_level + mana_mod_final)
-        sheet["mana_max"]   = base_final * nivel
-        sheet["mana_atual"] = sheet["mana_max"]
+    # (O pool de mana NÃO é recalculado por bônus racial: na variante de
+    # Pontos de Magia o pool depende só do nível, não do atributo.)
 
     # Aplica habilidades de classe para TODOS os níveis até o nível inicial
     all_feats: list[str] = []
@@ -4382,11 +4413,15 @@ def grant_xp(char_name: str, amount: int, reason: str = "") -> str:
         s["vida_max"]   += hp_gain
         s["vida_atual"] += hp_gain
 
-        mana_stat      = info.get("mana_stat")
-        mana_per_level = info.get("mana_per_level", 0)
-        if mana_stat and mana_per_level > 0:
-            s["mana_max"]  += mana_per_level
-            s["mana_atual"] = s["mana_max"]
+        # Mana recalculada pela tabela oficial (DMG p.288). É um lookup por
+        # nível, não um acumulador — isso corrige a inconsistência antiga em
+        # que o modificador de atributo era perdido a cada level-up.
+        mana_antes    = s.get("mana_max", 0)
+        novo_mana_max = _max_mana_for(s.get("classe", ""), s["nivel"])
+        mana_gain     = novo_mana_max - mana_antes
+        if novo_mana_max != mana_antes:
+            s["mana_max"]   = novo_mana_max
+            s["mana_atual"] = novo_mana_max
 
         s["xp_proximo"] = XP_THRESHOLDS[s["nivel"]] if s["nivel"] < 20 else s["xp"]
 
@@ -4395,8 +4430,8 @@ def grant_xp(char_name: str, amount: int, reason: str = "") -> str:
             f"\n   ❤️  Vida máxima: +{hp_gain} → {s['vida_max']}"
             f"\n   🛡️  Proficiência: +{s['proficiencia']}"
         )
-        if mana_stat and mana_per_level > 0:
-            result += f"\n   ✨ Mana máxima: +{mana_per_level} → {s['mana_max']}"
+        if mana_gain > 0:
+            result += f"\n   ✨ Mana máxima: +{mana_gain} → {s['mana_max']}"
 
         # Aplica habilidades de classe do novo nível automaticamente
         new_feats = _apply_class_features(char, s, s["nivel"])
@@ -4608,16 +4643,9 @@ def set_stat(char_name: str, stat_name: str, value: int) -> str:
             if s.get("ca", ca_antes) != ca_antes:
                 extra += f"\n   🛡️  CA: {ca_antes} → {s['ca']}"
 
-        info      = CLASS_DATA.get(s.get("classe", "").lower(), {})
-        mana_stat = info.get("mana_stat")
-        mpl       = info.get("mana_per_level", 0)
-        if mana_stat == key and mpl > 0 and delta:
-            old_mana_max    = s.get("mana_max", 0)
-            base            = max(0, mpl + new_mod)
-            s["mana_max"]   = base * nivel
-            d_mana          = s["mana_max"] - old_mana_max
-            s["mana_atual"] = max(0, min(s["mana_max"], s.get("mana_atual", 0) + d_mana))
-            extra += f"\n   ✨ Mana máx: {d_mana:+d} → {s['mana_max']}"
+        # O pool de mana NÃO muda ao alterar o atributo de conjuração — na
+        # variante de Pontos de Magia ele depende só do nível. O atributo
+        # segue afetando CD de magia e ataques mágicos, não o tamanho do pool.
     else:
         s[key] = value
 
