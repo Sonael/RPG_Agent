@@ -26,19 +26,28 @@
     o.id = 'combat-overlay';
     o.className = 'hidden';
     o.innerHTML = `
-      <div id="cbt-frame">
-        <div id="cbt-top">
-          <div id="cbt-round">Rodada 1</div>
-          <div id="cbt-order"></div>
+      <div id="cbt-frame" class="cbt-tome">
+        <div class="cbt-chapter-title">O Confronto</div>
+        <div id="cbt-round" class="cbt-round-marker">Anotações da 1ª Rodada</div>
+        <div id="cbt-order" class="cbt-initiative-strip"></div>
+
+        <div class="cbt-battlefield">
+          <div id="cbt-party" class="cbt-faction cbt-party"></div>
+          <div id="cbt-stage" class="cbt-vs-mark">Vs.</div>
+          <div id="cbt-enemies" class="cbt-faction cbt-enemies"></div>
         </div>
-        <div id="cbt-enemies"></div>
-        <div id="cbt-stage"><div id="cbt-vs">⚔️</div></div>
-        <div id="cbt-party"></div>
-        <div id="cbt-log"></div>
-        <div id="cbt-actionbar">
-          <div id="cbt-prompt">Aguardando…</div>
-          <div id="cbt-buttons"></div>
-          <div id="cbt-targets" class="hidden"></div>
+
+        <div class="cbt-dm-notes">
+          <div id="cbt-actionbar" class="cbt-note-section cbt-note-actions">
+            <h3 id="cbt-action-title" class="cbt-note-title">Anotações de Combate</h3>
+            <div id="cbt-prompt">Aguardando…</div>
+            <div id="cbt-buttons"></div>
+            <div id="cbt-targets" class="hidden"></div>
+          </div>
+          <div class="cbt-note-section cbt-note-log">
+            <h3 class="cbt-note-title">Registo dos Acontecimentos</h3>
+            <div id="cbt-log"></div>
+          </div>
         </div>
       </div>`;
     document.body.appendChild(o);
@@ -84,7 +93,8 @@
     const enemies = (snap.combatants || []).filter(c => !c.is_party);
     const party   = (snap.combatants || []).filter(c => c.is_party);
 
-    document.getElementById('cbt-round').textContent = `Rodada ${snap.round || 1}`;
+    const _r = snap.round || 1;
+    document.getElementById('cbt-round').textContent = `Anotações da ${_r}ª Rodada`;
     document.getElementById('cbt-order').innerHTML = (snap.order || [])
       .map((n, i) => `<span class="cbt-ord ${i === snap.turn_index ? 'on' : ''}">${esc(n)}</span>`)
       .join('<span class="cbt-ord-sep">›</span>');
@@ -107,13 +117,20 @@
     tgtEl.classList.add('hidden'); tgtEl.innerHTML = ''; _pick = null;
 
     const cur = (snap.combatants || []).find(c => c.is_current);
-    if (!cur) { promptEl.textContent = '…'; btnEl.innerHTML = ''; return; }
+    const titleEl = document.getElementById('cbt-action-title');
+    if (!cur) {
+      if (titleEl) titleEl.textContent = 'Anotações de Combate';
+      promptEl.textContent = '…'; btnEl.innerHTML = ''; return;
+    }
 
     if (!snap.current_is_party) {
-      promptEl.innerHTML = `Turno de <b>${esc(snap.current)}</b> (inimigo)…`;
+      if (titleEl) titleEl.textContent = `Turno do inimigo`;
+      promptEl.innerHTML = `<i>${esc(snap.current)}</i> avança nas sombras…`;
       btnEl.innerHTML = '';
       return;
     }
+
+    if (titleEl) titleEl.textContent = `O que fará ${esc(cur.name)}?`;
 
     // Economia 5e (Ação + Bônus) do turno atual.
     const eco       = snap.turn_economy || {};
@@ -219,6 +236,8 @@
     const tgtEl    = document.getElementById('cbt-targets');
     tgtEl.classList.add('hidden'); tgtEl.innerHTML = '';
 
+    const titleEl = document.getElementById('cbt-action-title');
+    if (titleEl) titleEl.textContent = 'Fim do Capítulo';
     const isWin = res.outcome === 'vitoria';
     const lista = (arr, kind) => (arr || []).map(c => {
       const lado = c.is_party
@@ -352,13 +371,17 @@
       if (window.showToast) window.showToast('Nenhuma habilidade ativa disponível.');
       return;
     }
-    tgtEl.innerHTML = `<div class="cbt-tgt-title">Habilidade:</div>` + habs.map(h =>
-      `<button ${dis(h.tipo_acao)} title="${esc(h.descricao)}" `
-      + `onclick="window.Combat._selHab('${esc(h.nome).replace(/'/g,"\\'")}')">`
-      + `✨ ${esc(h.nome)}${h.custo_mana ? ` <small>(${h.custo_mana}✨)</small>` : ''}`
-      + `${h.dado ? ` <small>· ${esc(h.dado)}</small>` : ''}`
-      + ` <em class="cbt-eco-tag eco-${h.tipo_acao}">${tag(h.tipo_acao)}</em></button>`
-    ).join('') + `<button class="cbt-cancel" onclick="window.Combat._cancel()">✕</button>`;
+    tgtEl.innerHTML = `<div class="cbt-tgt-title">Habilidade:</div>` + habs.map(h => {
+      const mode = h.target_mode || 'single';
+      const modeTag = mode === 'self' ? ' <small>· em si</small>'
+                    : mode === 'pool' ? ' <small>· área</small>' : '';
+      return `<button ${dis(h.tipo_acao)} title="${esc(h.descricao)}" `
+        + `onclick="window.Combat._selHab('${esc(h.nome).replace(/'/g,"\\'")}','${mode}')">`
+        + `✨ ${esc(h.nome)}${h.custo_mana ? ` <small>(${h.custo_mana}✨)</small>` : ''}`
+        + `${h.dado ? ` <small>· ${esc(h.dado)}</small>` : ''}`
+        + `${modeTag}`
+        + ` <em class="cbt-eco-tag eco-${h.tipo_acao}">${tag(h.tipo_acao)}</em></button>`;
+    }).join('') + `<button class="cbt-cancel" onclick="window.Combat._cancel()">✕</button>`;
     tgtEl.classList.remove('hidden');
   }
 
@@ -386,7 +409,24 @@
     }
   }
   function _selWeapon(name) { showTargets('attack',  { weapon: name }); }
-  function _selHab(name)    { showTargets('ability', { ability: name }); }
+  function _selHab(name, mode) {
+    if (_busy) return;
+    const cur = (_last && _last.combatants || []).find(c => c.is_current);
+    if (!cur) return;
+    // Self-only (Segunda Fôlego, Fúria…) — dispara direto no próprio ator.
+    if (mode === 'self') {
+      act({ action: 'ability', actor: cur.name, ability: name, target: cur.name });
+      return;
+    }
+    // Pool/área (Sleep, Color Spray) — engine decide os alvos pela ordem
+    // de iniciativa. Alvo vazio é o sinal pra autodeteção.
+    if (mode === 'pool') {
+      act({ action: 'ability', actor: cur.name, ability: name, target: '' });
+      return;
+    }
+    // single: picker normal de alvo.
+    showTargets('ability', { ability: name });
+  }
   function _target(name) {
     if (_busy || !_pick) return;
     const cur = (_last.combatants || []).find(c => c.is_current);

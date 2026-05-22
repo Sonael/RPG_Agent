@@ -483,6 +483,7 @@ def create_campaign():
         return jsonify({"error": f"Já existe uma campanha com o nome '{name}'"}), 409
 
     # Normaliza chaves de personagens para lowercase + normaliza sheet.classe
+    from tools_dnd import reconcile_character_archetypes
     raw_chars = campaign_data.get("characters", {})
     normalized_chars = {}
     for k, v in raw_chars.items():
@@ -490,6 +491,8 @@ def create_campaign():
         if char.get("sheet") and isinstance(char["sheet"].get("classe"), str):
             char["sheet"] = dict(char["sheet"])
             char["sheet"]["classe"] = char["sheet"]["classe"].lower()
+        # Materializa sub-features de arquétipos escolhidos no editor/wizard.
+        reconcile_character_archetypes(char)
         normalized_chars[k.lower().strip().replace("_", " ")] = char
 
     payload = {
@@ -549,6 +552,15 @@ def update_campaign(name):
     if not new_name:
         return jsonify({"error": "Nome inválido"}), 400
 
+    # Materializa sub-features de arquétipos escolhidos no editor antes de
+    # persistir (o picker do editor só grava a escolha em feature_choices).
+    from tools_dnd import reconcile_character_archetypes
+    edited_chars = campaign_data.get("characters", existing.get("characters", {}))
+    if isinstance(edited_chars, dict):
+        for _ch in edited_chars.values():
+            if isinstance(_ch, dict):
+                reconcile_character_archetypes(_ch)
+
     # Preserve fields that should not be overwritten by the editor
     payload = dict(existing)
     payload.update({
@@ -559,7 +571,7 @@ def update_campaign(name):
         "story_summary":    campaign_data.get("story_summary", existing.get("story_summary", "")),
         "current_scene":    campaign_data.get("current_scene", existing.get("current_scene", "")),
         "current_location": campaign_data.get("current_location", existing.get("current_location", "")),
-        "characters":       campaign_data.get("characters", existing.get("characters", {})),
+        "characters":       edited_chars,
         "locations":        campaign_data.get("locations", existing.get("locations", {})),
         "events":           campaign_data.get("events", existing.get("events", [])),
         "party":            campaign_data.get("party", existing.get("party", [])),
@@ -660,6 +672,10 @@ def get_class_spells():
                     "dado":          dado,
                     "ritual":        bool(s.get("ritual")),
                     "concentracao":  bool(s.get("concentration")),
+                    # Alcance vindo direto do Open5e — usado pelo engine para
+                    # decidir target_mode ("Self" → self-only; "Self (X cone)"
+                    # → área; resto → alvo único). Evita listas hardcoded.
+                    "alcance":       (s.get("range", "") or "").strip(),
                 })
             # A busca full-text da Open5e também casa na descrição (ex.:
             # "fireball" traz "Antimagic Field"). Prioriza nome; sort
@@ -858,6 +874,70 @@ def get_class_features():
                 "dado":       desc_data.get("dado", ""),
             })
     return jsonify({"ok": True, "features": result})
+
+
+@app.route("/api/dnd/feature_variants", methods=["GET"])
+@require_auth
+def get_feature_variants():
+    """
+    Retorna metadata de features com subescolha (Estilo de Combate, Inimigo
+    Favorecido, Metamagia, etc.). A UI usa para renderizar o picker em vez
+    do card descritivo padrão.
+
+    Sem query → devolve TODAS as features e suas opções.
+    Com ?feature=<nome> → só essa feature, com options resolvido (ex.:
+    "Inimigo Favorecido Adicional" herda options de "Inimigo Favorecido").
+    """
+    from tools_dnd import FEATURE_VARIANTS, _get_variants
+
+    feat = request.args.get("feature", "").strip()
+    if feat:
+        meta = _get_variants(feat)
+        if not meta:
+            return jsonify({"ok": False, "error": "feature sem variantes"}), 404
+        return jsonify({"ok": True, "feature": feat, "variants": meta})
+
+    # Lista completa — útil para o frontend cachear de uma vez.
+    out = {}
+    for name in FEATURE_VARIANTS.keys():
+        out[name] = _get_variants(name)
+    return jsonify({"ok": True, "variants": out})
+
+
+@app.route("/api/dnd/feature_choice", methods=["POST"])
+@require_auth
+def set_feature_choice_route():
+    """
+    Aplica/remove uma subescolha de feature. Body JSON:
+      { "char": "<nome>", "feature": "<feature>", "choice": "<opção>" }
+    Para remover: "choice": "remove:<opção>".
+
+    Despacha para tools_dnd.set_feature_choice — a função aplica a regra
+    de validação (pick limit, opção existir, etc.) e recalcula CA quando
+    necessário (Defesa).
+    """
+    from tools_dnd import set_feature_choice
+    import memory as _mem
+
+    data    = request.get_json() or {}
+    char    = (data.get("char") or "").strip()
+    feature = (data.get("feature") or "").strip()
+    choice  = (data.get("choice") or "").strip()
+    campaign = (data.get("campaign") or "").strip()
+
+    if not char or not feature or not choice:
+        return jsonify({"ok": False, "error": "char, feature e choice obrigatórios"}), 400
+
+    # Bind à campanha do usuário e carrega — set_feature_choice opera sobre
+    # memory.campaign (em sessão). Mesmo padrão de outros endpoints que
+    # mutam a ficha do personagem em jogo.
+    if campaign:
+        _mem.bind(g.user_id, campaign)
+        _mem.load_campaign()
+
+    msg = set_feature_choice(char, feature, choice)
+    ok = msg.startswith("✅") or msg.startswith("🗑️")
+    return jsonify({"ok": ok, "message": msg})
 
 
 @app.route("/api/campaigns/<name>", methods=["DELETE"])
@@ -1178,7 +1258,18 @@ def chat():
                                 resp_dict = dict(fr.response) if fr.response else {}
                                 conteudo  = resp_dict.get("result", "")
                                 if conteudo:
-                                    result_q.put(("tool_result", {"tool_name": fr.name, "content": str(conteudo)}))
+                                    # Remove trechos marcados como instrução interna
+                                    # ao modelo ([[llm]]…[[/llm]]) antes de exibir
+                                    # na UI. A LLM já consumiu o conteúdo completo
+                                    # via function_response; este queue só serve
+                                    # para o stream visual de tool_result.
+                                    visible = re.sub(
+                                        r'\s*\[\[llm\]\][\s\S]*?\[\[/llm\]\]\s*',
+                                        '\n',
+                                        str(conteudo),
+                                    ).strip()
+                                    if visible:
+                                        result_q.put(("tool_result", {"tool_name": fr.name, "content": visible}))
 
                     if event.usage_metadata:
                         usage = {
@@ -1404,13 +1495,57 @@ def generate_lore():
         return jsonify({"error": "Chave Google API não encontrada. Salve-a nas configurações."}), 400
 
     is_dnd = campaign_type == "dnd"
-    
-    # Schema D&D: inclui tipo (jogador/aliado/inimigo) e classe apenas para PCs
+
+    # Lista curada de slugs SRD (Open5e) — usada como enum mecânico de "raca"
+    # para NPCs/inimigos. O nome do personagem ("name") continua livre em
+    # português; o "raca" é só a referência ao bloco de stats.
+    SRD_MONSTER_SLUGS = (
+        # Humanoides civilizados / mercenários
+        "bandit, bandit-captain, guard, thug, scout, spy, veteran, knight, "
+        "noble, commoner, acolyte, priest, cultist, cult-fanatic, "
+        "mage, archmage, assassin, berserker, druid, tribal-warrior, "
+        # Humanoides monstruosos
+        "goblin, hobgoblin, bugbear, orc, kobold, gnoll, lizardfolk, drow, "
+        # Mortos-vivos
+        "skeleton, zombie, ghoul, ghost, wight, wraith, specter, mummy, "
+        "vampire-spawn, banshee, "
+        # Bestas
+        "wolf, dire-wolf, brown-bear, giant-spider, giant-eagle, panther, "
+        # Plantas e natureza (criaturas feitas de raízes/madeira/pedra viva)
+        "treant, awakened-tree, awakened-shrub, shambling-mound, vine-blight, "
+        "dryad, "
+        # Elementais
+        "fire-elemental, water-elemental, earth-elemental, air-elemental, "
+        "magma-mephit, dust-mephit, mud-mephit, "
+        # Gigantes
+        "ogre, troll, ettin, hill-giant, frost-giant, fire-giant, "
+        # Constructos
+        "animated-armor, flying-sword, gargoyle, scarecrow, "
+        "clay-golem, stone-golem, iron-golem, "
+        # Demônios / diabos
+        "imp, quasit, dretch, succubus, vrock, hezrou, "
+        # Aberrações
+        "mimic, gibbering-mouther, intellect-devourer, "
+        # Feras monstruosas
+        "owlbear, basilisk, manticore, displacer-beast, griffon, hippogriff, "
+        "harpy, minotaur, centaur, "
+        # Dragões
+        "young-red-dragon, young-blue-dragon, young-green-dragon, "
+        "young-white-dragon, young-black-dragon, wyvern, pseudodragon, "
+        # Fey
+        "satyr, sprite, pixie, blink-dog"
+    )
+
+    # Schema D&D: inclui tipo (jogador/aliado/inimigo) e classe apenas para PCs.
+    # O campo "raca" tem semântica DIFERENTE conforme o tipo:
+    #   • PC          → raça D&D em PT (humano, elfo, …)
+    #   • aliado/inim → slug SRD em INGLÊS (resolve no Open5e p/ CR/HP/CA reais)
     char_schema = (
         '{"name":"","description":"","traits":"","notes":"","role":"",'
         '"tipo":"<jogador|aliado|inimigo>",'
         '"classe":"<bárbaro|guerreiro|paladino|patrulheiro|bardo|clérigo|druida|monge|ladino|mago|feiticeiro|bruxo|npc>",'
-        '"raca":"<humano|elfo|anão|halfling|draconato|meio-elfo|tiferino|goblin|orc|draconato|outro>"}'
+        '"raca":"<PC: humano|elfo|anão|halfling|draconato|gnomo|meio-elfo|meio-orc|tiferino · '
+                'NPC: slug SRD em INGLÊS da lista fornecida no texto>"}'
         if is_dnd else
         '{"name":"","description":"","traits":"","notes":"","role":"","tipo":"<jogador|aliado|inimigo>"}'
     )
@@ -1418,8 +1553,25 @@ def generate_lore():
         'Para D&D use o campo "tipo" para classificar cada personagem: '
         '"jogador" = herói/aventureiro com classe PC (bárbaro, guerreiro, mago, etc.); '
         '"aliado" = NPC amigável sem classe PC (use classe "npc"); '
-        '"inimigo" = monstro ou antagonista sem classe PC (use classe "npc", raça pode ser goblin/orc/outro). '
+        '"inimigo" = monstro/antagonista sem classe PC (use classe "npc"). '
         "Apenas personagens do tipo jogador devem ter classes de PC. "
+        "REGRA CRÍTICA para o campo 'raca' de NPCs (tipo=aliado ou inimigo, classe=npc): "
+        "escolha OBRIGATORIAMENTE um slug de monstro SRD em INGLÊS desta lista, "
+        "pegando o que melhor representa MECANICAMENTE a criatura — o campo "
+        "'name' continua sendo livre/criativo em português e é o que o jogador "
+        "verá. O 'raca' é só a referência ao stat block. Lista permitida: "
+        f"{SRD_MONSTER_SLUGS}. "
+        "Exemplos de mapeamento name→raca: "
+        "'Guardião da Floresta' (criatura de raízes e pedras) → raca: 'treant'; "
+        "'Capitão dos Bandidos' → raca: 'bandit-captain'; "
+        "'Servo Esquelético' → raca: 'skeleton'; "
+        "'Senhor do Fogo' (elemental) → raca: 'fire-elemental'; "
+        "'Lobo Negro' → raca: 'dire-wolf'; "
+        "'Bruxa do Pântano' → raca: 'hag' não está na lista, use 'mage' ou 'druid' como aproximação. "
+        "JAMAIS use 'humanoide', 'monstro', 'outro' nem termos genéricos em "
+        "português para o 'raca' de NPCs — se nenhuma opção da lista couber "
+        "perfeitamente, escolha a APROXIMAÇÃO mais próxima (NUNCA deixe vazio "
+        "nem invente um slug fora da lista). "
         if is_dnd else
         'Use "tipo" para classificar: "jogador", "aliado" ou "inimigo". Não inclua classe ou raça. '
     )

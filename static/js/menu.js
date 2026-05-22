@@ -1184,6 +1184,9 @@ function wzAddSpell(i, spell) {
       custo_mana:  spell.custo_mana ?? 0,
       dado:        spell.dado || '',
       nivel_magia: spell.nivel_magia ?? 0,
+      // Vem do Open5e ("Self", "Self (15-foot cone)", "60 feet"…). O engine
+      // deriva target_mode a partir disso — sem listas hardcoded por nome.
+      alcance:     spell.alcance || '',
     });
   }
   // Atualiza o painel de magias (chips de selecionadas + marcador ✓) e o contador da aba
@@ -1425,13 +1428,18 @@ async function generateLore() {
         // Inimigos e aliados usam 'npc'; jogadores usam a classe gerada (ou guerreiro por padrão)
         const classeRaw = isPC ? (c.classe || 'guerreiro') : 'npc';
         const classe  = classeRaw.toLowerCase().trim();
-        // Para NPCs/inimigos: usa raça de monstro se válida, senão 'humanoide'
-        // Para PCs: usa raça de PC se válida, senão 'humano'
+        // Para PCs: usa raça de PC se válida, senão 'humano'.
+        // Para NPCs: aceita QUALQUER slug não-vazio (o prompt pede slugs SRD
+        // do Open5e — treant, bandit-captain, fire-elemental, etc.). O
+        // auto-fetch abaixo resolve no Open5e; se a IA mandar lixo, o
+        // fallback final é 'humanoide'. NÃO filtramos por MONSTER_RACES_WZ
+        // aqui — essa tabela é só um template offline para 13 raças clássicas.
         const racaRaw = (c.raca || '').toLowerCase().trim();
         const racaPC_validas = ['humano','elfo','anão','halfling','draconato','gnomo','meio-elfo','meio-orc','tiferino'];
+        const _racaGenerica = ['', 'humanoide', 'monstro', 'outro', 'npc'];
         const raca = isPC
           ? (racaPC_validas.includes(racaRaw) ? racaRaw : 'humano')
-          : (MONSTER_RACES_WZ[racaRaw] ? racaRaw : 'humanoide');
+          : (_racaGenerica.includes(racaRaw) ? 'humanoide' : racaRaw);
         const char = {
           name:        c.name        || '',
           description: c.description || '',
@@ -3153,6 +3161,125 @@ async function edDoItemSearch(i) {
   edRefreshItemPanel(i);
 }
 
+// ── Cache global de FEATURE_VARIANTS (1 fetch por sessão) ───────────────────
+// O endpoint /api/dnd/feature_variants devolve o dict de features com
+// subescolha (Estilo de Combate → Arquearia/Defesa/...). Cache aqui evita
+// um round-trip por card de habilidade no render.
+window._FEATURE_VARIANTS = window._FEATURE_VARIANTS || null;
+async function loadFeatureVariants() {
+  if (window._FEATURE_VARIANTS) return window._FEATURE_VARIANTS;
+  try {
+    const r = await authFetch(`${API}/api/dnd/feature_variants`);
+    const data = await r.json();
+    window._FEATURE_VARIANTS = data.variants || {};
+  } catch { window._FEATURE_VARIANTS = {}; }
+  return window._FEATURE_VARIANTS;
+}
+
+// Renderiza o picker de variante para uma habilidade SE ela estiver na
+// tabela FEATURE_VARIANTS. Retorna '' caso contrário (não polui cards).
+function edRenderVariantPicker(i, j, ctxKey) {
+  const variants = window._FEATURE_VARIANTS || {};
+  // ctxKey = 'edChars' (editor) ou 'wzChars' (wizard) — para gerar callbacks
+  // que referenciem a variável global certa via string no onchange.
+  const list = (ctxKey === 'wzChars' ? wzChars : edChars);
+  const ch = list[i];
+  if (!ch || !ch.habilidades || !ch.habilidades[j]) return '';
+  const h = ch.habilidades[j];
+  const meta = variants[h.nome];
+  if (!meta || !meta.options) return '';
+
+  const sheet  = ch.sheet || (ch.sheet = {});
+  const fc     = sheet.feature_choices || (sheet.feature_choices = {});
+  const pick   = parseInt(meta.pick, 10) || 1;
+  const cur    = fc[h.nome];
+  const label  = meta.pick_label || 'opção';
+
+  // Lista de opções como pares [nome, descricao]
+  const entries = Object.entries(meta.options || {});
+  if (!entries.length) return '';
+
+  if (pick === 1) {
+    // Dropdown único
+    const selected = (typeof cur === 'string') ? cur : '';
+    const opts = ['<option value="">— escolha o ' + escHtml(label) + ' —</option>']
+      .concat(entries.map(([key, val]) =>
+        `<option value="${escHtml(key)}"${selected===key?' selected':''}>${escHtml(key)}</option>`
+      )).join('');
+    const desc = selected && meta.options[selected]
+      ? `<div style="font-size:11px;color:var(--ink-user);margin-top:4px;font-style:italic;">${escHtml(meta.options[selected].descricao || '')}</div>`
+      : '';
+    return `
+      <div style="margin-bottom:8px;padding:8px 10px;background:rgba(38,75,130,0.06);border-left:3px solid var(--ink-user);border-radius:3px;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="cwc-label" style="margin:0;flex-shrink:0;">Escolha do ${escHtml(label)}:</span>
+          <select onchange="onFeatureChoiceChange('${ctxKey}',${i},${j},this.value)" style="flex:1;">${opts}</select>
+        </div>
+        ${desc}
+      </div>`;
+  }
+
+  // Multi-pick (Metamagia, Invocações…) — checkboxes com limite
+  const curArr = Array.isArray(cur) ? cur.slice() : [];
+  const remaining = Math.max(0, pick - curArr.length);
+  const boxes = entries.map(([key, val]) => {
+    const checked = curArr.includes(key);
+    const disabled = !checked && remaining <= 0;
+    return `<label style="display:flex;align-items:flex-start;gap:6px;padding:4px;border-radius:3px;${disabled?'opacity:0.5;':''}cursor:${disabled?'not-allowed':'pointer'};">
+      <input type="checkbox" ${checked?'checked':''} ${disabled?'disabled':''}
+        onchange="onFeatureChoiceMultiToggle('${ctxKey}',${i},${j},'${key.replace(/'/g,"\\'")}',this.checked)">
+      <div style="flex:1;">
+        <strong style="font-size:12px;">${escHtml(key)}</strong>
+        <div style="font-size:10px;color:var(--text-muted);">${escHtml(val.descricao||'')}</div>
+      </div>
+    </label>`;
+  }).join('');
+  return `
+    <div style="margin-bottom:8px;padding:8px 10px;background:rgba(38,75,130,0.06);border-left:3px solid var(--ink-user);border-radius:3px;">
+      <div style="font-size:11px;color:var(--ink-user);margin-bottom:6px;font-weight:600;">
+        Escolha ${pick} ${escHtml(label)} (${curArr.length}/${pick})
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">${boxes}</div>
+    </div>`;
+}
+
+function onFeatureChoiceChange(ctxKey, i, j, value) {
+  const list = (ctxKey === 'wzChars' ? wzChars : edChars);
+  const ch = list[i];
+  if (!ch || !ch.habilidades || !ch.habilidades[j]) return;
+  const h = ch.habilidades[j];
+  const sheet = ch.sheet || (ch.sheet = {});
+  const fc    = sheet.feature_choices || (sheet.feature_choices = {});
+  if (value) fc[h.nome] = value;
+  else delete fc[h.nome];
+  // Re-renderiza só o card pra mostrar a descrição da nova escolha.
+  if (ctxKey === 'wzChars') {
+    if (typeof wzRefreshDndSection === 'function') wzRefreshDndSection(i);
+  } else {
+    if (typeof edRefreshDndSections === 'function') edRefreshDndSections(i);
+  }
+}
+
+function onFeatureChoiceMultiToggle(ctxKey, i, j, optionName, checked) {
+  const list = (ctxKey === 'wzChars' ? wzChars : edChars);
+  const ch = list[i];
+  if (!ch || !ch.habilidades || !ch.habilidades[j]) return;
+  const h = ch.habilidades[j];
+  const sheet = ch.sheet || (ch.sheet = {});
+  const fc    = sheet.feature_choices || (sheet.feature_choices = {});
+  const cur   = Array.isArray(fc[h.nome]) ? fc[h.nome].slice() : [];
+  const idx   = cur.indexOf(optionName);
+  if (checked && idx < 0) cur.push(optionName);
+  else if (!checked && idx >= 0) cur.splice(idx, 1);
+  fc[h.nome] = cur;
+  if (ctxKey === 'wzChars') {
+    if (typeof wzRefreshDndSection === 'function') wzRefreshDndSection(i);
+  } else {
+    if (typeof edRefreshDndSections === 'function') edRefreshDndSections(i);
+  }
+}
+
+
 async function edLoadClassFeatures(i) {
   const ch = edChars[i];
   if (!ch) return;
@@ -3183,6 +3310,9 @@ function edAddSpell(i, spell) {
       custo_mana:  spell.custo_mana ?? 0,
       dado:        spell.dado || '',
       nivel_magia: spell.nivel_magia ?? 0,
+      // Vem do Open5e ("Self", "Self (15-foot cone)", "60 feet"…). O engine
+      // deriva target_mode a partir disso — sem listas hardcoded por nome.
+      alcance:     spell.alcance || '',
     });
   }
   // Mantém a aba de magias aberta; re-renderiza seção (atualiza ✓ na lista + habilidades abaixo)
@@ -3879,6 +4009,7 @@ function edBuildDndSections(i) {
             <div style="width:80px;"><span class="cwc-label">Mana</span><input type="number" min="0" value="${h.custo_mana??0}" onchange="edAbilityChange(${i},${j},'custo_mana',this.value)"></div>
             <div style="padding-top:20px;"><button onclick="removeEdAbility(${i},${j})" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:16px;">✕</button></div>
           </div>
+          ${edRenderVariantPicker(i, j, 'edChars')}
           <div><span class="cwc-label">Descrição / Efeito</span>
             <textarea rows="2" onchange="edAbilityChange(${i},${j},'descricao',this.value)" placeholder="Efeito, alcance, duração...">${escHtml(h.descricao||'')}</textarea>
           </div>
@@ -3922,6 +4053,11 @@ function edRenderStatGridEdit(i) {
 function edRenderChars() {
   const container = document.getElementById('ed-chars-list');
   const empty     = document.getElementById('ed-chars-empty');
+  // Garante que o cache de FEATURE_VARIANTS esteja populado — disparo
+  // assíncrono que re-renderiza ao chegar. Não bloqueia o render inicial.
+  if (!window._FEATURE_VARIANTS) {
+    loadFeatureVariants().then(() => edRenderChars());
+  }
   if (!edChars.length) {
     container.innerHTML = '';
     empty.style.display = 'block';

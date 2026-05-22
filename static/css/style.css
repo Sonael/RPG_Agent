@@ -1067,162 +1067,347 @@ textarea { resize: vertical; min-height: 40px; }
 }
 .combat-mode-toggle .cm-opt:hover { color: var(--text-main); }
 
+/* ════════════════════════════════════════════════════════════════
+   TELA DE COMBATE — Estilo "Tomo do Mestre"
+   Layout de pergaminho com anotações em tinta e rabiscos a caneta.
+   ════════════════════════════════════════════════════════════════ */
 #combat-overlay {
+  --cbt-paper: #f4ecd8;
+  --cbt-ink: #2c1e16;
+  --cbt-ink-light: #5c4a3d;
+  --cbt-red: #8b1e1e;
+  --cbt-green: #4a6b3a;
+  --cbt-blue: #3a5b8a;
+
   position: fixed; inset: 0; z-index: 9000;
-  background: rgba(8,8,12,0.92); backdrop-filter: blur(3px);
+  background: rgba(10,8,4,0.94); backdrop-filter: blur(3px);
   display: flex; align-items: center; justify-content: center;
+  padding: 16px; box-sizing: border-box;
+  font-family: 'Lora', serif;
+  overflow-y: auto;
 }
 #combat-overlay.hidden { display: none; }
 body.combat-on { overflow: hidden; }
 
-#cbt-frame {
-  width: min(960px, 96vw); height: min(92vh, 760px);
-  background: var(--page-bg, #f5f3eb);
-  border: 2px solid var(--ink-sys, #8b3a3a); border-radius: 12px;
-  box-shadow: 0 24px 80px rgba(0,0,0,0.6);
-  display: flex; flex-direction: column; overflow: hidden;
-  font-family: 'Lora', serif;
+/* A página do tomo */
+#cbt-frame.cbt-tome {
+  background: var(--cbt-paper);
+  color: var(--cbt-ink);
+  width: min(900px, 96vw);
+  max-height: 94vh;
+  border-radius: 4px;
+  box-shadow: 0 0 40px rgba(0,0,0,0.8), inset 0 0 60px rgba(200,160,120,0.3);
+  padding: 32px 40px;
+  box-sizing: border-box;
+  overflow-y: auto;
+  background-image:
+    radial-gradient(circle at 10% 20%, rgba(0,0,0,0.02) 0%, transparent 20%),
+    radial-gradient(circle at 90% 80%, rgba(139,30,30,0.03) 0%, transparent 30%);
 }
-#cbt-top {
-  display: flex; align-items: center; gap: 14px; padding: 10px 16px;
-  border-bottom: 1px solid var(--page-edge);
-  background: rgba(139,58,58,0.08);
-}
-#cbt-round {
-  font-family: 'Playfair Display', serif; font-weight: 700;
-  color: var(--ink-sys); font-size: 16px; flex-shrink: 0;
-}
-#cbt-order { display: flex; flex-wrap: wrap; gap: 4px; font-size: 12px; color: var(--text-muted); }
-.cbt-ord.on { color: var(--ink-user); font-weight: 700; }
-.cbt-ord-sep { color: var(--text-dim); }
 
-#cbt-enemies, #cbt-party {
-  display: flex; gap: 10px; padding: 14px 16px; flex-wrap: wrap;
-  justify-content: center; overflow-y: auto;
+/* Cabeçalho */
+.cbt-chapter-title {
+  font-family: 'Playfair Display', serif;
+  text-align: center;
+  font-size: 2rem;
+  border-bottom: 2px solid var(--cbt-ink);
+  padding-bottom: 10px;
+  margin: 0 0 18px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--cbt-ink);
 }
-#cbt-enemies { background: rgba(139,58,58,0.05); }
-#cbt-party   { background: rgba(38,75,130,0.05); }
-#cbt-stage {
-  flex: 0 0 auto; text-align: center; font-size: 22px;
-  color: var(--text-dim); padding: 2px;
+.cbt-round-marker {
+  font-family: 'Caveat', cursive;
+  font-size: 1.7rem;
+  color: var(--cbt-red);
+  text-align: center;
+  margin: -10px 0 8px;
+  transform: rotate(-1.5deg);
 }
-.cbt-empty { color: var(--text-dim); font-style: italic; }
+.cbt-initiative-strip {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  justify-content: center;
+  font-family: 'Caveat', cursive;
+  font-size: 1.1rem;
+  color: var(--cbt-ink-light);
+  margin-bottom: 22px;
+}
+.cbt-ord.on { color: var(--cbt-red); font-weight: 700; }
+.cbt-ord-sep { color: #b8a892; }
 
+/* Campo de batalha (esboço) */
+.cbt-battlefield {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 24px;
+  align-items: start;
+  margin-bottom: 28px;
+}
+.cbt-faction {
+  display: flex; flex-direction: column; gap: 14px;
+  min-width: 0;
+}
+.cbt-vs-mark {
+  font-family: 'Playfair Display', serif;
+  font-style: italic;
+  font-size: 2.6rem;
+  color: var(--cbt-ink-light);
+  align-self: center;
+  text-align: center;
+}
+.cbt-empty {
+  color: #8a7866; font-style: italic;
+  font-family: 'Caveat', cursive; font-size: 1.2rem;
+  text-align: center; padding: 14px;
+  border: 1px dashed #b8a892;
+}
+
+/* Combatente como esboço */
 .cbt-card {
-  width: 150px; padding: 8px 10px; border-radius: 8px;
-  border: 1px solid var(--page-edge); background: rgba(255,255,255,0.04);
+  width: 100%; box-sizing: border-box;
+  padding: 14px 16px;
+  border: 1px dashed var(--cbt-ink-light);
+  background: rgba(255,255,255,0.32);
+  position: relative;
+  color: var(--cbt-ink);
 }
-.cbt-card.cbt-cur { border-color: var(--gold, #c8a84b); box-shadow: 0 0 0 2px rgba(200,168,75,0.35); }
-.cbt-card.cbt-out { opacity: 0.45; filter: grayscale(0.6); }
-.cbt-name { font-weight: 700; font-size: 13px; color: var(--text-main); }
-.cbt-arrow { color: var(--gold, #c8a84b); }
-.cbt-meta { font-size: 10px; color: var(--text-muted); margin: 1px 0 5px; }
-.cbt-hpline { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
-.cbt-bar { height: 7px; background: var(--page-edge); border-radius: 4px; overflow: hidden; margin-top: 2px; }
+.cbt-card::before {
+  content: ''; position: absolute;
+  top: -5px; left: -5px; right: -5px; bottom: -5px;
+  border: 1px solid rgba(44,30,22,0.1);
+  pointer-events: none;
+}
+.cbt-card.cbt-cur {
+  border-style: solid; border-width: 2px;
+  border-color: var(--cbt-ink);
+  background: rgba(255,255,255,0.55);
+}
+.cbt-card.cbt-out { opacity: 0.55; }
+.cbt-card.cbt-out .cbt-name { text-decoration: line-through; }
+
+.cbt-name {
+  font-family: 'Playfair Display', serif;
+  font-weight: 700; font-size: 1.05rem;
+  color: var(--cbt-ink);
+  position: relative; z-index: 1;
+}
+.cbt-arrow { color: var(--cbt-red); margin-left: 4px; }
+.cbt-meta {
+  font-family: 'Lora', serif; font-style: italic;
+  font-size: 11px; color: var(--cbt-ink-light);
+  margin: 2px 0 6px;
+}
+.cbt-hpline {
+  font-family: 'Caveat', cursive;
+  font-size: 1.25rem;
+  color: var(--cbt-red);
+  margin-top: 4px; line-height: 1;
+  position: relative; z-index: 1;
+}
+.cbt-bar {
+  height: 6px; background: rgba(44,30,22,0.12);
+  margin-top: 4px; overflow: hidden;
+}
 .cbt-bar-fill { height: 100%; transition: width .35s; }
-.cbt-bar-fill.hp { background: var(--ink-sys, #8b3a3a); }
-.cbt-bar-fill.mp { background: var(--ink-user, #264b82); }
-.cbt-conds { margin-top: 5px; display: flex; flex-wrap: wrap; gap: 3px; }
+.cbt-bar-fill.hp { background: var(--cbt-red); }
+.cbt-bar-fill.mp { background: var(--cbt-blue); }
+.cbt-conds { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px; }
 .cbt-cond {
-  font-size: 9px; padding: 1px 5px; border-radius: 8px;
-  background: rgba(139,58,58,0.15); color: var(--ink-sys);
+  font-family: 'Caveat', cursive; font-size: 0.95rem;
+  padding: 0 6px;
+  background: rgba(139,30,30,0.12); color: var(--cbt-red);
 }
 .cbt-status-tag {
-  margin-top: 5px; font-size: 10px; text-transform: uppercase;
-  letter-spacing: .05em; color: var(--ink-sys); font-weight: 700;
+  margin-top: 6px;
+  font-family: 'Caveat', cursive; font-size: 1.05rem;
+  color: var(--cbt-ink-light); font-style: italic;
 }
 
-#cbt-log {
-  flex: 1; min-height: 60px; overflow-y: auto;
-  padding: 8px 16px; border-top: 1px solid var(--page-edge);
-  background: rgba(0,0,0,0.03); font-size: 12px; color: var(--text-muted);
+/* Anotações do Mestre (ações + log) */
+.cbt-dm-notes {
+  border-top: 2px dashed var(--cbt-ink-light);
+  padding-top: 18px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 28px;
 }
-.cbt-logline { padding: 2px 0; }
+.cbt-note-section { display: flex; flex-direction: column; min-width: 0; }
+.cbt-note-title {
+  font-family: 'Caveat', cursive;
+  font-size: 1.7rem; margin: 0 0 12px;
+  color: var(--cbt-ink); font-weight: 600;
+}
 
-#cbt-actionbar {
-  border-top: 1px solid var(--page-edge); padding: 12px 16px;
-  background: var(--page-bg);
+#cbt-prompt {
+  font-family: 'Lora', serif; font-size: 14px;
+  color: var(--cbt-ink-light); margin-bottom: 12px;
+  line-height: 1.4;
 }
-#cbt-prompt { font-size: 14px; color: var(--text-main); margin-bottom: 8px; text-align: center; }
-#cbt-buttons { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+#cbt-prompt b { color: var(--cbt-ink); }
+#cbt-prompt i { color: var(--cbt-ink); }
+
+#cbt-buttons { display: flex; flex-direction: column; gap: 8px; }
 #cbt-buttons button, #cbt-targets button {
-  padding: 9px 16px; font-family: 'Lora', serif; font-size: 13px;
-  cursor: pointer; border: 1px solid var(--ink-user); border-radius: 6px;
-  background: transparent; color: var(--ink-user); transition: all .15s;
+  display: block; width: 100%; text-align: left;
+  background: transparent;
+  border: 1px solid var(--cbt-ink);
+  color: var(--cbt-ink);
+  font-family: 'Lora', serif; font-weight: 700;
+  font-size: 1rem; padding: 9px 14px;
+  cursor: pointer; transition: all .18s;
+  border-radius: 0;
 }
 #cbt-buttons button:hover, #cbt-targets button:hover {
-  background: var(--ink-user); color: #fff;
+  background: var(--cbt-ink); color: var(--cbt-paper);
+  transform: translateX(4px);
 }
-#cbt-buttons button:disabled { opacity: .4; cursor: not-allowed; }
+#cbt-buttons button:disabled {
+  opacity: .4; cursor: not-allowed;
+  border-style: dashed;
+}
+#cbt-buttons button:disabled:hover {
+  transform: none; background: transparent; color: var(--cbt-ink);
+}
+#cbt-buttons .cbt-primary {
+  background: var(--cbt-ink); color: var(--cbt-paper);
+}
+#cbt-buttons .cbt-primary:hover {
+  background: var(--cbt-red); border-color: var(--cbt-red);
+}
+
 #cbt-targets {
-  display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;
-  margin-top: 10px; align-items: center;
+  display: flex; flex-direction: column; gap: 8px;
+  margin-top: 12px; padding-top: 12px;
+  border-top: 1px dashed var(--cbt-ink-light);
 }
 #cbt-targets.hidden { display: none; }
-.cbt-tgt-title { font-size: 12px; color: var(--text-muted); margin-right: 4px; }
-#cbt-targets .cbt-cancel { border-color: var(--text-dim); color: var(--text-dim); }
-#cbt-targets .cbt-cancel:hover { background: var(--text-dim); color: #fff; }
-
-@media (max-width: 900px) {
-  #cbt-frame { height: 96vh; width: 98vw; }
-  .cbt-card { width: 44%; }
+.cbt-tgt-title {
+  font-family: 'Caveat', cursive; font-size: 1.3rem;
+  color: var(--cbt-red); margin-bottom: 2px;
 }
+#cbt-targets .cbt-cancel {
+  border-style: dashed; color: var(--cbt-ink-light);
+  text-align: center; font-weight: 400;
+}
+#cbt-targets .cbt-cancel:hover {
+  background: var(--cbt-ink-light); color: var(--cbt-paper); transform: none;
+}
+
+#cbt-buttons button small,
+#cbt-targets button small {
+  color: var(--cbt-ink-light); font-style: italic;
+  margin-left: 4px; font-weight: 400;
+}
+
+/* Log de combate como rabiscos */
+#cbt-log {
+  font-family: 'Caveat', cursive;
+  font-size: 1.3rem; line-height: 1.25;
+  color: var(--cbt-ink-light);
+  max-height: 280px; overflow-y: auto;
+}
+.cbt-logline { margin: 5px 0; }
+.cbt-logline::before { content: "• "; color: var(--cbt-red); }
+
+/* Economia de ações (Ação / Bônus) */
+.cbt-econ {
+  display: inline-flex; gap: 8px; margin-left: 6px;
+  vertical-align: middle;
+}
+.cbt-slot {
+  padding: 1px 8px;
+  font-family: 'Caveat', cursive; font-size: 1.05rem;
+  border: 1px dashed var(--cbt-ink-light);
+  background: rgba(255,255,255,0.3);
+  color: var(--cbt-ink);
+}
+.cbt-slot.used {
+  color: #b89788; border-style: solid; border-color: #b89788;
+  text-decoration: line-through;
+}
+.cbt-eco-tag {
+  font-style: normal; font-family: 'Caveat', cursive;
+  font-size: 0.95rem; padding: 0 6px; margin-left: 6px;
+  vertical-align: middle;
+  border: 1px dashed var(--cbt-ink-light); color: var(--cbt-ink-light);
+}
+.cbt-eco-tag.eco-acao  { color: var(--cbt-ink);  border-color: var(--cbt-ink); }
+.cbt-eco-tag.eco-bonus { color: var(--cbt-green); border-color: var(--cbt-green); }
 
 /* Painel de fim do combate */
 .cbt-result-title {
-  font-family: 'Playfair Display', serif; font-weight: 700;
-  font-size: 22px; text-align: center; margin-bottom: 12px;
+  font-family: 'Playfair Display', serif;
+  font-weight: 700; font-style: italic;
+  font-size: 1.8rem; text-align: center; margin-bottom: 14px;
+  color: var(--cbt-ink);
 }
-.cbt-result-title.win  { color: var(--green, #4aaa80); }
-.cbt-result-title.lose { color: var(--ink-sys, #8b3a3a); }
+.cbt-result-title.win  { color: var(--cbt-green); }
+.cbt-result-title.lose { color: var(--cbt-red); }
 .cbt-result-cols {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
-  max-width: 720px; margin: 0 auto 6px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 18px;
+  margin: 0 auto 12px;
 }
 .cbt-result-cols ul {
   list-style: none; padding: 0; margin: 4px 0;
-  font-size: 12px; line-height: 1.7; color: var(--text-main);
+  font-family: 'Caveat', cursive; font-size: 1.2rem;
+  line-height: 1.4; color: var(--cbt-ink);
 }
 .cbt-result-cols li { padding: 2px 0; }
 .cbt-res-h {
-  font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
-  color: var(--text-muted); border-bottom: 1px solid var(--page-edge);
-  padding-bottom: 3px;
+  font-family: 'Caveat', cursive; font-size: 1.4rem;
+  color: var(--cbt-red);
+  border-bottom: 1px dashed var(--cbt-ink-light);
+  padding-bottom: 3px; margin-bottom: 4px;
 }
 .cbt-res-lado {
-  display: inline-block; font-size: 9px; padding: 1px 5px;
-  border-radius: 8px; margin-right: 4px; text-transform: uppercase;
+  display: inline-block; font-family: 'Lora', serif;
+  font-size: 9px; padding: 1px 5px; margin-right: 4px;
+  text-transform: uppercase; letter-spacing: .05em;
+  border: 1px solid currentColor;
 }
-.cbt-res-grp { background: rgba(38,75,130,0.15);  color: var(--ink-user); }
-.cbt-res-foe { background: rgba(139,58,58,0.15); color: var(--ink-sys); }
-.cbt-res-st  { color: var(--text-muted); font-style: italic; margin-left: 4px; }
-.cbt-res-hp  { color: var(--text-dim); font-family: monospace; margin-left: 6px; }
+.cbt-res-grp { color: var(--cbt-blue); }
+.cbt-res-foe { color: var(--cbt-red); }
+.cbt-res-st  { color: var(--cbt-ink-light); font-style: italic; margin-left: 4px; }
+.cbt-res-hp  { color: #8a7866; font-family: 'Lora', serif; font-size: 0.9rem; margin-left: 6px; }
 
-#cbt-buttons .cbt-primary {
-  background: var(--ink-user); color: #fff; border-color: var(--ink-user);
-  font-weight: 700;
-}
-#cbt-buttons .cbt-primary:hover {
-  background: var(--ink-sys); border-color: var(--ink-sys);
+/* Mobile */
+@media (max-width: 760px) {
+  #combat-overlay { padding: 8px; align-items: flex-start; }
+  #cbt-frame.cbt-tome {
+    padding: 22px 18px;
+    max-height: none;
+    min-height: 100%;
+    width: 100%;
+  }
+  .cbt-chapter-title { font-size: 1.4rem; letter-spacing: 1px; padding-bottom: 6px; }
+  .cbt-round-marker  { font-size: 1.3rem; margin-top: -6px; }
+  .cbt-initiative-strip { font-size: 1rem; margin-bottom: 16px; }
+
+  .cbt-battlefield {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    margin-bottom: 22px;
+  }
+  /* Em mobile: inimigos em cima, "Vs." no meio, herois embaixo */
+  .cbt-battlefield .cbt-enemies { order: 1; }
+  .cbt-battlefield .cbt-vs-mark { order: 2; font-size: 1.8rem; }
+  .cbt-battlefield .cbt-party   { order: 3; }
+
+  .cbt-dm-notes { grid-template-columns: 1fr; gap: 22px; padding-top: 14px; }
+  .cbt-note-title { font-size: 1.45rem; }
+
+  .cbt-card { padding: 11px 12px; }
+  .cbt-name { font-size: 1rem; }
+  .cbt-hpline { font-size: 1.15rem; }
+
+  #cbt-log { font-size: 1.15rem; max-height: 220px; }
+  #cbt-buttons button, #cbt-targets button { font-size: 0.95rem; padding: 10px 12px; }
+  /* Tap targets — sem deslocar no toque (não há hover real) */
+  #cbt-buttons button:hover, #cbt-targets button:hover { transform: none; }
 }
 
-/* Economia de ações (Ação / Bônus) na tela tática */
-.cbt-econ { display: inline-flex; gap: 8px; margin-left: 10px; font-size: 12px; }
-.cbt-slot {
-  padding: 2px 8px; border-radius: 10px; font-family: 'Lora', serif;
-  border: 1px solid var(--page-edge); background: rgba(0,0,0,0.03);
-  color: var(--text-muted);
+@media (max-width: 380px) {
+  #cbt-frame.cbt-tome { padding: 18px 12px; }
+  .cbt-chapter-title { font-size: 1.2rem; }
 }
-.cbt-slot.used { color: var(--ink-sys, #8b3a3a); border-color: var(--ink-sys, #8b3a3a);
-                 background: rgba(139,58,58,0.08); }
-
-#cbt-buttons button small,
-#cbt-targets button small { color: var(--text-dim); font-style: italic; margin-left: 2px; }
-
-.cbt-eco-tag {
-  font-style: normal; font-size: 9px; padding: 1px 6px; border-radius: 8px;
-  margin-left: 6px; vertical-align: middle; letter-spacing: .03em;
-  text-transform: uppercase;
-}
-.cbt-eco-tag.eco-acao  { background: rgba(38,75,130,0.12);  color: var(--ink-user); }
-.cbt-eco-tag.eco-bonus { background: rgba(74,170,128,0.15); color: var(--green, #4aaa80); }

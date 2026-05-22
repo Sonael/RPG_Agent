@@ -696,29 +696,1052 @@ CLASS_LEVEL_FEATURES: dict[str, dict[int, list[str]]] = {
 }
 
 # ── Descrições básicas para habilidades de classe automáticas ────────────────
+# Cobertura: TODAS as entradas de CLASS_LEVEL_FEATURES devem estar aqui.
+# Se faltar uma, o backend cai num fallback genérico ("Habilidade de classe —
+# X") que é inútil para o jogador. Mantenha sincronizado ao adicionar novas
+# features. Estilo: 1 frase curta (~100-180 chars) baseada no SRD 5e em PT-BR.
 CLASS_FEATURE_DESCS: dict[str, dict] = {
-    "Ataque Extra":              {"descricao": "Pode atacar duas vezes em vez de uma quando usa a ação Atacar.", "custo_mana": 0, "dado": ""},
-    "Ataque Extra Adicional":    {"descricao": "Pode atacar três vezes quando usa a ação Atacar.", "custo_mana": 0, "dado": ""},
-    "Surto de Ação":             {"descricao": "Uma vez por descanso curto: toma uma ação adicional neste turno.", "custo_mana": 0, "dado": ""},
-    "Surto de Ação Adicional":   {"descricao": "Pode usar Surto de Ação duas vezes por descanso curto.", "custo_mana": 0, "dado": ""},
-    "Segunda Fôlego":            {"descricao": "Ação bônus: recupera 1d10 + nível de PV. 1 uso por descanso curto.", "custo_mana": 0, "dado": "1d10"},
-    "Forma Selvagem":            {"descricao": "Transforma-se em besta cujo CR é até metade do nível do druida. 2 usos por descanso curto.", "custo_mana": 0, "dado": ""},
-    "Fúria":                     {"descricao": "Ação bônus: +2 dano, vantagem em FOR, resistência a dano físico. Usos = 2 + nível após 3º.", "custo_mana": 0, "dado": ""},
-    "Canalizar Divindade":       {"descricao": "Usa Expulsar Mortos-Vivos ou poder de domínio. 1 uso por descanso curto.", "custo_mana": 0, "dado": ""},
-    "Ki":                        {"descricao": "Pool de Ki = nível do monge. Usa para Flurry of Blows, Defesa Patient, Step of the Wind.", "custo_mana": 0, "dado": ""},
-    "Esquiva Incrivelmente Baixa":{"descricao": "Não pode ser surpreendido enquanto consciente. Visão dos aliados ocultos.", "custo_mana": 0, "dado": ""},
-    "Evasão":                    {"descricao": "Em saving throws de DEX bem-sucedidos: nenhum dano. Em falhas: metade.", "custo_mana": 0, "dado": ""},
-    "Ataque Furtivo":            {"descricao": "Dano extra 1d6 por 2 níveis ao atacar com vantagem ou aliado adjacente. 1× por turno.", "custo_mana": 0, "dado": ""},
-    "Inspiração Bárdica":        {"descricao": "Ação bônus: aliado em 18m ganha 1d6 de inspiração. Escala com nível.", "custo_mana": 0, "dado": ""},
-    "Imposição de Mãos":         {"descricao": "Pool de cura = nível × 5 PV. Gasta 5 PV para curar ou neutralizar veneno.", "custo_mana": 0, "dado": ""},
-    "Pontos de Feitiçaria":      {"descricao": "Pool = nível do feiticeiro. Usado para Metamagia e recuperar slots.", "custo_mana": 0, "dado": ""},
-    "Invocações Sobrenaturais":  {"descricao": "Aprende invocações que concedem habilidades passivas ou magias.", "custo_mana": 0, "dado": ""},
-    "Magia Mística":             {"descricao": "Ganha 1 magia de qualquer lista. Slot separado recuperado a cada descanso longo.", "custo_mana": 0, "dado": ""},
-    "Restauração de Feitiçaria": {"descricao": "1 vez por descanso longo: recupera 4 pontos de feitiçaria.", "custo_mana": 0, "dado": ""},
-    "Recuperação Arcana":        {"descricada": "Descanso curto: recupera slots totalizando ≤ metade do nível. 1 uso/descanso longo.", "custo_mana": 0, "dado": ""},
-    "Especialização":            {"descricao": "Dobra o bônus de proficiência em 2 perícias ou ferramentas.", "custo_mana": 0, "dado": ""},
-    "Ação Ardilosa":             {"descricao": "Ação bônus: Esconder ou Disparar (recuar sem ataque de oportunidade).", "custo_mana": 0, "dado": ""},
+    # ── Genéricas / compartilhadas ─────────────────────────────────────────
+    "Ataque Extra":              {"descricao": "Pode atacar duas vezes em vez de uma ao usar a ação Atacar.", "custo_mana": 0, "dado": ""},
+    "Ataque Extra Adicional":    {"descricao": "Pode atacar três vezes em vez de duas ao usar a ação Atacar (nv. 11+).", "custo_mana": 0, "dado": ""},
+    "Defesa Sem Armadura":       {"descricao": "Sem armadura, CA = 10 + mod. DES + mod. CON (Bárbaro) ou + mod. SAB (Monge). Pode usar escudo (Bárbaro).", "custo_mana": 0, "dado": ""},
+    "Estilo de Combate":         {"descricao": "Escolhe um estilo (Arquearia, Defesa, Duelo, Combate com Duas Armas, Proteção, Grande Arma) com bônus passivo permanente.", "custo_mana": 0, "dado": ""},
+    "Especialização":            {"descricao": "Dobra o bônus de proficiência em 2 perícias ou ferramentas escolhidas em que já tem proficiência.", "custo_mana": 0, "dado": ""},
+    "Evasão":                    {"descricao": "Em saves de DES bem-sucedidos contra efeitos de área: nenhum dano. Em falhas: metade do dano.", "custo_mana": 0, "dado": ""},
+    "Conjuração":                {"descricao": "Ganha acesso a magias da classe. Usa o atributo de conjuração próprio (CAR/SAB/INT) para CD e ataques mágicos.", "custo_mana": 0, "dado": ""},
+
+    # ── Bárbaro ───────────────────────────────────────────────────────────
+    "Fúria":                     {"descricao": "Ação bônus: +2 dano com armas FOR, vantagem em testes/saves de FOR, resistência a dano físico. Dura 1 minuto. Usos = 2 + nível (até 6 no 17º).", "custo_mana": 0, "dado": ""},
+    "Movimento Imprudente":      {"descricao": "Ao atacar com FOR no 1º ataque do turno: ganha vantagem, mas ataques contra você também ganham vantagem até o próximo turno.", "custo_mana": 0, "dado": ""},
+    "Senso de Perigo":           {"descricao": "Vantagem em saves de DES contra efeitos visíveis (armadilhas, magias) — desde que não esteja cego, surdo ou incapacitado.", "custo_mana": 0, "dado": ""},
+    "Caminho Primitivo":         {"descricao": "Escolhe uma trilha (Berserker, Guerreiro Totêmico, etc.) que define habilidades temáticas do 3º nível em diante.", "custo_mana": 0, "dado": ""},
+    "Movimento Rápido":          {"descricao": "Deslocamento +3m enquanto não estiver usando armadura pesada.", "custo_mana": 0, "dado": ""},
+    "Instinto Selvagem":         {"descricao": "Vantagem em testes de iniciativa. Não é considerado surpreso se entrar em fúria no primeiro turno.", "custo_mana": 0, "dado": ""},
+    "Resistência Brutal":        {"descricao": "Pode reduzir qualquer dano físico recebido em 3 + nível de bárbaro, uma vez por turno.", "custo_mana": 0, "dado": ""},
+    "Fúria Implacável":          {"descricao": "Se for reduzido a 0 PV durante a fúria (sem morrer na hora), fica com 1 PV. 1 uso por descanso longo.", "custo_mana": 0, "dado": ""},
+    "Ira Persistente":           {"descricao": "Sua fúria só termina cedo se você ficar inconsciente ou escolher terminá-la — não mais pela falta de ações ou dano.", "custo_mana": 0, "dado": ""},
+    "Fúria Devastadora":         {"descricao": "Ao acertar um crítico com arma corpo a corpo, role um dado extra de dano da arma.", "custo_mana": 0, "dado": ""},
+    "Força Indômita":            {"descricao": "Sua FOR e CON sobem para 24 e o limite máximo das duas vai para 24 (nv. 20).", "custo_mana": 0, "dado": ""},
+    "Guerreiro Primordial":      {"descricao": "Ganha +4 em FOR e CON (nv. 20), com limite máximo 24 nesses dois atributos.", "custo_mana": 0, "dado": ""},
+
+    # ── Guerreiro ─────────────────────────────────────────────────────────
+    "Segunda Fôlego":            {"descricao": "Ação bônus: recupera 1d10 + nível de guerreiro de PV. 1 uso por descanso curto ou longo.", "custo_mana": 0, "dado": "1d10"},
+    "Surto de Ação":             {"descricao": "1 uso por descanso curto: ganha uma Ação adicional neste turno (além da Ação e Bônus normais).", "custo_mana": 0, "dado": ""},
+    "Surto de Ação Adicional":   {"descricao": "Pode usar Surto de Ação 2 vezes entre descansos curtos (nv. 17+).", "custo_mana": 0, "dado": ""},
+    "Arquétipo Marcial":         {"descricao": "Escolhe um arquétipo (Campeão, Mestre de Batalha, Cavaleiro Élditch, etc.) — define habilidades temáticas a partir do 3º nível.", "custo_mana": 0, "dado": ""},
+    "Indomável":                 {"descricao": "1 vez por descanso longo: pode refazer um teste de resistência que falhou (2 usos no 13º, 3 no 17º).", "custo_mana": 0, "dado": ""},
+    "Campeão Eterno":            {"descricao": "Sua FOR ou CON aumenta em 4 (limite máximo 24). Ganha resistência adicional contra ataques (nv. 20).", "custo_mana": 0, "dado": ""},
+
+    # ── Paladino ──────────────────────────────────────────────────────────
+    "Sentido Divino":            {"descricao": "Ação: detecta criaturas celestiais, infernais e mortos-vivos em até 18m. Usos = 1 + mod. CAR por descanso longo.", "custo_mana": 0, "dado": ""},
+    "Imposição de Mãos":         {"descricao": "Pool de cura = nível × 5 PV. Pode dividir entre cura ou gastar 5 PV para neutralizar um veneno/doença em um toque.", "custo_mana": 0, "dado": ""},
+    "Combate Divino":            {"descricao": "Pode gastar slots de magia ao acertar com arma corpo a corpo para causar +2d8 (slot 1) até +5d8 radiante extra (Smite Divino).", "custo_mana": 0, "dado": "2d8"},
+    "Saúde Divina":              {"descricao": "Imune a doenças mágicas e naturais (nv. 3+).", "custo_mana": 0, "dado": ""},
+    "Juramento Sagrado":         {"descricao": "Escolhe um juramento (Devoção, Antigos, Vingança, etc.) que define preceitos, magias bônus e usos de Canalizar Divindade.", "custo_mana": 0, "dado": ""},
+    "Aura de Proteção":          {"descricao": "Você e aliados em 3m (6m no 18º) ganham +mod. CAR em todos os saves enquanto você estiver consciente.", "custo_mana": 0, "dado": ""},
+    "Aura de Coragem":           {"descricao": "Você e aliados em 3m (6m no 18º) são imunes à condição Amedrontado enquanto você estiver consciente.", "custo_mana": 0, "dado": ""},
+    "Golpe Divino Aprimorado":   {"descricao": "Seus ataques com arma corpo a corpo causam +1d8 radiante extra automático (nv. 11+).", "custo_mana": 0, "dado": "1d8"},
+    "Pureza do Espírito":        {"descricao": "Permanentemente sob efeito da magia Proteção contra o Mal e Bem (nv. 14+).", "custo_mana": 0, "dado": ""},
+    "Aura Aprimorada":           {"descricao": "Suas auras de Proteção e Coragem têm alcance ampliado para 9m (nv. 18+).", "custo_mana": 0, "dado": ""},
+    "Campeão Sagrado":           {"descricao": "+4 em FOR ou CAR (limite máximo 24). Recupera 10 PV no início de cada turno se estiver com ≥ 1 PV (nv. 20).", "custo_mana": 0, "dado": ""},
+
+    # ── Patrulheiro ───────────────────────────────────────────────────────
+    "Inimigo Favorecido":        {"descricao": "Escolhe um tipo de criatura — vantagem em testes para rastreá-la, +PROF de info, +2 dano em armas contra ela.", "custo_mana": 0, "dado": ""},
+    "Inimigo Favorecido Adicional":{"descricao": "Escolhe um 2º tipo de inimigo favorecido (nv. 6+).", "custo_mana": 0, "dado": ""},
+    "Explorador Natural":        {"descricao": "Escolhe um terreno: viaja em ritmo normal mesmo em terreno difícil, sempre alerta, +PROF na busca por suprimentos.", "custo_mana": 0, "dado": ""},
+    "Explorador Natural Adicional":{"descricao": "Escolhe um 2º terreno favorável (nv. 6+).", "custo_mana": 0, "dado": ""},
+    "Arquétipo do Patrulheiro":  {"descricao": "Escolhe um arquétipo (Caçador, Senhor das Feras, etc.) — define habilidades temáticas a partir do 3º nível.", "custo_mana": 0, "dado": ""},
+    "Consciência Primitiva":     {"descricao": "Ação: detecta tipos de criaturas (feéricos, mortos-vivos, celestiais…) em até 1,5km — varia conforme o terreno (3º+).", "custo_mana": 0, "dado": ""},
+    "Passagem pela Terra":       {"descricao": "Move-se em terreno difícil natural sem penalidade. Imune a magias que manipulam plantas vivas. Não deixa rastros (nv. 8+).", "custo_mana": 0, "dado": ""},
+    "Escondes-te à Vista":       {"descricao": "1 minuto de preparo em cobertura natural → camuflagem perfeita; pode se esconder mesmo apenas levemente obscurecido (nv. 10+).", "custo_mana": 0, "dado": ""},
+    "Desaparecer":               {"descricao": "Pode usar Esconder como ação bônus em seu turno. Não pode ser rastreado magicamente (nv. 14+).", "custo_mana": 0, "dado": ""},
+    "Inimigo do Inimigo":        {"descricao": "Uma vez por turno: usa Inimigo Favorecido contra QUALQUER criatura sem gastar slot — escolha o tipo na hora (nv. 20).", "custo_mana": 0, "dado": ""},
+
+    # ── Bardo ─────────────────────────────────────────────────────────────
+    "Inspiração Bárdica":        {"descricao": "Ação bônus: aliado em 18m ganha 1d6 (1d8 no 5º, 1d10 no 10º, 1d12 no 15º) para somar a 1 teste/save em 10 min.", "custo_mana": 0, "dado": "1d6"},
+    "Inspiração Bárdica Aprimorada":{"descricao": "Seu dado de Inspiração Bárdica sobe (1d8 no 5º; 1d10 no 10º; 1d12 no 15º).", "custo_mana": 0, "dado": "1d8"},
+    "Inspiração Superior":       {"descricao": "Em iniciativa, se nenhum uso de Inspiração Bárdica estiver disponível, ganha 1 de volta (nv. 10+).", "custo_mana": 0, "dado": ""},
+    "Inspiração Superior Aprimorada":{"descricao": "Recupera todos os usos de Inspiração Bárdica ao rolar iniciativa (nv. 20).", "custo_mana": 0, "dado": ""},
+    "Canção de Repouso":         {"descricao": "No descanso curto, aliados que ouvirem você recuperam +1d6 PV extra (escala: 1d8 no 9º, 1d10 no 13º, 1d12 no 17º).", "custo_mana": 0, "dado": "1d6"},
+    "Versatilidade":             {"descricao": "Ganha proficiência em qualquer perícia/ferramenta com bônus = metade do PROF (Bardic Jack of All Trades).", "custo_mana": 0, "dado": ""},
+    "Colégio Bárdico":           {"descricao": "Escolhe um colégio (Saber, Coragem, etc.) — define habilidades temáticas a partir do 3º nível.", "custo_mana": 0, "dado": ""},
+    "Fonte de Inspiração":       {"descricao": "Recupera todos os usos de Inspiração Bárdica em descansos curtos (não apenas longos) (nv. 5+).", "custo_mana": 0, "dado": ""},
+    "Segredo da Magia":          {"descricao": "Aprende 2 magias de qualquer classe e as adiciona à sua lista permanentemente (nv. 6+).", "custo_mana": 0, "dado": ""},
+    "Segredos Mágicos":          {"descricao": "Aprende mais 2 magias de qualquer classe e as adiciona à sua lista (nv. 10+).", "custo_mana": 0, "dado": ""},
+    "Segredos Mágicos Adicionais":{"descricao": "Aprende mais 2 magias de qualquer classe (nv. 14+).", "custo_mana": 0, "dado": ""},
+    "Sapiência":                 {"descricao": "+4 em INT ou CAR, limite máximo 24 (nv. 18+).", "custo_mana": 0, "dado": ""},
+
+    # ── Clérigo ───────────────────────────────────────────────────────────
+    "Domínio Divino":            {"descricao": "Escolhe um domínio (Vida, Guerra, Conhecimento, Tempestade, etc.) — concede magias bônus e habilidades temáticas.", "custo_mana": 0, "dado": ""},
+    "Canalizar Divindade":       {"descricao": "Ação: usa Expulsar Mortos-Vivos ou um efeito do seu domínio. 1 uso por descanso curto (2 no 6º, 3 no 18º).", "custo_mana": 0, "dado": ""},
+    "Destruição de Mortos-Vivos":{"descricao": "Ao Expulsar Mortos-Vivos, criaturas com CR ≤ 1/2 (escala com nível) que falharem no save são destruídas (nv. 5+).", "custo_mana": 0, "dado": ""},
+    "Destruição de Mortos-Vivos Aprimorada":{"descricao": "O CR máximo destruído por Expulsar sobe (1 no 8º, 2 no 11º, 3 no 14º, 4 no 17º).", "custo_mana": 0, "dado": ""},
+    "Intervenção Divina Inicial":{"descricao": "1 vez por descanso longo: implora ajuda divina — 1% × nível de chance de sucesso (nv. 8+).", "custo_mana": 0, "dado": ""},
+    "Intervenção Divina":        {"descricao": "Suas chances de Intervenção Divina aumentam (até 30% no 17º) (nv. 10+).", "custo_mana": 0, "dado": ""},
+    "Intervenção Divina Superior":{"descricao": "Sua Intervenção Divina tem sucesso automático, sem rolagem (nv. 20).", "custo_mana": 0, "dado": ""},
+
+    # ── Druida ────────────────────────────────────────────────────────────
+    "Druídico":                  {"descricao": "Aprende Druídico — idioma secreto dos druidas, falado e escrito (cifras em marcações naturais).", "custo_mana": 0, "dado": ""},
+    "Forma Selvagem":            {"descricao": "Ação: transforma-se em besta com CR ≤ ¼ do seu nível (½ no 4º, 1 no 8º). 2 usos por descanso curto ou longo.", "custo_mana": 0, "dado": ""},
+    "Círculo Druídico":          {"descricao": "Escolhe um círculo (Terra, Lua, Sonhos, etc.) — define habilidades temáticas a partir do 2º nível.", "custo_mana": 0, "dado": ""},
+    "Forma Selvagem Aprimorada": {"descricao": "Sua Forma Selvagem pode adotar bestas com CR maior e formas aquáticas/voadoras (4º: aquática; 8º: voadora).", "custo_mana": 0, "dado": ""},
+    "Uso de Forma Selvagem Adicional":{"descricao": "Forma Selvagem agora tem 3 usos por descanso (nv. 6+).", "custo_mana": 0, "dado": ""},
+    "Forma Selvagem do Druida de Besta":{"descricao": "Pode usar Forma Selvagem com criaturas mais poderosas e mantê-la por mais tempo (nv. 18+).", "custo_mana": 0, "dado": ""},
+    "Arquidruida":               {"descricao": "Forma Selvagem com usos ilimitados. Conjura magias druídicas sem componente material ou verbal (nv. 20).", "custo_mana": 0, "dado": ""},
+
+    # ── Monge ─────────────────────────────────────────────────────────────
+    "Artes Marciais":            {"descricao": "Sem armadura/escudo: usa DES no lugar de FOR em ataques desarmados/marciais. Dado marcial 1d4 (sobe até 1d10 no 17º). Bônus: ataque desarmado extra.", "custo_mana": 0, "dado": "1d4"},
+    "Ki":                        {"descricao": "Pool de pontos de Ki = seu nível de monge. Gasta em Rajada de Golpes, Defesa Paciente, Passo do Vento, Atordoamento, etc.", "custo_mana": 0, "dado": ""},
+    "Movimento Sem Armadura":    {"descricao": "Deslocamento aumenta sem armadura/escudo: +3m no 2º, escalando até +9m no 18º.", "custo_mana": 0, "dado": ""},
+    "Desviar Projéteis":         {"descricao": "Reação: reduz dano de ataque à distância em 1d10 + DES + nível de monge. Se zerar, pode arremessar a munição de volta gastando 1 Ki.", "custo_mana": 0, "dado": "1d10"},
+    "Tradição Monástica":        {"descricao": "Escolhe uma tradição (Mão Aberta, Sombras, Quatro Elementos, etc.) — define habilidades temáticas a partir do 3º nível.", "custo_mana": 0, "dado": ""},
+    "Queda Lenta":               {"descricao": "Reação: reduz dano de queda em 5 × nível de monge.", "custo_mana": 0, "dado": ""},
+    "Atordoamento":              {"descricao": "Após acertar um golpe marcial, gasta 1 Ki: alvo faz save de CON; se falhar, fica Atordoado até o fim do próximo turno.", "custo_mana": 0, "dado": ""},
+    "Golpes Ki-Aprimorados":     {"descricao": "Ataques desarmados contam como mágicos para resistência/imunidade a dano (nv. 6+).", "custo_mana": 0, "dado": ""},
+    "Tranquilidade":             {"descricao": "Ao fim do descanso longo, recebe efeito de Santuário gratuito até o próximo descanso longo (nv. 7+).", "custo_mana": 0, "dado": ""},
+    "Correr Pelas Paredes":      {"descricao": "Pode correr em paredes verticais e na água (sem cair) durante o seu turno (nv. 9+).", "custo_mana": 0, "dado": ""},
+    "Pureza de Corpo":           {"descricao": "Imune a doenças e venenos (nv. 10+).", "custo_mana": 0, "dado": ""},
+    "Língua do Sol e da Lua":    {"descricao": "Compreende todas as línguas faladas (nv. 13+).", "custo_mana": 0, "dado": ""},
+    "Alma do Diamante":          {"descricao": "Proficiência em todos os saves. Pode gastar 1 Ki para refazer um save que falhou (nv. 14+).", "custo_mana": 0, "dado": ""},
+    "Alma Sem Idade":            {"descricao": "Não envelhece e não precisa de comida ou água (nv. 15+).", "custo_mana": 0, "dado": ""},
+    "Mente Vazia":               {"descricao": "Imune a Enfeitiçado e Amedrontado (nv. 15+).", "custo_mana": 0, "dado": ""},
+    "Corpo Vazio":               {"descricao": "Ação: gasta 4 Ki — fica invisível por 1 minuto e ganha resistência a todo dano exceto força (nv. 18+).", "custo_mana": 0, "dado": ""},
+    "Ser Perfeito":              {"descricao": "Recupera 4 Ki ao rolar iniciativa se estiver com 0. SAB e DES máximos sobem para 24 (nv. 20).", "custo_mana": 0, "dado": ""},
+
+    # ── Ladino ────────────────────────────────────────────────────────────
+    "Ataque Furtivo":            {"descricao": "1 vez por turno: +1d6 dano (escala até 10d6 no 19º) em ataque com vantagem OU aliado adjacente ao alvo.", "custo_mana": 0, "dado": "1d6"},
+    "Linguagem dos Ladrões":     {"descricao": "Aprende cifra secreta usada por ladinos — mensagens ocultas em conversas, gírias e marcações.", "custo_mana": 0, "dado": ""},
+    "Ação Ardilosa":             {"descricao": "Ação bônus: pode Disparar (Disengage), Esconder, ou Correr (Dash) no seu turno.", "custo_mana": 0, "dado": ""},
+    "Arquétipo de Ladrão":       {"descricao": "Escolhe um arquétipo (Ladrão, Assassino, Trapaceiro Arcano) — define habilidades temáticas a partir do 3º nível.", "custo_mana": 0, "dado": ""},
+    "Especialização Adicional":  {"descricao": "Dobra o bônus de proficiência em 2 perícias/ferramentas extras (nv. 6+).", "custo_mana": 0, "dado": ""},
+    "Esquiva Incrivelmente Baixa":{"descricao": "Reação: ao ser atingido por ataque visível, reduz o dano pela metade.", "custo_mana": 0, "dado": ""},
+    "Talento Confiável":         {"descricao": "Em testes de perícia com proficiência, qualquer rolagem ≤ 9 é tratada como 10 (nv. 11+).", "custo_mana": 0, "dado": ""},
+    "Visão às Cegas":            {"descricao": "Visão às cegas em raio de 3m — percebe ao redor sem usar a visão (nv. 14+).", "custo_mana": 0, "dado": ""},
+    "Mente Escorregadia":        {"descricao": "Ganha proficiência em saves de SAB (nv. 15+).", "custo_mana": 0, "dado": ""},
+    "Elusivo":                   {"descricao": "Nenhum ataque tem vantagem contra você enquanto estiver consciente (nv. 18+).", "custo_mana": 0, "dado": ""},
+    "Assassino Reflexivo":       {"descricao": "Pode refazer uma rolagem de ataque, teste de atributo ou save por turno (nv. 20).", "custo_mana": 0, "dado": ""},
+
+    # ── Mago ──────────────────────────────────────────────────────────────
+    "Recuperação Arcana":        {"descricao": "1 vez por dia, em descanso curto: recupera slots de magia totalizando ≤ metade do seu nível (arredondado para cima, nenhum slot > nv. 5).", "custo_mana": 0, "dado": ""},
+    "Tradição Arcana":           {"descricao": "Escolhe uma tradição (Evocação, Abjuração, Necromancia, Ilusão, Encantamento, Transmutação, Adivinhação, Conjuração) — define habilidades temáticas.", "custo_mana": 0, "dado": ""},
+    "Feitiço de Tradição":       {"descricao": "Habilidade temática da Tradição Arcana no 2º nível — varia conforme a escola escolhida.", "custo_mana": 0, "dado": ""},
+    "Habilidade de Tradição":    {"descricao": "Habilidade adicional da Tradição Arcana no 6º nível — varia conforme a escola escolhida.", "custo_mana": 0, "dado": ""},
+    "Habilidade de Tradição Adicional":{"descricao": "Habilidade adicional da Tradição Arcana no 10º nível.", "custo_mana": 0, "dado": ""},
+    "Habilidade de Tradição Superior":{"descricao": "Habilidade culminante da Tradição Arcana no 14º nível.", "custo_mana": 0, "dado": ""},
+    "Maestria de Feitiço":       {"descricao": "Escolhe 1 magia de nível 1 e 1 de nível 2 do seu livro — pode conjurá-las à vontade sem gastar slot (nv. 18+).", "custo_mana": 0, "dado": ""},
+    "Assinatura de Feitiço":     {"descricao": "Escolhe 2 magias de nível 3 do livro — cada uma pode ser conjurada uma vez por descanso curto sem gastar slot (nv. 20).", "custo_mana": 0, "dado": ""},
+
+    # ── Feiticeiro ────────────────────────────────────────────────────────
+    "Origem de Feiticeiro":      {"descricao": "Escolhe a origem do seu poder (Linhagem Dracônica, Magia Selvagem, etc.) — define habilidades temáticas e atributos passivos.", "custo_mana": 0, "dado": ""},
+    "Pontos de Feitiçaria":      {"descricao": "Pool de pontos = seu nível de feiticeiro. Use para criar slots de magia, alimentar Metamagia ou trocar slot ↔ ponto.", "custo_mana": 0, "dado": ""},
+    "Metamagia":                 {"descricao": "Escolhe 2 efeitos (Sutil, Empoderada, Distante, Gêmea, Cuidadosa, Estendida, etc.) que alteram magias gastando pontos de feitiçaria.", "custo_mana": 0, "dado": ""},
+    "Metamagia Adicional":       {"descricao": "Aprende mais 1 efeito de Metamagia (no 10º e no 17º nível).", "custo_mana": 0, "dado": ""},
+    "Habilidade de Origem":      {"descricao": "Habilidade temática da sua Origem de Feiticeiro no 6º nível.", "custo_mana": 0, "dado": ""},
+    "Habilidade de Origem Adicional":{"descricao": "Habilidade adicional da Origem de Feiticeiro no 14º nível.", "custo_mana": 0, "dado": ""},
+    "Habilidade de Origem Superior":{"descricao": "Habilidade culminante da Origem de Feiticeiro no 18º nível.", "custo_mana": 0, "dado": ""},
+    "Restauração de Feitiçaria": {"descricao": "1 vez por descanso curto: recupera 4 Pontos de Feitiçaria (nv. 20).", "custo_mana": 0, "dado": ""},
+
+    # ── Bruxo ─────────────────────────────────────────────────────────────
+    "Patrono Sobrenatural":      {"descricao": "Faz um pacto com um patrono (Senhor Lich, Arquifada, Senhor das Sombras, Grande Antigo, etc.) — define habilidades temáticas.", "custo_mana": 0, "dado": ""},
+    "Magia do Pacto":             {"descricao": "Conjuração via pacto: poucos slots, mas todos sobem juntos para o nível máximo. Recuperados em descanso CURTO (não longo).", "custo_mana": 0, "dado": ""},
+    "Invocações Sobrenaturais":  {"descricao": "Aprende invocações (Eldritch Invocations) — habilidades passivas/at-will que modificam magias e perícias.", "custo_mana": 0, "dado": ""},
+    "Invocações Sobrenaturais Adicionais":{"descricao": "Aprende mais 1 Invocação Sobrenatural.", "custo_mana": 0, "dado": ""},
+    "Bênção do Pacto":           {"descricao": "Escolhe um pacto: Lâmina (arma mágica), Tomo (livro com 3 truques extras) ou Corrente (familiar especial).", "custo_mana": 0, "dado": ""},
+    "Habilidade do Patrono":     {"descricao": "Habilidade temática do seu Patrono no 6º nível — varia conforme o patrono escolhido.", "custo_mana": 0, "dado": ""},
+    "Habilidade do Patrono Adicional":{"descricao": "Habilidade adicional do Patrono no 10º nível.", "custo_mana": 0, "dado": ""},
+    "Habilidade do Patrono Superior":{"descricao": "Habilidade culminante do Patrono no 14º nível.", "custo_mana": 0, "dado": ""},
+    "Magia Mística":             {"descricao": "Aprende 1 magia de QUALQUER lista de classe, conjurada com slot separado recuperado a cada descanso longo (nv. 11+).", "custo_mana": 0, "dado": ""},
+    "Mestre Sobrenatural":       {"descricao": "Pode recuperar 1 slot de pacto como ação no combate, 1 vez por descanso longo (nv. 20).", "custo_mana": 0, "dado": ""},
 }
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# FEATURE_VARIANTS — subescolhas mecânicas de habilidades de classe.
+# (Fase 1: features "escolha 1/N de uma lista finita" com efeito bem definido.)
+#
+# Estrutura:
+#   FEATURE_VARIANTS[<nome da feature em PT-BR>] = {
+#     "pick":        int        # quantas opções escolher
+#     "pick_label":  str        # rótulo da unidade (ex.: "estilo", "tipo")
+#     "options": {
+#         <nome>: {"descricao": str, "narrative_hint": "passive"|"reaction"|"active"}
+#     },
+#   }
+#
+# Storage por personagem: char["sheet"]["feature_choices"][feature_name].
+#   • pick=1 → string única ("Arquearia")
+#   • pick>1 → lista ([..])
+#
+# Para LIGAR o efeito mecânico, ver _combat_style_bonus / _recalculate_ca /
+# attack_roll. Variantes sem hook engine valem como nota narrativa que a
+# IA-mestre lê na descrição da ficha.
+# ────────────────────────────────────────────────────────────────────────────
+FEATURE_VARIANTS: dict[str, dict] = {
+    # Guerreiro / Patrulheiro / Paladino — 1º nível (e Bardo de Coragem no 3º)
+    "Estilo de Combate": {
+        "pick": 1,
+        "pick_label": "estilo",
+        "options": {
+            "Arquearia":               {"descricao": "+2 nos rolls de ataque com armas à distância.", "narrative_hint": "passive"},
+            "Defesa":                  {"descricao": "+1 CA enquanto estiver usando qualquer armadura.", "narrative_hint": "passive"},
+            "Duelo":                   {"descricao": "+2 dano com arma corpo a corpo de uma mão, desde que não esteja empunhando outra arma.", "narrative_hint": "passive"},
+            "Combate com Duas Armas":  {"descricao": "Adiciona o modificador de atributo ao dano do ataque com a 2ª arma (off-hand).", "narrative_hint": "passive"},
+            "Proteção":                {"descricao": "Reação (precisa estar com escudo): impõe desvantagem em um ataque contra aliado adjacente.", "narrative_hint": "reaction"},
+            "Grande Arma":             {"descricao": "Quando rola 1 ou 2 nos dados de dano de arma de duas mãos, pode re-rolar uma vez por dado.", "narrative_hint": "passive"},
+        },
+    },
+    # Patrulheiro — 1º nível (segundo tipo no 6º via "Inimigo Favorecido Adicional")
+    "Inimigo Favorecido": {
+        "pick": 1,
+        "pick_label": "tipo",
+        "options": {
+            "Aberrações":     {"descricao": "Especialista em aberrações: vantagem para rastreá-las e +PROF info; +2 dano contra esse tipo.", "narrative_hint": "passive"},
+            "Bestas":         {"descricao": "Especialista em bestas (animais): vantagem para rastrear, +PROF info, +2 dano.",                  "narrative_hint": "passive"},
+            "Celestiais":     {"descricao": "Especialista em celestiais: vantagem para rastrear, +PROF info, +2 dano.",                       "narrative_hint": "passive"},
+            "Constructos":    {"descricao": "Especialista em constructos: vantagem para rastrear, +PROF info, +2 dano.",                      "narrative_hint": "passive"},
+            "Dragões":        {"descricao": "Especialista em dragões: vantagem para rastrear, +PROF info, +2 dano.",                          "narrative_hint": "passive"},
+            "Elementais":     {"descricao": "Especialista em elementais: vantagem para rastrear, +PROF info, +2 dano.",                       "narrative_hint": "passive"},
+            "Feéricos":       {"descricao": "Especialista em feéricos: vantagem para rastrear, +PROF info, +2 dano.",                         "narrative_hint": "passive"},
+            "Infernais":      {"descricao": "Especialista em infernais (demônios/diabos): vantagem para rastrear, +PROF info, +2 dano.",      "narrative_hint": "passive"},
+            "Gigantes":       {"descricao": "Especialista em gigantes: vantagem para rastrear, +PROF info, +2 dano.",                         "narrative_hint": "passive"},
+            "Humanoides":     {"descricao": "Especialista em humanoides: vantagem para rastrear, +PROF info, +2 dano.",                       "narrative_hint": "passive"},
+            "Mortos-vivos":   {"descricao": "Especialista em mortos-vivos: vantagem para rastrear, +PROF info, +2 dano.",                     "narrative_hint": "passive"},
+            "Monstruosidades":{"descricao": "Especialista em monstruosidades: vantagem para rastrear, +PROF info, +2 dano.",                  "narrative_hint": "passive"},
+            "Plantas":        {"descricao": "Especialista em plantas: vantagem para rastrear, +PROF info, +2 dano.",                          "narrative_hint": "passive"},
+            "Limos":          {"descricao": "Especialista em limos: vantagem para rastrear, +PROF info, +2 dano.",                            "narrative_hint": "passive"},
+        },
+    },
+    "Inimigo Favorecido Adicional": {  # 6º nível — herda mesmas opções
+        "pick": 1,
+        "pick_label": "tipo",
+        "options": "ref:Inimigo Favorecido",  # resolvido em _get_variants()
+    },
+    # Patrulheiro — 1º nível (segundo terreno no 6º via "Explorador Natural Adicional")
+    "Explorador Natural": {
+        "pick": 1,
+        "pick_label": "terreno",
+        "options": {
+            "Ártico":       {"descricao": "Em ambiente ártico: viagem normal em terreno difícil, sempre alerta, +PROF na busca por suprimentos.",     "narrative_hint": "passive"},
+            "Costa":        {"descricao": "Em ambiente costeiro: viagem normal em terreno difícil, sempre alerta, +PROF na busca por suprimentos.",  "narrative_hint": "passive"},
+            "Deserto":      {"descricao": "Em ambiente desértico: viagem normal em terreno difícil, sempre alerta, +PROF na busca por suprimentos.", "narrative_hint": "passive"},
+            "Floresta":     {"descricao": "Em florestas: viagem normal em terreno difícil, sempre alerta, +PROF na busca por suprimentos.",          "narrative_hint": "passive"},
+            "Pântano":      {"descricao": "Em pântanos: viagem normal em terreno difícil, sempre alerta, +PROF na busca por suprimentos.",           "narrative_hint": "passive"},
+            "Montanha":     {"descricao": "Em montanhas: viagem normal em terreno difícil, sempre alerta, +PROF na busca por suprimentos.",          "narrative_hint": "passive"},
+            "Planície":     {"descricao": "Em planícies: viagem normal em terreno difícil, sempre alerta, +PROF na busca por suprimentos.",          "narrative_hint": "passive"},
+            "Subterrâneo":  {"descricao": "No subterrâneo: viagem normal em terreno difícil, sempre alerta, +PROF na busca por suprimentos.",        "narrative_hint": "passive"},
+        },
+    },
+    "Explorador Natural Adicional": {  # 6º nível
+        "pick": 1,
+        "pick_label": "terreno",
+        "options": "ref:Explorador Natural",
+    },
+    # Feiticeiro — 3º nível, escolhe 2 (+1 no 10º, +1 no 17º via "Metamagia Adicional")
+    "Metamagia": {
+        "pick": 2,
+        "pick_label": "efeitos",
+        "options": {
+            "Sutil":       {"descricao": "1 ponto: conjura sem componente verbal nem somático (ignora silêncio/restrição de mãos).",                "narrative_hint": "active"},
+            "Empoderada":  {"descricao": "1 ponto: re-rola até CAR (mín. 1) dados de dano de uma magia, usando o novo resultado.",                  "narrative_hint": "active"},
+            "Distante":    {"descricao": "1 ponto: dobra o alcance da magia; ou em magias de Toque, vira alcance de 9m.",                            "narrative_hint": "active"},
+            "Estendida":   {"descricao": "1 ponto: dobra a duração de magias com duração ≥ 1 min (máx. 24h).",                                       "narrative_hint": "active"},
+            "Gêmea":       {"descricao": "Custo = nível da magia: alveja 1 criatura adicional (somente magias de alvo único).",                      "narrative_hint": "active"},
+            "Cuidadosa":   {"descricao": "1 ponto: ao conjurar magia com save em área, até CAR aliados passam automaticamente.",                     "narrative_hint": "active"},
+            "Acelerada":   {"descricao": "2 pontos: uma magia que normalmente tem tempo de conjuração 1 Ação vira 1 Ação Bônus.",                    "narrative_hint": "active"},
+            "Intensificada":{"descricao": "3 pontos: 1 alvo da magia tem desvantagem no 1º save de resistência.",                                   "narrative_hint": "active"},
+        },
+    },
+    "Metamagia Adicional": {
+        "pick": 1,
+        "pick_label": "efeito",
+        "options": "ref:Metamagia",
+    },
+    # Bruxo — 2º nível, escolhe N (escala com nível)
+    "Invocações Sobrenaturais": {
+        "pick": 2,
+        "pick_at_level": {2: 2, 5: 3, 7: 4, 9: 5, 12: 6, 15: 7, 18: 8},
+        "pick_label": "invocações",
+        "options": {
+            "Agonizing Blast":     {"descricao": "Quando conjura Eldritch Blast, soma o mod. de CAR ao dano de cada raio.",            "narrative_hint": "passive"},
+            "Repelling Blast":     {"descricao": "Eldritch Blast empurra criatura Grande ou menor em 3m.",                              "narrative_hint": "passive"},
+            "Devil's Sight":       {"descricao": "Enxerga normalmente em escuridão mágica em raio de 36m.",                              "narrative_hint": "passive"},
+            "Armor of Shadows":    {"descricao": "Conjura Mage Armor (em si) à vontade, sem gastar slot.",                              "narrative_hint": "active"},
+            "Eldritch Sight":      {"descricao": "Conjura Detect Magic à vontade, sem gastar slot.",                                    "narrative_hint": "active"},
+            "Fiendish Vigor":      {"descricao": "Conjura False Life (nv. 1) em si à vontade.",                                          "narrative_hint": "active"},
+            "Mask of Many Faces":  {"descricao": "Conjura Disguise Self à vontade.",                                                     "narrative_hint": "active"},
+            "Misty Visions":       {"descricao": "Conjura Silent Image à vontade.",                                                      "narrative_hint": "active"},
+            "Beast Speech":        {"descricao": "Pode falar com bestas como na magia Speak with Animals, à vontade.",                  "narrative_hint": "active"},
+            "Book of Ancient Secrets":{"descricao": "Pacto do Tomo: escreve magias de ritual (qualquer classe) no livro.",              "narrative_hint": "passive"},
+            "Thirsting Blade":     {"descricao": "Pacto da Lâmina (nv.5+): ataca duas vezes com a arma do pacto ao usar Atacar.",       "narrative_hint": "passive"},
+            "Lifedrinker":         {"descricao": "Pacto da Lâmina (nv.12+): arma causa +CAR dano necrótico extra.",                     "narrative_hint": "passive"},
+            "Voice of the Chain Master":{"descricao": "Pacto da Corrente: comunica telepaticamente com o familiar.",                    "narrative_hint": "passive"},
+            "Eldritch Mind":       {"descricao": "Vantagem em saves de CON para manter concentração em magias.",                         "narrative_hint": "passive"},
+            "Gaze of Two Minds":   {"descricao": "Toca um humanoide consciente: vê pelos olhos dele por até 1h.",                       "narrative_hint": "active"},
+        },
+    },
+}
+
+
+def _get_variants(feature_name: str) -> dict | None:
+    """Retorna metadata da feature com 'options' resolvido (se for ref:)."""
+    v = FEATURE_VARIANTS.get(feature_name)
+    if not v:
+        return None
+    opts = v.get("options")
+    if isinstance(opts, str) and opts.startswith("ref:"):
+        target = opts.split(":", 1)[1]
+        ref = FEATURE_VARIANTS.get(target, {})
+        return {**v, "options": ref.get("options", {})}
+    return v
+
+
+def _get_feature_choice(char: dict, feature_name: str):
+    """Retorna a(s) escolha(s) atual(is) ou None."""
+    fc = ((char or {}).get("sheet") or {}).get("feature_choices") or {}
+    return fc.get(feature_name)
+
+
+def _has_combat_style(char: dict, style: str) -> bool:
+    """True se o personagem escolheu o estilo de combate informado."""
+    return _get_feature_choice(char, "Estilo de Combate") == style
+
+
+def _favored_enemy_types(char: dict) -> set[str]:
+    """Conjunto normalizado de tipos de criatura favorecidos (em PT-BR)."""
+    result = set()
+    for feat in ("Inimigo Favorecido", "Inimigo Favorecido Adicional"):
+        v = _get_feature_choice(char, feat)
+        if isinstance(v, str) and v:
+            result.add(_norm_txt(v))
+        elif isinstance(v, list):
+            for x in v:
+                if x: result.add(_norm_txt(x))
+    return result
+
+
+# ── Fase 3: hooks mecânicos de sub-features de arquétipo ──────────────────
+def _char_has_feature(char: dict, feature_name: str) -> bool:
+    """True se o personagem tem a habilidade/feature pelo nome exato (case-insensitive)."""
+    target = (feature_name or "").lower().strip()
+    return any((h.get("nome", "") or "").lower().strip() == target
+               for h in (char.get("habilidades") or []))
+
+
+def _crit_threshold(char: dict) -> int:
+    """
+    Menor resultado de d20 que conta como acerto crítico.
+    Campeão: Crítico Aprimorado (nv.3) → 19; Crítico Superior (nv.15) → 18.
+    Padrão: 20.
+    """
+    if _char_has_feature(char, "Crítico Superior"):
+        return 18
+    if _char_has_feature(char, "Crítico Aprimorado"):
+        return 19
+    return 20
+
+
+def _golpe_divino_info(char: dict) -> tuple[int, str] | None:
+    """
+    Detecta Golpe Divino (domínio de clérigo) ou Golpe Divino Aprimorado
+    (paladino). Retorna (n_dados_d8, rótulo_do_tipo) ou None.
+
+    • Clérigo: +1d8 (sobe a 2d8 a partir do nv. 14).
+    • Paladino "Golpe Divino Aprimorado": +1d8 fixo, sempre radiante.
+    """
+    nivel = int((char.get("sheet") or {}).get("nivel", 1) or 1)
+    for h in (char.get("habilidades") or []):
+        nome = (h.get("nome", "") or "")
+        if nome == "Golpe Divino Aprimorado":
+            return (1, "radiante")
+        if nome.startswith("Golpe Divino"):
+            # Extrai o tipo de dano entre parênteses, se houver.
+            tipo = "radiante"
+            if "(" in nome and ")" in nome:
+                inside = nome[nome.find("(") + 1:nome.find(")")].strip().lower()
+                _TIPO_MAP = {
+                    "vida": "radiante", "guerra": "do tipo escolhido",
+                    "luz": "radiante", "conhecimento": "psíquico",
+                    "natureza": "elemental", "tempestade": "trovão",
+                    "ardil": "veneno",
+                }
+                tipo = _TIPO_MAP.get(inside, "radiante")
+            return (2 if nivel >= 14 else 1, tipo)
+    return None
+
+
+# ── Armas pesadas (two-handed) — usado por Estilo de Combate ──────────────
+TWO_HANDED_WEAPONS = {
+    "espada grande", "espada de duas mãos", "greatsword",
+    "machado grande", "greataxe",
+    "maul", "marreta", "alabarda", "halberd",
+    "lança", "pike", "pica",
+    "glaive", "lança serrilhada",
+    "arco longo", "longbow", "besta pesada", "heavy crossbow",
+    "cajado quarterstaff",  # quando empunhado a duas mãos
+    "maça grande", "maul de guerra",
+}
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# ARCHETYPE_FEATURES — arquétipos de classe e suas sub-features por nível.
+#
+# Cada feature de arquétipo (ex.: "Arquétipo Marcial") é uma escolha entre
+# arquétipos (ex.: Campeão, Mestre de Batalha, Cavaleiro Élditch). Cada
+# arquétipo concede sub-features automáticas em níveis específicos.
+#
+# Estrutura:
+#   ARCHETYPE_FEATURES[<feature pai>][<nome do arquétipo>] = {
+#     "descricao": str,         # 1 linha que descreve a temática
+#     "features": {
+#         <nível>: [
+#             {"nome": str, "descricao": str, "dado": str, "custo_mana": int},
+#             ...
+#         ],
+#         ...
+#     },
+#   }
+#
+# Ao module-load, _register_archetypes() flat-mapeia isso em:
+#   • FEATURE_VARIANTS[<feature pai>]   — picker reusa o sistema da Fase 1.
+#   • CLASS_FEATURE_DESCS[<sub-feat>]   — descrição visível em todo lugar.
+#
+# Para CONCEDER as sub-features quando o jogador escolhe (ou sobe de nível),
+# ver _apply_archetype_features().
+# ────────────────────────────────────────────────────────────────────────────
+ARCHETYPE_FEATURES: dict[str, dict[str, dict]] = {
+    # ── Guerreiro (Arquétipo Marcial — nv. 3) ──────────────────────────────
+    "Arquétipo Marcial": {
+        "Campeão": {
+            "descricao": "Foco em força bruta, atletismo e críticos.",
+            "features": {
+                3:  [{"nome": "Crítico Aprimorado", "descricao": "Seus acertos críticos com armas ocorrem em 19 ou 20 no d20.", "dado": "", "custo_mana": 0}],
+                7:  [{"nome": "Atleta Notável", "descricao": "Vantagem em testes de FOR (Atletismo). Pode saltar +mod. FOR metros e correr enquanto se levanta sem gastar deslocamento.", "dado": "", "custo_mana": 0}],
+                10: [{"nome": "Estilo de Combate Adicional", "descricao": "Aprende um 2º Estilo de Combate da lista do Guerreiro.", "dado": "", "custo_mana": 0}],
+                15: [{"nome": "Crítico Superior", "descricao": "Seus acertos críticos com armas ocorrem em 18, 19 ou 20 no d20.", "dado": "", "custo_mana": 0}],
+                18: [{"nome": "Sobrevivente", "descricao": "No início do seu turno, recupera 5 + mod. CON de PV se estiver com ≤ metade dos PV (e ≥ 1).", "dado": "", "custo_mana": 0}],
+            },
+        },
+        "Mestre de Batalha": {
+            "descricao": "Manobras táticas, dados de superioridade.",
+            "features": {
+                3:  [
+                    {"nome": "Manobras de Combate", "descricao": "Aprende 3 manobras da lista do Mestre de Batalha (Aparar, Desarmar, Empurrar, Investida, etc.).", "dado": "", "custo_mana": 0},
+                    {"nome": "Dado de Superioridade", "descricao": "Pool de 4 dados d8 (sobe a d10 no 10º, d12 no 18º). Gasta-os para alimentar manobras. Recupera no descanso curto/longo.", "dado": "1d8", "custo_mana": 0},
+                    {"nome": "Saber Estudante", "descricao": "Ganha proficiência em uma perícia OU ferramenta de artesão.", "dado": "", "custo_mana": 0},
+                ],
+                7:  [{"nome": "Resposta Tática", "descricao": "Vantagem em testes de iniciativa. Aliados adjacentes (1,5m) ganham +PROF em rolagens contra criaturas que você golpeou no turno.", "dado": "", "custo_mana": 0}],
+                10: [{"nome": "Manobras Aprimoradas", "descricao": "Aprende mais 2 manobras. Dado de Superioridade sobe para d10.", "dado": "1d10", "custo_mana": 0}],
+                15: [{"nome": "Manobras Relâmpago", "descricao": "Aprende mais 2 manobras. Mais 1 Dado de Superioridade no pool (total 6).", "dado": "", "custo_mana": 0}],
+                18: [{"nome": "Manobra Suprema", "descricao": "Quando rola iniciativa sem Dados de Superioridade, recupera 1. Dado sobe para d12.", "dado": "1d12", "custo_mana": 0}],
+            },
+        },
+        "Cavaleiro Élditch": {
+            "descricao": "Combatente que mistura magia arcana com armas.",
+            "features": {
+                3:  [
+                    {"nome": "Conjuração (Cavaleiro Élditch)", "descricao": "Conjura magias da lista de mago (foco em Abjuração e Evocação). Atributo de conjuração: INT.", "dado": "", "custo_mana": 0},
+                    {"nome": "Vínculo com Arma", "descricao": "Ritual de 1h: vincula-se a até 2 armas. Pode invocá-las à mão como ação bônus.", "dado": "", "custo_mana": 0},
+                ],
+                7:  [{"nome": "Golpe Mágico", "descricao": "Ao acertar um ataque com arma, gasta uma reação para conjurar uma magia de truque contra o mesmo alvo.", "dado": "", "custo_mana": 0}],
+                10: [{"nome": "Disparo Mágico", "descricao": "Conjura uma magia como ação e faz 1 ataque como ação bônus.", "dado": "", "custo_mana": 0}],
+                15: [{"nome": "Vínculo Aprimorado", "descricao": "Quando acerta um crítico, pode rolar mais 1 dado de dano. Suas armas vinculadas contam como mágicas.", "dado": "", "custo_mana": 0}],
+                18: [{"nome": "Vínculo Superior", "descricao": "Pode fazer 2 ataques no lugar de 1 ao usar Conjuração na mesma ação.", "dado": "", "custo_mana": 0}],
+            },
+        },
+    },
+
+    # ── Bárbaro (Caminho Primitivo — nv. 3) ────────────────────────────────
+    "Caminho Primitivo": {
+        "Berserker": {
+            "descricao": "Caminho da fúria descontrolada e da carnificina.",
+            "features": {
+                3:  [{"nome": "Frenesi", "descricao": "Durante a fúria, pode entrar em Frenesi: ataque bônus corpo-a-corpo a cada turno, mas exaustão (1 nível) após a fúria.", "dado": "", "custo_mana": 0}],
+                6:  [{"nome": "Furioso Implacável", "descricao": "Imune a Enfeitiçado e Amedrontado durante a fúria. Se já estava, o efeito é suspenso.", "dado": "", "custo_mana": 0}],
+                10: [{"nome": "Presença Intimidadora", "descricao": "Ação: criatura em 9m faz save de SAB ou fica Amedrontada por 1 minuto.", "dado": "", "custo_mana": 0}],
+                14: [{"nome": "Retaliação", "descricao": "Reação ao receber dano de criatura adjacente: faz um ataque corpo-a-corpo contra ela.", "dado": "", "custo_mana": 0}],
+            },
+        },
+        "Guerreiro Totêmico": {
+            "descricao": "Caminho da conexão com espíritos animais.",
+            "features": {
+                3:  [
+                    {"nome": "Espírito Selvagem (Totem)", "descricao": "Escolhe um totem animal (Urso, Águia, Lobo, etc.) que concede um benefício passivo na fúria.", "dado": "", "custo_mana": 0},
+                    {"nome": "Aspecto do Totem", "descricao": "Benefício passivo permanente baseado no totem (visão de Águia, rastreio de Lobo, etc.).", "dado": "", "custo_mana": 0},
+                ],
+                6:  [{"nome": "Caminho do Andarilho", "descricao": "Comer/beber metade do normal. Resistência a clima extremo. Andar sobre superfícies não-sólidas (totem da Águia).", "dado": "", "custo_mana": 0}],
+                10: [{"nome": "Andarilho Espiritual", "descricao": "Conjura Sentir Inferior e Comungar com Natureza como rituais sem gastar slot.", "dado": "", "custo_mana": 0}],
+                14: [{"nome": "Sintonia Totem", "descricao": "Outro benefício do totem escolhido, mais poderoso (ex.: Urso = aliados adjacentes têm vantagem em saves).", "dado": "", "custo_mana": 0}],
+            },
+        },
+    },
+
+    # ── Paladino (Juramento Sagrado — nv. 3) ───────────────────────────────
+    "Juramento Sagrado": {
+        "Devoção": {
+            "descricao": "Juramento clássico do paladino justo.",
+            "features": {
+                3:  [
+                    {"nome": "Canalizar Divindade (Arma Sagrada)", "descricao": "Ação: arma corpo-a-corpo brilha; +CAR atk e dano por 1 min ou até soltar.", "dado": "", "custo_mana": 0},
+                    {"nome": "Canalizar Divindade (Repelir Mortos-Vivos)", "descricao": "Ação: mortos-vivos em 9m fazem save de SAB ou fogem amedrontados por 1 min.", "dado": "", "custo_mana": 0},
+                ],
+                7:  [{"nome": "Aura de Devoção", "descricao": "Você e aliados em 3m (6m no 18º) imunes a Enfeitiçado enquanto consciente.", "dado": "", "custo_mana": 0}],
+                15: [{"nome": "Pureza de Espírito (Devoção)", "descricao": "Permanentemente sob Proteção contra o Mal e Bem.", "dado": "", "custo_mana": 0}],
+                20: [{"nome": "Avatar Sagrado", "descricao": "Ação: 1 hora aura sagrada (vantagem em ataques contra você e aliados próximos resistem a dano).", "dado": "", "custo_mana": 0}],
+            },
+        },
+        "Antigos": {
+            "descricao": "Juramento da luz contra a corrupção e treva.",
+            "features": {
+                3:  [
+                    {"nome": "Natureza Selvagem", "descricao": "Aprende Falar com Animais como magia de paladino.", "dado": "", "custo_mana": 0},
+                    {"nome": "Canalizar Divindade (Tornado de Folhas)", "descricao": "Ação: criatura em 3m faz save de SAB ou fica Amedrontada de você por 1 min.", "dado": "", "custo_mana": 0},
+                ],
+                7:  [{"nome": "Aura de Combate", "descricao": "Você e aliados em 3m (6m no 18º) ganham resistência a dano de magias.", "dado": "", "custo_mana": 0}],
+                15: [{"nome": "Inalterável", "descricao": "Imune a doença. Veneno sofre desvantagem e você resiste.", "dado": "", "custo_mana": 0}],
+                20: [{"nome": "Campeão da Natureza", "descricao": "Ação: 1 min forma feérica (vantagem em saves de magia, cura 10 PV/turno, ataques causam +1d10 radiante).", "dado": "1d10", "custo_mana": 0}],
+            },
+        },
+        "Vingança": {
+            "descricao": "Juramento de retribuição contra a injustiça.",
+            "features": {
+                3:  [
+                    {"nome": "Marca da Vingança", "descricao": "Reação ao ver criatura atacar aliado em 3m: ataque corpo-a-corpo contra ela.", "dado": "", "custo_mana": 0},
+                    {"nome": "Canalizar Divindade (Voto de Inimizade)", "descricao": "Ação bônus: até 1 min, vantagem em todos os ataques contra a criatura marcada.", "dado": "", "custo_mana": 0},
+                ],
+                7:  [{"nome": "Implacável", "descricao": "Velocidade aumenta em 3m quando se move em direção a inimigo. Imune a Amedrontado.", "dado": "", "custo_mana": 0}],
+                15: [{"nome": "Alma de Vingança", "descricao": "Ao usar Marca da Vingança, faz 2 ataques em vez de 1.", "dado": "", "custo_mana": 0}],
+                20: [{"nome": "Anjo Vingador", "descricao": "Ação: 1h forma com asas voadora (18m), criaturas próximas amedrontadas, +CAR dano em ataques.", "dado": "", "custo_mana": 0}],
+            },
+        },
+    },
+
+    # ── Patrulheiro (Arquétipo do Patrulheiro — nv. 3) ─────────────────────
+    "Arquétipo do Patrulheiro": {
+        "Caçador": {
+            "descricao": "Patrulheiro especialista em matar monstros perigosos.",
+            "features": {
+                3:  [{"nome": "Presa do Caçador", "descricao": "Escolhe uma das técnicas: Colossal (mais dano em alvos Grandes+), Massa (+atk vs grupos), Furtivo (+atk vs alvos isolados).", "dado": "", "custo_mana": 0}],
+                7:  [{"nome": "Tática Defensiva", "descricao": "Escolhe Esquiva (não há vantagem contra você de criaturas a +1,5m), Coberta (escudo +1 CA contra projéteis) ou Bestial (CA +2 vs uma criatura Grande).", "dado": "", "custo_mana": 0}],
+                11: [{"nome": "Ataque Múltiplo", "descricao": "Escolhe Volley (ataque ranged contra área 3m de raio) ou Tempestade Giratória (corpo-a-corpo contra todos os adjacentes).", "dado": "", "custo_mana": 0}],
+                15: [{"nome": "Defesa Superior do Caçador", "descricao": "Escolhe Evasivo (+1 reação por turno), Inalterável (vantagem em saves de medo) ou Vingança Selvagem (+1d8 dano ao ser atingido).", "dado": "1d8", "custo_mana": 0}],
+            },
+        },
+        "Senhor das Feras": {
+            "descricao": "Patrulheiro com um companheiro animal devotado.",
+            "features": {
+                3:  [{"nome": "Companheiro Animal", "descricao": "Adquire uma besta CR ≤ 1/4 como aliado leal. Você compartilha iniciativa e ela age sob seu comando.", "dado": "", "custo_mana": 0}],
+                7:  [{"nome": "Comunicação Exemplar", "descricao": "Pode dar 2 ordens à fera por turno e ela age automaticamente. Telepatia em 30m.", "dado": "", "custo_mana": 0}],
+                11: [{"nome": "Defesa de Mestre", "descricao": "Atributos da fera escalam com seu nível. Ataques dela causam dano extra.", "dado": "", "custo_mana": 0}],
+                15: [{"nome": "Recuperação Bestial", "descricao": "Pode usar uma reação para receber o dano destinado à sua fera.", "dado": "", "custo_mana": 0}],
+            },
+        },
+    },
+
+    # ── Bardo (Colégio Bárdico — nv. 3) ────────────────────────────────────
+    "Colégio Bárdico": {
+        "Saber": {
+            "descricao": "Bardo erudito de magias secretas e perícias.",
+            "features": {
+                3:  [
+                    {"nome": "Saber Estudante (Bardo)", "descricao": "Ganha proficiência em 3 perícias quaisquer.", "dado": "", "custo_mana": 0},
+                    {"nome": "Especialização Cortês", "descricao": "Como reação ao ser alvo de atk/teste/save de habilidade visível, gasta Inspiração para diminuir o resultado.", "dado": "1d6", "custo_mana": 0},
+                ],
+                6:  [{"nome": "Segredos Adicionais (Saber)", "descricao": "Aprende 2 magias de qualquer classe (sem precisar esperar nv. 10).", "dado": "", "custo_mana": 0}],
+                14: [{"nome": "Inspiração Cortês", "descricao": "Aliado com seu d6 de inspiração pode reutilizá-lo após o efeito original.", "dado": "", "custo_mana": 0}],
+            },
+        },
+        "Coragem": {
+            "descricao": "Bardo guerreiro inspirador de combate.",
+            "features": {
+                3:  [
+                    {"nome": "Inspiração de Combate", "descricao": "Aliado com seu dado de inspiração pode usá-lo como dado de dano OU para reagir e ganhar +CA.", "dado": "", "custo_mana": 0},
+                    {"nome": "Estilo de Combate (Bardo)", "descricao": "Ganha proficiência em armaduras médias, escudo e armas marciais.", "dado": "", "custo_mana": 0},
+                ],
+                6:  [
+                    {"nome": "Talento de Combate", "descricao": "Pode fazer 2 ataques em vez de 1 ao usar Atacar.", "dado": "", "custo_mana": 0},
+                    {"nome": "Conjuração em Armadura", "descricao": "Pode conjurar magias usando armadura de combate.", "dado": "", "custo_mana": 0},
+                ],
+                14: [{"nome": "Batalha Inspiradora", "descricao": "Inicia o combate concedendo Inspiração a todos os aliados em 9m.", "dado": "", "custo_mana": 0}],
+            },
+        },
+    },
+
+    # ── Clérigo (Domínio Divino — nv. 1) ────────────────────────────────────
+    "Domínio Divino": {
+        "Vida": {
+            "descricao": "Clérigo curandeiro consagrado à preservação.",
+            "features": {
+                1:  [
+                    {"nome": "Treinamento em Armadura Pesada", "descricao": "Ganha proficiência em armaduras pesadas.", "dado": "", "custo_mana": 0},
+                    {"nome": "Discípulo da Vida", "descricao": "Magias de cura curam +2 + nível da magia PV adicionais.", "dado": "", "custo_mana": 0},
+                ],
+                2:  [{"nome": "Canalizar Divindade (Preservar Vida)", "descricao": "Ação: divide nv. × 5 PV de cura entre aliados em 9m (cada um até metade do HP máx).", "dado": "", "custo_mana": 0}],
+                6:  [{"nome": "Bênção do Cura", "descricao": "Quando cura, alvo ganha PV temporários iguais a 2× nv. clérigo.", "dado": "", "custo_mana": 0}],
+                8:  [{"nome": "Golpe Divino (Vida)", "descricao": "1×/turno: ataque corpo-a-corpo causa +1d8 dano radiante (sobe a 2d8 no 14º).", "dado": "1d8", "custo_mana": 0}],
+                17: [{"nome": "Renovação Suprema", "descricao": "Cura máxima rolada sempre (sem rolar dados de cura).", "dado": "", "custo_mana": 0}],
+            },
+        },
+        "Guerra": {
+            "descricao": "Clérigo de batalha, marcial e direto.",
+            "features": {
+                1:  [
+                    {"nome": "Treinamento em Armadura Pesada", "descricao": "Ganha proficiência em armaduras pesadas e armas marciais.", "dado": "", "custo_mana": 0},
+                    {"nome": "Sacerdote de Guerra", "descricao": "Ação bônus: faz 1 ataque adicional. Usos = mod. SAB por descanso longo.", "dado": "", "custo_mana": 0},
+                ],
+                2:  [{"nome": "Canalizar Divindade (Guiar Ataque)", "descricao": "Reação após errar atk: +10 no resultado (suficiente para acertar?).", "dado": "", "custo_mana": 0}],
+                6:  [{"nome": "Ataque Vindouro", "descricao": "Quando crítica com arma, próximo ataque tem vantagem.", "dado": "", "custo_mana": 0}],
+                8:  [{"nome": "Golpe Divino (Guerra)", "descricao": "1×/turno: ataque corpo-a-corpo causa +1d8 dano do tipo de sua escolha (sobe a 2d8 no 14º).", "dado": "1d8", "custo_mana": 0}],
+                17: [{"nome": "Avatar da Batalha", "descricao": "1 min de resistência a todo dano físico não-mágico.", "dado": "", "custo_mana": 0}],
+            },
+        },
+        "Conhecimento": {
+            "descricao": "Clérigo erudito, buscador de segredos.",
+            "features": {
+                1:  [{"nome": "Bênção do Conhecimento", "descricao": "2 idiomas extras. Proficiência em 2 perícias (Arcana/Religião/História/Natureza) — dobradas.", "dado": "", "custo_mana": 0}],
+                2:  [{"nome": "Canalizar Divindade (Ler Pensamentos)", "descricao": "Ação: criatura em 18m, save de SAB; falha = lê pensamentos por 1 min.", "dado": "", "custo_mana": 0}],
+                6:  [{"nome": "Ler Pensamentos Aprimorado", "descricao": "Após ler pensamentos, pode lançar Sugestão sem gastar slot.", "dado": "", "custo_mana": 0}],
+                8:  [{"nome": "Dano Potencializado (Conhecimento)", "descricao": "1×/turno: truque de dano causa +1d8 (sobe a 2d8 no 14º).", "dado": "1d8", "custo_mana": 0}],
+                17: [{"nome": "Visões do Passado", "descricao": "1 min de meditação: ganha visões sobre criatura ou objeto.", "dado": "", "custo_mana": 0}],
+            },
+        },
+        "Luz": {
+            "descricao": "Clérigo de divindades solares e radiantes.",
+            "features": {
+                1:  [
+                    {"nome": "Truque Bônus (Chamas Sagradas)", "descricao": "Aprende Chamas Sagradas (sacred flame) sem ocupar slot de truque.", "dado": "1d8", "custo_mana": 0},
+                    {"nome": "Bandeira de Aviso", "descricao": "Reação ao ser atingido: impõe desvantagem no ataque. Usos = mod. SAB por descanso longo.", "dado": "", "custo_mana": 0},
+                ],
+                2:  [{"nome": "Canalizar Divindade (Radiância do Amanhecer)", "descricao": "Ação: esfera de luz 9m raio; criaturas hostis fazem save de CON ou 2d10+nv. dano radiante.", "dado": "2d10", "custo_mana": 0}],
+                6:  [{"nome": "Bandeira de Aviso Aprimorada", "descricao": "Bandeira de Aviso também protege aliados em 9m.", "dado": "", "custo_mana": 0}],
+                8:  [{"nome": "Golpe Divino (Luz)", "descricao": "1×/turno: truque/atk causa +1d8 radiante (sobe a 2d8 no 14º).", "dado": "1d8", "custo_mana": 0}],
+                17: [{"nome": "Coroa da Luz", "descricao": "Ação: 1 min de coroa luminosa; magias hostis com save sofrem desvantagem perto.", "dado": "", "custo_mana": 0}],
+            },
+        },
+        "Natureza": {
+            "descricao": "Clérigo druídico, ponte entre fé e natureza.",
+            "features": {
+                1:  [
+                    {"nome": "Acólito da Natureza", "descricao": "Truque de druida bônus + proficiência em uma perícia (Natureza, Sobrevivência, Adestramento).", "dado": "", "custo_mana": 0},
+                    {"nome": "Treinamento em Armadura Pesada", "descricao": "Proficiência em armaduras pesadas.", "dado": "", "custo_mana": 0},
+                ],
+                2:  [{"nome": "Canalizar Divindade (Encantar Animais e Plantas)", "descricao": "Ação: animais/plantas em 9m, save de SAB; falha = Enfeitiçado por 1 min.", "dado": "", "custo_mana": 0}],
+                6:  [{"nome": "Servidor da Natureza", "descricao": "Tropeça e mata animais menores com facilidade. Vantagem em saves contra magias de Encantamento.", "dado": "", "custo_mana": 0}],
+                8:  [{"nome": "Golpe Divino (Natureza)", "descricao": "1×/turno: ataque com arma causa +1d8 elemental (escolha) (sobe a 2d8 no 14º).", "dado": "1d8", "custo_mana": 0}],
+                17: [{"nome": "Mestre da Natureza", "descricao": "Comanda criaturas Enfeitiçadas por Encantar Animais e Plantas com mais precisão.", "dado": "", "custo_mana": 0}],
+            },
+        },
+        "Tempestade": {
+            "descricao": "Clérigo de deuses do raio e do trovão.",
+            "features": {
+                1:  [
+                    {"nome": "Treinamento em Armadura Pesada e Marciais (Tempestade)", "descricao": "Proficiência em armaduras pesadas e armas marciais.", "dado": "", "custo_mana": 0},
+                    {"nome": "Cólera Temporal", "descricao": "Reação ao ser atingido por inimigo em 1,5m: +2d8 dano de trovão a ele. Usos = mod. SAB por descanso longo.", "dado": "2d8", "custo_mana": 0},
+                ],
+                2:  [{"nome": "Canalizar Divindade (Trovão Destrutivo)", "descricao": "Ação: criaturas em 9m fazem save de CON; falha = 2d6 + nv. dano trovão (sucesso = metade).", "dado": "2d6", "custo_mana": 0}],
+                6:  [{"nome": "Resistência da Tempestade", "descricao": "Resistência a dano de relâmpago e trovão.", "dado": "", "custo_mana": 0}],
+                8:  [{"nome": "Golpe Divino (Tempestade)", "descricao": "1×/turno: ataque com arma causa +1d8 trovão (sobe a 2d8 no 14º).", "dado": "1d8", "custo_mana": 0}],
+                17: [{"nome": "Trovão Estrondoso", "descricao": "Quando crítica, dano de trovão/relâmpago é maximizado.", "dado": "", "custo_mana": 0}],
+            },
+        },
+        "Ardil": {
+            "descricao": "Clérigo de deuses trapaceiros e ladinos.",
+            "features": {
+                1:  [{"nome": "Bênção do Trapaceiro", "descricao": "Ação: toca um aliado, dá vantagem em testes de DES (Furtividade) por 1 hora.", "dado": "", "custo_mana": 0}],
+                2:  [{"nome": "Canalizar Divindade (Invocar Duplicação)", "descricao": "Ação: cria uma ilusão sua até 9m que pode falar e mover por 1 min.", "dado": "", "custo_mana": 0}],
+                6:  [{"nome": "Bênção do Trapaceiro Aprimorada", "descricao": "Pode usar Bênção do Trapaceiro como ação bônus em 9m. Múltiplos alvos.", "dado": "", "custo_mana": 0}],
+                8:  [{"nome": "Golpe Divino (Ardil)", "descricao": "1×/turno: ataque com arma causa +1d8 veneno (sobe a 2d8 no 14º).", "dado": "1d8", "custo_mana": 0}],
+                17: [{"nome": "Trapaça Improvisada", "descricao": "Pode usar Canalizar Divindade duas vezes seguidas se inspirado.", "dado": "", "custo_mana": 0}],
+            },
+        },
+    },
+
+    # ── Druida (Círculo Druídico — nv. 2) ──────────────────────────────────
+    "Círculo Druídico": {
+        "Terra": {
+            "descricao": "Druida do círculo dos sábios e dos lugares sagrados.",
+            "features": {
+                2:  [
+                    {"nome": "Recuperação Natural", "descricao": "Em descanso curto: recupera slots de magia até metade do nível (1x/dia).", "dado": "", "custo_mana": 0},
+                    {"nome": "Magias do Círculo (Terra)", "descricao": "Ganha magias adicionais ligadas ao terreno escolhido (Ártico, Costa, Deserto, etc.).", "dado": "", "custo_mana": 0},
+                ],
+                6:  [{"nome": "Passos da Terra", "descricao": "Move-se em terreno difícil mágico sem penalidade. Imune a magias que retardam.", "dado": "", "custo_mana": 0}],
+                10: [{"nome": "Refúgio da Natureza", "descricao": "Imune a doenças, venenos e proteção contra envelhecimento.", "dado": "", "custo_mana": 0}],
+                14: [{"nome": "Santuário da Natureza", "descricao": "Bestas e plantas não atacam você a menos que provocadas.", "dado": "", "custo_mana": 0}],
+            },
+        },
+        "Lua": {
+            "descricao": "Druida especializado em Forma Selvagem de combate.",
+            "features": {
+                2:  [
+                    {"nome": "Forma Selvagem do Combate", "descricao": "Pode adotar Forma Selvagem com CR ≤ 1 já no 2º nível. Forma Selvagem como ação bônus.", "dado": "", "custo_mana": 0},
+                    {"nome": "Magias Lunares", "descricao": "Pode lançar Cura Ferimentos como ação bônus enquanto em Forma Selvagem.", "dado": "", "custo_mana": 0},
+                ],
+                6:  [{"nome": "Forma Selvagem Primal", "descricao": "Suas formas selvagens contam como mágicas para resistência a dano.", "dado": "", "custo_mana": 0}],
+                10: [{"nome": "Golpes Elementais", "descricao": "Ataques em Forma Selvagem causam +1d6 dano elemental escolhido.", "dado": "1d6", "custo_mana": 0}],
+                14: [{"nome": "Mudança Imediata", "descricao": "Forma Selvagem como reação ao receber dano.", "dado": "", "custo_mana": 0}],
+            },
+        },
+    },
+
+    # ── Monge (Tradição Monástica — nv. 3) ──────────────────────────────────
+    "Tradição Monástica": {
+        "Mão Aberta": {
+            "descricao": "Tradição clássica do monge artista marcial puro.",
+            "features": {
+                3:  [{"nome": "Técnicas da Mão Aberta", "descricao": "Ao usar Rajada de Golpes: pode derrubar, empurrar 4,5m, ou impedir reações do alvo.", "dado": "", "custo_mana": 0}],
+                6:  [{"nome": "Corpo Curativo", "descricao": "Ação: cura nv. monge × 3 PV em si.", "dado": "", "custo_mana": 0}],
+                11: [{"nome": "Trinta Anos de Tranquilidade", "descricao": "Ao fim do descanso longo, recebe efeito de Santuário gratuito.", "dado": "", "custo_mana": 0}],
+                17: [{"nome": "Palma Vibrante Trêmula", "descricao": "1 Ki: atinge criatura com vibração; até 23 dias depois, ação para detonar e causar 10d10 necrótico (save CON metade).", "dado": "10d10", "custo_mana": 0}],
+            },
+        },
+        "Sombras": {
+            "descricao": "Tradição do monge furtivo, manipulador de sombras.",
+            "features": {
+                3:  [{"nome": "Artes Sombrias", "descricao": "Conjura Mãos Mágicas, Escuridão, Silêncio, Visão no Escuro, Passar sem Deixar Rastro com Ki.", "dado": "", "custo_mana": 0}],
+                6:  [{"nome": "Salto Sombrio", "descricao": "Em áreas de escuridão: teletransporta-se até 18m para outra área sombra como ação bônus.", "dado": "", "custo_mana": 0}],
+                11: [{"nome": "Manto Sombrio", "descricao": "Em luz fraca/escuridão: torna-se invisível como ação.", "dado": "", "custo_mana": 0}],
+                17: [{"nome": "Oportunista", "descricao": "Reação: faz um ataque corpo-a-corpo contra criatura adjacente que foi atingida por um aliado.", "dado": "", "custo_mana": 0}],
+            },
+        },
+        "Quatro Elementos": {
+            "descricao": "Tradição do monge que canaliza elementais via Ki.",
+            "features": {
+                3:  [
+                    {"nome": "Discípulo dos Elementos", "descricao": "Aprende uma Disciplina Elemental + a básica (Elemental Attunement).", "dado": "", "custo_mana": 0},
+                    {"nome": "Conjuração Elemental", "descricao": "Gasta Ki para conjurar efeitos elementais (Sopro de Fogo, Punho de Pedra, etc.).", "dado": "", "custo_mana": 0},
+                ],
+                6:  [{"nome": "Disciplina Elemental Adicional", "descricao": "Aprende mais 1 Disciplina Elemental.", "dado": "", "custo_mana": 0}],
+                11: [{"nome": "Disciplina Elemental Avançada", "descricao": "Aprende mais 1 Disciplina (até nv. 5 de magia equivalente).", "dado": "", "custo_mana": 0}],
+                17: [{"nome": "Mestre dos Elementos", "descricao": "Aprende todas as Disciplinas Elementais restantes.", "dado": "", "custo_mana": 0}],
+            },
+        },
+    },
+
+    # ── Ladino (Arquétipo de Ladrão — nv. 3) ───────────────────────────────
+    "Arquétipo de Ladrão": {
+        "Ladrão": {
+            "descricao": "Arquétipo clássico de ladrão ágil e versátil.",
+            "features": {
+                3:  [
+                    {"nome": "Mãos Rápidas", "descricao": "Ação Ardilosa pode incluir Prestidigitação, Roubar (Sleight of Hand), ou usar item.", "dado": "", "custo_mana": 0},
+                    {"nome": "Acrobata de Combate", "descricao": "Subir e descer não custa deslocamento extra. Salto melhorado.", "dado": "", "custo_mana": 0},
+                ],
+                9:  [{"nome": "Ladrão Supremo", "descricao": "Vantagem em testes contra armadilhas e portas trancadas.", "dado": "", "custo_mana": 0}],
+                13: [{"nome": "Uso Mágico de Itens", "descricao": "Pode usar itens mágicos como pergaminhos e varinhas mesmo de outras classes.", "dado": "", "custo_mana": 0}],
+                17: [{"nome": "Reflexos do Ladrão", "descricao": "Tem 2 turnos no primeiro round (1 turno de iniciativa real, outro de iniciativa-PROF).", "dado": "", "custo_mana": 0}],
+            },
+        },
+        "Assassino": {
+            "descricao": "Ladrão letal especializado em mortes súbitas.",
+            "features": {
+                3:  [
+                    {"nome": "Maestria do Disfarce", "descricao": "Proficiência em Kit de Envenenamento e Kit de Disfarce.", "dado": "", "custo_mana": 0},
+                    {"nome": "Assassinato", "descricao": "Vantagem em atk contra alvo que ainda não agiu. Acerto contra surpreso = crítico.", "dado": "", "custo_mana": 0},
+                ],
+                9:  [{"nome": "Identidade Falsa", "descricao": "Pode criar identidades falsas críveis (1 semana para preparar).", "dado": "", "custo_mana": 0}],
+                13: [{"nome": "Impostor", "descricao": "Pode imitar voz, modo de falar e comportamento de outra pessoa com perícia.", "dado": "", "custo_mana": 0}],
+                17: [{"nome": "Golpe da Morte", "descricao": "Ao acertar atk com surpresa, save de CON ou dano dobrado.", "dado": "", "custo_mana": 0}],
+            },
+        },
+        "Trapaceiro Arcano": {
+            "descricao": "Ladrão que combina furtividade com magia arcana.",
+            "features": {
+                3:  [
+                    {"nome": "Conjuração (Trapaceiro Arcano)", "descricao": "Conjura magias da lista de mago (foco em Encantamento/Ilusão). Atributo: INT.", "dado": "", "custo_mana": 0},
+                    {"nome": "Mão Mística (Trapaceiro)", "descricao": "Aprende Mãos Mágicas (Mage Hand) que é invisível e usa Furtividade.", "dado": "", "custo_mana": 0},
+                ],
+                9:  [{"nome": "Truques da Mão Mística", "descricao": "Pode usar Mãos Mágicas para roubar bolsos, abrir trancas, sabotar à distância.", "dado": "", "custo_mana": 0}],
+                13: [{"nome": "Versátil (Trapaceiro)", "descricao": "Pode trocar 1 magia conhecida quando sobe de nível.", "dado": "", "custo_mana": 0}],
+                17: [{"nome": "Ladrão Élditch", "descricao": "Mãos Mágicas pode entregar magias de truque à distância.", "dado": "", "custo_mana": 0}],
+            },
+        },
+    },
+
+    # ── Mago (Tradição Arcana — nv. 2) — 8 escolas ─────────────────────────
+    "Tradição Arcana": {
+        "Abjuração": {
+            "descricao": "Escola da proteção e bloqueio mágico.",
+            "features": {
+                2:  [
+                    {"nome": "Salvaguarda do Abjurador", "descricao": "Ao conjurar magia de Abjuração: ganha pool de PV temporários = 2× nv. magia + INT.", "dado": "", "custo_mana": 0},
+                    {"nome": "Recuperação Arcana (Abjuração)", "descricao": "Aprende a copiar magias de Abjuração no livro por metade do tempo/custo.", "dado": "", "custo_mana": 0},
+                ],
+                6:  [{"nome": "Resistência Mágica Projetada", "descricao": "Reação: aliado em 9m alvo de magia pode usar SEU bônus de save em vez do dele.", "dado": "", "custo_mana": 0}],
+                10: [{"nome": "Quebra de Magia Aprimorada", "descricao": "Dispelar magia tem +PROF e funciona automaticamente contra magias até nv. 3.", "dado": "", "custo_mana": 0}],
+                14: [{"nome": "Resistência a Magia", "descricao": "Vantagem em saves contra magias.", "dado": "", "custo_mana": 0}],
+            },
+        },
+        "Adivinhação": {
+            "descricao": "Escola da clarividência e leitura do destino.",
+            "features": {
+                2:  [
+                    {"nome": "Lampejos de Adivinhação", "descricao": "Após descanso longo: rola 2d20 e guarda. Pode substituir QUALQUER d20 (atk/teste/save) por um dos guardados.", "dado": "2d20", "custo_mana": 0},
+                    {"nome": "Reservas de Adivinhação", "descricao": "Aprende a copiar magias de Adivinhação por metade do custo/tempo.", "dado": "", "custo_mana": 0},
+                ],
+                6:  [{"nome": "Visão Aprofundada", "descricao": "Lampejos guardados sobem para 3d20 por descanso longo.", "dado": "3d20", "custo_mana": 0}],
+                10: [{"nome": "Terceiro Olho", "descricao": "Visão Verdadeira por 1 min sem gastar slot. 1×/descanso curto.", "dado": "", "custo_mana": 0}],
+                14: [{"nome": "Lampejos Aprimorados", "descricao": "Lampejos sobem para 4d20 por descanso longo.", "dado": "4d20", "custo_mana": 0}],
+            },
+        },
+        "Conjuração": {
+            "descricao": "Escola de invocação e manipulação de seres.",
+            "features": {
+                2:  [
+                    {"nome": "Conjurador Minucioso", "descricao": "Aprende a copiar magias de Conjuração por metade do custo/tempo.", "dado": "", "custo_mana": 0},
+                    {"nome": "Conjurar Item Menor", "descricao": "Ação: invoca item não-mágico pesando até 5kg na mão por 1 hora.", "dado": "", "custo_mana": 0},
+                ],
+                6:  [{"nome": "Conjuração Veloz", "descricao": "Magias de Conjuração de 1 ação viram 1 ação bônus, 1×/descanso curto.", "dado": "", "custo_mana": 0}],
+                10: [{"nome": "Teletransporte Pequeno", "descricao": "Ação bônus: teleporta-se até 9m a um local visível, 1×/turno.", "dado": "", "custo_mana": 0}],
+                14: [{"nome": "Aliado Convocado Aprimorado", "descricao": "Criaturas convocadas por suas magias ganham +CD AC e +AC dano.", "dado": "", "custo_mana": 0}],
+            },
+        },
+        "Encantamento": {
+            "descricao": "Escola da manipulação mental e charme.",
+            "features": {
+                2:  [
+                    {"nome": "Sussurros Encantadores", "descricao": "Aprende a copiar magias de Encantamento por metade do custo/tempo.", "dado": "", "custo_mana": 0},
+                    {"nome": "Lapso de Memória", "descricao": "Quando enfeitiça humanoide, sua vítima esquece o evento depois.", "dado": "", "custo_mana": 0},
+                ],
+                6:  [{"nome": "Mente Dividida", "descricao": "Mantém concentração em 2 magias de Encantamento simultaneamente.", "dado": "", "custo_mana": 0}],
+                10: [{"nome": "Mago Encantador", "descricao": "Vantagem em saves contra Encantamento. Pode lançar uma cópia da magia recebida no atacante.", "dado": "", "custo_mana": 0}],
+                14: [{"nome": "Encantamento Alterado", "descricao": "Quando enfeitiça humanoide, pode alterar sua personalidade durante a duração.", "dado": "", "custo_mana": 0}],
+            },
+        },
+        "Evocação": {
+            "descricao": "Escola do dano elemental direto.",
+            "features": {
+                2:  [
+                    {"nome": "Esculpir Magias", "descricao": "Em magias de Evocação com save de DEX: até 1+nv. magia aliados na área passam automaticamente sem sofrer dano.", "dado": "", "custo_mana": 0},
+                    {"nome": "Recuperação Arcana (Evocação)", "descricao": "Aprende a copiar magias de Evocação por metade do custo/tempo.", "dado": "", "custo_mana": 0},
+                ],
+                6:  [{"nome": "Truque Potente", "descricao": "Magias de truque de Evocação causam dano + INT mesmo em falha (se aplicável).", "dado": "", "custo_mana": 0}],
+                10: [{"nome": "Truque Empoderado", "descricao": "Soma INT ao dano de TODOS os truques de Evocação.", "dado": "", "custo_mana": 0}],
+                14: [{"nome": "Sobrecarga", "descricao": "1×/descanso longo: maximiza o dano da próxima magia de Evocação de nv. 1-5.", "dado": "", "custo_mana": 0}],
+            },
+        },
+        "Ilusão": {
+            "descricao": "Escola da falsidade e do engano.",
+            "features": {
+                2:  [
+                    {"nome": "Ilusionista Melhorado", "descricao": "Aprende a copiar magias de Ilusão por metade do custo/tempo.", "dado": "", "custo_mana": 0},
+                    {"nome": "Ilusão Menor Aprimorada", "descricao": "Pode lançar Ilusão Menor (Minor Illusion) com ambos os componentes (som E imagem).", "dado": "", "custo_mana": 0},
+                ],
+                6:  [{"nome": "Ilusão Maleável", "descricao": "Pode alterar a forma/conteúdo de ilusões em andamento como ação.", "dado": "", "custo_mana": 0}],
+                10: [{"nome": "Auto-Ilusão", "descricao": "Reação ao ser atingido: cria duplicata ilusória que assume o dano.", "dado": "", "custo_mana": 0}],
+                14: [{"nome": "Realidade Ilusória", "descricao": "Suas ilusões podem se tornar reais por 1 min (objetos não-mágicos).", "dado": "", "custo_mana": 0}],
+            },
+        },
+        "Necromancia": {
+            "descricao": "Escola da morte, dos mortos e da vida drenada.",
+            "features": {
+                2:  [
+                    {"nome": "Macabro", "descricao": "Aprende a copiar magias de Necromancia por metade do custo/tempo.", "dado": "", "custo_mana": 0},
+                    {"nome": "Colhedor de Ceifa", "descricao": "Quando mata criatura com magia de Necromancia: ganha PV temporários = 2× nv. magia + INT.", "dado": "", "custo_mana": 0},
+                ],
+                6:  [{"nome": "Comando dos Mortos-Vivos", "descricao": "Aprende Animar Mortos. Pode controlar mais esqueletos/zumbis que o normal.", "dado": "", "custo_mana": 0}],
+                10: [{"nome": "Resiliência Insidiosa", "descricao": "Resistência a dano necrótico. Limite máximo de PV não pode ser reduzido.", "dado": "", "custo_mana": 0}],
+                14: [{"nome": "Senhor dos Mortos-Vivos", "descricao": "Esqueletos e zumbis sob seu comando têm +PV e +dano.", "dado": "", "custo_mana": 0}],
+            },
+        },
+        "Transmutação": {
+            "descricao": "Escola da mudança de forma e propriedades.",
+            "features": {
+                2:  [
+                    {"nome": "Aluno da Transmutação", "descricao": "Aprende a copiar magias de Transmutação por metade do custo/tempo.", "dado": "", "custo_mana": 0},
+                    {"nome": "Pedra Transmutadora", "descricao": "Cria pedra mágica: dá um benefício escolhido (visão escuro/cativeiro/CON/resistência) por 8h.", "dado": "", "custo_mana": 0},
+                ],
+                6:  [{"nome": "Recuperação do Transmutador", "descricao": "Pode usar Pedra Transmutadora para conjurar Cura Ferimentos nv. 5.", "dado": "", "custo_mana": 0}],
+                10: [{"nome": "Mestre Transmutador", "descricao": "Usa Pedra Transmutadora para conjurar Polimorfismo (em si) sem slot.", "dado": "", "custo_mana": 0}],
+                14: [{"nome": "Transmutação Suprema", "descricao": "Pedra Transmutadora ganha efeitos extras: rejuvenescimento, restaurar atributo, etc.", "dado": "", "custo_mana": 0}],
+            },
+        },
+    },
+
+    # ── Feiticeiro (Origem de Feiticeiro — nv. 1) ──────────────────────────
+    "Origem de Feiticeiro": {
+        "Linhagem Dracônica": {
+            "descricao": "Poder vem de ancestral dragão.",
+            "features": {
+                1:  [
+                    {"nome": "Ancestral Dracônico", "descricao": "Escolhe a cor do ancestral (vermelho/azul/verde/branco/preto/ouro/prata/etc) — define o tipo de dano resistido.", "dado": "", "custo_mana": 0},
+                    {"nome": "Resistência Dracônica", "descricao": "+1 PV/nível. CA = 13 + DES quando sem armadura.", "dado": "", "custo_mana": 0},
+                ],
+                6:  [{"nome": "Magia Elemental Afim", "descricao": "Magias do tipo de dano do ancestral causam +CAR de dano. Custo de mana reduzido em 1.", "dado": "", "custo_mana": 0}],
+                14: [{"nome": "Asas Dracônicas", "descricao": "Ação bônus: faz crescer asas (mov. voo 18m) por 1 min.", "dado": "", "custo_mana": 0}],
+                18: [{"nome": "Presença Dracônica", "descricao": "Ação: 1 min de aura de medo/admiração (3 pontos de feitiçaria).", "dado": "", "custo_mana": 0}],
+            },
+        },
+        "Magia Selvagem": {
+            "descricao": "Poder caótico e imprevisível das tempestades arcanas.",
+            "features": {
+                1:  [
+                    {"nome": "Surto de Magia Selvagem", "descricao": "Quando conjura magia de nv. 1+: rola d20; em 1, mestre rola na tabela de Surto Selvagem (efeito aleatório).", "dado": "1d20", "custo_mana": 0},
+                    {"nome": "Marés do Caos", "descricao": "1×/descanso longo: vantagem em 1 atk/teste/save. Mestre pode acionar Surto Selvagem depois.", "dado": "", "custo_mana": 0},
+                ],
+                6:  [{"nome": "Esculpir o Caos", "descricao": "Gasta 2 PF para rolar na tabela de Surto Selvagem manualmente.", "dado": "", "custo_mana": 0}],
+                14: [{"nome": "Recuperação Mágica (Selvagem)", "descricao": "Após Surto Selvagem, recupera 2d4 de Pontos de Feitiçaria.", "dado": "2d4", "custo_mana": 0}],
+                18: [{"nome": "Magia Espontânea", "descricao": "Quando rola Surto Selvagem: pode escolher qualquer resultado da tabela.", "dado": "", "custo_mana": 0}],
+            },
+        },
+    },
+
+    # ── Bruxo (Patrono Sobrenatural — nv. 1) ───────────────────────────────
+    "Patrono Sobrenatural": {
+        "Arquifada": {
+            "descricao": "Patrono é um senhor/senhora do reino feérico.",
+            "features": {
+                1:  [{"nome": "Presença Feérica", "descricao": "Ação: criaturas em cone 3m fazem save de SAB; falha = Enfeitiçado OU Amedrontado por 1 turno.", "dado": "", "custo_mana": 0}],
+                6:  [{"nome": "Refúgio Feérico", "descricao": "Reação ao receber dano: teleporta-se 18m para outra área visível. Usos = PROF/descanso curto.", "dado": "", "custo_mana": 0}],
+                10: [{"nome": "Visão Feérica", "descricao": "Imune a Enfeitiçado. Magias e itens não afetam sua mente.", "dado": "", "custo_mana": 0}],
+                14: [{"nome": "Apenas Para Mim", "descricao": "Ação: criatura humanoide alvo, save SAB; falha = Enfeitiçada e fica entorpecida em transe.", "dado": "", "custo_mana": 0}],
+            },
+        },
+        "Senhor Lich": {
+            "descricao": "Patrono é um senhor lich, demônio ou diabo.",
+            "features": {
+                1:  [{"nome": "Resistência Sombria", "descricao": "Quando reduz humanoide a 0 PV, ganha PV temporários = nv. bruxo + CAR.", "dado": "", "custo_mana": 0}],
+                6:  [{"nome": "Maldição do Patrono Sombrio", "descricao": "Ao errar atk contra criatura, próximo atk dela contra você falha.", "dado": "", "custo_mana": 0}],
+                10: [{"nome": "Resistência Aprimorada", "descricao": "Resistência a 1 tipo de dano de sua escolha (entre fogo/frio/elétrico/necrótico).", "dado": "", "custo_mana": 0}],
+                14: [{"nome": "Hurl Through Hell", "descricao": "Ao acertar atk: alvo passa 1 turno no inferno; 10d10 dano psíquico ao voltar.", "dado": "10d10", "custo_mana": 0}],
+            },
+        },
+        "Grande Antigo": {
+            "descricao": "Patrono é uma entidade alienígena/cósmica.",
+            "features": {
+                1:  [{"nome": "Telepatia Tenebrosa", "descricao": "Comunicação telepática com qualquer criatura em 9m.", "dado": "", "custo_mana": 0}],
+                6:  [{"nome": "Vingança do Grande Antigo", "descricao": "Quando alguém te ataca: dano psíquico = 1+CAR ao atacante (reação).", "dado": "", "custo_mana": 0}],
+                10: [{"nome": "Pensamento Inquebrantável", "descricao": "Imune a Enfeitiçado e Amedrontado. Vantagem em saves contra outras magias mentais.", "dado": "", "custo_mana": 0}],
+                14: [{"nome": "Mestrado do Grande Antigo", "descricao": "Ação: força criatura visível em 18m a fazer atk/save por você (CAR vs INT/CAR).", "dado": "", "custo_mana": 0}],
+            },
+        },
+    },
+
+    # ── Bruxo (Bênção do Pacto — nv. 3) ────────────────────────────────────
+    "Bênção do Pacto": {
+        "Pacto da Lâmina": {
+            "descricao": "Pacto que dá uma arma mágica vinculada.",
+            "features": {
+                3: [{"nome": "Arma do Pacto", "descricao": "Cria arma mágica em 1 hora ritual. Atk usa CAR. Pode invocar/dispensar como ação.", "dado": "", "custo_mana": 0}],
+            },
+        },
+        "Pacto do Tomo": {
+            "descricao": "Pacto que dá um livro com truques mágicos extras.",
+            "features": {
+                3: [{"nome": "Livro das Sombras", "descricao": "Recebe um livro com 3 truques de qualquer classe. Pode lançá-los à vontade enquanto o livro está em mãos.", "dado": "", "custo_mana": 0}],
+            },
+        },
+        "Pacto da Corrente": {
+            "descricao": "Pacto que dá um familiar único.",
+            "features": {
+                3: [{"nome": "Encontrar Familiar Aprimorado", "descricao": "Aprende Encontrar Familiar; pode invocar criaturas como imp, pseudodragão, quasit, sprite. Familiar pode atacar com sua reação.", "dado": "", "custo_mana": 0}],
+            },
+        },
+    },
+}
+
+
+def _register_archetypes() -> None:
+    """
+    Module-load: popula FEATURE_VARIANTS e CLASS_FEATURE_DESCS a partir de
+    ARCHETYPE_FEATURES. Mantém uma única fonte de verdade pros arquétipos.
+    """
+    for feat_name, archetypes in ARCHETYPE_FEATURES.items():
+        # Registra a feature-pai como subescolha de arquétipo.
+        if feat_name not in FEATURE_VARIANTS:
+            FEATURE_VARIANTS[feat_name] = {
+                "pick": 1,
+                "pick_label": "arquétipo",
+                "options": {
+                    arch_name: {
+                        "descricao": data.get("descricao", ""),
+                        "narrative_hint": "passive",
+                    }
+                    for arch_name, data in archetypes.items()
+                },
+            }
+        # Registra as descrições de cada sub-feature.
+        for arch_name, data in archetypes.items():
+            for lvl, sub_feats in (data.get("features") or {}).items():
+                for sf in sub_feats:
+                    name = sf.get("nome")
+                    if not name:
+                        continue
+                    # Só registra se ainda não existir (não sobrescreve descrições
+                    # personalizadas já em CLASS_FEATURE_DESCS).
+                    if name not in CLASS_FEATURE_DESCS:
+                        CLASS_FEATURE_DESCS[name] = {
+                            "descricao":  sf.get("descricao", ""),
+                            "custo_mana": int(sf.get("custo_mana", 0) or 0),
+                            "dado":       sf.get("dado", ""),
+                        }
+
+
+_register_archetypes()
+
+
+def _apply_archetype_features(char: dict, archetype_feature: str) -> list[str]:
+    """
+    Concede ao personagem todas as sub-features do arquétipo escolhido cujo
+    nível de desbloqueio ≤ nível atual do char. Não duplica. Retorna lista
+    de nomes recém-adicionados.
+
+    Chamado de set_feature_choice (logo após escolher um arquétipo) e de
+    _apply_class_features (quando o char sobe e novas sub-features liberam).
+    """
+    archetype = _get_feature_choice(char, archetype_feature)
+    if not isinstance(archetype, str) or not archetype:
+        return []
+    arch_table = ARCHETYPE_FEATURES.get(archetype_feature, {}).get(archetype)
+    if not arch_table:
+        return []
+
+    nivel    = int((char.get("sheet") or {}).get("nivel", 1) or 1)
+    existing = {h.get("nome", "").lower() for h in char.get("habilidades", [])}
+    added: list[str] = []
+    for lvl_unlock, sub_feats in (arch_table.get("features") or {}).items():
+        if lvl_unlock > nivel:
+            continue
+        for sf in sub_feats:
+            name = sf.get("nome", "")
+            if not name or name.lower() in existing:
+                continue
+            char.setdefault("habilidades", []).append({
+                "nome":       name,
+                "descricao":  sf.get("descricao", ""),
+                "custo_mana": int(sf.get("custo_mana", 0) or 0),
+                "dado":       sf.get("dado", ""),
+            })
+            existing.add(name.lower())
+            added.append(name)
+    return added
+
+
+def reconcile_character_archetypes(char: dict) -> list[str]:
+    """
+    Garante que um personagem tenha TODAS as sub-features de arquétipo
+    correspondentes às suas escolhas (sheet.feature_choices) e ao nível
+    atual. Idempotente — seguro chamar várias vezes.
+
+    Usado no save da campanha pelo editor: o picker do editor grava só a
+    escolha localmente; esta função materializa as sub-features no backend
+    antes de persistir. NÃO chama save_campaign (só muta o dict).
+
+    Retorna lista de nomes de sub-features adicionadas.
+    """
+    if not isinstance(char, dict) or not char.get("sheet"):
+        return []
+    added: list[str] = []
+    for arch_feat in ARCHETYPE_FEATURES.keys():
+        if _get_feature_choice(char, arch_feat):
+            added.extend(_apply_archetype_features(char, arch_feat))
+    # Sub-features podem mexer na CA (ex.: Resistência Dracônica). Recalcula
+    # se algo foi concedido.
+    if added:
+        try:
+            _recalculate_ca(char)
+        except Exception:
+            pass
+    return added
 
 
 RANGED_WEAPONS = {
@@ -1105,11 +2128,19 @@ def _recalculate_ca(char: dict) -> None:
         else:  # "none"
             new_ca = ca_base
     else:
-        # Sem armadura: CA padrão (ou Monge/Bárbaro usam regras especiais — aqui simplificado)
-        new_ca = 10 + dex
+        # Sem armadura: CA padrão 10 + DES.
+        # Resistência Dracônica (Feiticeiro de Linhagem Dracônica): 13 + DES.
+        if _char_has_feature(char, "Resistência Dracônica"):
+            new_ca = 13 + dex
+        else:
+            new_ca = 10 + dex
 
     if shield_data and shield_data["dex_bonus"] == "shield":
         new_ca += shield_data["ca_base"]
+
+    # ── Estilo de Combate: Defesa → +1 CA enquanto usando QUALQUER armadura.
+    if armor_data and _has_combat_style(char, "Defesa"):
+        new_ca += 1
 
     s["ca"] = new_ca
 
@@ -2142,17 +3173,80 @@ def attack_roll(
     if force_crit:
         cond_notes.append(f"⚡ {target['name']} está paralisado/petrificado → crítico automático!")
 
+    # ── Bônus por Estilo de Combate / Inimigo Favorecido ────────────────────
+    # Calcula UMA vez e reusa para a linha de log e para o cálculo final.
+    weapon_l   = (weapon or "").lower()
+    is_ranged  = any(r in weapon_l for r in RANGED_WEAPONS)
+    is_2h_wpn  = any(w in weapon_l for w in TWO_HANDED_WEAPONS)
+    has_off    = bool(sa.get("equipamentos", {}).get("arma_secundaria"))
+    style      = _get_feature_choice(attacker, "Estilo de Combate")
+    style_atk_bonus = 0   # +2 atk (Arquearia)
+    style_dmg_bonus = 0   # +2 dmg (Duelo / Combate Duas Armas via mod off-hand)
+    style_reroll_low = False  # Grande Arma re-rola 1s e 2s no dado de dano
+    style_note     = ""
+    if style == "Arquearia" and is_ranged:
+        style_atk_bonus = 2
+        style_note     = "🏹 Estilo: Arquearia → +2 atk à distância"
+    elif style == "Duelo" and not is_ranged and not is_2h_wpn and not has_off:
+        style_dmg_bonus = 2
+        style_note      = "🗡️ Estilo: Duelo → +2 dano (arma 1h, sem off-hand)"
+    elif style == "Grande Arma" and not is_ranged and is_2h_wpn:
+        style_reroll_low = True
+        style_note       = "🪓 Estilo: Grande Arma → re-rola 1s/2s no dado"
+    # "Combate com Duas Armas" → o bônus se aplica APENAS no ataque off-hand;
+    # como esse fluxo é orquestrado pela LLM com 2 chamadas separadas, ela já
+    # informa quando é o off-hand passando attack_attribute manualmente. Por
+    # enquanto deixamos como instrução narrativa.
+
+    # Inimigo Favorecido: +2 dano contra criatura cujo tipo de monstro
+    # bate com o tipo escolhido. Usa o campo sheet["tipo"] (preenchido por
+    # spawn_monster / create_npcs_with_real_stats via Open5e) ou cai no
+    # raca como fallback.
+    favored = _favored_enemy_types(attacker)
+    favored_bonus = 0
+    if favored:
+        target_type = _norm_txt(
+            st.get("tipo", "") or st.get("raca", "")
+        )
+        # Match por substring — "humanoid (orc)" casa com "humanoides"
+        if target_type and any(t.rstrip("s") in target_type for t in favored):
+            favored_bonus = 2
+            style_note = (style_note + " · " if style_note else "") + "🎯 Inimigo Favorecido → +2 dano"
+
+    # ── Golpe Divino (Domínio de Clérigo / Paladino) ────────────────────────
+    # +1d8 (2d8 a partir do nv. 14) de dano elemental UMA vez por turno, ao
+    # acertar com arma corpo-a-corpo. Gating 1×/turno via turn_token quando
+    # há combate ativo; fora de combate, aplica a cada ataque.
+    gd_info = None          # (n_dados, tipo) ou None
+    if not is_ranged and not matched_hab:
+        _gd = _golpe_divino_info(attacker)
+        if _gd:
+            _cs_gd   = memory.campaign.get("combat_state", {}) or {}
+            _tk_now  = int(_cs_gd.get("turn_token", 0) or 0)
+            _gd_used = sa.get("_gd_turn_token")
+            if (not _cs_gd.get("is_active")) or _gd_used != _tk_now:
+                gd_info = _gd
+
+    # ── Crítico Aprimorado / Superior (Campeão) ─────────────────────────────
+    crit_min = _crit_threshold(attacker)
+
     # ── Rolagem do ataque ───────────────────────────────────────────────────
     d20, roll_log = _roll_d20_with_adv(advantage, disadvantage)
-    attack_total  = d20 + mod + prof
+    attack_total  = d20 + mod + prof + style_atk_bonus
     target_ca     = st["ca"]
-    critico       = force_crit or (d20 == 20)
+    critico       = force_crit or (d20 >= crit_min)
     falha_critica = (not force_crit) and (d20 == 1)
+    if critico and crit_min < 20 and not force_crit and d20 < 20:
+        style_note = (style_note + " · " if style_note else "") + \
+                     f"🌟 Crítico ampliado ({crit_min}-20)"
 
     result = f"⚔️  {attacker['name']} ataca {target['name']} com {weapon}!\n"
     if cond_notes:
         result += "   " + "\n   ".join(cond_notes) + "\n"
-    result += f"   {roll_log} +{mod}(mod) +{prof}(prof) = **{attack_total}** vs CA {target_ca}\n"
+    if style_note:
+        result += f"   {style_note}\n"
+    _atk_style_str = f" +{style_atk_bonus}(estilo)" if style_atk_bonus else ""
+    result += f"   {roll_log} +{mod}(mod) +{prof}(prof){_atk_style_str} = **{attack_total}** vs CA {target_ca}\n"
 
     if falha_critica:
         result += "   💀 ERRO CRÍTICO! O ataque falha miseravelmente."
@@ -2169,11 +3263,45 @@ def attack_roll(
     if critico or attack_total >= target_ca:
         n_dice = damage_dice_count * (2 if critico else 1)
         rolls  = [random.randint(1, damage_dice_sides) for _ in range(n_dice)]
-        dmg    = max(1, sum(rolls) + mod + _hab_bonus)
+        # Grande Arma: re-rola UMA VEZ cada 1 ou 2 inicial (mantém o novo
+        # resultado mesmo que seja 1/2 de novo). Marca o que foi re-rolado.
+        rerolled = []
+        if style_reroll_low:
+            for i, r in enumerate(rolls):
+                if r <= 2:
+                    new_r = random.randint(1, damage_dice_sides)
+                    rerolled.append((i, r, new_r))
+                    rolls[i] = new_r
+        # Golpe Divino: dados extras d8 (dobram no crítico, como smite).
+        gd_rolls: list[int] = []
+        gd_total = 0
+        if gd_info:
+            gd_n, gd_tipo = gd_info
+            gd_count = gd_n * (2 if critico else 1)
+            gd_rolls = [random.randint(1, 8) for _ in range(gd_count)]
+            gd_total = sum(gd_rolls)
+            # Consome o uso do turno (1×/turno via turn_token).
+            sa["_gd_turn_token"] = int(
+                (memory.campaign.get("combat_state", {}) or {}).get("turn_token", 0) or 0
+            )
+
+        extra_dmg = style_dmg_bonus + favored_bonus
+        dmg    = max(1, sum(rolls) + mod + _hab_bonus + extra_dmg + gd_total)
         detail = " + ".join(str(r) for r in rolls)
         bonus_str = f" +{_hab_bonus}" if _hab_bonus > 0 else (f" {_hab_bonus}" if _hab_bonus < 0 else "")
+        if extra_dmg:
+            bonus_str += f" +{extra_dmg}(estilo/favor)"
+        if gd_total:
+            bonus_str += f" +{gd_total}(golpe divino)"
 
         result += f"   {'🌟 CRÍTICO! ' if critico else ''}✅ ACERTO!\n"
+        if rerolled:
+            _rr = ", ".join(f"{old}→{new}" for _, old, new in rerolled)
+            result += f"   🪓 Grande Arma re-rolou: {_rr}\n"
+        if gd_rolls:
+            result += (f"   ⚡ Golpe Divino: {len(gd_rolls)}d8 "
+                       f"[{' + '.join(str(r) for r in gd_rolls)}] = {gd_total} "
+                       f"dano {gd_tipo}\n")
         result += f"   Dano: [{detail}] +{mod}(mod){bonus_str} = **{dmg}**\n"
 
         hp_antes       = st["vida_atual"]
@@ -2325,6 +3453,12 @@ def use_ability(
         available = ", ".join(h["nome"] for h in habs) if habs else "nenhuma"
         return f"'{char_name}' não conhece '{ability_name}'. Habilidades disponíveis: {available}."
 
+    # ── Coerção de alvo por modo da habilidade ────────────────────────────
+    # Self-only (Segunda Fôlego, Fúria, Surto de Ação…) sempre afeta o
+    # próprio conjurador, ignorando o que a UI/LLM passou como target.
+    if _is_self_only_ability(hab.get("nome", "")) or _is_self_only_ability(ability_name):
+        target_name = char["name"]
+
     s     = char["sheet"]
     custo = hab.get("custo_mana", 0)
 
@@ -2353,6 +3487,9 @@ def use_ability(
 
     # ── Aplica efeito ao alvo ────────────────────────────────────────────────
     ctrl_effect = _get_control_effect(hab)
+    # Inicializa lista de afetados por pool spell — usada no log mesmo
+    # quando o branch pool não roda (mantém escopo seguro).
+    slept: list[str] = []
 
     # ══════════════════════════════════════════════════════════════════════════
     # POOL SPELLS (Sleep, Color Spray, …)
@@ -2366,17 +3503,24 @@ def use_ability(
         cond = ctrl_effect["condition"]
         caster_key = memory.char_key(char_name)
 
-        # Monta lista de nomes de alvos potenciais
+        # Pool spells (Sleep, Color Spray) são SEMPRE área: ignoram o
+        # target_name passado pela UI e afetam TODOS os inimigos vivos da
+        # ordem de iniciativa, ordenados por HP crescente. O target_name
+        # serve apenas como hint visual no log.
+        cs = memory.campaign.get("combat_state", {})
+        raw_names = [
+            k for k in cs.get("initiative_order", [])
+            if memory.char_key(k) != caster_key
+            and not memory.campaign["characters"]
+                       .get(memory.char_key(k), {}).get("party_member")
+        ]
+        # Se ainda assim a UI passou nomes explícitos (uso narrado pela LLM),
+        # mescla — preserva intenção sem perder a natureza de área.
         if target_name:
-            raw_names = [t.strip() for t in target_name.split(",") if t.strip()]
-        else:
-            # Auto: usa ordem de turno, exclui conjurador e aliados
-            cs        = memory.campaign.get("combat_state", {})
-            raw_names = [
-                k for k in cs.get("turn_order", [])
-                if k != caster_key
-                and not memory.campaign["characters"].get(k, {}).get("party_member")
-            ]
+            for t in target_name.split(","):
+                t = t.strip()
+                if t and t not in raw_names:
+                    raw_names.append(t)
 
         # Resolve personagens válidos (vivos, com sheet)
         candidates: list[dict] = []
@@ -2392,7 +3536,6 @@ def use_ability(
         # Ordena por HP atual crescente (mais fraco dorme primeiro)
         candidates.sort(key=lambda c: c["sheet"]["vida_atual"])
 
-        slept: list[str] = []
         remaining = pool
         for tchar in candidates:
             if remaining <= 0:
@@ -2483,14 +3626,27 @@ def use_ability(
                     _log_combat_event("down", char["name"], target["name"],
                                       msg=f"{target['name']} caiu inconsciente")
 
+    # ── Linha do log da habilidade ────────────────────────────────────────
+    # Para pool spells (Sleep, Color Spray) o dado representa um POOL de HP,
+    # NÃO dano. Mostra explicitamente quem foi afetado para não parecer dano.
     _abil_dice = ""
     if hab.get("dado"):
         _abil_dice = (f" • 🎲 {n_dice}d{sides}: [{detail}]{bonus_str} "
                       f"= {total_dano}")
+    if ctrl_effect is not None and ctrl_effect.get("pool"):
+        cond_emoji = "💤" if ctrl_effect.get("condition", "").lower() == "inconsciente" else "🔴"
+        if hab.get("dado"):
+            _abil_dice = (f" • 🎲 {n_dice}d{sides} (pool): [{detail}]{bonus_str} "
+                          f"= {total_dano} HP")
+        if slept:
+            _abil_dice += f" • {cond_emoji} {', '.join(slept)}"
+        else:
+            _abil_dice += " • ⚪ ninguém foi afetado (HP alto demais)"
+
     _log_combat_event(
         "ability", char["name"], target_name,
         msg=(f"{char['name']} usou {hab['nome']}"
-             + (f" em {target_name}" if target_name else "")
+             + (f" em {target_name}" if target_name and not (ctrl_effect and ctrl_effect.get('pool')) else "")
              + _abil_dice),
         ability=hab["nome"], dado=hab.get("dado", ""),
         rolls=list(rolls), total=total_dano,
@@ -3929,15 +5085,17 @@ def _enc_block(label: str, count: int, cr, budget: int) -> str:
 def _apply_class_features(char: dict, sheet: dict, new_level: int) -> list[str]:
     """
     Adiciona automaticamente as habilidades de classe do novo nível.
-    Não duplica habilidades já existentes.
-    Retorna lista de nomes adicionados.
+    Também concede sub-features de arquétipos já escolhidos cujo nível
+    de desbloqueio bate com o novo nível (ex.: Crítico Superior do
+    Campeão libera no 15º). Não duplica habilidades já existentes.
+
+    Retorna lista de nomes adicionados (incluindo sub-features de arquétipo).
     """
     classe   = sheet.get("classe", "").lower()
     features = CLASS_LEVEL_FEATURES.get(classe, {}).get(new_level, [])
-    if not features:
-        return []
     existing = {h.get("nome", "").lower() for h in char.get("habilidades", [])}
-    added = []
+    added: list[str] = []
+
     for feat_name in features:
         if feat_name.lower() in existing:
             continue
@@ -3951,7 +5109,18 @@ def _apply_class_features(char: dict, sheet: dict, new_level: int) -> list[str]:
             "custo_mana": desc_data.get("custo_mana", 0),
             "dado":       desc_data.get("dado", ""),
         })
+        existing.add(feat_name.lower())
         added.append(feat_name)
+
+    # Sub-features de arquétipos: para cada feature de arquétipo já escolhida,
+    # concede o que o novo nível desbloqueou. Idempotente (não duplica).
+    for arch_feat in ARCHETYPE_FEATURES.keys():
+        if _get_feature_choice(char, arch_feat):
+            sub_added = _apply_archetype_features(char, arch_feat)
+            for s in sub_added:
+                if s.lower() not in {a.lower() for a in added}:
+                    added.append(s)
+
     return added
 
 
@@ -4080,6 +5249,10 @@ def learn_spell(char_name: str, spell_name: str) -> str:
         "descricao":  f"[{escola}{ritual}{concentr}] {desc_clean}",
         "custo_mana": mana,
         "dado":       dado,
+        # Alcance vindo direto do Open5e — fonte de verdade para target_mode.
+        # Ex.: "Self" (Mage Armor), "Self (15-foot cone)" (Burning Hands),
+        # "60 feet" (Magic Missile), "Touch" (Cure Wounds).
+        "alcance":    (spell.get("range", "") or "").strip(),
     })
     memory.save_campaign()
 
@@ -4237,8 +5410,9 @@ def suggest_encounter(party_level: int, party_size: int = 4, difficulty: str = "
     else:
         lines.append(_enc_block(f"OPÇÃO C — Horda ×{horde_cnt}", horde_cnt, horde_cr, budget))
 
-    lines += ["", "💡 Use os stats em create_character_sheet ANTES de roll_initiative.",
-              "   Adapte os nomes ao tema da campanha."]
+    # Instrução interna à LLM — filtrada antes de exibir na UI (server.py).
+    lines += ["", "[[llm]]💡 Use os stats em create_character_sheet ANTES de roll_initiative.",
+              "   Adapte os nomes ao tema da campanha.[[/llm]]"]
     return "\n".join(lines)
 
 
@@ -4301,6 +5475,127 @@ def _fetch_background(bg_name: str) -> dict | None:
     except Exception:
         pass
     return _BACKGROUND_FALLBACK.get(en_name)
+
+
+def set_feature_choice(char_name: str, feature_name: str, choice: str) -> str:
+    """
+    Define a subescolha de uma feature de classe que tem variantes — por
+    exemplo, qual estilo de combate (Arquearia/Defesa/Duelo/...), qual tipo
+    de Inimigo Favorecido, qual terreno de Explorador Natural, qual efeito
+    de Metamagia, qual Invocação Sobrenatural.
+
+    Use sempre que o jogador escolher (ou trocar) uma variante. O efeito
+    mecânico (bônus de ataque/CA/dano) passa a valer imediatamente nas
+    rolagens seguintes.
+
+    Para features com múltiplas escolhas (Metamagia: 2; Invocações: N),
+    chame uma vez por escolha — a função acumula numa lista e RECUSA se
+    passar do limite, instruindo a remover a antiga primeiro.
+
+    Args:
+        char_name:    Nome do personagem.
+        feature_name: Nome exato da feature (ex.: "Estilo de Combate",
+                      "Inimigo Favorecido", "Metamagia").
+        choice:       Nome da variante (ex.: "Arquearia", "Dragões",
+                      "Sutil"). Para REMOVER uma escolha, passe "remove:X".
+    """
+    char, err = _get_char(char_name)
+    if not char:
+        return err
+
+    meta = _get_variants(feature_name)
+    if not meta:
+        avail = ", ".join(sorted(FEATURE_VARIANTS.keys()))
+        return (
+            f"❌ Feature '{feature_name}' não tem variantes registradas.\n"
+            f"   Features com subescolha: {avail}."
+        )
+
+    # Personagem precisa de fato ter a feature na ficha (concedida pela classe).
+    has_feat = any(
+        h.get("nome", "").lower() == feature_name.lower()
+        for h in (char.get("habilidades") or [])
+    )
+    if not has_feat:
+        return (
+            f"❌ {char['name']} ainda não tem a habilidade '{feature_name}'. "
+            f"Suba de nível ou conceda a feature antes de escolher variante."
+        )
+
+    options = meta.get("options", {}) or {}
+    pick    = int(meta.get("pick", 1) or 1)
+
+    sheet  = char.setdefault("sheet", {})
+    fc     = sheet.setdefault("feature_choices", {})
+    cur    = fc.get(feature_name)
+
+    # Remoção explícita: "remove:Sutil"
+    if choice.lower().startswith("remove:"):
+        target = choice.split(":", 1)[1].strip()
+        if pick == 1:
+            if cur == target:
+                fc.pop(feature_name, None)
+                memory.save_campaign()
+                return f"🗑️ Removida a escolha '{target}' de {feature_name}."
+            return f"ℹ️ {target!r} não estava marcado em {feature_name}."
+        cur_list = list(cur or [])
+        if target in cur_list:
+            cur_list.remove(target)
+            fc[feature_name] = cur_list
+            memory.save_campaign()
+            return f"🗑️ Removido {target!r} de {feature_name}."
+        return f"ℹ️ {target!r} não estava marcado em {feature_name}."
+
+    # Validação
+    if choice not in options:
+        opts_str = ", ".join(sorted(options.keys()))
+        return (
+            f"❌ '{choice}' não é uma opção de {feature_name}.\n"
+            f"   Opções disponíveis: {opts_str}."
+        )
+
+    if pick == 1:
+        fc[feature_name] = choice
+        # Se for um arquétipo, concede as sub-features do nível atual.
+        archetype_granted: list[str] = []
+        if feature_name in ARCHETYPE_FEATURES:
+            archetype_granted = _apply_archetype_features(char, feature_name)
+        # Recalcula CA: Estilo de Combate (Defesa) ou sub-feature de
+        # arquétipo que mexe na CA (Resistência Dracônica).
+        if feature_name == "Estilo de Combate" or archetype_granted:
+            _recalculate_ca(char)
+        memory.save_campaign()
+        desc = options[choice].get("descricao", "")
+        granted_str = ""
+        if archetype_granted:
+            granted_str = (
+                f"\n   🎁 Sub-features concedidas neste nível: "
+                f"{', '.join(archetype_granted)}."
+            )
+        return (
+            f"✅ {char['name']} agora tem {feature_name}: **{choice}**.\n"
+            f"   {desc}{granted_str}"
+        )
+
+    # Multi-pick
+    cur_list = list(cur or [])
+    if choice in cur_list:
+        return f"ℹ️ {choice!r} já está marcado em {feature_name}."
+    if len(cur_list) >= pick:
+        atual = ", ".join(cur_list)
+        return (
+            f"❌ {char['name']} já escolheu {len(cur_list)}/{pick} em {feature_name}: {atual}.\n"
+            f"   Remova uma antes: set_feature_choice('{char['name']}', "
+            f"'{feature_name}', 'remove:<nome>')."
+        )
+    cur_list.append(choice)
+    fc[feature_name] = cur_list
+    memory.save_campaign()
+    desc = options[choice].get("descricao", "")
+    return (
+        f"✅ {char['name']} aprendeu {feature_name}: **{choice}** "
+        f"({len(cur_list)}/{pick}).\n   {desc}"
+    )
 
 
 def choose_feat(char_name: str, feat_name: str) -> str:
@@ -4587,8 +5882,9 @@ def spawn_monster(
         f"👹 {qty_label}{base_name} criado(s) com stats reais (Open5e)!\n"
         f"   CR {cr_label} | ❤️ HP {hp_max} | 🛡️ CA {ac}{atk_info}{sec_info}\n"
         f"   FOR {str_}  DES {dex}  CON {con}  INT {int_}  SAB {wis}  CAR {cha}\n"
-        f"   Personagens: {names_str}\n"
-        f"   → Agora chame roll_initiative() incluindo: {names_str}"
+        f"   Personagens: {names_str}"
+        # Instrução interna à LLM — filtrada antes de exibir na UI (server.py).
+        f"\n[[llm]]→ Agora chame roll_initiative() incluindo: {names_str}[[/llm]]"
     )
 
 
@@ -4791,6 +6087,76 @@ def _ability_action_type(name: str) -> str:
     return "acao"
 
 
+# ── Habilidades que afetam SOMENTE o conjurador (sem picker de alvo) ──────
+# Match por substring no nome normalizado.
+_ABILITY_SELF_ONLY_PATTERNS = (
+    "second wind", "segunda folego", "segundo folego",
+    "rage", "furia",
+    "wild shape", "forma selvagem",
+    "action surge", "surto de acao",
+    "patient defense", "defesa paciente",
+    "step of the wind", "passo do vento",
+    "shield of faith",  # cast in self (concentração; alvo único = self)
+)
+
+
+def _is_self_only_ability(name: str) -> bool:
+    n = _norm_txt(name)
+    return bool(n) and any(p in n for p in _ABILITY_SELF_ONLY_PATTERNS)
+
+
+def _ability_target_mode(name: str, hab: dict | None = None) -> str:
+    """
+    Modo de alvo para a UI tática decidir se mostra picker.
+
+    Fonte primária de verdade: o campo `alcance` do habilidade (vem do
+    Open5e — "Self", "Self (15-foot cone)", "60 feet", "Touch"…). Não
+    mantemos lista hardcoded de magias.
+
+    Fallbacks (para dados que NÃO vêm do Open5e):
+      • Class features SRD (Segunda Fôlego, Fúria…): lista pequena fixa.
+      • Pool spells (Sleep, Color Spray): tabela CONTROL_SPELL_EFFECTS
+        — são 2 itens no SRD, e a mecânica "pool de HP" é única do 5e.
+      • Heurística por nome para legados sem `alcance`.
+
+    Retornos:
+      "self"   → afeta só o conjurador (sem picker).
+      "pool"   → área com pool de HP, múltiplos alvos (Sleep). Sem picker.
+      "area"   → AoE genuíno centrado no conjurador (Burning Hands, etc.).
+                 Hoje o engine ainda trata como single — UI cai em "single"
+                 até existir engine de dano em área. TODO marcado.
+      "single" → alvo único.
+    """
+    # 1. Class features SRD — sempre self-only (lista fixa pequena).
+    if _is_self_only_ability(name):
+        return "self"
+
+    # 2. Pool spells — só Sleep e Color Spray no SRD, mecânica peculiar.
+    if hab is not None:
+        eff = _get_control_effect(hab)
+        if eff is not None and eff.get("pool"):
+            return "pool"
+
+    # 3. Fonte primária: campo `alcance` (do Open5e via learn_spell/wizard).
+    alcance = ((hab or {}).get("alcance") or "").strip().lower()
+    if alcance == "self":
+        return "self"
+    if alcance.startswith("self (") or alcance.startswith("self("):
+        # AoE centrado no conjurador (cone/sphere/cube/line). Engine ainda
+        # não distribui dano em área, então caímos em "single" por ora.
+        # TODO: quando houver _area_damage no use_ability, retornar "area".
+        return "single"
+    if alcance in ("", "n/a", "none"):
+        # Sem dado de alcance — pode ser feature de classe ou legado.
+        # Heurística por nome só para esses casos.
+        n = _norm_txt(name)
+        if any(k in n for k in ("sleep", "sono", "color spray")):
+            return "pool"
+
+    # Default: alvo único (Touch, X feet, …).
+    return "single"
+
+
 def _item_action_type(name: str) -> str:
     """
     'bonus' para itens que custam Ação Bônus pela regra (2024).
@@ -4959,6 +6325,9 @@ def _combatant_snapshot(name: str) -> dict | None:
             "dado":       h.get("dado", ""),
             "descricao":  h.get("descricao", ""),
             "tipo_acao":  _ability_action_type(h.get("nome", "")),
+            # Modo de alvo: "self" | "pool" | "single". A UI usa para decidir
+            # se mostra o picker ou despacha direto (self/pool não pedem alvo).
+            "target_mode": _ability_target_mode(h.get("nome", ""), h),
         }
         if _ability_is_passive(h):
             passivas.append(entry["nome"])
@@ -4983,6 +6352,14 @@ def _combatant_snapshot(name: str) -> dict | None:
                 "tipo_acao": _item_action_type(entry["nome"]),
                 "dice": f"{kind[1]}d{kind[2]}+{kind[3]}" if kind[0] == "heal" else "",
             })
+    # Anota a subescolha de cada habilidade de classe (Estilo de Combate,
+    # Inimigo Favorecido, Metamagia…) na entrada correspondente — assim a UI
+    # mostra "Estilo de Combate: Arquearia" no card sem buscar de novo.
+    _choices = (s.get("feature_choices") or {})
+    for h in habs:
+        v = _choices.get(h["nome"])
+        if v is not None:
+            h["choice"] = v
     return {
         "name":       ch.get("name", name),
         "status":     (ch.get("status", "vivo") or "vivo"),
@@ -5111,6 +6488,34 @@ def combat_action(action: str, actor: str = "", target: str = "",
             if not ability:
                 return {"ok": False, "message": "Habilidade exige ability.",
                         "snapshot": combat_snapshot()}
+            # Pré-checa mana ANTES de consumir slot — sem isso, uma magia
+            # recusada por falta de mana ainda gastaria a Ação/Bônus do turno.
+            ch_pre = memory.campaign["characters"].get(memory.char_key(actor)) or {}
+            habs_pre = ch_pre.get("habilidades") or []
+            hab_pre = next((h for h in habs_pre
+                            if isinstance(h, dict)
+                            and (h.get("nome") or "").lower() == ability.lower()), None)
+            if hab_pre is None:
+                # Tenta tradução PT→EN
+                en_alt = _SPELL_PT_TO_EN.get(ability.lower())
+                if en_alt:
+                    hab_pre = next((h for h in habs_pre
+                                    if isinstance(h, dict)
+                                    and (h.get("nome") or "").lower() == en_alt.lower()), None)
+            if hab_pre is not None:
+                custo_pre = int(hab_pre.get("custo_mana", 0) or 0)
+                sheet_pre = ch_pre.get("sheet") or {}
+                mp_atual  = int(sheet_pre.get("mana_atual", 0) or 0)
+                if custo_pre > mp_atual:
+                    mp_max = int(sheet_pre.get("mana_max", 0) or 0)
+                    return {
+                        "ok": False,
+                        "message": (f"❌ {actor} não tem mana suficiente para "
+                                    f"'{hab_pre.get('nome', ability)}' "
+                                    f"(precisa {custo_pre}, tem {mp_atual}/{mp_max}). "
+                                    f"A Ação/Bônus deste turno NÃO foi gasta."),
+                        "snapshot": combat_snapshot(),
+                    }
             slot = "bonus" if _ability_action_type(ability) == "bonus" else "acao"
             err = _use_slot(eco, slot)
             if err:
@@ -5341,6 +6746,7 @@ DND_TOOLS = [
     list_inventory,
     identify_item,
     choose_feat,
+    set_feature_choice,
     grant_xp,
     short_rest,
     long_rest,
