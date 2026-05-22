@@ -163,19 +163,31 @@ def _verify_agent_response(
             "Chame apply_condition(char_name, 'condição') para registrar o efeito mecânico."
         )
 
-    # 7. end_combat() chamado sem grant_xp() para os membros do grupo
+    # 7. end_combat() sem grant_xp() — SÓ é violação numa VITÓRIA.
+    #    Numa DERROTA (grupo todo caído/inconsciente/fugiu) não há XP a
+    #    conceder — perder uma luta não dá XP. Vitória = alguém do grupo
+    #    ainda de pé quando o combate terminou.
     if ("end_combat" in tools_called and not _XP_TOOLS.intersection(tools_called)):
-        party = [
-            c["name"]
-            for c in memory.campaign.get("characters", {}).values()
+        _DOWNED = {"morto", "inconsciente", "estabilizado", "fugiu",
+                   "exilado", "dormindo"}
+        party_members = [
+            c for c in memory.campaign.get("characters", {}).values()
             if memory.is_party_member(c)
-            and c.get("status") not in ("morto", "fugiu")
         ]
-        if party:
-            names = ", ".join(party)
+        party_standing = [
+            c["name"] for c in party_members
+            if (c.get("status") or "").lower() not in _DOWNED
+        ]
+        if party_standing:
+            # Vitória: cobra XP para todo o grupo que não morreu/fugiu.
+            recv = [
+                c["name"] for c in party_members
+                if (c.get("status") or "").lower() not in ("morto", "fugiu")
+            ]
+            names = ", ".join(recv or party_standing)
             violations.append(
-                f"Encerrou o combate com end_combat() mas não chamou grant_xp() "
-                f"para nenhum membro do grupo. "
+                f"Encerrou o combate (vitória) com end_combat() mas não chamou "
+                f"grant_xp() para o grupo. "
                 f"Chame grant_xp() para CADA personagem jogável: {names}. "
                 f"Use o XP adequado ao inimigo derrotado (25–2000 XP conforme a tabela)."
             )

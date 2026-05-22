@@ -133,10 +133,17 @@ _SPELL_PT_TO_EN: dict[str, str] = {
 # Helpers de controle de turno
 # ---------------------------------------------------------------------------
 
-# Status que tiram o combatente da ordem de turno (fonte única de verdade).
-OUT_OF_COMBAT_STATUSES = {
+# Status que ENCERRAM a participação no combate — o combatente está
+# definitivamente fora (morto, caído a 0 HP, fugiu). Usado para decidir
+# QUANDO O COMBATE ACABA e para classificar caídos × sobreviventes.
+DEFEATED_STATUSES = {
     "morto", "inconsciente", "estabilizado", "fugiu", "exilado",
 }
+# Status que fazem o combatente PULAR A VEZ na ordem de turno. Inclui
+# "dormindo" (Sleep): a criatura está incapacitada (não age), mas continua
+# VIVA e no combate — por isso "dormindo" NÃO entra em DEFEATED_STATUSES
+# (dormir um inimigo não encerra a luta; é preciso derrotá-lo de fato).
+OUT_OF_COMBAT_STATUSES = DEFEATED_STATUSES | {"dormindo"}
 
 _MAX_COMBAT_LOG = 300
 
@@ -169,6 +176,50 @@ def _log_combat_event(etype: str, actor: str = "", target: str = "",
 def _is_out_of_combat(name: str) -> bool:
     ch = memory.campaign["characters"].get(memory.char_key(name))
     return (ch.get("status", "") if ch else "").lower() in OUT_OF_COMBAT_STATUSES
+
+
+def _wake_sleeper(char: dict) -> None:
+    """
+    Acorda uma criatura que está DORMINDO (efeito de Sleep): restaura o
+    status para vivo/inimigo e remove a condição 'Dormindo'. Idempotente —
+    não faz nada se a criatura não estiver dormindo.
+    """
+    if not isinstance(char, dict):
+        return
+    if (char.get("status", "") or "").lower() == "dormindo":
+        char["status"] = "vivo" if memory.is_party_member(char) else "inimigo"
+    sh = char.get("sheet") or {}
+    conds = sh.get("condicoes")
+    if isinstance(conds, list):
+        sh["condicoes"] = [
+            c for c in conds
+            if not (isinstance(c, dict)
+                    and (c.get("nome", "") or "").lower() == "dormindo")
+        ]
+
+
+def _normalize_for_new_combat(char: dict) -> None:
+    """
+    Sanitiza estados transitórios herdados ao INICIAR uma luta nova:
+    ninguém entra dormindo, e quem está com HP > 0 não pode estar
+    inconsciente/estabilizado. Remove as condições incapacitantes
+    transitórias (Dormindo / Inconsciente) que jamais devem vazar entre
+    combates. Não mexe em personagens genuinamente mortos.
+    """
+    if not isinstance(char, dict):
+        return
+    sh = char.get("sheet") or {}
+    st = (char.get("status", "") or "").lower()
+    hp = int(sh.get("vida_atual", 0) or 0)
+    if st == "dormindo" or (hp > 0 and st in ("inconsciente", "estabilizado")):
+        char["status"] = "vivo" if memory.is_party_member(char) else "inimigo"
+    conds = sh.get("condicoes")
+    if isinstance(conds, list):
+        sh["condicoes"] = [
+            c for c in conds
+            if not (isinstance(c, dict)
+                    and (c.get("nome", "") or "").lower() in ("dormindo", "inconsciente"))
+        ]
 
 
 def _heal_current_turn() -> None:
@@ -246,7 +297,7 @@ def _auto_advance_turn(actor_name: str = "") -> str:
     if not order:
         return ""
 
-    OUT_OF_COMBAT = {"morto", "inconsciente", "estabilizado", "fugiu", "exilado"}
+    OUT_OF_COMBAT = OUT_OF_COMBAT_STATUSES   # inclui "dormindo" → pula a vez
 
     round_num     = cs.get("round", 1)
     initial_round = round_num
@@ -1765,7 +1816,7 @@ HEALING_KEYWORDS = {
 # ---------------------------------------------------------------------------
 CONTROL_SPELL_EFFECTS: dict[str, dict] = {
     # Nível 1
-    "sleep":                 {"condition": "Inconsciente", "pool": True},
+    "sleep":                 {"condition": "Dormindo",     "pool": True},
     "color spray":           {"condition": "Cego",         "pool": True},
     # Nível 2
     "hold person":           {"condition": "Paralisado",   "pool": False},
@@ -2896,9 +2947,10 @@ def make_skill_check(
     advantage: bool = False,
     disadvantage: bool = False,
     skill: str = "",
+    player_roll: int = 0,
 ) -> str:
     """
-    Realiza um teste de atributo: rola 1d20 + modificador vs Classe de Dificuldade.
+    Realiza um teste de atributo: 1d20 + modificador vs Classe de Dificuldade.
     Suporta Vantagem (rola 2d20, usa o maior) e Desvantagem (rola 2d20, usa o menor).
     Condições ativas (ex: Envenenado) podem forçar desvantagem automaticamente.
 
@@ -2913,6 +2965,13 @@ def make_skill_check(
         advantage:    Se True, rola 2d20 e usa o maior.
         disadvantage: Se True, rola 2d20 e usa o menor.
         skill:        Nome da perícia (ex: 'atletismo', 'furtividade'). Resolve o atributo automaticamente.
+        player_roll:  Resultado do d20 JÁ ROLADO pelo jogador (1–20). Quando o
+                      teste é de um PERSONAGEM JOGÁVEL e o jogador rolou pela
+                      bandeja de dados ("[DADO DO JOGADOR …] rolei X"), passe X
+                      aqui — NUNCA role um d20 novo nem invente o valor. Deixe
+                      0 para o mestre rolar (testes de NPC). Com player_roll,
+                      vantagem/desvantagem são ignoradas (o jogador rolou uma
+                      vez só).
     """
     char, err = _get_char(char_name)
     if not char:
@@ -2935,7 +2994,13 @@ def make_skill_check(
 
     attr_val = s[attr_key]
     mod      = _modifier(attr_val)
-    d20, roll_log = _roll_d20_with_adv(advantage, disadvantage)
+    # Usa a rolagem do JOGADOR quando fornecida e válida (1–20); senão o
+    # mestre/sistema rola (com vantagem/desvantagem se aplicável).
+    if isinstance(player_roll, int) and 1 <= player_roll <= 20:
+        d20      = player_roll
+        roll_log = f"d20={d20} (rolado pelo jogador)"
+    else:
+        d20, roll_log = _roll_d20_with_adv(advantage, disadvantage)
     total    = d20 + mod
     sign     = "+" if mod >= 0 else ""
 
@@ -3322,11 +3387,18 @@ def attack_roll(
             dmg=dmg, dmg_dice=detail, hp=hp_depois, hp_max=st["vida_max"],
             crit=bool(critico),
         )
+        _was_asleep = (target.get("status", "") or "").lower() == "dormindo"
         if hp_depois == 0:
             target["status"] = "inconsciente"
             result += " ⚠️  INCONSCIENTE!"
             _log_combat_event("down", attacker["name"], target["name"],
                               msg=f"{target['name']} caiu inconsciente")
+        elif _was_asleep:
+            # 5e: uma criatura dormindo (Sleep) acorda ao sofrer dano.
+            _wake_sleeper(target)
+            result += f" ⏰ {target['name']} acordou com o golpe!"
+            _log_combat_event("wake", attacker["name"], target["name"],
+                              msg=f"{target['name']} acordou ao sofrer dano")
         elif pct <= 0.25:
             result += " ⚠️  Estado crítico!"
 
@@ -3530,7 +3602,8 @@ def use_ability(
                     or memory.campaign["characters"].get(raw)
             if (tchar and tchar.get("sheet")
                     and memory.char_key(tchar.get("name", "")) != caster_key
-                    and tchar.get("status") not in ("morto", "inconsciente", "fugiu")):
+                    and (tchar.get("status") or "").lower()
+                        not in ("morto", "inconsciente", "fugiu", "dormindo")):
                 candidates.append(tchar)
 
         # Ordena por HP atual crescente (mais fraco dorme primeiro)
@@ -3546,7 +3619,12 @@ def use_ability(
                 tconds = tchar["sheet"].setdefault("condicoes", [])
                 if not any(c["nome"].lower() == cond.lower() for c in tconds):
                     tconds.append({"nome": cond.capitalize(), "duracao": None})
-                tchar["status"] = "inconsciente"
+                # Sleep → status "dormindo": a criatura fica incapacitada
+                # (pula a vez), mas continua VIVA — o combate NÃO acaba só
+                # por isso. Color Spray apenas cega (a criatura ainda age),
+                # então não mexe no status.
+                if cond.lower() in ("dormindo", "inconsciente"):
+                    tchar["status"] = "dormindo"
                 slept.append(f"{tchar['name']} ({hp} HP)")
 
         # Monta linha de resultado do pool
@@ -3634,7 +3712,7 @@ def use_ability(
         _abil_dice = (f" • 🎲 {n_dice}d{sides}: [{detail}]{bonus_str} "
                       f"= {total_dano}")
     if ctrl_effect is not None and ctrl_effect.get("pool"):
-        cond_emoji = "💤" if ctrl_effect.get("condition", "").lower() == "inconsciente" else "🔴"
+        cond_emoji = "💤" if ctrl_effect.get("condition", "").lower() in ("inconsciente", "dormindo") else "🔴"
         if hab.get("dado"):
             _abil_dice = (f" • 🎲 {n_dice}d{sides} (pool): [{detail}]{bonus_str} "
                           f"= {total_dano} HP")
@@ -3906,10 +3984,10 @@ def modify_currency(char_name: str, currency_type: str, amount: int) -> str:
 # 10. Teste de Morte  (NOVO)
 # ---------------------------------------------------------------------------
 
-def roll_death_save(char_name: str) -> str:
+def roll_death_save(char_name: str, player_roll: int = 0) -> str:
     """
     Realiza um Teste de Morte para um personagem com HP = 0 (inconsciente).
-    Rola 1d20 limpo:
+    Avalia 1d20 limpo:
     • Natural 20: recupera 1 ponto de vida e estabiliza (testes zerados).
     • 10 ou mais: 1 sucesso (3 sucessos = estabilizado).
     • 9 ou menos: 1 falha (3 falhas = morto).
@@ -3919,7 +3997,13 @@ def roll_death_save(char_name: str) -> str:
     e sem aliados para estabilizá-lo.
 
     Args:
-        char_name: Nome do personagem inconsciente.
+        char_name:   Nome do personagem inconsciente.
+        player_roll: Resultado do d20 JÁ ROLADO pelo jogador (1–20). Quando o
+                     teste de morte é de um PERSONAGEM JOGÁVEL, peça o dado ao
+                     jogador, espere a resposta ("[DADO DO JOGADOR …] rolei X")
+                     e passe esse X aqui. NUNCA role um d20 novo nem invente o
+                     valor — isso descartaria a rolagem real do jogador. Deixe
+                     0 apenas para NPCs, quando o sistema deve rolar sozinho.
     """
     char, err = _get_char(char_name)
     if not char:
@@ -3930,7 +4014,12 @@ def roll_death_save(char_name: str) -> str:
     if s["vida_atual"] > 0:
         return f"⚠️  {char['name']} não está inconsciente (HP: {s['vida_atual']}). Teste de Morte não aplicável."
 
-    roll = random.randint(1, 20)
+    # Usa a rolagem do JOGADOR quando fornecida e válida (1–20). Só rola
+    # internamente quando nenhum valor veio (teste de morte de NPC).
+    if isinstance(player_roll, int) and 1 <= player_roll <= 20:
+        roll = player_roll
+    else:
+        roll = random.randint(1, 20)
 
     # Natural 20: milagre — recupera 1 pv
     if roll == 20:
@@ -4621,6 +4710,10 @@ def roll_initiative(characters_names: str) -> str:
             char["habilidades"] = char.get("habilidades") or []
             auto_created.append(name)
 
+        # Combate NOVO: limpa estados transitórios herdados da luta anterior
+        # — ninguém entra dormindo nem "inconsciente" com a vida cheia.
+        _normalize_for_new_combat(char)
+
         dex_mod = _modifier(char["sheet"]["destreza"])
         roll    = random.randint(1, 20)
         total   = roll + dex_mod
@@ -4723,7 +4816,7 @@ def next_turn() -> str:
             f"   Ordem: {order_str}"
         )
 
-    OUT_OF_COMBAT = {"morto", "inconsciente", "estabilizado", "fugiu", "exilado"}
+    OUT_OF_COMBAT = OUT_OF_COMBAT_STATUSES   # inclui "dormindo" → pula a vez
 
     idx       = cs.get("current_turn_index", 0)
     round_num = cs.get("round", 1)
@@ -4779,6 +4872,10 @@ def end_combat() -> str:
     cs["initiative_order"]    = []
     cs["current_turn_index"]  = 0
     cs["round"]               = 1
+    # Acorda quem ficou DORMINDO — o efeito de Sleep não persiste após a
+    # luta (jamais deve vazar para o próximo combate ou para a ficha).
+    for _ch in memory.campaign.get("characters", {}).values():
+        _wake_sleeper(_ch)
     memory.save_campaign()
     return "🏳️  Combate encerrado. Iniciativa e rastreador de turnos limpos."
 
@@ -6312,8 +6409,13 @@ def _combatant_snapshot(name: str) -> dict | None:
         return None
     s = ch.get("sheet") or {}
     conds = []
+    _seen_cond = set()
     for c in (s.get("condicoes") or []):
-        conds.append(c.get("nome", "") if isinstance(c, dict) else str(c))
+        nm  = (c.get("nome", "") if isinstance(c, dict) else str(c)) or ""
+        key = nm.lower().strip()
+        if key and key not in _seen_cond:        # dedup por nome
+            _seen_cond.add(key)
+            conds.append(nm)
     habs = []        # só ATIVAS (viram botão)
     passivas = []    # exibição informativa
     for h in (ch.get("habilidades") or []):
@@ -6645,7 +6747,9 @@ def combat_action(action: str, actor: str = "", target: str = "",
             if not ch:
                 continue
             is_p = bool(memory.is_party_member(ch))
-            out  = (ch.get("status", "") or "").lower() in OUT_OF_COMBAT_STATUSES
+            # DEFEATED (não OUT): uma criatura DORMINDO está incapacitada mas
+            # ainda viva — não conta como derrotada, então não encerra a luta.
+            out  = (ch.get("status", "") or "").lower() in DEFEATED_STATUSES
             if is_p:
                 party_seen = True
                 party_alive = party_alive or (not out)
@@ -6665,7 +6769,7 @@ def combat_action(action: str, actor: str = "", target: str = "",
                 linha = {"name": snp["name"], "is_party": snp["is_party"],
                          "hp": snp["hp"], "hp_max": snp["hp_max"],
                          "status": snp["status"]}
-                if snp["status"].lower() in OUT_OF_COMBAT_STATUSES:
+                if snp["status"].lower() in DEFEATED_STATUSES:
                     caidos.append(linha)
                 else:
                     sobrev.append(linha)
@@ -6706,14 +6810,25 @@ def combat_recap_payload() -> str:
         finais.append(f"{c.get('name')} [{lado}]: {c.get('status')} "
                       f"({c.get('hp')}/{c.get('hp_max')} HP)")
 
+    if str(desfecho).lower() == "derrota":
+        instrucao = (
+            "Desfecho: DERROTA. Narre a queda do grupo de forma cinematográfica "
+            "e contínua, com base no log abaixo. NÃO gere saque e NÃO conceda "
+            "XP — perder a luta não dá recompensa nenhuma. Conduza as "
+            "consequências (captura, resgate, quase-morte, fuga…) e siga a história."
+        )
+    else:
+        instrucao = (
+            "Desfecho: VITÓRIA. Narre a luta INTEIRA de forma cinematográfica e "
+            "contínua (não turno a turno), com base no log abaixo. Gere o SAQUE "
+            "dos inimigos derrotados (use add_item/modify_currency se houver) e "
+            "conceda XP a cada membro do grupo com grant_xp(). Depois siga a história."
+        )
     payload = (
         "[COMBATE RESOLVIDO NA TELA TÁTICA]\n"
-        f"Desfecho: {desfecho}. "
-        "Narre a luta INTEIRA de forma cinematográfica e contínua (não turno a "
-        "turno) com base no log abaixo, e gere o SAQUE dos inimigos derrotados "
-        "(use add_item/modify_currency se houver). Depois siga a história.\n\n"
-        "— Eventos —\n" + "\n".join(linhas) +
-        "\n\n— Estado final —\n" + "\n".join(finais)
+        + instrucao + "\n\n"
+        + "— Eventos —\n" + "\n".join(linhas)
+        + "\n\n— Estado final —\n" + "\n".join(finais)
     )
     # Acknowledged: limpa o resultado para não reabrir o painel de fim.
     if isinstance(cs, dict):
