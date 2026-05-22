@@ -107,8 +107,15 @@ def require_auth(f):
             memory.bind_request(user.id)
 
         except Exception as e:
-            # Útil para debug local, mas você pode simplificar a mensagem no Render
-            return jsonify({"error": f"Falha na verificação: {str(e)}"}), 401
+            # Log interno para debug; resposta genérica ao cliente (não
+            # vaza stack/detalhes de implementação para um atacante).
+            try:
+                import logging
+                logging.getLogger(__name__).warning(
+                    "Falha na verificação de token: %s", e)
+            except Exception:
+                pass
+            return jsonify({"error": "Sessão inválida ou expirada."}), 401
 
         return f(*args, **kwargs)
     return decorated

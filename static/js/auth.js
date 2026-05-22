@@ -34,9 +34,10 @@ async function submitAuth() {
     const data = await res.json();
 
     if (!res.ok || !data.ok) {
-      // Supabase retorna erro específico para email não confirmado
+      // O backend sinaliza email não confirmado com reason:'unconfirmed'
+      // (campo estruturado — não dependemos mais de keyword na mensagem).
       const msg = data.error || '';
-      if (msg.toLowerCase().includes('confirm') || msg.toLowerCase().includes('verificad') || msg.toLowerCase().includes('email')) {
+      if (data.reason === 'unconfirmed') {
         errorEl.innerHTML = `${msg}<br><span style="color:var(--text-dim);font-size:11px;">Verifique sua caixa de entrada e clique no link de confirmação.</span>`;
       } else {
         errorEl.textContent = msg || 'Erro desconhecido.';

@@ -15,6 +15,10 @@
     rel="stylesheet">
 
   <script src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js"></script>
+  <!-- DOMPurify: sanitiza o HTML gerado pelo marked antes de ir ao DOM.
+       Sem isso, a narração da IA (ou texto injetado) poderia conter
+       <script>/<img onerror> e executar — XSS. -->
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.7/dist/purify.min.js"></script>
   <link rel="stylesheet" href="/static/css/style.css?v=28">
 </head>
 
@@ -327,7 +331,7 @@
   </div>
 
   <script src="/static/js/utils.js?v=6"></script>
-  <script src="/static/js/game.js?v=19"></script>
+  <script src="/static/js/game.js?v=20"></script>
   <script src="/static/js/combat.js?v=6"></script>
 
   <script>

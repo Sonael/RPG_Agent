@@ -3,7 +3,11 @@ services:
     name: rpg-agent
     runtime: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn server:app --worker-class gthread --threads 4 --timeout 120 --bind 0.0.0.0:$PORT
+    # --preload: importa o app no master ANTES de abrir a porta. Sem isso, a
+    # porta abre na hora mas o worker ainda está importando a stack pesada
+    # (google-adk, litellm, etc.) — o Render sonda, não obtém resposta e mata
+    # o deploy ("Port scan timeout"). Com --preload, porta aberta = app pronto.
+    startCommand: gunicorn server:app --worker-class gthread --threads 4 --timeout 120 --preload --bind 0.0.0.0:$PORT
     envVars:
       - key: GOOGLE_API_KEY
         sync: false          # definida no painel do Render

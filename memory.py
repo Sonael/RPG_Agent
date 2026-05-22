@@ -63,6 +63,9 @@ def bind(user_id: str, campaign_name: str) -> str:
     _META[key] = (user_id, campaign_name)
     _ACTIVE_BY_USER[user_id] = key
     _STORE.setdefault(key, _defaults())
+    # Descarta o slot transitório "__none__" (criado por bind_request quando
+    # o usuário estava autenticado mas sem jogo) — evita acúmulo de memória.
+    _STORE.pop(_session_key(user_id, "__none__"), None)
     _active_key.set(key)
     return key
 
@@ -89,6 +92,8 @@ def unbind(user_id: str) -> None:
     if key:
         _STORE.pop(key, None)
         _META.pop(key, None)
+    # Também descarta o slot transitório "__none__" do usuário, se houver.
+    _STORE.pop(_session_key(user_id, "__none__"), None)
     _active_key.set(None)
 
 

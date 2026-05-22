@@ -6,6 +6,7 @@ Acesse em:  http://localhost:5000
 """
 
 import asyncio
+import collections
 import json
 import queue
 import re
@@ -282,6 +283,119 @@ def _build_correction_prompt(violations: list[str], already_called: set | None =
 
 app = Flask(__name__, static_folder="static")
 app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0   # desativa cache de arquivos estáticos
+# Teto de tamanho de payload — bloqueia POSTs gigantes (DoS de memória).
+# 4 MB cobre com folga a maior campanha legítima (histórico limitado a 200 falas).
+app.config["MAX_CONTENT_LENGTH"] = 4 * 1024 * 1024
+
+# ---------------------------------------------------------------------------
+# Segurança — rate limiting, CORS allowlist e política de senha
+# ---------------------------------------------------------------------------
+
+# Origens permitidas para CORS. O app serve o frontend SAME-ORIGIN (login.html,
+# menu.html… vêm deste mesmo Flask), então em produção CORS nem é necessário.
+# A allowlist cobre dev local e é configurável via env ALLOWED_ORIGINS
+# (separado por vírgula). NUNCA mais usar "*".
+_ALLOWED_ORIGINS = {
+    o.strip() for o in os.environ.get(
+        "ALLOWED_ORIGINS",
+        "http://localhost:5000,http://127.0.0.1:5000,http://localhost:3000",
+    ).split(",") if o.strip()
+}
+
+# Rate limiting in-memory (sliding window). Suficiente para o porte do app;
+# para multi-worker robusto, migrar o storage para Redis. Cada chave guarda
+# os timestamps dos hits recentes.
+_rate_buckets: dict = collections.defaultdict(list)
+_rate_lock = threading.Lock()
+_rate_sweep = 0
+
+
+def _client_ip() -> str:
+    """IP real do cliente atrás de Cloudflare/Render."""
+    cf = request.headers.get("CF-Connecting-IP")
+    if cf:
+        return cf.strip()
+    xff = request.headers.get("X-Forwarded-For", "")
+    if xff:
+        return xff.split(",")[0].strip()
+    return request.remote_addr or "unknown"
+
+
+def _rate_hit(key: str, max_hits: int, window_s: int) -> int:
+    """
+    Registra um hit em `key` numa janela deslizante. Retorna 0 se permitido,
+    ou os segundos a aguardar (Retry-After) se o limite foi estourado.
+    """
+    global _rate_sweep
+    now = time.time()
+    with _rate_lock:
+        hits = _rate_buckets[key]
+        cutoff = now - window_s
+        hits[:] = [t for t in hits if t > cutoff]
+        if len(hits) >= max_hits:
+            wait = int(window_s - (now - hits[0])) + 1
+        else:
+            hits.append(now)
+            wait = 0
+        # Sweep periódico: remove chaves antigas para não vazar memória.
+        _rate_sweep += 1
+        if _rate_sweep % 500 == 0:
+            for k in list(_rate_buckets.keys()):
+                _rate_buckets[k][:] = [t for t in _rate_buckets[k] if t > now - 3600]
+                if not _rate_buckets[k]:
+                    del _rate_buckets[k]
+        return wait
+
+
+def _enforce_rate(scope: str, email: str, ip_max: int, email_max: int,
+                  window_s: int = 900):
+    """
+    Aplica rate limit por IP e (se email informado) por email. Retorna uma
+    Response 429 pronta se o limite estourou, ou None se liberado.
+    """
+    wait = _rate_hit(f"{scope}:ip:{_client_ip()}", ip_max, window_s)
+    if not wait and email:
+        wait = _rate_hit(f"{scope}:em:{email.lower()}", email_max, window_s)
+    if wait:
+        resp = jsonify({"error": "Muitas tentativas. Aguarde alguns "
+                                 "minutos e tente novamente."})
+        resp.status_code = 429
+        resp.headers["Retry-After"] = str(wait)
+        return resp
+    return None
+
+
+def _rate_guard(key: str, max_hits: int, window_s: int):
+    """
+    Rate limit genérico por chave arbitrária (ex.: por user_id em endpoints
+    caros de LLM). Retorna Response 429 pronta ou None se liberado.
+    """
+    wait = _rate_hit(key, max_hits, window_s)
+    if wait:
+        resp = jsonify({"error": "Muitas requisições em pouco tempo. "
+                                 "Aguarde um momento e tente novamente."})
+        resp.status_code = 429
+        resp.headers["Retry-After"] = str(wait)
+        return resp
+    return None
+
+
+def _validate_password(password: str) -> str | None:
+    """Retorna mensagem de erro se a senha for fraca; None se aceitável."""
+    if len(password) < 8:
+        return "A senha deve ter ao menos 8 caracteres."
+    if len(password) > 128:
+        return "A senha é longa demais (máximo 128 caracteres)."
+    if not any(c.isalpha() for c in password):
+        return "A senha deve conter ao menos uma letra."
+    if not any(c.isdigit() for c in password):
+        return "A senha deve conter ao menos um número."
+    if password.lower() in (
+        "password", "12345678", "123456789", "senha123", "11111111",
+        "qwertyui", "password1", "senha1234",
+    ):
+        return "Essa senha é comum demais. Escolha uma senha mais forte."
+    return None
 
 # ---------------------------------------------------------------------------
 # Asyncio bridge — loop dedicado rodando em thread daemon
@@ -314,27 +428,38 @@ def run_async(coro):
 _sessions: dict = {}
 
 # ---------------------------------------------------------------------------
-# CORS (aplicação local, qualquer origem)
+# CORS (allowlist) + headers de segurança
 # ---------------------------------------------------------------------------
+
+def _apply_cors(resp):
+    """Reflete a origem SOMENTE se estiver na allowlist (_ALLOWED_ORIGINS)."""
+    origin = request.headers.get("Origin", "")
+    if origin and origin in _ALLOWED_ORIGINS:
+        resp.headers["Access-Control-Allow-Origin"]  = origin
+        resp.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+        resp.headers["Access-Control-Allow-Methods"] = "GET,POST,PUT,DELETE,OPTIONS"
+        # Vary: Origin evita cache servir a resposta de uma origem para outra.
+        existing_vary = resp.headers.get("Vary", "")
+        resp.headers["Vary"] = (existing_vary + ", Origin").lstrip(", ") \
+            if "origin" not in existing_vary.lower() else existing_vary
+    return resp
+
 
 @app.before_request
 def handle_preflight():
     if request.method == "OPTIONS":
-        resp = app.make_default_options_response()
-        resp.headers.update({
-            "Access-Control-Allow-Origin":  "*",
-            "Access-Control-Allow-Headers": "Content-Type, Authorization",
-            "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
-        })
-        return resp
+        return _apply_cors(app.make_default_options_response())
+
 
 @app.after_request
-def add_cors(resp):
-    resp.headers.update({
-        "Access-Control-Allow-Origin":  "*",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization",
-        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
-    })
+def add_security_headers(resp):
+    _apply_cors(resp)
+    # Defense-in-depth para todas as respostas.
+    resp.headers["X-Content-Type-Options"] = "nosniff"
+    resp.headers["X-Frame-Options"]        = "DENY"
+    resp.headers["Referrer-Policy"]        = "strict-origin-when-cross-origin"
+    # HSTS — TLS é terminado no Cloudflare/Render; força HTTPS no browser.
+    resp.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     return resp
 
 # ---------------------------------------------------------------------------
@@ -371,36 +496,36 @@ def register():
     password = data.get("password", "")
     if not email or not password:
         return jsonify({"error": "Email e senha são obrigatórios."}), 400
+
+    # Política de senha no servidor (não confia só no front nem no Supabase).
+    pw_err = _validate_password(password)
+    if pw_err:
+        return jsonify({"error": pw_err}), 400
+
+    # Rate limit — registro é raro; limites mais apertados.
+    limited = _enforce_rate("register", email, ip_max=15, email_max=5)
+    if limited:
+        return limited
+
     try:
         result = auth_register(email, password)
 
-        # Se voltou com token, conta criada e confirmada imediatamente
+        # Token presente → conta criada e já confirmada (confirmação desligada).
         if result.get("access_token"):
             return jsonify({"ok": True, "needs_confirmation": False, **result})
 
-        # access_token é null: pode ser conta nova (aguarda confirmação)
-        # OU email duplicado. Tentamos login para distinguir os dois casos.
-        try:
-            auth_login(email, password)
-            # Login OK → email já está cadastrado e confirmado
-            return jsonify({"error": "Este email já está cadastrado. Faça login."}), 400
-        except Exception as login_err:
-            login_msg = str(login_err).lower()
-            if any(w in login_msg for w in ["confirm", "verified", "not confirmed", "email"]):
-                # Conta nova, aguardando clique no link de confirmação
-                return jsonify({"ok": True, "needs_confirmation": True, **result})
-            elif any(w in login_msg for w in ["invalid", "credentials", "password", "wrong"]):
-                # Email já existe mas com senha diferente
-                return jsonify({"error": "Este email já está cadastrado. Faça login ou recupere sua senha."}), 400
-            else:
-                # Caso inesperado: assume confirmação pendente
-                return jsonify({"ok": True, "needs_confirmation": True, **result})
+        # Sem token: conta nova aguardando confirmação OU email já cadastrado.
+        # NÃO distinguimos os dois casos — resposta idêntica para não permitir
+        # enumeração de emails. (O Supabase com confirmação de email ligada já
+        # devolve um usuário ofuscado para emails existentes.)
+        return jsonify({"ok": True, "needs_confirmation": True, "email": email})
 
     except Exception as e:
-        err = str(e).lower()
-        if any(w in err for w in ["already", "registered", "exists", "unique"]):
-            return jsonify({"error": "Este email já está cadastrado. Faça login."}), 400
-        return jsonify({"error": str(e)}), 400
+        # Erro real (rede, email malformado, etc.) — log interno, mensagem
+        # genérica ao cliente. Não revela se o email existe nem detalhes.
+        app.logger.warning("Falha no registro (%s): %s", email, e)
+        return jsonify({"error": "Não foi possível concluir o registro. "
+                                 "Verifique o email e tente novamente."}), 400
 
 
 @app.route("/api/auth/confirm", methods=["POST"])
@@ -408,12 +533,22 @@ def confirm_email():
     """
     Recebe o access_token que o Supabase coloca no hash da URL de confirmação
     e devolve ok=True para o frontend salvar a sessão.
+
+    O token é VALIDADO contra o Supabase aqui — não confiamos cegamente no
+    que o cliente envia.
     """
-    data          = request.json or {}
-    access_token  = data.get("access_token", "")
+    from auth import get_user_id
+
+    data         = request.json or {}
+    access_token = data.get("access_token", "")
     if not access_token:
         return jsonify({"error": "Token ausente."}), 400
-    # O token já foi validado pelo Supabase — apenas o retornamos confirmado
+
+    # Valida de verdade: get_user_id retorna None se o token for inválido.
+    user_id = get_user_id(access_token)
+    if not user_id:
+        return jsonify({"error": "Token inválido ou expirado."}), 401
+
     return jsonify({"ok": True, "access_token": access_token})
 
 
@@ -424,12 +559,28 @@ def login():
     password = data.get("password", "")
     if not email or not password:
         return jsonify({"error": "Email e senha são obrigatórios."}), 400
+
+    # Rate limit — barra brute-force / credential stuffing.
+    limited = _enforce_rate("login", email, ip_max=30, email_max=8)
+    if limited:
+        return limited
+
     try:
         result = auth_login(email, password)
         return jsonify({"ok": True, **result})
     except Exception as e:
-        return jsonify({"error": str(e)}), 401
-    
+        # Log interno detalhado; resposta genérica ao cliente.
+        app.logger.warning("Falha no login (%s): %s", email, e)
+        msg = str(e).lower()
+        # O aviso de "email não confirmado" NÃO é vetor de enumeração: o
+        # Supabase só o emite quando a senha está correta — ou seja, o
+        # atacante já precisaria da senha. Mantemos por UX.
+        if any(w in msg for w in ("confirm", "not confirmed", "verified")):
+            return jsonify({"error": "Confirme seu email antes de entrar.",
+                            "reason": "unconfirmed"}), 401
+        return jsonify({"error": "Email ou senha incorretos."}), 401
+
+
 @app.route("/api/auth/refresh", methods=["POST"])
 def refresh_token():
     """
@@ -437,17 +588,23 @@ def refresh_token():
     """
     data = request.json or {}
     token = data.get("refresh_token")
-    
+
     if not token:
         return jsonify({"error": "Refresh token ausente."}), 400
-        
+
+    # Rate limit frouxo por IP — o refresh legítimo é raro (~1×/hora), mas
+    # ainda assim limitamos para não virar oráculo de tokens.
+    limited = _enforce_rate("refresh", "", ip_max=60, email_max=0)
+    if limited:
+        return limited
+
     try:
-        # Chama a função que acabamos de criar no auth.py
         result = refresh_session(token)
         return jsonify({"ok": True, **result})
     except Exception as e:
-        # Retorna 401 para que o frontend saiba que a renovação falhou de vez
-        return jsonify({"error": str(e)}), 401
+        # 401 sinaliza ao frontend que a renovação falhou de vez.
+        app.logger.warning("Falha no refresh: %s", e)
+        return jsonify({"error": "Sessão expirada. Faça login novamente."}), 401
 
 # ---------------------------------------------------------------------------
 # Campanhas
@@ -972,6 +1129,7 @@ def rename_campaign(name):
 # ---------------------------------------------------------------------------
 
 @app.route("/api/ollama/models")
+@require_auth
 def ollama_models():
     import urllib.request, urllib.error
     base = os.environ.get("OLLAMA_API_BASE", "http://localhost:11434")
@@ -1177,6 +1335,13 @@ def _is_npc(name: str) -> bool:
 @require_auth
 def chat():
     user_id = g.user_id
+
+    # Rate limit por usuário — /api/chat aciona a LLM (custo/token). Barra
+    # abuso e contém o dano de um token roubado. 40 mensagens / 5 min.
+    limited = _rate_guard(f"chat:user:{user_id}", 40, 300)
+    if limited:
+        return limited
+
     sess    = _sessions.get(user_id)
     if not sess:
         return jsonify({"error": "Sessão não iniciada"}), 400
@@ -1476,6 +1641,12 @@ def generate_lore():
     Gera resumo, cena, locais E personagens a partir de uma ideia básica.
     Roteia para Google Gemini, DeepSeek ou Ollama conforme o prefixo do modelo.
     """
+    # Rate limit por usuário — geração de lore aciona a LLM (custo alto).
+    # 12 gerações / 15 min é folgado para uso legítimo e barra abuso.
+    limited = _rate_guard(f"lore:user:{g.user_id}", 12, 900)
+    if limited:
+        return limited
+
     data            = request.get_json()
     user_prompt     = data.get("prompt", "").strip()
     model           = data.get("model", "").strip()

@@ -810,7 +810,7 @@ function renderHistory(history) {
     else if (e.role === 'assistant') {
       const row = document.createElement('div'); row.className = 'msg-row master';
       const b = document.createElement('div'); b.className = 'msg-bubble'; b.style.opacity = '0.75';
-      b.innerHTML = marked.parse(processDiceRolls(e.text || ''));
+      b.innerHTML = renderMarkdown(e.text || '');
       row.innerHTML = '<div class="msg-label">Mestre</div>'; row.appendChild(b);
       document.getElementById('chat-history').appendChild(row);
     }
@@ -836,8 +836,13 @@ function appendMaster(text) {
 function appendSystem(text) {
   const row = document.createElement('div'); row.className = 'msg-row system';
   const b = document.createElement('div'); b.className = 'msg-bubble';
-  // Se já for HTML (começa com '<'), usa direto; senão, parseia markdown básico
-  b.innerHTML = text.trimStart().startsWith('<') ? text : _parseMd(text);
+  // Se já for HTML (começa com '<'), sanitiza antes de inserir; senão,
+  // _parseMd já escapa o texto. DOMPurify aqui é defesa em profundidade
+  // — caso algum HTML de sistema carregue conteúdo de origem não confiável.
+  const _raw = text.trimStart().startsWith('<') ? text : _parseMd(text);
+  b.innerHTML = (window.DOMPurify && typeof DOMPurify.sanitize === 'function')
+    ? DOMPurify.sanitize(_raw, { USE_PROFILES: { html: true } })
+    : _raw;
   row.appendChild(b);
   document.getElementById('chat-history').appendChild(row); scrollDown(); return row;
 }
@@ -866,8 +871,20 @@ function processDiceRolls(text) {
   });
 }
 
+// Converte markdown da IA em HTML SANITIZADO. marked.parse sozinho deixa
+// passar <script>, <img onerror>, etc. — DOMPurify remove tudo que for
+// executável. Se o DOMPurify não tiver carregado (CDN fora), faz fallback
+// SEGURO: escapa o texto e só preserva quebras de linha (sem HTML cru).
+function renderMarkdown(text) {
+  const md = marked.parse(processDiceRolls(text || ''));
+  if (window.DOMPurify && typeof DOMPurify.sanitize === 'function') {
+    return DOMPurify.sanitize(md, { USE_PROFILES: { html: true } });
+  }
+  return escapeHtml(text || '').replace(/\n/g, '<br>');
+}
+
 async function typewriter(el, text) {
-  el.innerHTML = marked.parse(processDiceRolls(text));
+  el.innerHTML = renderMarkdown(text);
   el.style.opacity = '0';
   let op = 0;
   const t = setInterval(() => { op = Math.min(1, op + 0.08); el.style.opacity = op; scrollDown(); if (op >= 1) clearInterval(t); }, 20);
