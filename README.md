@@ -3,6 +3,12 @@
 > Um RPG narrado por uma IA que age como Mestre, com memória persistente, regras
 > de D&D 5e mecanicamente fiéis e uma tela de combate tática opcional.
 
+**🎲 Jogue agora: [rpg-agent.onrender.com](https://rpg-agent.onrender.com)**
+
+> A aplicação está hospedada no plano gratuito do Render; a primeira
+> requisição após um período ocioso pode levar alguns segundos enquanto o
+> serviço acorda.
+
 A IA não é só um chatbot que escreve narrativa: ela é um **agente** com
 ferramentas (function calling) que **lê e altera o estado do mundo**:
 personagens, locais, fichas D&D, inventário, condições, combate. Um verificador
@@ -16,6 +22,61 @@ O resultado é um RPG onde:
 
 ---
 
+## Motivação, o "esquecimento" das LLMs
+
+Quando alguém usa uma LLM crua (ChatGPT, Gemini, etc.) para jogar RPG, surge
+sempre o mesmo problema: **a IA esquece**. Conforme a aventura cresce, ela
+perde o fio da meada. Troca nomes de NPCs, esquece locais já visitados,
+ignora itens do inventário, contradiz decisões anteriores e "reinventa" a
+ficha do personagem. Tudo o que importa numa campanha (quem é quem, onde se
+foi, o que aconteceu, quanto de vida o personagem tem) vive apenas na
+**janela de contexto** do modelo, e some quando ela enche, é compactada ou
+quando a sessão recomeça do zero.
+
+Este projeto nasceu para resolver exatamente esse esquecimento. A ideia
+central é **tirar o estado do jogo de dentro do texto da conversa** e
+tratá-lo como **dados estruturados e persistentes**: personagens, locais,
+fichas D&D, inventário, condições, combate e flags de missão vivem num
+estado central, gravado em banco e **reinjetado** a cada sessão. A IA não
+precisa "lembrar" de nada: ela **consulta e atualiza** esse estado através
+de ferramentas. O contexto da conversa pode encher e ser resumido; a
+memória da campanha **não se perde**.
+
+## Por que a IA é um agente
+
+O foco do projeto é a IA atuando como um **agente de verdade**: não um
+gerador de texto passivo, mas uma entidade que **percebe**, **delibera** e
+**age** sobre um ambiente, sob supervisão.
+
+Mapeando o projeto para o vocabulário de agentes:
+
+- **Ambiente**, o estado do mundo do jogo (personagens, locais, combate,
+  inventário, flags), estruturado e persistente (`memory.py` + Supabase).
+- **Percepção**, a cada turno o agente *lê* o ambiente por ferramentas de
+  consulta (`get_scene_context`, `get_character_sheet`, `get_combat_status`…).
+  Ele não age "às cegas": primeiro observa o estado atual.
+- **Ação**, o agente *altera* o ambiente **exclusivamente por ferramentas**
+  (`attack_roll`, `save_character`, `apply_condition`, `grant_xp`…). Ele não
+  pode mudar um número apenas "narrando", só chamando a ferramenta. A
+  narrativa vem **depois** da ação, descrevendo o que as ferramentas decidiram.
+- **Deliberação**, o LLM decide *quais* ferramentas chamar e *em que ordem*,
+  encadeando múltiplas `function_call` num único turno até produzir a
+  resposta final (o loop está detalhado na próxima seção).
+- **Autonomia supervisionada**, um **verificador determinístico** valida
+  cada resposta e **força o agente a se corrigir** quando ele narra uma
+  mecânica sem executar a ação correspondente. O agente é livre para narrar,
+  mas não para burlar as regras do ambiente.
+- **Múltiplos agentes no ambiente**, NPCs e inimigos têm comportamento
+  próprio (`execute_npc_turn` com estratégias: agressivo, tático, covarde,
+  suporte, aleatório), tomando turnos de combate **sem o LLM no meio**.
+- **Isolamento de agentes**, cada usuário tem seu próprio runner ADK e seu
+  próprio estado por sessão; agentes de jogadores diferentes não se enxergam.
+
+A seção [Como a IA é usada como agente](#como-a-ia-é-usada-como-agente)
+abre o loop **percepção → deliberação → ação → verificação** em detalhe.
+
+---
+
 ## Sumário
 
 1. [Visão geral](#visão-geral)
@@ -25,7 +86,7 @@ O resultado é um RPG onde:
 5. [Persistência (Supabase) e autenticação](#persistência-supabase-e-autenticação)
 6. [Modo D&D, mecânicas](#modo-dd--mecânicas)
 7. [Sistema de combate](#sistema-de-combate)
-8. [Tela de combate tática (JRPG)](#tela-de-combate-tática-jrpg)
+8. [Tela de combate tática (Pergaminho Épico)](#tela-de-combate-tática-pergaminho-épico)
 9. [Tools, o catálogo do agente](#tools--o-catálogo-do-agente)
 10. [Endpoints HTTP](#endpoints-http)
 11. [Frontend](#frontend)
@@ -138,7 +199,7 @@ uma re-execução do agente com prompt corretivo. Os checks:
 | 4 | Mana modificada narrativamente | "Mana: 8 → 4" |
 | 5 | Magia/habilidade "aprendida" sem `learn_spell()` | "Kael aprendeu Bola de Fogo" |
 | 6 | Condição aplicada sem `apply_condition()` | "ficou envenenado", "tornou-se cego" |
-| 7 | `end_combat()` sem `grant_xp()` para o grupo | XP automático ignorado |
+| 7 | `end_combat()` numa **vitória** sem `grant_xp()` | derrota/fuga não exige XP |
 
 Se houver violação, o sistema **reenvia ao modelo** uma mensagem de correção
 explicando o que faltou e **quais ferramentas já foram chamadas** (pra evitar
@@ -316,11 +377,29 @@ preencher campos novos em campanhas antigas.
 Tokens (`access_token` + `refresh_token`) vivem no `localStorage` do
 navegador. `static/js/utils.js:authFetch` tenta refresh silencioso em 401.
 
+### Endurecimento de segurança
+
+- **Rate limiting** (sliding-window in-memory) em `/api/auth/*` (anti
+  brute-force / credential stuffing) e nos endpoints de LLM `/api/chat` e
+  `/api/campaigns/generate-lore` (anti abuso de custo).
+- **CORS por allowlist** (`ALLOWED_ORIGINS`), sem `Access-Control-Allow-Origin: *`.
+- **Anti-enumeração**: registro não revela se um e-mail já existe; erros de
+  auth são genéricos (exceções internas só no log).
+- **Política de senha** no servidor (mínimo 8 caracteres, letra + número).
+- **`/api/auth/confirm`** valida o token contra o Supabase de verdade.
+- **XSS**: a narração da IA passa por DOMPurify antes de ir ao DOM
+  (`renderMarkdown`); `marked` sozinho deixaria passar `<script>`.
+- **Escopo de usuário estrutural**: `database.py` só acessa a tabela
+  `campaigns` por helpers que exigem `user_id` válido e embutem o filtro,
+  tornando impossível montar uma query sem escopo. Complementado por RLS no Supabase.
+- Headers: HSTS, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`.
+- `MAX_CONTENT_LENGTH` de 4 MB contra payloads gigantes.
+
 ---
 
 ## Modo D&D, mecânicas
 
-`tools_dnd.py` (~5400 linhas, 37 ferramentas + helpers) é o motor de regras D&D 5e
+`tools_dnd.py` (~6900 linhas, 38 ferramentas + helpers) é o motor de regras D&D 5e
 simplificado (mana em vez de slots, casos comuns cobertos). Resumo:
 
 ### Criação de personagem
@@ -365,12 +444,18 @@ simplificado (mana em vez de slots, casos comuns cobertos). Resumo:
 ### Testes e dados
 
 - `roll_dice(sides, count, modifier)`.
-- `make_skill_check(char, atributo, dificuldade, advantage, disadvantage, skill)`
-  o mestre rola pelo jogador. Resolve atributo automaticamente pela perícia
-  (Atletismo → FOR, Furtividade → DES, etc.).
+- `make_skill_check(char, atributo, dificuldade, advantage, disadvantage, skill, player_roll)`
+  resolve o atributo automaticamente pela perícia (Atletismo → FOR,
+  Furtividade → DES, etc.). Para personagem **jogável**, passe `player_roll`
+  com o d20 que o jogador rolou; para NPC, o mestre/sistema rola.
 - `social_check(char, skill, dc, player_roll, target)`, **o jogador informa
   o d20**, o sistema aplica modificador + proficiência. Usado em
   Persuasão/Intimidação/Enganação/Recrutamento.
+
+> **Regra única de rolagem:** todo teste de d20 de um personagem jogável
+> honra o dado REAL do jogador. `make_skill_check`, `social_check`,
+> `resolve_saving_throw` e `roll_death_save` aceitam `player_roll`; a
+> ferramenta nunca inventa o número quando o jogador rolou.
 
 ### Combate (resumido, detalhe na próxima seção)
 
@@ -380,10 +465,14 @@ simplificado (mana em vez de slots, casos comuns cobertos). Resumo:
 - `use_ability(char, habilidade, alvo, saving_throw_*)`, gasta mana,
   rola dado, aplica efeito. Suporta **magias de pool** (Sleep, Color Spray),
   **magias de condição** (Hold Person, Charm Person…), cura, dano.
-- `roll_death_save(char)`, d20: 20=acorda 1 HP, 1=2 falhas, 3 sucessos
-  estabiliza, 3 falhas mata.
+- `roll_death_save(char, player_roll)`, d20: 20=acorda 1 HP, 1=2 falhas, 3
+  sucessos estabiliza, 3 falhas mata. PC informa o `player_roll`; NPC rola.
 - `apply_condition` / `remove_condition`, busca descrição no SRD.
 - `next_turn`, `end_combat`.
+
+> **XP só por vitória.** `end_combat()` numa derrota (grupo todo caído ou
+> fuga) **não** concede XP: perder a luta não dá recompensa. O verificador
+> do servidor só cobra `grant_xp()` quando alguém do grupo ficou de pé.
 
 ### XP / Level-up
 
@@ -420,6 +509,42 @@ simplificado (mana em vez de slots, casos comuns cobertos). Resumo:
   derivados automaticamente: HP por CON, CA por DES, mana pelo atributo de
   conjuração.
 
+### Subescolhas de habilidade e arquétipos
+
+Muitas habilidades de classe são "escolha 1 de N". Duas tabelas em
+`tools_dnd.py` cobrem isso:
+
+- **`FEATURE_VARIANTS`**, features com variante direta: Estilo de Combate
+  (Arquearia, Defesa, Duelo, Grande Arma…), Inimigo Favorecido, Explorador
+  Natural, Metamagia, Invocações Sobrenaturais.
+- **`ARCHETYPE_FEATURES`**, 13 arquétipos de classe (Campeão, Mestre de
+  Batalha, Berserker, os 8 domínios de clérigo, as 8 tradições de mago,
+  etc.) com **sub-features que escalam por nível** (~200 entradas).
+
+`set_feature_choice(char, feature, escolha)` grava a escolha em
+`sheet.feature_choices`; ao escolher um arquétipo, concede automaticamente
+as sub-features liberadas no nível atual. Em level-up, `_apply_class_features`
+materializa as novas sub-features do arquétipo.
+
+**Efeitos ligados ao motor de combate** (não só descrição):
+
+- Estilo de Combate, Arquearia (+2 atk à distância), Defesa (+1 CA),
+  Duelo (+2 dano), Grande Arma (re-rola 1s/2s no dado de dano).
+- Inimigo Favorecido, +2 dano contra o tipo de criatura escolhido.
+- Crítico Aprimorado / Superior (Campeão), faixa de crítico vai a 19-20 / 18-20.
+- Golpe Divino (domínio de clérigo), +1d8 (2d8 no nv. 14) 1×/turno.
+- Resistência Dracônica (feiticeiro), CA sem armadura = 13 + DES.
+
+O **modo de alvo** de cada habilidade (`self` / `pool` / `single`) é
+derivado do campo `alcance` que vem do Open5e, não de listas hardcoded.
+O picker de variante aparece no editor de campanha e no wizard.
+
+### Descrições de habilidade de classe
+
+`CLASS_FEATURE_DESCS` cobre as **126 habilidades** de classe do SRD com
+descrição mecânica real (cada feature de `CLASS_LEVEL_FEATURES` tem entrada,
+sem cair num texto de fallback genérico).
+
 ---
 
 ## Sistema de combate
@@ -437,7 +562,7 @@ demonstradas por fuzz** (`tests_combat_fuzz.py`, 8k+ combates aleatórios,
 | **Ponteiro nunca preso em morto** | `_heal_current_turn` em toda entrada de tool |
 | **Sem duplo-avanço** | `turn_auto_advanced` + token; `next_turn` é idempotente |
 | **Avanço ancorado no ator** | `_auto_advance_turn(actor_name)`, não no ponteiro stale |
-| **Fim automático** | Quando um lado é derrotado/foge totalmente |
+| **Fim automático** | Quando um lado é DERROTADO (morto / 0 HP / fugiu). Um inimigo apenas DORMINDO não encerra a luta |
 
 Cada ferramenta de combate (attack_roll, use_ability, roll_death_save,
 execute_npc_turn) chama `_combat_turn_violation` no início. Se for ação fora
@@ -464,6 +589,15 @@ O turno **só avança** quando:
 
 Classificadores (`tools_dnd.py:_ability_action_type` e `_item_action_type`)
 detectam Bônus por nome (PT e EN). Default: Ação.
+
+### Status "dormindo" (Sleep)
+
+`Sleep` aplica o status **`dormindo`**, distinto de `inconsciente` (caído a
+0 HP). Uma criatura dormindo pula a vez (incapacitada), mas continua **viva
+e no combate**; derrotá-la ainda exige dano. Por isso `dormindo` entra em
+`OUT_OF_COMBAT_STATUSES` (pula turno) mas **não** em `DEFEATED_STATUSES`
+(encerra a luta). Sofrer dano acorda a criatura (regra 5e); `end_combat()` e
+`roll_initiative()` acordam/normalizam para o status nunca vazar entre lutas.
 
 ### Dois modos de combate
 
@@ -503,15 +637,19 @@ Eventos: `combat_start`, `attack_hit`, `attack_crit`, `attack_miss`,
 
 ---
 
-## Tela de combate tática (JRPG)
+## Tela de combate tática (Pergaminho Épico)
 
 Quando `combat_mode == "tela"`:
 
 - A IA monta a cena → chama `roll_initiative` → `is_active` vira true.
 - O cliente (`combat.js`) detecta via `Combat.sync()` (chamado em
   `renderMemory` após qualquer tool de estado).
-- Um overlay full-screen abre: inimigos em cima, grupo embaixo, ordem de
-  turno na barra superior, feed de log no meio, barra de ações embaixo.
+- Um overlay full-screen abre no tema **"Pergaminho Épico"** (paleta
+  creme/dourado/vermelho, Playfair Display + Lora): cabeçalho com título e
+  a ordem de iniciativa em pílulas; campo de batalha **heróis × Vs ×
+  inimigos** com cards de HP/MP; painel inferior dividido em **ações** +
+  **Diário de Combate**; modal sobreposto no fim da luta. Responsivo,
+  em telas estreitas vira coluna única.
 
 ### O que o jogador vê
 
@@ -575,6 +713,15 @@ Quando `combat_mode == "tela"`:
   O overlay reabre no próximo `sync()` se o combate ainda estiver ativo.
 - ⏭️ **Encerrar Turno**, força avanço sem gastar slot.
 
+### Fechar a tela durante o combate
+
+O botão **✕** no cabeçalho fecha a tela **sem encerrar o combate**: o
+jogador pode acessar o menu e sair do jogo no meio da luta. O combate fica
+pausado e o `combat_state` é persistido; ao voltar, retoma de onde parou.
+Uma pílula flutuante **"⚔️ Retomar combate"** reabre a tela. A flag
+`_userClosed` impede a reabertura automática no `sync()` enquanto o jogador
+mantém a tela fechada.
+
 ### Turno de inimigo
 
 `execute_npc_turn()` roda **sem LLM**. O cliente detecta `current_is_party
@@ -620,7 +767,9 @@ Goblin 4 [inimigo]: inconsciente (0/7 HP)
 
 O `result` é limpo no servidor após a busca, não reaparece. O agente em
 modo tela tem instrução específica pra reconhecer esse marcador e narrar a
-luta inteira de uma vez (e chamar `add_item`/`modify_currency` para saque).
+luta inteira de uma vez. O texto do recap é **ciente do desfecho**: numa
+vitória instrui saque (`add_item`/`modify_currency`) + `grant_xp()`; numa
+derrota instrui explicitamente **não** gerar saque nem XP.
 
 ---
 
@@ -654,7 +803,7 @@ A lista completa exposta ao agente (`tools.py:ALL_TOOLS` = narrativas +
 | `get_character_sheet` / `get_combat_status` | Lê ficha / status do combate |
 | `modify_hp(char, amount, reason)` | Aplica HP (positivo cura, negativo dano) |
 | `modify_mana(char, amount, reason)` | Aplica mana |
-| `make_skill_check(char, atr, dc, adv/dis, skill)` | Mestre rola um teste |
+| `make_skill_check(char, atr, dc, adv/dis, skill, player_roll)` | Teste de atributo (PC informa o d20; NPC o sistema rola) |
 | `social_check(char, skill, dc, player_roll)` | Jogador informa o d20 |
 | `attack_roll(atacante, alvo, arma, dado)` | Ataque completo: d20 → dano → KO |
 | `learn_ability(char, nome, desc, mana, dado)` | Adiciona habilidade |
@@ -665,11 +814,12 @@ A lista completa exposta ao agente (`tools.py:ALL_TOOLS` = narrativas +
 | `add_item` / `remove_item` / `list_inventory` | Inventário |
 | `identify_item(char, nome)` | Valida item mágico contra o SRD |
 | `modify_currency(char, "ouro"\|"prata"\|"cobre", amount)` | Moedas |
-| `roll_death_save(char)` | Teste de morte (3 sucessos / 3 falhas) |
+| `roll_death_save(char, player_roll)` | Teste de morte (PC informa o d20; NPC o sistema rola) |
 | `short_rest` / `use_hit_die` / `long_rest` | Descansos |
 | `grant_xp(char, amount, reason)` | XP + level up automático |
 | `set_stat(char, stat, value)` | ASI manual; recalcula derivados |
 | `choose_feat(char, feat_name)` | Talento via SRD, valida pré-requisitos |
+| `set_feature_choice(char, feature, escolha)` | Subescolha de habilidade/arquétipo (Estilo de Combate, domínio, etc.) |
 | `roll_initiative(nomes)` | Inicia combate |
 | `next_turn` / `end_combat` | Controle de turno |
 | `recruit_character(npc, role)` | NPC vira aliado (com guarda de nível) |
@@ -734,6 +884,8 @@ acessam memória):
 - `GET /api/dnd/items/search?q=...`, busca item.
 - `GET /api/dnd/monsters/search?q=...`, busca monstro.
 - `GET /api/dnd/class-features?classe=guerreiro&nivel=5`, features.
+- `GET /api/dnd/feature_variants`, catálogo de subescolhas (variantes/arquétipos).
+- `POST /api/dnd/feature_choice`, aplica/remove uma subescolha de habilidade.
 
 ### Combate em tela
 
@@ -779,16 +931,17 @@ acessam memória):
   `/habilidades`, `/status`, `/condicoes`, `/combate`, `/rolar`,
   `/personagens`, …), modal de edição rica (ficha D&D inline, level up,
   busca de spells/feats), turn tracker, dice tray do jogador.
-- **`combat.js`** (~460 linhas), overlay JRPG, action bar com economia
-  5e, submenus de arma/habilidade/item, painel de fim, toggle de modo.
-  **Zero regra de jogo no cliente**, só renderiza snapshot e envia
-  intents.
+- **`combat.js`** (~580 linhas), overlay "Pergaminho Épico", action bar com
+  economia 5e, submenus de arma/habilidade/item, picker de variantes,
+  modal de fim, botão de fechar + pílula de retomar, toggle de modo.
+  **Zero regra de jogo no cliente**, só renderiza snapshot e envia intents.
 
 ### Tema
 
-`static/css/style.css` (~1230 linhas), visual de livro/tomo (Lora,
-Playfair Display, Caveat), 7 temas alternáveis, totalmente responsivo
-(`--app-height` cobre o quirk do iOS Safari).
+`static/css/style.css` (~1460 linhas), visual de livro/tomo (Lora,
+Playfair Display, Caveat) + tela de combate "Pergaminho Épico", 7 temas
+alternáveis, totalmente responsivo (`--app-height` cobre o quirk do iOS
+Safari).
 
 ---
 
@@ -851,10 +1004,10 @@ Já descrito, força correção quando a IA narra mecânica sem ferramenta
 
 ```
 .
-├── server.py              Flask + SSE + endpoints (~1800 linhas)
+├── server.py              Flask + SSE + endpoints + segurança (~2100 linhas)
 ├── agent.py               Instruções de estilo + create_agent
 ├── tools.py               Tools narrativas + ALL_TOOLS
-├── tools_dnd.py           Motor D&D 5e + combate (~5400 linhas, 37 tools)
+├── tools_dnd.py           Motor D&D 5e + combate (~6900 linhas, 38 tools)
 ├── memory.py              Estado por sessão, proxy, persistência
 ├── database.py            Camada Supabase
 ├── auth.py                Supabase Auth + @require_auth
@@ -874,7 +1027,7 @@ Já descrito, força correção quando a IA narra mecânica sem ferramenta
         ├── auth.js        Login / cadastro / confirmação
         ├── menu.js        Wizard, edição, importação, modelos
         ├── game.js        Chat, comandos, sidebar, dice tray
-        └── combat.js      Tela tática JRPG
+        └── combat.js      Tela tática "Pergaminho Épico"
 ```
 
 ---
@@ -969,6 +1122,14 @@ Documentadas honestamente, coisas que sei que poderiam estar melhores:
   (não tem regra inline). Poções de cura têm regra mecânica direta.
 - **Sem reação modelada** (Shield, Counterspell, ataque de oportunidade)
   na tela tática, coisas de fora-do-turno ainda não estão na economia.
+- **Sub-features de arquétipo**, só as de efeito numérico claro têm hook no
+  motor (faixa de crítico, Golpe Divino, Resistência Dracônica, Estilo de
+  Combate). Manobras, reações e recursos de pool (Ki, Dado de Superioridade)
+  ficam como descrição que a IA-mestre arbitra; exigiriam um subsistema de
+  reações/recursos.
+- **Tokens em `localStorage`**, o XSS está mitigado (sanitização DOMPurify),
+  mas a migração do refresh token para cookie `httpOnly` é um item pendente
+  de endurecimento.
 - **`main.py` (CLI)** foi removido, o sistema só roda via servidor web.
 - **Multimodal**: a IA hoje só lê/escreve texto (sem imagens).
 - **Reset do `_active_by_user` em memória**: se o processo do servidor
