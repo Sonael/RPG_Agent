@@ -438,6 +438,10 @@ textarea { resize: vertical; min-height: 40px; }
    MODAIS E OVERLAYS
    ========================================================= */
 #dialog-overlay, #import-overlay, #wizard-overlay, #edit-overlay { position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; backdrop-filter: blur(3px); }
+/* O diálogo de confirmação/alerta pode ser disparado de dentro de outro
+   modal (ex.: deletar dentro do modal de edição). Precisa ficar SEMPRE
+   por cima, independentemente da ordem no DOM. */
+#dialog-overlay { z-index: 10001; }
 .import-box, .wizard-box, .dialog-box, .edit-box { background: var(--page-right); border: 1px solid var(--page-edge); border-radius: 8px; position: relative; width: 90%; box-shadow: 0 20px 50px rgba(0,0,0,0.6); display: flex; flex-direction: column; background-image: radial-gradient(circle at 80% 20%, rgba(139, 69, 19, 0.02) 0%, transparent 60%); }
 .import-box { max-width: 600px; padding: 30px; }
 .wizard-box { max-width: 800px; max-height: 90vh; }
