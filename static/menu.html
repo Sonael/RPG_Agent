@@ -271,7 +271,7 @@
             </div>
             <div class="field-group" style="margin:0;">
               <label>Estilo de RPG</label>
-              <select id="ed-type">
+              <select id="ed-type" onchange="edRenderChars()">
                 <option value="dnd">D&D / Estruturado</option>
                 <option value="fantasia">Fantasia / Aventura</option>
                 <option value="romance">Romance / Drama</option>
@@ -363,7 +363,7 @@
   </div>
 
   <script src="/static/js/utils.js?v=7"></script>
-  <script src="/static/js/menu.js?v=33"></script>
+  <script src="/static/js/menu.js?v=34"></script>
   <script>
     // Animação de volta para a capa quando carregado da cache
     window.addEventListener('pageshow', function(event) {

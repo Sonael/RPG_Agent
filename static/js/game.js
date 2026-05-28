@@ -392,7 +392,7 @@ async function handleSlash(raw) {
       const renderChar = c => `<div class="cmd-list-item"><b>${c.name}</b> (${c.status || 'vivo'})<br><span style="color:var(--text-muted);font-size:13px;">${c.description || ''}</span></div>`;
       const partyList  = (mem.party || []).map(renderChar).join(sep);
       const npcList    = (mem.characters || []).map(renderChar).join(sep);
-      const partyHtml  = partyList ? `<div class="cmd-list-title" style="font-size:11px;margin-top:10px;border:none;padding:0 0 4px;">🫂 GRUPO</div>${partyList}` : '';
+      const partyHtml  = partyList ? `<div class="cmd-list-title" style="font-size:11px;margin-top:10px;border:none;padding:0 0 4px;">🫂 ${(window._campaignConfig?.party_label || 'Grupo').toUpperCase()}</div>${partyList}` : '';
       const npcHtml    = npcList   ? `<div class="cmd-list-title" style="font-size:11px;margin-top:${partyList?'14px':'0'};border:none;padding:0 0 4px;">👤 OUTROS</div>${npcList}` : '';
       html = `<div class="cmd-list-box"><div class="cmd-list-title">👥 Personagens na Memória</div>${partyHtml || ''}${npcHtml || ''}${!partyList && !npcList ? 'Nenhum personagem.' : ''}</div>`;
     }
@@ -407,7 +407,7 @@ async function handleSlash(raw) {
     }
     else if (cmd === '/grupo') {
       const list = mem.party.map(p => `<div class="cmd-list-item"><b>${p.name}</b> (${p.role})<br><span style="color:var(--text-muted);font-size:13px;">${p.notes || ''}</span></div>`).join('<hr style="border:none;border-top:1px dashed var(--page-edge);margin:8px 0;">');
-      html = `<div class="cmd-list-box"><div class="cmd-list-title">🫂 Grupo de Aventureiros</div>${list || 'Grupo vazio.'}</div>`;
+      html = `<div class="cmd-list-box"><div class="cmd-list-title">🫂 ${window._campaignConfig?.party_label || 'Grupo de Aventureiros'}</div>${list || 'Grupo vazio.'}</div>`;
     }
     else if (cmd === '/eventos') {
       const list = mem.events.slice(-5).map(e => `<div class="cmd-list-item"><b>#${e.index} — ${e.location}</b><br><span style="color:var(--text-muted);font-size:13px;">${e.summary}</span></div>`).join('<hr style="border:none;border-top:1px dashed var(--page-edge);margin:8px 0;">');

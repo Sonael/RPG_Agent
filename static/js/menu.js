@@ -2449,6 +2449,20 @@ const THEME_CHAR_FIELDS = {
   },
 };
 
+// Rótulos do "grupo" por estilo de campanha. Espelha CAMPAIGN_CONFIGS
+// (agent.py) para que o wizard e o editor não usem termos de aventura/D&D
+// ("Membro do Grupo", "GRUPO") em campanhas narrativas como romance.
+const THEME_PARTY_META = {
+  fantasia: { member: 'Membro do Grupo',  badge: 'GRUPO',      role: 'Classe / Função',       hint: 'Ex: Guerreira, Mago, Ladino...' },
+  romance:  { member: 'Pessoa Próxima',   badge: 'PRÓXIMO',    role: 'Relacionamento',        hint: 'Ex: Interesse romântico, Melhor amigo, Rival...' },
+  horror:   { member: 'Sobrevivente',     badge: 'GRUPO',      role: 'Papel no Grupo',        hint: 'Ex: Líder, Cético, Especialista...' },
+  misterio: { member: 'Aliado',           badge: 'ALIADO',     role: 'Papel na Investigação', hint: 'Ex: Detetive, Informante, Testemunha...' },
+  scifi:    { member: 'Tripulante',       badge: 'TRIPULAÇÃO', role: 'Especialização',        hint: 'Ex: Hacker, Piloto, Médico...' },
+  faroeste: { member: 'Comparsa',         badge: 'COMPARSA',   role: 'Papel na Gangue',       hint: 'Ex: Pistoleiro, Xerife, Foragido...' },
+  dnd:      { member: 'Membro do Grupo',  badge: 'GRUPO',      role: 'Função no Grupo',       hint: 'Ex: Líder, Tanque, Suporte...' },
+};
+function partyMeta(theme) { return THEME_PARTY_META[theme] || THEME_PARTY_META.fantasia; }
+
 function wzExtraBadge(char, theme) {
   const cfg = THEME_CHAR_FIELDS[theme];
   if (!cfg || !char.extras) return '';
@@ -2496,7 +2510,9 @@ function wzRenderThemeExtras(i, theme, char) {
 }
 
 function wzRenderChars() {
-  const isDnd   = document.getElementById('wz-type').value === 'dnd';
+  const theme   = document.getElementById('wz-type').value;
+  const isDnd   = theme === 'dnd';
+  const meta    = partyMeta(theme);
   const list    = document.getElementById('wz-chars-list');
   const empty   = document.getElementById('wz-chars-empty');
   empty.classList.toggle('hidden', wzChars.length > 0);
@@ -2511,7 +2527,7 @@ function wzRenderChars() {
           <span style="font-family:'Cinzel',serif;font-size:13px;color:var(--text);">
             ${char.name || `Personagem ${i+1}`}
           </span>
-          ${char.isParty ? `<span style="font-family:'JetBrains Mono',monospace;font-size:9px;background:rgba(200,168,75,0.15);border:1px solid var(--gold-dim);border-radius:3px;padding:2px 6px;color:var(--gold-dim);">GRUPO</span>` : ''}
+          ${char.isParty ? `<span style="font-family:'JetBrains Mono',monospace;font-size:9px;background:rgba(200,168,75,0.15);border:1px solid var(--gold-dim);border-radius:3px;padding:2px 6px;color:var(--gold-dim);">${meta.badge}</span>` : ''}
           ${isDnd && char.classe ? `<span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);">${CLASS_DATA_WZ[char.classe]?.label||''}${char.nivel>1?` Nv.${char.nivel}`:''}</span>` : wzExtraBadge(char, document.getElementById('wz-type').value)}
         </div>
         <button onclick="event.stopPropagation();removeWzChar(${i})" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:16px;padding:2px 6px;">✕</button>
@@ -2531,13 +2547,13 @@ function wzRenderChars() {
         </div>
         <div class="cwc-row2">
           <div>
-            <span class="cwc-label">Papel / Função no Grupo</span>
-            <input value="${escHtml(char.role)}" onchange="wzChars[${i}].role=this.value" placeholder="Ex: Guerreira, Aliada, Rival...">
+            <span class="cwc-label">${meta.role}</span>
+            <input value="${escHtml(char.role)}" onchange="wzChars[${i}].role=this.value" placeholder="${meta.hint}">
           </div>
           <div style="display:flex;align-items:center;gap:8px;padding-top:20px;">
             <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text-dim);">
               <input type="checkbox" ${char.isParty?'checked':''} onchange="wzChars[${i}].isParty=this.checked" style="accent-color:var(--gold);">
-              Membro do Grupo (party)
+              ${meta.member}
             </label>
           </div>
         </div>
@@ -4065,6 +4081,7 @@ function edRenderChars() {
   }
   empty.style.display = 'none';
   const isDnd = edIsDnd();
+  const meta  = partyMeta(document.getElementById('ed-type')?.value || 'fantasia');
   container.innerHTML = edChars.map((ch, i) => {
     const sh = ch.sheet;
     const classeLabel = isDnd && sh ? (CLASS_DATA_WZ[sh.classe]?.label || sh.classe || '') : '';
@@ -4075,7 +4092,7 @@ function edRenderChars() {
           <span id="ed-ca-${i}" style="color:var(--text-muted);font-size:12px;">${ch._open?'▾':'▸'}</span>
           <span style="font-family:'Playfair Display',serif;font-size:14px;" id="ed-cname-${i}">${escHtml(ch.name) || `Personagem ${i+1}`}</span>
           ${classeLabel ? `<span style="font-family:monospace;font-size:10px;color:var(--text-muted);">${classeLabel}</span>` : ''}
-          ${ch.isParty ? `<span style="font-family:monospace;font-size:9px;background:rgba(38,75,130,0.08);border:1px solid rgba(38,75,130,0.25);border-radius:3px;padding:2px 6px;color:var(--ink-user);">GRUPO</span>` : ''}
+          ${ch.isParty ? `<span style="font-family:monospace;font-size:9px;background:rgba(38,75,130,0.08);border:1px solid rgba(38,75,130,0.25);border-radius:3px;padding:2px 6px;color:var(--ink-user);">${meta.badge}</span>` : ''}
         </div>
         <button onclick="event.stopPropagation();removeEditChar(${i})" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:16px;padding:2px 6px;">✕</button>
       </div>
@@ -4094,13 +4111,13 @@ function edRenderChars() {
           </div>
         </div>
         <div>
-          <span class="cwc-label">Papel / Função</span>
-          <input value="${escHtml(ch.role)}" onchange="edChars[${i}].role=this.value" placeholder="Ex: Guerreira, Aliada, Antagonista...">
+          <span class="cwc-label">${meta.role}</span>
+          <input value="${escHtml(ch.role)}" onchange="edChars[${i}].role=this.value" placeholder="${meta.hint}">
         </div>
         <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
           <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text-muted);">
             <input type="checkbox" ${ch.isParty?'checked':''} onchange="edChars[${i}].isParty=this.checked">
-            Membro do Grupo (party)
+            ${meta.member}
           </label>
         </div>
         <div>
