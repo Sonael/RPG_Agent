@@ -402,8 +402,398 @@ function _injectSettingsPanel() {
   });
 }
 
+// ═══════════════════════════════════════
+//  Guia "Como Jogar" (injetado em game e menu)
+// ═══════════════════════════════════════
+const _HELP_ICON = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`;
+
+const _GUIDE_HTML = `
+  <div class="guide-box">
+    <div class="guide-header">
+      <div>
+        <div class="guide-subtitle">Guia do Aventureiro</div>
+        <div class="guide-title">Como Jogar</div>
+      </div>
+      <button onclick="closeGuide()" class="close-btn" aria-label="Fechar">✕</button>
+    </div>
+
+    <div class="guide-body scroll-area">
+      <p class="guide-intro">
+        Aqui <b>você é o protagonista</b>. A inteligência artificial é o seu
+        <b>Mestre</b>: ela narra o mundo, dá voz aos personagens, controla os
+        inimigos e reage a tudo o que você decidir. Para jogar, basta
+        <b>escrever o que o seu personagem faz ou diz</b>, em linguagem
+        natural — como se contasse uma história junto com um amigo.
+      </p>
+
+      <div id="guide-mode-banner" class="guide-banner"></div>
+
+      <details class="guide-sec" open>
+        <summary>🗣️ Conversando com o Mestre</summary>
+        <div class="guide-sec-body">
+          <p>Não existe forma "certa" de escrever. Diga o que quiser fazer:</p>
+          <ul>
+            <li>«Pergunto ao taberneiro sobre os rumores na estrada.»</li>
+            <li>«Examino a porta com cuidado antes de a abrir.»</li>
+            <li>«Tento convencer o guarda a me deixar passar.»</li>
+          </ul>
+          <p>
+            O Mestre responde narrando o que acontece. Use <b>Enter</b> para
+            enviar e <b>Shift+Enter</b> para pular uma linha.
+          </p>
+          <p class="guide-tip">
+            Diferente de um chatbot comum, este Mestre <b>não esquece</b>: tudo
+            o que importa (quem você conheceu, onde esteve, o que aconteceu)
+            fica guardado numa memória à parte e volta sempre, mesmo depois de
+            muitas horas de jogo.
+          </p>
+        </div>
+      </details>
+
+      <details class="guide-sec">
+        <summary>✋ Você manda na história — corrigindo o Mestre</summary>
+        <div class="guide-sec-body">
+          <p>
+            Esta é talvez a parte mais importante: <b>se você não gostar de
+            como uma cena foi narrada, é só dizer</b>. O Mestre aceita
+            correções e reescreve. Você é coautor, não um espectador.
+          </p>
+          <ul>
+            <li>«Na verdade, meu personagem nunca concordaria com isso. Refaça a cena.»</li>
+            <li>«Espera — eu nunca disse que larguei a espada.»</li>
+            <li>«Prefiro que o NPC reaja com medo, não com raiva.»</li>
+            <li>«Você trocou o nome do ferreiro; ele se chama Doran.»</li>
+          </ul>
+          <p>Também dá para ajustar o <b>tom e o ritmo</b> a qualquer momento:</p>
+          <ul>
+            <li>«Deixa a atmosfera mais sombria.»</li>
+            <li>«Menos descrição, mais ação.»</li>
+            <li>«Vá mais devagar, quero explorar este lugar.»</li>
+          </ul>
+          <p class="guide-tip">
+            Se o Mestre inventar um detalhe errado (um item que você não tem,
+            um lugar onde você nunca esteve), basta apontar e ele corrige.
+          </p>
+        </div>
+      </details>
+
+      <details class="guide-sec">
+        <summary>📖 A barra lateral: Mundo, Enciclopédia e Diário</summary>
+        <div class="guide-sec-body">
+          <p>
+            Durante o jogo, a barra lateral mostra o "estado" da sua aventura.
+            No computador ela fica à esquerda; no celular, toque no botão
+            <b>☰</b> no topo para abri-la. Ela tem três abas:
+          </p>
+          <ul>
+            <li><b>Mundo</b> — o capítulo e o local atuais, avisos de
+              Validação, o Resumo da história e as Observações (flags).</li>
+            <li><b>Enciclopédia</b> — o seu grupo, os personagens (NPCs) que
+              você conheceu e os locais registrados.</li>
+            <li><b>Diário</b> — as crônicas da aventura, capítulo a capítulo.
+              Pode ser exportado como ficheiro <b>.md</b>.</li>
+          </ul>
+        </div>
+      </details>
+
+      <details class="guide-sec">
+        <summary>🧩 Os conceitos do jogo</summary>
+        <div class="guide-sec-body">
+          <p>Tudo o que o Mestre "lembra" é organizado nestes registros:</p>
+          <dl class="guide-dl">
+            <dt>Personagens</dt>
+            <dd>As pessoas que você encontra (NPCs) e os companheiros do seu
+              grupo. Cada um tem nome, descrição e um <i>status</i> (vivo,
+              ferido, aliado, morto…).</dd>
+
+            <dt>Locais</dt>
+            <dd>Os lugares que você visita ou ouve falar. Ajudam o Mestre a
+              manter o mapa do mundo coerente.</dd>
+
+            <dt>Eventos</dt>
+            <dd>Os marcos importantes da história — aquilo que aconteceu e que
+              vale a pena lembrar mais tarde.</dd>
+
+            <dt>Resumo</dt>
+            <dd>Uma recapitulação curta de tudo até agora. Você pode editá-la
+              clicando em <i>(editar)</i> na aba Mundo.</dd>
+
+            <dt>Observações (Flags)</dt>
+            <dd>
+              Uma <b>flag</b> é uma anotação que o mundo guarda: uma
+              <b>decisão, um segredo ou um estado</b> que tem consequências
+              mais tarde. Por exemplo: <code>portão_norte = aberto</code>,
+              <code>rei_confia_em_você = sim</code>,
+              <code>veneno_no_vinho = verdadeiro</code>. Servem para a
+              história ser <b>coerente no longo prazo</b>: se você abriu um
+              portão no capítulo 1, ele continua aberto no capítulo 5; se um
+              NPC desconfia de você, isso pesa nas próximas conversas.
+            </dd>
+
+            <dt>Diário</dt>
+            <dd>A narrativa escrita da aventura, dividida por capítulos.</dd>
+
+            <dt>Validação</dt>
+            <dd>Avisos automáticos (não são erros) que aparecem quando algo
+              parece inconsistente — por exemplo, um personagem dado como
+              morto sendo narrado como ativo. Você pode limpá-los quando
+              quiser.</dd>
+          </dl>
+        </div>
+      </details>
+
+      <details class="guide-sec">
+        <summary>⌨️ Quando o Mestre esquece de salvar algo — comandos /</summary>
+        <div class="guide-sec-body">
+          <p>
+            Dentro do jogo, digite <b>/</b> no campo de mensagem para abrir o
+            menu de comandos. Use as setas e <b>Enter</b> (ou <b>Tab</b>) para
+            escolher. Os comandos servem para <b>consultar</b> e
+            <b>corrigir</b> a memória.
+          </p>
+          <p><b>Para consultar (em qualquer campanha):</b></p>
+          <ul class="guide-cmds">
+            <li><code>/personagens</code> — lista os NPCs e seus status</li>
+            <li><code>/locais</code> — locais registrados</li>
+            <li><code>/grupo</code> — companheiros do grupo</li>
+            <li><code>/eventos</code> — os últimos acontecimentos</li>
+            <li><code>/flags</code> — as observações/decisões guardadas</li>
+            <li><code>/diario</code> — entradas do diário</li>
+            <li><code>/resumo</code> — recapitulação da história</li>
+            <li><code>/contexto</code> — a memória completa</li>
+            <li><code>/exportar</code> — baixa o diário em .md</li>
+            <li><code>/ajuda</code> — mostra todos os comandos</li>
+          </ul>
+          <p>
+            <b>Esqueceu de salvar?</b> Se o Mestre não registrou um personagem,
+            local ou evento que você considera importante, salve você mesmo:
+          </p>
+          <ul class="guide-cmds">
+            <li><code>/salvar personagem &lt;nome&gt;</code></li>
+            <li><code>/salvar local &lt;nome&gt;</code></li>
+            <li><code>/salvar evento &lt;descrição&gt;</code></li>
+          </ul>
+          <p class="guide-tip">
+            Você também pode simplesmente <b>pedir ao Mestre</b>: «Registre o
+            ferreiro Doran como personagem» ou «Salve que descobrimos a caverna
+            escondida». Ele guarda na memória para você.
+          </p>
+        </div>
+      </details>
+
+      <details class="guide-sec">
+        <summary>✏️ Editando e corrigindo à mão</summary>
+        <div class="guide-sec-body">
+          <p>
+            Durante o jogo, tudo na barra lateral pode ser ajustado
+            diretamente — útil quando o Mestre erra um detalhe ou esquece algo:
+          </p>
+          <ul>
+            <li><b>Clique em qualquer registro</b> (personagem, local, flag…)
+              para abrir o editor.</li>
+            <li>Use os botões <b>+ Adicionar / + Personagem / + Local /
+              + Entrada</b> para criar algo novo.</li>
+            <li>Dentro do editor, <b>Deletar Registo</b> remove o item.</li>
+            <li><b>Limpar Todas</b> apaga os avisos de Validação.</li>
+          </ul>
+        </div>
+      </details>
+
+      <details id="guide-dnd-sec" class="guide-sec guide-dnd-block">
+        <summary>🎲 Modo D&amp;D — regras de verdade</summary>
+        <div class="guide-sec-body">
+          <p class="guide-dnd-note">
+            <b>Atenção:</b> esta seção só vale para campanhas de
+            <b>Regras D&amp;D</b>. Nos modos puramente narrativos (Fantasia,
+            Romance, Horror…) nada disto aparece — lá a história é livre, sem
+            fichas nem combate por turnos.
+          </p>
+          <p>
+            No modo D&amp;D, além da narrativa, valem as <b>regras de D&amp;D
+            5e</b>. A grande diferença: <b>os números são decididos por
+            dados, não pela vontade do Mestre</b>. Ele não pode "decidir" que
+            você acertou um golpe — ele <b>rola</b> e narra o resultado.
+          </p>
+
+          <dl class="guide-dl">
+            <dt>A Ficha</dt>
+            <dd>Cada personagem tem atributos (Força, Destreza, Constituição,
+              Inteligência, Sabedoria, Carisma), Vida (HP), Mana (MP) para
+              magias, Classe de Armadura (CA), nível, classe e raça.</dd>
+
+            <dt>O botão de dados 🎲</dt>
+            <dd>Quando o jogo pede um teste, você rola o seu próprio dado (d20
+              e companhia) pelo botão 🎲 ao lado do campo de mensagem. O
+              resultado <b>real</b> que você tirou é o que conta.</dd>
+
+            <dt>Inventário e moedas</dt>
+            <dd>Itens, equipamentos e moedas (ouro, prata, cobre). Equipar uma
+              armadura ou escudo muda a sua CA automaticamente.</dd>
+
+            <dt>Habilidades e magias</dt>
+            <dd>Poderes e feitiços que normalmente custam Mana para usar.</dd>
+
+            <dt>Condições</dt>
+            <dd>Estados como Envenenado, Cego ou Atordoado, com efeitos
+              mecânicos reais durante o combate.</dd>
+
+            <dt>XP e subir de nível</dt>
+            <dd>Você ganha experiência ao vencer desafios e sobe de nível
+              automaticamente, ganhando vida, perícias e poderes.</dd>
+
+            <dt>Descansos</dt>
+            <dd>Descanso curto e descanso longo recuperam Vida, Mana e
+              recursos.</dd>
+          </dl>
+
+          <p><b>Comandos exclusivos do D&amp;D:</b></p>
+          <ul class="guide-cmds">
+            <li><code>/ficha [nome]</code> — atributos, CA e equipamentos</li>
+            <li><code>/inventario [nome]</code> — itens e moedas</li>
+            <li><code>/habilidades [nome]</code> — magias e poderes</li>
+            <li><code>/status</code> — Vida e Mana de todo o grupo</li>
+            <li><code>/condicoes [nome]</code> — condições ativas</li>
+            <li><code>/combate</code> — ordem de iniciativa e turno atual</li>
+            <li><code>/rolar &lt;XdY+Z&gt;</code> — rola uma fórmula (ex.: /rolar 2d6+3)</li>
+          </ul>
+
+          <h4 class="guide-h4">⚔️ O combate: dois modos</h4>
+          <p>
+            O combate acontece por <b>turnos</b>, seguindo uma ordem de
+            iniciativa. Você escolhe como quer vivê-lo (na barra lateral →
+            aba <b>Mundo</b> → <b>Modo de Combate</b>):
+          </p>
+          <ul>
+            <li><b>📖 Narrado pela IA</b> — o Mestre descreve cada turno no
+              próprio chat, como o resto da história.</li>
+            <li><b>⚔️ Tela tática</b> — abre uma tela dedicada (o "Pergaminho
+              Épico") com cards de Vida/Mana e botões: <b>Atacar, Habilidade,
+              Item, Defender, Fugir</b> e <b>Encerrar Turno</b>. Os inimigos
+              agem sozinhos. No fim da luta, o Mestre narra a batalha inteira
+              de uma vez.</li>
+          </ul>
+          <p class="guide-tip">
+            Na tela tática você pode fechar a tela no meio da luta (botão ✕) e
+            <b>retomar depois</b> de onde parou — o combate fica pausado e
+            salvo.
+          </p>
+        </div>
+      </details>
+
+      <details class="guide-sec">
+        <summary>💡 Dicas rápidas</summary>
+        <div class="guide-sec-body">
+          <ul>
+            <li>Seja específico: quanto mais detalhe na sua ação, melhor a narração.</li>
+            <li>Não gostou de uma cena? <b>Corrija</b> — você é coautor.</li>
+            <li>Confira a barra lateral para acompanhar o estado do mundo.</li>
+            <li>Se o Mestre esquecer algo importante, salve à mão ou peça para ele salvar.</li>
+            <li>Sua jornada é <b>salva automaticamente</b> quando você volta ao menu.</li>
+          </ul>
+        </div>
+      </details>
+    </div>`;
+
+function openGuide() {
+  const ov = document.getElementById('guide-overlay');
+  if (!ov) return;
+  // No jogo, fecha a sidebar no mobile para não sobrepor
+  if (typeof toggleSidebar === 'function') toggleSidebar(true);
+
+  const mem = (typeof window !== 'undefined') ? window._lastMem : null;
+  const banner = document.getElementById('guide-mode-banner');
+  const STYLE_LABELS = {
+    dnd: 'Regras D&D', fantasia: 'Fantasia', romance: 'Romance',
+    horror: 'Horror', misterio: 'Mistério', scifi: 'Ficção Científica',
+    faroeste: 'Faroeste'
+  };
+
+  if (banner) {
+    if (!mem) {
+      // Fora de uma campanha (ex.: menu): guia genérico, sem aviso de modo
+      banner.className = 'guide-banner';
+      banner.style.display = 'none';
+    } else {
+      banner.style.display = '';
+      const isDnd = mem.dnd_mode === true || mem.campaign_type === 'dnd';
+      const label = STYLE_LABELS[mem.campaign_type] || (isDnd ? 'Regras D&D' : 'Narrativo');
+      if (isDnd) {
+        banner.className = 'guide-banner is-dnd';
+        banner.innerHTML = `Esta é uma campanha de <b>${label}</b>. Tudo abaixo se aplica, <b>incluindo a seção do Modo D&D</b> (fichas, dados e combate por turnos).`;
+      } else {
+        banner.className = 'guide-banner is-narrative';
+        banner.innerHTML = `Esta é uma campanha <b>narrativa (${label})</b>. A história é livre e com memória — a seção <b>«Modo D&D»</b> no fim <b>não se aplica</b> a esta campanha.`;
+      }
+    }
+  }
+
+  ov.classList.remove('hidden');
+  const body = ov.querySelector('.guide-body');
+  if (body) body.scrollTop = 0;
+}
+
+function closeGuide() {
+  const ov = document.getElementById('guide-overlay');
+  if (ov) ov.classList.add('hidden');
+}
+
+function _makeHelpBtn(extraClass) {
+  const btn = document.createElement('button');
+  btn.className = 'help-trigger-btn' + (extraClass ? ' ' + extraClass : '');
+  btn.setAttribute('aria-label', 'Como Jogar');
+  btn.setAttribute('title', 'Como Jogar');
+  btn.innerHTML = _HELP_ICON;
+  btn.addEventListener('click', openGuide);
+  return btn;
+}
+
+function _injectGuide() {
+  // Só nas páginas de jogo e menu (não no login)
+  const isGame = !!document.getElementById('chat-area');
+  const isMenu = !!document.getElementById('campaign-list');
+  if (!isGame && !isMenu) return;
+  if (document.getElementById('guide-overlay')) return;
+
+  // Overlay
+  const ov = document.createElement('div');
+  ov.id = 'guide-overlay';
+  ov.className = 'hidden';
+  ov.innerHTML = _GUIDE_HTML;
+  document.body.appendChild(ov);
+  ov.addEventListener('click', e => { if (e.target === ov) closeGuide(); });
+
+  // Botão no header mobile do jogo (antes da engrenagem)
+  const mh = document.getElementById('mobile-header');
+  if (mh) {
+    const gear = mh.querySelector('.settings-trigger-btn');
+    const btn = _makeHelpBtn();
+    if (gear) mh.insertBefore(btn, gear); else mh.appendChild(btn);
+  }
+
+  // Botão flutuante de desktop (jogo), à esquerda da engrenagem
+  if (isGame) {
+    const wrapper = document.createElement('div');
+    wrapper.id = 'guide-desktop-wrapper';
+    wrapper.appendChild(_makeHelpBtn('help-desktop-btn'));
+    document.body.appendChild(wrapper);
+  }
+
+  // Botão fixo para páginas sem header mobile (menu), à esquerda da engrenagem
+  if (!mh) {
+    const wrapper = document.createElement('div');
+    wrapper.id = 'guide-fixed-wrapper';
+    wrapper.appendChild(_makeHelpBtn('help-fixed-btn'));
+    document.body.appendChild(wrapper);
+  }
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeGuide();
+});
+
 document.addEventListener('DOMContentLoaded', () => {
   loadTheme();
   loadFonts();
   _injectSettingsPanel();
+  _injectGuide();
 });
