@@ -560,7 +560,7 @@ async function handleSlash(raw) {
     const lines = chars.map(c => {
       const conds = c.sheet?.condicoes || [];
       if (!conds.length) return `<div class="cmd-list-item"><b>${c.name}</b> — ✅ Sem condições ativas</div>`;
-      return `<div class="cmd-list-item"><b>${c.name}</b> — ${conds.map(cd => `<span style="color:var(--ink-sys);">🔴 ${cd.nome || cd}${cd.duracao !== undefined ? ` (${cd.duracao}t)` : ''}</span>`).join(' · ')}</div>`;
+      return `<div class="cmd-list-item"><b>${c.name}</b> — ${conds.map(cd => `<span style="color:var(--ink-sys);">🔴 ${cd.nome || cd}${typeof cd.duracao === 'number' && cd.duracao > 0 ? ` (${cd.duracao}t)` : ''}</span>`).join(' · ')}</div>`;
     });
     appendSystem(`<div class="cmd-list-box"><div class="cmd-list-title">🔴 Condições Ativas</div>${lines.join('')}</div>`); return true;
   }
@@ -984,7 +984,7 @@ function buildDndCharCard(c, idx, type) {
       html += `<div class="condition-badges">`;
       condicoes.forEach(cd => {
         const { nome, dur } = _condInfo(cd);
-        html += `<span class="condition-badge" style="background:rgba(139,58,58,0.1);color:var(--ink-sys);">${escapeHtml(nome)}${dur !== undefined ? ` (${dur}t)` : ''}</span>`;
+        html += `<span class="condition-badge" style="background:rgba(139,58,58,0.1);color:var(--ink-sys);">${escapeHtml(nome)}${typeof dur === 'number' && dur > 0 ? ` (${dur}t)` : ''}</span>`;
       });
       html += `</div>`;
     }
