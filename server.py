@@ -1250,9 +1250,30 @@ def start_session():
     "adk_session":     adk_session,
     }
 
-    if has_history:
+    # Distingue "campanha com histórico de conversa de verdade" de "campanha
+    # recém-criada pelo wizard que já tem setup (resumo, cena, personagens)
+    # mas nunca foi jogada". A flag `has_history` retornada por
+    # memory.load_campaign() é True em ambos os casos — precisamos olhar
+    # diretamente para conversation_history aqui.
+    real_history = len(memory.campaign.get("conversation_history", [])) > 0
+    has_setup    = (
+        bool((memory.campaign.get("story_summary")    or "").strip()) or
+        bool((memory.campaign.get("current_scene")    or "").strip()) or
+        bool((memory.campaign.get("current_location") or "").strip()) or
+        bool(memory.campaign.get("characters") or {}) or
+        bool(memory.campaign.get("locations")  or {}) or
+        bool(memory.campaign.get("party")      or []) or
+        bool(memory.campaign.get("events")     or [])
+    )
+
+    if real_history:
         opening      = _build_recap()
         opening_type = "recap"
+    elif has_setup:
+        # Campanha criada pelo wizard: já temos resumo/cena/personagens.
+        # NÃO perguntar ao jogador o tema — ele já preencheu tudo.
+        opening      = _build_fresh_start_opening()
+        opening_type = "new"
     elif story_mode == "custom" and story_input:
         opening = (
             f"O jogador quer começar uma campanha com o seguinte cenário:\n\n"
@@ -1286,6 +1307,39 @@ def start_session():
         "model_limits": limits,
         "conversation_history": memory.campaign.get("conversation_history", []),
     })
+
+
+def _build_fresh_start_opening() -> str:
+    """
+    Prompt de abertura para campanhas recém-criadas pelo wizard: já existe
+    resumo, cena inicial, local, personagens e/ou eventos preenchidos pelo
+    jogador, mas ainda não há nenhuma conversa. O mestre deve começar
+    narrando a partir desse setup, sem perguntar nada que já foi informado.
+    """
+    from tools import get_full_context
+    contexto = get_full_context()
+    protagonist = (memory.campaign.get("protagonist") or "").strip()
+    proto_line  = (
+        f"O protagonista do jogador é {protagonist}. " if protagonist else ""
+    )
+    return (
+        "Esta é uma campanha NOVA que o jogador acabou de criar pelo "
+        "wizard. Os dados abaixo (resumo, cena inicial, local, personagens, "
+        "eventos) foram preenchidos por ele — trate-os como verdade do "
+        "mundo e ponto de partida da narrativa.\n\n"
+        f"{contexto}\n\n"
+        "INSTRUÇÕES DE ABERTURA:\n"
+        "• NÃO pergunte ao jogador qual é o tema, cenário, gênero, "
+        "personagem ou local — ele já forneceu tudo isso.\n"
+        "• NÃO peça para o jogador escolher entre estilos de campanha.\n"
+        "• COMECE narrando imediatamente a cena inicial descrita acima de "
+        "forma imersiva e sensorial (no mínimo 3–5 parágrafos), "
+        "estabelecendo atmosfera, local e personagens presentes.\n"
+        f"• {proto_line}Use segunda pessoa (\"você...\").\n"
+        "• Termine a abertura entregando a vez ao jogador com uma situação "
+        "concreta para ele reagir (uma escolha, um estímulo, alguém "
+        "falando com ele, um som, uma decisão a tomar)."
+    )
 
 
 def _build_recap() -> str:
