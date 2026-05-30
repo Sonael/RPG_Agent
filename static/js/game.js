@@ -1076,7 +1076,15 @@ function renderMemory(mem) {
   const pEl = document.getElementById('sb-party');
   pEl.innerHTML = !mem.party.length ? '<span class="empty-state">Nenhum membro ainda.</span>' : mem.party.map((p, i) => {
     if (isDnd) return buildDndCharCard(p, i, 'party');
-    return `<div class="char-card editable" onclick="openEditModal('party','${p.name.replace(/'/g, "\\'")}',window._lastMem.party[${i}])"><div class="char-name">${p.name} <span class="char-status">${p.role}</span></div><div class="char-desc">${p.notes || ''}</div></div>`;
+    // Se o membro do grupo tem entrada correspondente em characters (descrição,
+    // traços, status…), abre o editor completo de personagem em vez do modal
+    // mínimo de grupo. O backend (/api/memory) já mescla a ficha do
+    // personagem em mem.party. Mantém o modal 'party' apenas para membros
+    // soltos, sem ficha de personagem por trás.
+    const hasCharData = !!(p.description || p.traits || p.status || p.sheet);
+    const modalType   = hasCharData ? 'character' : 'party';
+    const keyEsc      = (hasCharData ? (p.name || '').toLowerCase().trim() : (p.name || '')).replace(/'/g, "\\'");
+    return `<div class="char-card editable" onclick="openEditModal('${modalType}','${keyEsc}',window._lastMem.party[${i}])"><div class="char-name">${p.name} <span class="char-status">${p.role}</span></div><div class="char-desc">${p.notes || ''}</div></div>`;
   }).join('');
 
   const cEl = document.getElementById('sb-chars');
