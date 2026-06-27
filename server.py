@@ -336,7 +336,7 @@ def _client_ip() -> str:
 def _rate_hit(key: str, max_hits: int, window_s: int) -> int:
     """
     Registra um hit em `key` numa janela deslizante. Retorna 0 se permitido,
-    ou os segundos a aguardar (Retry-After) se o limite foi estourado.
+    ou os segundos de espera (Retry-After) se o limite foi estourado.
     """
     global _rate_sweep
     now = time.time()
@@ -496,6 +496,38 @@ def menu_page():
 @app.route("/game.html")
 def game_page():
     return send_from_directory("static", "game.html")
+
+# --- PWA ---------------------------------------------------------------------
+# O service worker precisa ser servido a partir da raiz para o seu escopo
+# cobrir /menu.html e /game.html (um SW só controla páginas no seu path ou
+# abaixo). Por isso /sw.js em vez de /static/sw.js.
+@app.route("/sw.js")
+def service_worker():
+    resp = send_from_directory("static", "sw.js", mimetype="application/javascript")
+    resp.headers["Cache-Control"] = "no-cache"  # garante atualização do SW
+    resp.headers["Service-Worker-Allowed"] = "/"
+    return resp
+
+@app.route("/manifest.webmanifest")
+def web_manifest():
+    return send_from_directory(
+        "static", "manifest.webmanifest", mimetype="application/manifest+json"
+    )
+
+@app.route("/offline.html")
+def offline_page():
+    # Tela "A despertar…" servida pelo service worker durante o cold start.
+    return send_from_directory("static", "offline.html")
+
+@app.route("/healthz")
+def healthz():
+    # Endpoint propositadamente trivial: o app já está totalmente importado
+    # (gunicorn --preload) quando qualquer rota responde, então um 200 aqui
+    # significa "servidor acordado". Usado pela tela de despertar para saber
+    # quando recarregar. Sem cache e sem auth.
+    resp = jsonify({"status": "ok"})
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
 
 # ---------------------------------------------------------------------------
 # Autenticação

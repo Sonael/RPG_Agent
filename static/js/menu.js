@@ -1121,7 +1121,7 @@ function wzBuildSpellPanel(i) {
 
   let listHtml;
   if (loading) {
-    listHtml = '<div style="font-size:12px;color:var(--text-muted);font-style:italic;padding:8px 0;">A carregar magias...</div>';
+    listHtml = '<div style="font-size:12px;color:var(--text-muted);font-style:italic;padding:8px 0;">Carregando magias...</div>';
   } else if (results.length === 0) {
     listHtml = `<div style="font-size:12px;color:var(--text-muted);font-style:italic;padding:8px 0;">
       Nenhuma magia encontrada. Tente buscar pelo nome em inglês (ex: "fireball", "shield").
@@ -2038,7 +2038,7 @@ function wzOnLevelChange(i, val) {
     wzDoSpellSearch(i);
   } else if (char._habTab === 'feats') {
     char._featLoading = true;
-    wzRefreshFeatPanel(i);    // mostra "A carregar..." imediatamente
+    wzRefreshFeatPanel(i);    // mostra "Carregando..." imediatamente
     wzLoadClassFeatures(i);
   }
 }
@@ -2084,7 +2084,7 @@ function wzRefreshFeatPanel(i) {
 function wzBuildFeatPanel(i) {
   const char = wzChars[i];
   if (!char) return '';
-  if (char._featLoading) return '<div style="font-size:12px;color:var(--text-muted);font-style:italic;padding:8px 0;">A carregar habilidades de classe...</div>';
+  if (char._featLoading) return '<div style="font-size:12px;color:var(--text-muted);font-style:italic;padding:8px 0;">Carregando habilidades de classe...</div>';
   const feats    = char._classFeatures || [];
   const selected = char._selectedFeats || [];
   const listHtml = feats.length === 0
@@ -3381,7 +3381,7 @@ async function openEditCampaign(e, name) {
     if (el) el.value = '';
   });
   document.getElementById('ed-err').textContent = '';
-  document.getElementById('ed-chars-list').innerHTML = '<div style="padding:10px;font-style:italic;color:var(--text-muted);">A carregar...</div>';
+  document.getElementById('ed-chars-list').innerHTML = '<div style="padding:10px;font-style:italic;color:var(--text-muted);">Carregando...</div>';
   document.getElementById('ed-locs-list').innerHTML = '';
   document.getElementById('ed-evts-list').innerHTML = '';
   edRenderStep();
@@ -3648,7 +3648,7 @@ function edBuildSpellPanel(i) {
   // ── Conteúdo da lista ───────────────────────────────────────────────
   let listHtml;
   if (loading) {
-    listHtml = '<div style="font-size:12px;color:var(--text-muted);font-style:italic;padding:8px 0;">A carregar magias...</div>';
+    listHtml = '<div style="font-size:12px;color:var(--text-muted);font-style:italic;padding:8px 0;">Carregando magias...</div>';
   } else if (results.length === 0) {
     listHtml = `<div style="font-size:12px;color:var(--text-muted);font-style:italic;padding:8px 0;">
       Nenhuma magia encontrada. Tente buscar pelo nome em inglês (ex: "fireball", "shield").
@@ -3692,7 +3692,7 @@ function edBuildFeatPanel(i) {
   const feats   = ch._classFeatures || [];
   const loading = ch._featLoading;
 
-  if (loading) return '<div style="font-size:12px;color:var(--text-muted);font-style:italic;padding:8px 0;">A carregar habilidades de classe...</div>';
+  if (loading) return '<div style="font-size:12px;color:var(--text-muted);font-style:italic;padding:8px 0;">Carregando habilidades de classe...</div>';
 
   const listHtml = feats.length === 0
     ? `<div style="font-size:12px;color:var(--text-muted);font-style:italic;padding:8px 0;">Nenhuma habilidade de classe encontrada para ${escHtml(ch.sheet?.classe||'esta classe')} nível ${ch.sheet?.nivel||1}.</div>`

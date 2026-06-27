@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>RPG Agent · Acordando o servidor</title>
+  <meta name="theme-color" content="#2b303a">
+  <!-- Tela 100% autossuficiente (CSS inline, emoji em vez de imagem) para
+       renderizar mesmo com o servidor adormecido e sem outros assets. -->
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: radial-gradient(circle at center, #2b303a 0%, #101626 100%);
+      color: #f0f2f5;
+      display: flex; align-items: center; justify-content: center;
+      text-align: center;
+      padding: 24px calc(24px + env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) calc(24px + env(safe-area-inset-left));
+    }
+    .box { max-width: 420px; width: 100%; }
+    .crest {
+      font-size: 64px; line-height: 1;
+      animation: sway 2.4s ease-in-out infinite;
+    }
+    @keyframes sway {
+      0%,100% { transform: rotate(-6deg); }
+      50%     { transform: rotate(6deg); }
+    }
+    h1 { font-size: 22px; font-weight: 600; margin: 22px 0 8px; letter-spacing: .5px; }
+    p  { font-size: 15px; line-height: 1.5; color: #c5cad6; margin: 0 0 6px; }
+    .hint { font-size: 13px; color: #8b93a4; margin-top: 14px; }
+    .ring {
+      margin: 26px auto 0; width: 40px; height: 40px;
+      border: 3px solid rgba(255,255,255,.15);
+      border-top-color: #c9a227; border-radius: 50%;
+      animation: spin .9s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .bar {
+      margin: 22px auto 0; height: 4px; width: 100%; max-width: 260px;
+      background: rgba(255,255,255,.12); border-radius: 4px; overflow: hidden;
+    }
+    .bar > i {
+      display: block; height: 100%; width: 30%;
+      background: linear-gradient(90deg, transparent, #c9a227, transparent);
+      animation: slide 1.4s ease-in-out infinite;
+    }
+    @keyframes slide {
+      0%   { transform: translateX(-120%); }
+      100% { transform: translateX(420%); }
+    }
+    button {
+      margin-top: 24px; background: transparent; color: #c9a227;
+      border: 1px solid rgba(201,162,39,.5); border-radius: 10px;
+      padding: 10px 20px; font-size: 14px; cursor: pointer;
+      transition: background .15s;
+    }
+    button:active { background: rgba(201,162,39,.12); }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <div class="crest">⚔️</div>
+    <h1>Acordando o servidor…</h1>
+    <p id="msg">O servidor estava em repouso. No primeiro acesso, isso pode levar até cerca de 1 minuto.</p>
+    <div class="bar"><i></i></div>
+    <div class="ring"></div>
+    <p class="hint" id="hint">Vamos entrar automaticamente assim que estiver pronto.</p>
+    <button id="retry" type="button">Tentar agora</button>
+  </div>
+
+  <script>
+    // Página servida pelo service worker no lugar da navegação original quando
+    // o servidor (Render free tier) está acordando. A nossa localização ainda
+    // é a URL pretendida (ex.: /menu.html), por isso basta recarregar quando o
+    // servidor responder: aí o SW serve a página real, já com o backend quente.
+    var attempts  = 0;
+    var dead      = false;
+    var nextTimer = null;   // timer da próxima tentativa agendada
+    var inflight  = null;   // AbortController do ping em curso
+    var msg  = document.getElementById('msg');
+    var hint = document.getElementById('hint');
+
+    function ping() {
+      if (dead) return;
+      // Mantém uma única verificação ativa: cancela o timer agendado e o
+      // pedido ainda em curso antes de começar um novo. Assim o botão
+      // "Tentar agora" reinicia o ciclo limpo, sem acumular pings.
+      clearTimeout(nextTimer);
+      if (inflight) inflight.abort();
+
+      attempts++;
+      var ctrl = new AbortController();
+      inflight = ctrl;
+      var to = setTimeout(function () { ctrl.abort(); }, 9000);
+
+      fetch('/healthz', { cache: 'no-store', signal: ctrl.signal })
+        .then(function (r) {
+          clearTimeout(to);
+          if (ctrl !== inflight) return;   // substituído por um ping mais recente
+          if (r && r.ok) { dead = true; location.reload(); }
+          else { schedule(); }
+        })
+        .catch(function () {
+          clearTimeout(to);
+          if (ctrl !== inflight) return;   // abortado por um ping mais recente
+          schedule();
+        });
+    }
+
+    function schedule() {
+      if (dead) return;
+      if (attempts >= 4) {
+        msg.textContent  = 'Ainda acordando. Está demorando um pouco mais que o normal.';
+        hint.textContent = 'Vamos continuar tentando. Pode aguardar nesta tela.';
+      }
+      // ~3s entre tentativas; o próprio ping já mantém o servidor acordado.
+      nextTimer = setTimeout(ping, 3000);
+    }
+
+    document.getElementById('retry').addEventListener('click', function () {
+      if (!dead) { msg.textContent = 'Verificando…'; ping(); }
+    });
+
+    // Se a conexão voltar (ex.: estava sem rede), tenta logo.
+    window.addEventListener('online', function () { if (!dead) ping(); });
+
+    ping();
+  </script>
+</body>
+</html>

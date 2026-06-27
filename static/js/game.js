@@ -4,7 +4,7 @@
 let waiting = false;
 let maxRPD = parseInt(localStorage.getItem('rpg_max_rpd') || '500');
 
-// Reseta contadores se o dia mudou (meia-noite no timezone do utilizador)
+// Reseta contadores se o dia mudou (meia-noite no timezone do usuário)
 (function resetQuotaIfNewDay() {
   const today = new Date().toLocaleDateString('sv'); // "YYYY-MM-DD" sem depender de locale
   const stored = localStorage.getItem('rpg_quota_date');
@@ -429,7 +429,7 @@ async function handleSlash(raw) {
 
   if (cmd === '/exportar') {
     const d = await (await authFetch(`${API}/api/diary/export`, { method: 'POST' })).json();
-    appendSystem(`<div class="cmd-list-box" style="text-align:center;"><div class="cmd-list-title" style="border:none;margin:0;">✅ Diário Exportado</div><div style="font-size:13px;color:var(--ink-main);">Ficheiro: <b>${d.path.split('/').pop()}</b></div></div>`); 
+    appendSystem(`<div class="cmd-list-box" style="text-align:center;"><div class="cmd-list-title" style="border:none;margin:0;">✅ Diário Exportado</div><div style="font-size:13px;color:var(--ink-main);">Arquivo: <b>${d.path.split('/').pop()}</b></div></div>`); 
     return true;
   }
 
@@ -1502,7 +1502,7 @@ async function gameDoSpellSearch() {
   const q = (_gameHabState._spellQuery || '').trim();
   _gameHabState._spellLoading = true;
   const panelEl = document.getElementById('game-spell-panel');
-  if (panelEl) panelEl.innerHTML = '<div style="font-size:12px;color:var(--text-muted);font-style:italic;padding:8px 0;">A carregar magias...</div>';
+  if (panelEl) panelEl.innerHTML = '<div style="font-size:12px;color:var(--text-muted);font-style:italic;padding:8px 0;">Carregando magias...</div>';
   else gameRefreshHabSection();
   try {
     const params = new URLSearchParams({ class: classe, max_level: maxLevel });
@@ -1526,7 +1526,7 @@ async function gameLoadClassFeatures() {
   const { classe, nivel } = _gameGetSheet();
   _gameHabState._featLoading = true;
   const el = document.getElementById('game-feat-panel');
-  if (el) el.innerHTML = '<div style="font-size:12px;color:var(--text-muted);font-style:italic;padding:8px 0;">A carregar habilidades de classe...</div>';
+  if (el) el.innerHTML = '<div style="font-size:12px;color:var(--text-muted);font-style:italic;padding:8px 0;">Carregando habilidades de classe...</div>';
   else gameRefreshHabSection();
   try {
     const res  = await authFetch(`${API}/api/dnd/class-features?class=${encodeURIComponent(classe)}&level=${nivel}`);

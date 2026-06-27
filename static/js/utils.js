@@ -428,6 +428,44 @@ const _GUIDE_HTML = `
 
       <div id="guide-mode-banner" class="guide-banner"></div>
 
+      <details class="guide-sec guide-install-block" id="guide-install-sec">
+        <summary>📲 Instalar como aplicativo</summary>
+        <div class="guide-sec-body">
+          <p id="guide-install-status" class="guide-tip" style="display:none;"></p>
+          <p>
+            Dá para instalar o RPG Agent como um <b>aplicativo de verdade</b>:
+            ele ganha um ícone na tela inicial e abre em <b>tela cheia</b>, sem
+            a barra do navegador — igual a um app baixado de loja, mas sem
+            ocupar espaço nem passar por loja nenhuma.
+          </p>
+          <button type="button" id="guide-install-btn" class="guide-install-btn" style="display:none;">
+            📲 Instalar agora
+          </button>
+          <div id="guide-install-android">
+            <h4 class="guide-h4">🤖 Android (Chrome)</h4>
+            <ul>
+              <li>Toque no menu <b>⋮</b> no canto superior direito.</li>
+              <li>Escolha <b>«Instalar aplicativo»</b> (ou «Adicionar à tela inicial»).</li>
+              <li>Confirme — o ícone ⚔️ aparece na sua tela inicial.</li>
+            </ul>
+          </div>
+          <div id="guide-install-ios">
+            <h4 class="guide-h4">🍎 iPhone / iPad (Safari)</h4>
+            <ul>
+              <li>Abra o site no <b>Safari</b> (só funciona pelo Safari).</li>
+              <li>Toque no botão <b>Compartilhar</b> (o quadrado com a seta ↑).</li>
+              <li>Role a lista e escolha <b>«Adicionar à Tela de Início»</b>.</li>
+              <li>Toque em <b>Adicionar</b> — o ícone ⚔️ aparece na tela inicial.</li>
+            </ul>
+          </div>
+          <p class="guide-tip">
+            Na primeira vez após um tempo parado, o app pode levar até cerca de
+            1 minuto para acordar. É normal — ele entra sozinho assim que o
+            servidor estiver pronto.
+          </p>
+        </div>
+      </details>
+
       <details class="guide-sec" open>
         <summary>🗣️ Conversando com o Mestre</summary>
         <div class="guide-sec-body">
@@ -491,7 +529,7 @@ const _GUIDE_HTML = `
             <li><b>Enciclopédia</b> — o seu grupo, os personagens (NPCs) que
               você conheceu e os locais registrados.</li>
             <li><b>Diário</b> — as crônicas da aventura, capítulo a capítulo.
-              Pode ser exportado como ficheiro <b>.md</b>.</li>
+              Pode ser exportado como arquivo <b>.md</b>.</li>
           </ul>
         </div>
       </details>
@@ -593,7 +631,7 @@ const _GUIDE_HTML = `
               para abrir o editor.</li>
             <li>Use os botões <b>+ Adicionar / + Personagem / + Local /
               + Entrada</b> para criar algo novo.</li>
-            <li>Dentro do editor, <b>Deletar Registo</b> remove o item.</li>
+            <li>Dentro do editor, <b>Deletar Registro</b> remove o item.</li>
             <li><b>Limpar Todas</b> apaga os avisos de Validação.</li>
           </ul>
         </div>
@@ -727,6 +765,8 @@ function openGuide() {
     }
   }
 
+  _refreshInstallSection();
+
   ov.classList.remove('hidden');
   const body = ov.querySelector('.guide-body');
   if (body) body.scrollTop = 0;
@@ -790,6 +830,81 @@ function _injectGuide() {
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') closeGuide();
 });
+
+// ═══════════════════════════════════════
+//  PWA: seção "Instalar como aplicativo" do guia
+// ═══════════════════════════════════════
+// Guarda o evento do Chrome/Android para acionar o instalador nativo a partir
+// do nosso botão (em vez de depender do mini-banner padrão do navegador).
+let _deferredInstallPrompt = null;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  _deferredInstallPrompt = e;
+  _refreshInstallSection();
+});
+
+window.addEventListener('appinstalled', () => {
+  _deferredInstallPrompt = null;
+  _refreshInstallSection();
+});
+
+// true se já está rodando como app instalado (tela cheia, sem navegador).
+function _isStandalone() {
+  return window.matchMedia('(display-mode: standalone)').matches ||
+         window.navigator.standalone === true;
+}
+
+// iPhone/iPad (inclui iPad recente que se identifica como "MacIntel").
+function _isIOSDevice() {
+  const ua = navigator.userAgent || '';
+  return /iphone|ipad|ipod/i.test(ua) ||
+         (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
+// Adapta a seção de instalação ao aparelho/estado atual.
+function _refreshInstallSection() {
+  const status = document.getElementById('guide-install-status');
+  if (!status) return;  // guia ainda não injetado nesta página
+  const btn     = document.getElementById('guide-install-btn');
+  const android = document.getElementById('guide-install-android');
+  const ios     = document.getElementById('guide-install-ios');
+
+  // Já instalado: mostra confirmação e esconde instruções/botão.
+  if (_isStandalone()) {
+    status.style.display = '';
+    status.textContent = '✅ Você já está usando o RPG Agent instalado como aplicativo.';
+    if (btn) btn.style.display = 'none';
+    if (android) android.style.display = 'none';
+    if (ios) ios.style.display = 'none';
+    return;
+  }
+  status.style.display = 'none';
+
+  // Botão nativo: só aparece quando o navegador disponibiliza o prompt
+  // (Chrome/Edge no Android e no desktop). iOS/Safari não expõe essa API.
+  if (btn) {
+    if (_deferredInstallPrompt) {
+      btn.style.display = '';
+      btn.onclick = async () => {
+        const ev = _deferredInstallPrompt;
+        if (!ev) return;
+        _deferredInstallPrompt = null;
+        btn.style.display = 'none';
+        ev.prompt();
+        try { await ev.userChoice; } catch (_) {}
+        _refreshInstallSection();
+      };
+    } else {
+      btn.style.display = 'none';
+    }
+  }
+
+  // Mostra apenas as instruções relevantes ao aparelho.
+  const isIOS = _isIOSDevice();
+  if (android) android.style.display = isIOS ? 'none' : '';
+  if (ios)     ios.style.display     = isIOS ? '' : 'none';
+}
 
 document.addEventListener('DOMContentLoaded', () => {
   loadTheme();

@@ -1,16 +1,32 @@
 <!DOCTYPE html>
-<html lang="pt-PT">
+<html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>RPG Agent — Identificação</title>
+
+  <!-- PWA: instalável no Android e iOS -->
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#2b303a">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="RPG Agent">
+  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", function () {
+        navigator.serviceWorker.register("/sw.js").catch(function () {});
+      });
+    }
+  </script>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚔️</text></svg>">
   
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;600&family=Lora:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Playfair+Display:ital,wght@0,500;0,700;1,500&display=swap" rel="stylesheet">
   
-  <link rel="stylesheet" href="/static/css/style.css?v=34">
+  <link rel="stylesheet" href="/static/css/style.css?v=35">
 </head>
 <body>
   
@@ -28,8 +44,8 @@
         <h1 class="book-title">RPG Agent</h1>
         <div style="text-align: center; color: var(--page-edge); font-size: 24px; margin-bottom: 10px;">❦</div>
         <div style="font-size: 16px; line-height: 1.8; color: var(--text-muted); text-align: justify; margin-top: 20px;">
-          Bem-vindo ao RPG Agent. Este livro guarda os registos de incontáveis aventuras, mistérios não resolvidos, romances perdidos no tempo e explorações galácticas.<br><br>
-          Identifique-se para aceder às suas crónicas ou inicie um novo capítulo criando um registo.
+          Bem-vindo ao RPG Agent. Este livro guarda os registros de incontáveis aventuras, mistérios não resolvidos, romances perdidos no tempo e explorações galácticas.<br><br>
+          Identifique-se para acessar as suas crônicas ou inicie um novo capítulo criando um registro.
         </div>
         <div class="page-number left">I</div>
       </div>
@@ -77,7 +93,7 @@
     </div>
   </div>
 
-  <script src="/static/js/utils.js?v=7"></script>
+  <script src="/static/js/utils.js?v=8"></script>
   <script src="/static/js/auth.js?v=4"></script>
 </body>
 </html>

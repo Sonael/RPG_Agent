@@ -1610,6 +1610,19 @@ body.combat-on { overflow: hidden; }
   border-top: 1px solid var(--page-edge);
 }
 
+/* Bloco "Instalar como aplicativo" (PWA) */
+.guide-install-block { border-color: var(--green); background: rgba(42,138,91,0.05); }
+.guide-install-block > summary { color: var(--green); }
+.guide-install-btn {
+  display: inline-block; margin: 2px 0 14px;
+  background: var(--green); color: #fff; border: none;
+  padding: 11px 22px; border-radius: 10px;
+  font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer;
+  transition: filter .15s, transform .1s;
+}
+.guide-install-btn:hover { filter: brightness(1.08); }
+.guide-install-btn:active { transform: scale(0.97); }
+
 @media (max-width: 900px) {
   #guide-desktop-wrapper { display: none; }
   #guide-fixed-wrapper { top: 14px; right: 62px; }
