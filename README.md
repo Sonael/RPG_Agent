@@ -7,7 +7,9 @@
 
 > A aplicação está hospedada no plano gratuito do Render; a primeira
 > requisição após um período ocioso pode levar alguns segundos enquanto o
-> serviço acorda.
+> serviço acorda. O app é um **PWA instalável** (Android/iOS) e exibe uma
+> tela "Acordando o servidor…" com retry automático durante esse cold start,
+> em vez de travar. Veja [PWA e instalação](#pwa-e-instalação).
 
 A IA não é só um chatbot que escreve narrativa: ela é um **agente** com
 ferramentas (function calling) que **lê e altera o estado do mundo**:
@@ -90,10 +92,11 @@ abre o loop **percepção → deliberação → ação → verificação** em de
 9. [Tools, o catálogo do agente](#tools-o-catálogo-do-agente)
 10. [Endpoints HTTP](#endpoints-http)
 11. [Frontend](#frontend)
-12. [Testes e garantias](#testes-e-garantias)
-13. [Estrutura de arquivos](#estrutura-de-arquivos)
-14. [Configuração e execução](#configuração-e-execução)
-15. [Limitações conhecidas](#limitações-conhecidas)
+12. [PWA e instalação](#pwa-e-instalação)
+13. [Testes e garantias](#testes-e-garantias)
+14. [Estrutura de arquivos](#estrutura-de-arquivos)
+15. [Configuração e execução](#configuração-e-execução)
+16. [Limitações conhecidas](#limitações-conhecidas)
 
 ---
 
@@ -149,7 +152,7 @@ combate, vive num estado central que tanto a IA quanto a interface enxergam.
 └─────────────────────────────────────────────────────────────┘
                     │
 ┌─────────────────────────────────────────────────────────────┐
-│  tools.py + tools_dnd.py  (59 ferramentas expostas)         │
+│  tools.py + tools_dnd.py  (60 ferramentas expostas)         │
 │  Operam sobre memory.campaign (proxy resolvido por contexto)│
 └─────────────────────────────────────────────────────────────┘
                     │
@@ -836,7 +839,7 @@ automaticamente a partir dela, que vira a descrição que o LLM enxerga.
 
 ## Endpoints HTTP
 
-`server.py` (~1800 linhas, todas as rotas atrás de `@require_auth` quando
+`server.py` (~2200 linhas, todas as rotas atrás de `@require_auth` quando
 acessam memória):
 
 ### Autenticação
@@ -901,11 +904,21 @@ acessam memória):
 
 - `GET /api/ollama/models`, descobre modelos locais.
 
+### PWA (sem autenticação)
+
+- `GET /healthz` → `{status: "ok"}`, health check trivial usado pela tela de
+  cold start para saber quando o servidor acordou.
+- `GET /manifest.webmanifest`, manifesto do app (nome, ícones, tema).
+- `GET /sw.js`, service worker, servido da raiz (escopo `/`) com header
+  `Service-Worker-Allowed: /`.
+- `GET /offline.html`, tela "Acordando o servidor…" servida pelo service
+  worker durante o cold start.
+
 ---
 
 ## Frontend
 
-3 páginas estáticas + 5 scripts JS:
+4 páginas estáticas + 5 scripts JS (+ os assets de PWA):
 
 ### Páginas
 
@@ -916,15 +929,21 @@ acessam memória):
   de API.
 - **`static/game.html`**, chat principal + sidebar (Mundo, Enciclopédia,
   Diário) + dice tray + tela de combate (`combat.js`).
+- **`static/offline.html`**, tela "Acordando o servidor…" do PWA (CSS/JS
+  inline, autossuficiente), exibida pelo service worker durante o cold
+  start do Render; faz polling em `/healthz` e recarrega sozinha quando o
+  servidor responde.
 
 ### Scripts
 
 - **`utils.js`**, `authFetch` com refresh silencioso, sistema de toast/
   dialog, temas (Pergaminho, Noite de Tinta, Ardósia…), fontes
-  configuráveis, painel de configurações unificado.
+  configuráveis, painel de configurações unificado, guia de ajuda "Como
+  Jogar" (com a seção **"Instalar como aplicativo"**, que aciona o
+  instalador nativo no Android e mostra instruções do Safari no iOS).
 - **`auth.js`**, login/registro/refresh, processamento do link de
   confirmação Supabase.
-- **`menu.js`** (~4140 linhas), wizard de campanha (etapa 1 mundo, etapa
+- **`menu.js`** (~4290 linhas), wizard de campanha (etapa 1 mundo, etapa
   2 personagens com seleção D&D), edição completa de campanha, busca de
   monstros/magias/features na hora.
 - **`game.js`** (~2040 linhas), chat com SSE, parser de eventos do
@@ -939,10 +958,72 @@ acessam memória):
 
 ### Tema
 
-`static/css/style.css` (~1460 linhas), visual de livro/tomo (Lora,
+`static/css/style.css` (~1640 linhas), visual de livro/tomo (Lora,
 Playfair Display, Caveat) + tela de combate "Pergaminho Épico", 7 temas
 alternáveis, totalmente responsivo (`--app-height` cobre o quirk do iOS
 Safari).
+
+---
+
+## PWA e instalação
+
+O app é um **Progressive Web App**: pode ser instalado na tela inicial
+(Android e iOS) e aberto em tela cheia, como um aplicativo nativo, sem
+passar por nenhuma loja.
+
+### Arquivos
+
+- **`static/manifest.webmanifest`**, nome, ícones, `display: standalone`,
+  `theme_color`, `start_url: /menu.html`. Servido em `/manifest.webmanifest`
+  (a extensão `.webmanifest` evita o `*.json` do `.gitignore`).
+- **`static/sw.js`**, o service worker. Servido da **raiz** (`/sw.js`) para
+  o escopo cobrir `/menu.html` e `/game.html`.
+- **`static/offline.html`**, a tela "Acordando o servidor…".
+- **`static/icons/`**, ícones PNG (192/512, versão `maskable` e
+  `apple-touch-icon` de 180px).
+- Meta tags PWA (`manifest`, `theme-color`, `apple-mobile-web-app-*`) e o
+  registro do service worker estão no `<head>` de `login/menu/game.html`.
+
+### Service worker, conservador por design
+
+`sw.js` é deliberadamente cauteloso para **nunca** interferir em
+autenticação nem no streaming SSE do `/api/chat`:
+
+- **Navegações** (`mode === "navigate"`), *network-first com timeout* de
+  ~4,5s. Servidor quente → página fresca (respeita o `no-store` do menu);
+  servidor frio/sem rede → serve a tela de despertar.
+- **Assets `/static/*`**, *stale-while-revalidate* (resposta instantânea do
+  cache + atualização em segundo plano).
+- **Tudo o mais** (`/api/*`, `/healthz`, terceiros, métodos não-GET), passa
+  direto para a rede, sem cache.
+
+### Cold start do Render (free tier)
+
+Quando o serviço está adormecido, a primeira requisição demoraria 30–60s.
+Em vez de a navegação ficar pendurada (e, no iOS standalone, possivelmente
+estourar o timeout com erro), o service worker mostra `offline.html`, que:
+
+1. abre **instantaneamente** do cache, com a marca do app;
+2. faz polling em `/healthz` a cada ~3s (uma verificação por vez, sem
+   acúmulo) — esse próprio ping é o que acorda o Render;
+3. recarrega a URL original assim que o servidor responde 200, já com o
+   backend quente.
+
+O wakeup do Render **não é alterado**; a melhoria é puramente de UX no
+cliente. O primeiro acesso de sempre (antes do SW instalar) ainda pega o
+cold start "cru"; a partir daí a tela amigável entra em ação.
+
+### Instalar como aplicativo
+
+A seção **"📲 Instalar como aplicativo"** no guia de ajuda ("Como Jogar",
+em `utils.js`) é adaptativa:
+
+- **Android (Chrome/Edge)**, capta o evento `beforeinstallprompt` e mostra
+  um botão **"Instalar agora"** que dispara o instalador nativo.
+- **iPhone/iPad (Safari)**, como o iOS não expõe essa API, mostra o passo a
+  passo (Compartilhar → "Adicionar à Tela de Início").
+- **Já instalado** (`display-mode: standalone`), esconde tudo e confirma que
+  o app já está rodando instalado.
 
 ---
 
@@ -1005,7 +1086,7 @@ Já descrito, força correção quando a IA narra mecânica sem ferramenta
 
 ```
 .
-├── server.py              Flask + SSE + endpoints + segurança (~2100 linhas)
+├── server.py              Flask + SSE + endpoints + segurança (~2200 linhas)
 ├── agent.py               Instruções de estilo + create_agent
 ├── tools.py               Tools narrativas + ALL_TOOLS
 ├── tools_dnd.py           Motor D&D 5e + combate (~6900 linhas, 38 tools)
@@ -1022,9 +1103,13 @@ Já descrito, força correção quando a IA narra mecânica sem ferramenta
     ├── login.html
     ├── menu.html
     ├── game.html
+    ├── offline.html       Tela "Acordando o servidor…" (PWA cold start)
+    ├── manifest.webmanifest  Manifesto do PWA
+    ├── sw.js              Service worker (servido em /sw.js)
+    ├── icons/             Ícones do PWA (192/512/maskable/apple-touch)
     ├── css/style.css      Tema livro/tomo + tela de combate
     └── js/
-        ├── utils.js       authFetch, toast, dialog, temas, fontes
+        ├── utils.js       authFetch, toast, dialog, temas, fontes, guia/PWA
         ├── auth.js        Login / cadastro / confirmação
         ├── menu.js        Wizard, edição, importação, modelos
         ├── game.js        Chat, comandos, sidebar, dice tray
@@ -1088,8 +1173,10 @@ services:
   - type: web
     runtime: python
     buildCommand: pip install -r requirements.txt
+    # --preload: importa o app no master antes de abrir a porta, evita o
+    # "Port scan timeout" do Render (porta aberta = app pronto).
     startCommand: gunicorn server:app --worker-class gthread
-                  --threads 4 --timeout 120 --bind 0.0.0.0:$PORT
+                  --threads 4 --timeout 120 --preload --bind 0.0.0.0:$PORT
     envVars:
       - SUPABASE_URL / SUPABASE_ANON_KEY / SUPABASE_SERVICE_KEY
 ```
