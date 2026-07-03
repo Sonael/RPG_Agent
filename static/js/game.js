@@ -1111,10 +1111,22 @@ function renderMemory(mem) {
   try { if (window.Combat) window.Combat.sync(); } catch (_) {}
 }
 
+// Editor do estado do mundo: capítulo, LOCAL atual, CENA atual e resumo.
+// Permite corrigir manualmente o local/cena caso o agente esqueça de chamar
+// update_world_state numa transição (ex.: floresta → praia).
+function openWorldEdit() {
+  const m = window._lastMem || {};
+  openEditModal('world', 'current_location', {
+    chapter:          m.chapter || 1,
+    current_location: m.current_location || '',
+    current_scene:    m.current_scene || '',
+    story_summary:    m.story_summary || '',
+  });
+}
+
 async function openSummaryEdit() {
-  const t = document.getElementById('sb-summary').textContent;
-  if (t === 'Nenhum resumo ainda.') return;
-  openEditModal('world', 'story_summary', { story_summary: t });
+  // Reaproveita o editor completo do mundo (inclui local/cena/resumo).
+  openWorldEdit();
 }
 
 async function exportDiary() {
@@ -1982,7 +1994,7 @@ function buildEditFields(type, data) {
     case 'flag': return field('flag_key', 'Nome da Observação', data.key) + field('flag_value', 'Valor', data.value);
     case 'event': return field('summary', 'Resumo', data.summary, 'textarea', { rows: 2 }) + field('characters_involved', 'Personagens', data.characters_involved) + field('location', 'Local', data.location) + field('consequence', 'Consequência', data.consequence, 'textarea', { rows: 2 });
     case 'diary': return field('title', 'Título', data.title) + field('chapter', 'Capítulo', data.chapter) + field('content', 'Conteúdo', data.content, 'textarea', { rows: 5 });
-    case 'world': return field('story_summary', 'Resumo', data.story_summary, 'textarea', { rows: 8 });
+    case 'world': return field('chapter', 'Capítulo', data.chapter) + field('current_location', 'Local atual', data.current_location) + field('current_scene', 'Cena atual', data.current_scene, 'textarea', { rows: 3 }) + field('story_summary', 'Resumo', data.story_summary, 'textarea', { rows: 8 });
     default: return '';
   }
 }
@@ -2011,7 +2023,7 @@ function getEditValues() {
     case 'flag': return { key: v('flag_key'), value: v('flag_value') };
     case 'event': return { summary: v('summary'), characters_involved: v('characters_involved'), location: v('location'), consequence: v('consequence') };
     case 'diary': return { title: v('title'), chapter: parseInt(v('chapter')) || 1, content: v('content') };
-    case 'world': return { story_summary: v('story_summary') };
+    case 'world': return { chapter: parseInt(v('chapter')) || 1, current_location: v('current_location'), current_scene: v('current_scene'), story_summary: v('story_summary') };
     default: return {};
   }
 }

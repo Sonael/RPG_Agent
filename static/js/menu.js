@@ -1634,6 +1634,30 @@ function wzPointsUsed(stats) {
   }, 0);
 }
 
+// Pool de mana pela tabela oficial Spell Points do DMG (p.288) — IGUAL ao
+// backend (_max_mana_for em tools_dnd.py). Depende SÓ do nível de conjurador,
+// nunca do atributo. Mantém o preview do wizard idêntico ao que é criado.
+const SPELL_POINTS_BY_LEVEL_WZ = {
+  1:4, 2:6, 3:14, 4:17, 5:27, 6:32, 7:38, 8:44, 9:57, 10:64,
+  11:73, 12:73, 13:83, 14:83, 15:94, 16:94, 17:107, 18:114, 19:123, 20:133,
+};
+const FULL_CASTERS_WZ  = new Set(['mago','feiticeiro','clerigo','druida','bardo','bruxo','arcanista']);
+const HALF_CASTERS_WZ  = new Set(['paladino','patrulheiro']);
+const THIRD_CASTERS_WZ = new Set(['guerreiro','ladino']);
+
+function wzMaxMana(classe, nivel) {
+  // Normaliza igual ao backend (_norm_txt): minúsculas, sem acento.
+  const c   = (classe || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const lvl = Math.max(1, Math.min(20, parseInt(nivel) || 1));
+  let cl;
+  if      (FULL_CASTERS_WZ.has(c))  cl = lvl;
+  else if (HALF_CASTERS_WZ.has(c))  cl = lvl >= 2 ? Math.ceil(lvl / 2) : 0;  // meio-conjurador
+  else if (THIRD_CASTERS_WZ.has(c)) cl = lvl >= 3 ? Math.ceil(lvl / 3) : 0;  // terço-conjurador
+  else if (c === 'monge')           return lvl;   // pool de Ki = nível
+  else                              return 0;      // bárbaro / não-conjurador
+  return SPELL_POINTS_BY_LEVEL_WZ[cl] || 0;
+}
+
 function wzCalcSheet(char) {
   const isDnd = document.getElementById('wz-type').value === 'dnd';
   if (!isDnd) return null;
@@ -1646,11 +1670,7 @@ function wzCalcSheet(char) {
   const avgDie = Math.floor(cls.hit_die / 2) + 1;
   const hp     = Math.max(nivel, (cls.hit_die + conMod) + (nivel - 1) * Math.max(1, avgDie + conMod));
   const ca     = 10 + dexMod;
-  let mana = 0;
-  if (cls.mana_stat && cls.mana_per_level > 0) {
-    const mStatMod = Math.floor((parseInt(stats[cls.mana_stat]) - 10) / 2);
-    mana = Math.max(0, (cls.mana_per_level + mStatMod) * nivel);
-  }
+  const mana   = wzMaxMana(char.classe, nivel);
   return { hp, ca, mana, hit_die: cls.hit_die };
 }
 
@@ -2784,11 +2804,7 @@ async function createCampaignFromWizard() {
       const hp_max  = isNpc && char._monsterHp
         ? char._monsterHp
         : Math.max(nivel, (cls.hit_die + conMod) + (nivel - 1) * Math.max(1, avgDie + conMod));
-      let mana_max  = 0;
-      if (!isNpc && cls.mana_stat && cls.mana_per_level > 0) {
-        const mStatMod = Math.floor((parseInt(stats[cls.mana_stat]) - 10) / 2);
-        mana_max = Math.max(0, (cls.mana_per_level + mStatMod) * nivel);
-      }
+      const mana_max = isNpc ? 0 : wzMaxMana(char.classe, nivel);
 
       // Equipamentos: NPCs usam armas extraídas do bloco do monstro (Open5e)
       const startEquip  = isNpc

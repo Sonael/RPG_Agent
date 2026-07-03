@@ -26,6 +26,48 @@ from validator import validate
 
 
 # ---------------------------------------------------------------------------
+# Debug do loop do agente (para demonstração ao vivo)
+# Imprime no terminal cada passo do ciclo ReAct do agente: percepção,
+# chamada de ferramenta (ação), resultado observado e resposta final.
+# Ligado por padrão; defina RPG_DEBUG=0 no ambiente para silenciar (ex.: produção).
+# ---------------------------------------------------------------------------
+
+DEBUG_AGENT = os.environ.get("RPG_DEBUG", "1") not in ("0", "false", "False", "")
+
+
+def _dbg(msg: str = "") -> None:
+    """Imprime uma linha de debug do agente se RPG_DEBUG estiver ligado."""
+    if DEBUG_AGENT:
+        print(msg, flush=True)
+
+
+def _short(value, limit: int = 220) -> str:
+    """Encolhe um valor para caber numa linha de log sem poluir o terminal."""
+    text = str(value).replace("\n", " ⏎ ").strip()
+    return text if len(text) <= limit else text[:limit] + " …"
+
+
+def _dbg_block(value, title: str = "") -> None:
+    """Imprime um texto multi-linha emoldurado (para inspecionar o que é
+    injetado no agente: contexto do mundo, recap, percepção da cena)."""
+    if not DEBUG_AGENT:
+        return
+    if title:
+        print(f"  ┌─ {title} " + "─" * max(0, 64 - len(title)), flush=True)
+    else:
+        print("  ┌" + "─" * 66, flush=True)
+    for line in str(value).splitlines() or [""]:
+        print("  │ " + line, flush=True)
+    print("  └" + "─" * 66, flush=True)
+
+
+# Ferramentas de PERCEPÇÃO: o que informa o agente sobre personagens, local,
+# eventos e flags. No log mostramos o resultado COMPLETO (não truncado), pois
+# é exatamente "como o agente sabe o que está acontecendo".
+_CONTEXT_TOOLS = {"get_scene_context", "get_full_context"}
+
+
+# ---------------------------------------------------------------------------
 # Loop de verificação pós-resposta (D&D mode)
 # Detecta quando o agente narrou ações mecânicas sem chamar as ferramentas.
 # ---------------------------------------------------------------------------
@@ -94,20 +136,95 @@ _SPELL_LEARNED_RE = re.compile(
 )
 
 
+# ---------------------------------------------------------------------------
+# Trava de coerência de verdade: personagem MORTO não pode agir como vivo.
+# Vale para QUALQUER estilo de campanha (não só D&D).
+# ---------------------------------------------------------------------------
+
+# Verbos de ação/fala que indicam um personagem agindo como ser vivo.
+_LIVING_VERBS = (
+    "diz|disse|fala|falou|responde|respondeu|pergunta|perguntou|grita|gritou|"
+    "sussurra|sussurrou|murmura|murmurou|exclama|exclamou|ri|riu|sorri|sorriu|"
+    "ataca|atacou|golpeia|golpeou|avança|avançou|corre|correu|caminha|caminhou|"
+    "anda|andou|ergue|ergueu|levanta|levantou|senta|sentou|pega|pegou|puxa|puxou|"
+    "saca|sacou|empunha|empunhou|olha|olhou|encara|encarou|vira|virou|acena|acenou|"
+    "aproxima|aproximou|afasta|afastou|aponta|apontou|salta|saltou|lança|lançou|"
+    "respira|respirou|pisca|piscou|assente|assentiu|balança|balançou|"
+    "investe|investiu|recua|recuou|esquiva|esquivou|defende|defendeu"
+)
+
+# Indícios de exceção legítima (a narração deixa claro que é sobrenatural/onírico).
+# Nesses casos um personagem morto PODE aparecer — não é incoerência.
+_UNDEAD_CONTEXT_RE = re.compile(
+    r"\b(flashback|sonh[oa]|pesadelo|lembran[çc]a[s]?|mem[óo]ria[s]?|vis[ãa]o|"
+    r"fantasma|esp[íi]rito|esp[ée]ctro|alma|apari[çc][ãa]o|al[ée]m-?t[úu]mulo|"
+    r"reviv\w*|ressuscit\w*|necroman\w*|morto-?vivo|zumbi|esqueleto)\b",
+    re.IGNORECASE,
+)
+
+
+def _check_dead_characters_alive(text: str, dead_before: set) -> list[str]:
+    """
+    Detecta quando a narração faz um personagem MORTO agir/falar como vivo.
+
+    Só considera personagens que JÁ estavam mortos ANTES deste turno
+    (dead_before) — assim o turno em que o inimigo morre, descrevendo sua
+    última ação, não gera falso-positivo. Ignora menções neutras ('o corpo
+    de X jazia ali') e exceções legítimas (flashback, sonho, fantasma...)
+    sinalizadas no próprio texto.
+    """
+    if not text or not dead_before:
+        return []
+    if _UNDEAD_CONTEXT_RE.search(text):
+        return []
+
+    chars = memory.campaign.get("characters", {})
+    violations = []
+    for ch in chars.values():
+        name = (ch.get("name") or "").strip()
+        if not name:
+            continue
+        if name.lower().strip() not in dead_before:
+            continue
+        if (ch.get("status") or "").lower() != "morto":
+            continue  # ressuscitou legitimamente durante o turno
+        # Nome seguido (até 2 palavras depois) de um verbo de ação/fala.
+        pat = re.compile(
+            r"\b" + re.escape(name) + r"\b(?:\s+\w+){0,2}\s+(?:" + _LIVING_VERBS + r")\b",
+            re.IGNORECASE,
+        )
+        if pat.search(text):
+            violations.append(
+                f"Coerência quebrada: '{name}' está MORTO na memória, mas a "
+                f"narração o faz agir ou falar como vivo. Personagens mortos não "
+                f"agem nem falam (exceto em flashback, sonho ou como fantasma — e "
+                f"nesse caso deixe explícito no texto). Reescreva sem ressuscitar "
+                f"'{name}'; trate-o como corpo/lembrança, ou — se ele realmente "
+                f"voltou — registre com update_character_status antes de narrar."
+            )
+    return violations
+
+
 def _verify_agent_response(
     text: str,
     tools_called: set,
     combat_was_active: bool,
+    dead_before: set | None = None,
 ) -> list[str]:
     """
-    Verifica se o agente narrou eventos mecânicos sem chamar as ferramentas.
-    Só atua em campanhas com dnd_mode=True.
-    Retorna lista de strings descrevendo cada violação encontrada.
-    """
-    if not memory.campaign.get("dnd_mode", False):
-        return []
+    Verifica violações na resposta do agente e retorna uma lista de descrições.
 
+    • Coerência de verdade (personagem morto agindo como vivo): vale para
+      QUALQUER estilo de campanha.
+    • Checagens mecânicas (HP, dados, combate, XP): só em dnd_mode=True.
+    """
     violations = []
+
+    # Trava de coerência — independe de dnd_mode.
+    violations.extend(_check_dead_characters_alive(text, dead_before or set()))
+
+    if not memory.campaign.get("dnd_mode", False):
+        return violations
 
     # 1. Início de combate sem roll_initiative
     if (not combat_was_active
@@ -192,6 +309,34 @@ def _verify_agent_response(
                 f"Use o XP adequado ao inimigo derrotado (25–2000 XP conforme a tabela)."
             )
 
+    # 8. Vitória não encerrada: combate ATIVO, nenhum inimigo vivo restante,
+    #    mas o agente não chamou end_combat() neste turno.
+    if "end_combat" not in tools_called:
+        cs = memory.campaign.get("combat_state", {})
+        if cs.get("is_active") and cs.get("initiative_order"):
+            _DEFEATED = {"morto", "inconsciente", "estabilizado", "fugiu", "exilado"}
+            chars = memory.campaign.get("characters", {})
+            enemies_alive, allies_alive = [], []
+            for nome in cs.get("initiative_order", []):
+                ch = chars.get(memory.char_key(nome))
+                if not ch:
+                    continue
+                status = (ch.get("status") or "").lower()
+                if status in _DEFEATED:
+                    continue
+                if memory.is_party_member(ch):
+                    allies_alive.append(ch.get("name", nome))
+                else:
+                    enemies_alive.append(ch.get("name", nome))
+            # Vitória = nenhum inimigo vivo, mas o grupo ainda de pé.
+            if not enemies_alive and allies_alive:
+                violations.append(
+                    "O combate ainda está ATIVO, mas TODOS os inimigos foram "
+                    "derrotados. Encerre a luta agora: chame end_combat() e, em "
+                    "seguida, grant_xp() para CADA personagem do grupo "
+                    f"({', '.join(allies_alive)}) com o XP do(s) inimigo(s) vencido(s)."
+                )
+
     return violations
 
 
@@ -205,7 +350,7 @@ def _check_all_level_ups() -> list[str]:
     Não duplica work — grant_xp() já aplica level up internamente.
     Esta função garante que nenhum level up seja perdido por falha do LLM.
     """
-    from tools_dnd import XP_THRESHOLDS, _proficiency_bonus, _apply_class_features, CLASS_DATA
+    from tools_dnd import XP_THRESHOLDS, _proficiency_bonus, _apply_class_features, CLASS_DATA, _max_mana_for
     import random
 
     if not memory.campaign.get("dnd_mode", False):
@@ -242,11 +387,12 @@ def _check_all_level_ups() -> list[str]:
             sheet["vida_max"]   += hp_gain
             sheet["vida_atual"] += hp_gain
 
-            mana_stat      = info.get("mana_stat")
-            mana_per_level = info.get("mana_per_level", 0)
-            if mana_stat and mana_per_level > 0:
-                sheet["mana_max"]  += mana_per_level
-                sheet["mana_atual"] = sheet["mana_max"]
+            # Mana pela tabela Spell Points do DMG (igual ao grant_xp e ao
+            # wizard de criação) — NÃO usar mana_per_level (fórmula legada).
+            novo_mana_max = _max_mana_for(sheet.get("classe", ""), sheet["nivel"])
+            if novo_mana_max != sheet.get("mana_max", 0):
+                sheet["mana_max"]   = novo_mana_max
+                sheet["mana_atual"] = novo_mana_max
 
             sheet["xp_proximo"] = XP_THRESHOLDS[sheet["nivel"]] if sheet["nivel"] < 20 else sheet["xp"]
             _apply_class_features(char, sheet, sheet["nivel"])
@@ -1262,8 +1408,20 @@ def start_session():
         model_label = f"Gemini — {model_id}"
         is_ollama   = False
 
+    _dbg("\n" + "▓" * 70)
+    _dbg("🚀 [MENU] Iniciando sessão de jogo — montando o agente")
+    _dbg(f"   • Usuário ............ {user_id}")
+    _dbg(f"   • Campanha ........... {campaign_name}")
+    _dbg(f"   • Estilo (instrução) . {campaign_type}  (define a 'política' do agente)")
+    _dbg(f"   • Modelo (LLM) ....... {model_label}")
+    _dbg(f"   • Histórico salvo? ... {'sim — vai gerar recap' if has_history else 'não — campanha nova'}")
+
     agent = create_agent(model, campaign_type)
     runner, session_service = create_runner(agent)
+    _n_tools = len(getattr(agent, "tools", []) or [])
+    _dbg(f"   ✅ Agente '{getattr(agent, 'name', 'rpg_master_agent')}' criado "
+         f"com {_n_tools} ferramentas (ações disponíveis).")
+    _dbg("▓" * 70 + "\n")
 
     # Identidade ADK POR USUÁRIO/CAMPANHA (antes era fixa "jogador1"/"sessao1"
     # → o histórico de conversa do LLM vazava entre todos os usuários).
@@ -1324,7 +1482,15 @@ def start_session():
     else:
         opening      = "Olá! Pergunte ao jogador o tema ou cenário da campanha."
         opening_type = "ask"
-        
+
+    # Debug: este é o PRIMEIRO contexto que o agente recebe sobre o mundo.
+    # Para recap/campanha nova, embute o get_full_context() (personagens,
+    # local, eventos, flags, resumo) — é "como o agente sabe o que existe".
+    _dbg(f"\n📜 [CONTEXTO INICIAL] Mensagem de abertura injetada no agente "
+         f"(tipo: {opening_type}):")
+    _dbg_block(opening, title="CONTEXTO INJETADO NO AGENTE")
+    _dbg("")
+
     limits = MODEL_LIMITS.get(model_id, {"rpd": 500, "rpm": 15})
 
     return jsonify({
@@ -1354,6 +1520,24 @@ def _build_fresh_start_opening() -> str:
     proto_line  = (
         f"O protagonista do jogador é {protagonist}. " if protagonist else ""
     )
+
+    # Se o wizard já gerou fichas D&D, o agente NÃO deve recriá-las (recriar
+    # zera CA/atributos/equipamento e duplica itens). Aviso explícito.
+    chars_com_ficha = [
+        c.get("name", "")
+        for c in memory.campaign.get("characters", {}).values()
+        if c.get("sheet")
+    ]
+    ficha_line = ""
+    if chars_com_ficha:
+        ficha_line = (
+            "• ⚠️ Os personagens a seguir JÁ possuem ficha D&D pronta (criada "
+            f"pelo wizard): {', '.join(chars_com_ficha)}. NÃO chame "
+            "create_character_sheet para eles — as fichas já existem com "
+            "atributos, vida, CA e equipamento corretos. Recriar destruiria "
+            "esses dados. Apenas comece a narrar.\n"
+        )
+
     return (
         "Esta é uma campanha NOVA que o jogador acabou de criar pelo "
         "wizard. Os dados abaixo (resumo, cena inicial, local, personagens, "
@@ -1361,6 +1545,7 @@ def _build_fresh_start_opening() -> str:
         "mundo e ponto de partida da narrativa.\n\n"
         f"{contexto}\n\n"
         "INSTRUÇÕES DE ABERTURA:\n"
+        f"{ficha_line}"
         "• NÃO pergunte ao jogador qual é o tema, cenário, gênero, "
         "personagem ou local — ele já forneceu tudo isso.\n"
         "• NÃO peça para o jogador escolher entre estilos de campanha.\n"
@@ -1485,6 +1670,15 @@ def chat():
     # Estado de combate ANTES desta resposta (para comparação na verificação)
     _combat_was_active = memory.campaign.get("combat_state", {}).get("is_active", False)
 
+    # Personagens já MORTOS antes deste turno — usado pela trava de coerência.
+    # Capturado aqui (antes do agente rodar) para não acusar falso-positivo no
+    # próprio turno em que um inimigo morre (sua última ação pode ser narrada).
+    _dead_before = {
+        (c.get("name") or "").lower().strip()
+        for c in memory.campaign.get("characters", {}).values()
+        if (c.get("status") or "").lower() == "morto" and c.get("name")
+    }
+
     adk_user    = sess.get("adk_user", str(user_id))
     adk_session = sess.get("adk_session", f"{user_id}::sessao")
 
@@ -1499,9 +1693,16 @@ def chat():
         msg          = gtypes.Content(role="user", parts=[gtypes.Part(text=texto)])
         MAX_RETRIES  = 5
 
+        _dbg("\n" + "═" * 70)
+        _dbg(f"🎲 [AGENTE] Novo turno  |  usuário={adk_user}  campanha={memory.campaign.get('name', '?')}")
+        _dbg(f"   ▶ Entrada: {_short(texto, 300)}")
+        _dbg("─" * 70)
+
         for attempt in range(MAX_RETRIES):
             full         = ""
             tools_called = set()
+            if attempt > 0:
+                _dbg(f"🔁 [AGENTE] Tentativa {attempt + 1}/{MAX_RETRIES} (retry após erro recuperável)")
             try:
                 async for event in runner.run_async(
                     user_id=adk_user, session_id=adk_session, new_message=msg
@@ -1514,12 +1715,28 @@ def chat():
                                 args = dict(fc.args) if fc.args else {}
                                 kind = "write" if name in WRITE_TOOLS else "read"
                                 tools_called.add(name)
+                                # Debug: o agente DECIDIU agir sobre o ambiente.
+                                icon     = "✏️  WRITE" if kind == "write" else "👁️  READ "
+                                args_str = ", ".join(f"{k}={_short(v, 60)}" for k, v in args.items())
+                                _dbg(f"  🔧 [AÇÃO ] {icon} → {name}({args_str})")
                                 result_q.put(("tool_call", {"name": name, "args": args, "kind": kind}))
 
                             fr = getattr(part, "function_response", None)
                             if fr and getattr(fr, "name", None):
                                 resp_dict = dict(fr.response) if fr.response else {}
                                 conteudo  = resp_dict.get("result", "")
+                                # Debug: o ambiente RESPONDEU à ação (observação).
+                                if fr.name in _CONTEXT_TOOLS:
+                                    # Percepção: é exatamente o que informa o agente
+                                    # sobre personagens, local, eventos e flags.
+                                    # Mostra o bloco COMPLETO (não truncado).
+                                    _dbg(f"  📥 [OBSERV] {fr.name} → PERCEPÇÃO DA CENA (contexto que o agente lê):")
+                                    _dbg_block(conteudo)
+                                else:
+                                    # Limite maior aqui para não esconder marcações
+                                    # importantes que vêm no fim do texto (ex.: morte,
+                                    # "INCONSCIENTE", XP concedido, level up).
+                                    _dbg(f"  📥 [OBSERV] {fr.name} → {_short(conteudo, 600)}")
                                 if conteudo:
                                     # Remove trechos marcados como instrução interna
                                     # ao modelo ([[llm]]…[[/llm]]) antes de exibir
@@ -1540,6 +1757,11 @@ def chat():
                             "candidates_tokens": event.usage_metadata.candidates_token_count,
                             "total_tokens":      event.usage_metadata.total_token_count,
                         }
+                        _dbg(
+                            f"  🧮 [TOKENS] prompt={usage['prompt_tokens']} "
+                            f"resposta={usage['candidates_tokens']} "
+                            f"total={usage['total_tokens']}"
+                        )
                         result_q.put(("quota_update", usage))
 
                     if event.is_final_response() and event.content and event.content.parts:
@@ -1550,10 +1772,17 @@ def chat():
                 if not full.strip():
                     full = "*(O Mestre observa os registros em silêncio por um momento, parecendo organizar as memórias da aventura...)*"
 
+                _dbg("─" * 70)
+                _dbg(f"💬 [AGENTE] Resposta final ({len(tools_called)} ferramenta(s) usada(s): "
+                     f"{', '.join(sorted(tools_called)) or 'nenhuma'})")
+                _dbg(f"   {_short(full, 400)}")
+                _dbg("═" * 70 + "\n")
+
                 result_q.put(("done", {
                     "text":              full,
                     "tools_called":      tools_called,
                     "combat_was_active": _combat_was_active,
+                    "dead_before":       _dead_before,
                 }))
                 return
 
@@ -1609,19 +1838,28 @@ def chat():
                     response_text      = content["text"]
                     tools_called       = content.get("tools_called", set())
                     combat_was_active  = content.get("combat_was_active", False)
+                    dead_before        = content.get("dead_before", set())
 
                     # ── Loop de verificação pós-resposta ──────────────────
                     if not correction_attempted:
                         mech_violations = _verify_agent_response(
-                            response_text, tools_called, combat_was_active
+                            response_text, tools_called, combat_was_active, dead_before
                         )
                         if mech_violations:
                             correction_attempted = True
                             correction_prompt    = _build_correction_prompt(mech_violations, tools_called)
 
-                            print(f"[VERIFICADOR] {len(mech_violations)} violação(ões) — re-injetando correção.")
+                            _dbg("\n" + "🛑" * 35)
+                            _dbg(f"🔎 [VERIFICADOR] {len(mech_violations)} violação(ões) detectada(s) "
+                                 f"— a resposta do agente quebrou regras mecânicas:")
                             for v in mech_violations:
-                                print(f"  • {v}")
+                                _dbg(f"     • {_short(v, 160)}")
+                            _dbg("↩️  [VERIFICADOR] Re-injetando o seguinte prompt de correção no agente:")
+                            _dbg("┌" + "─" * 68)
+                            for line in correction_prompt.splitlines():
+                                _dbg("│ " + line)
+                            _dbg("└" + "─" * 68)
+                            _dbg("🛑" * 35 + "\n")
 
                             # Notifica o frontend que está corrigindo
                             yield f"data: {json.dumps({'type': 'correction', 'violations': mech_violations})}\n\n"
@@ -1864,6 +2102,12 @@ def generate_lore():
     )
     
     full_prompt = f"{system}\n\nIdeia: {user_prompt}\n\nTipo de campanha: {campaign_type}"
+
+    _route = "DeepSeek" if is_deepseek else ("Ollama" if is_ollama else "Gemini")
+    _dbg("\n" + "✨" * 35)
+    _dbg(f"🧙 [MENU/LORE] Gerando mundo da campanha via {_route} ({model})")
+    _dbg(f"   • Tipo: {campaign_type}  |  Ideia do jogador: {_short(user_prompt, 200)}")
+    _dbg("✨" * 35 + "\n")
 
     try:
         raw = ""

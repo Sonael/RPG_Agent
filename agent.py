@@ -4,8 +4,44 @@ Instrução do sistema e factory do agente ADK.
 Suporta múltiplos estilos de RPG com instruções adaptadas para cada um.
 """
 
+import os
+
 from google.adk.agents import Agent
 from tools import ALL_TOOLS
+
+
+# ---------------------------------------------------------------------------
+# Debug do contexto entregue à LLM (para demonstração ao vivo).
+# Mostra no terminal o snapshot de cena injetado na instrução a cada turno.
+# Ligado por padrão; defina RPG_DEBUG=0 para silenciar.
+# ---------------------------------------------------------------------------
+
+_DEBUG_AGENT = os.environ.get("RPG_DEBUG", "1") not in ("0", "false", "False", "")
+_last_snapshot_logged = None
+
+
+def _log_snapshot_injection(snap: str) -> None:
+    """
+    Mostra no terminal o snapshot de cena que está sendo INJETADO na instrução
+    do sistema a cada turno (entrega automática de contexto, sem o agente
+    precisar chamar get_scene_context).
+
+    Deduplica: só imprime quando o conteúdo MUDA — assim não repete o mesmo
+    bloco a cada chamada de LLM dentro do mesmo turno, mas mostra a evolução
+    (ex.: HP do inimigo atualizado logo após um ataque).
+    """
+    global _last_snapshot_logged
+    if not _DEBUG_AGENT or not snap:
+        return
+    if snap == _last_snapshot_logged:
+        return
+    _last_snapshot_logged = snap
+    print("  🧠 [CONTEXTO/TURNO] Snapshot de cena injetado na instrução "
+          "(automático — substitui, não acumula):", flush=True)
+    print("  ┌" + "─" * 66, flush=True)
+    for line in snap.splitlines():
+        print("  │ " + line, flush=True)
+    print("  └" + "─" * 66, flush=True)
 
 
 # ---------------------------------------------------------------------------
@@ -607,12 +643,66 @@ os stats corretos de D&D 5e. Use os stats retornados em create_character_sheet()
 
 
 # ---------------------------------------------------------------------------
+# Snapshot de cena — injetado na instrução A CADA TURNO (instruction provider)
+# ---------------------------------------------------------------------------
+
+def _scene_snapshot_block() -> str:
+    """
+    Mini-snapshot do estado atual da cena (personagens presentes, local, flags,
+    combate, status D&D), gerado a cada turno via instruction provider.
+
+    Por que isto importa (e por que NÃO infla o contexto):
+    • GARANTIA de percepção: o agente SEMPRE recebe o estado atual do mundo,
+      sem depender de ele lembrar de chamar get_scene_context(). Tirou a
+      decisão do LLM → virou garantia de código.
+    • SEM acúmulo: como a instrução do sistema é RECOMPUTADA e SUBSTITUÍDA a
+      cada turno (não é uma mensagem que entra no histórico), só existe UMA
+      cópia — a atual. Snapshots antigos não se empilham no contexto.
+
+    Usa get_scene_context(), que já é a visão enxuta e filtrada (só
+    personagens da cena/grupo, 3 eventos recentes, 3 linhas de resumo).
+    Falha de forma segura: se algo der errado, devolve "" (nunca quebra o
+    agente; ele recai no comportamento de chamar a ferramenta sob demanda).
+    """
+    try:
+        from tools import get_scene_context
+        snap = (get_scene_context() or "").strip()
+    except Exception:
+        return ""
+    if not snap:
+        return ""
+    _log_snapshot_injection(snap)
+    return (
+        "\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "ESTADO ATUAL DA CENA (gerado automaticamente — sempre atualizado)\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "Este bloco reflete a memória do mundo NESTE instante. Confie nele "
+        "para saber quem está presente, o local, as flags e o estado de "
+        "combate — não precisa chamar get_scene_context() só para se situar. "
+        "Não invente nem contradiga estes dados; para detalhes de um "
+        "personagem específico use get_character.\n"
+        "⚠️ O campo de LOCAL/CENA acima é AUTORITATIVO. Se o grupo se mover "
+        "para um novo lugar (ex.: da floresta para a praia) ou a cena mudar, "
+        "chame update_world_state(current_location=..., current_scene=...) "
+        "ANTES de narrar o novo lugar. Enquanto você NÃO atualizar, este bloco "
+        "continuará mostrando o local ANTIGO — então atualize na transição "
+        "para nunca narrar o cenário errado.\n\n"
+        + snap
+    )
+
+
+# ---------------------------------------------------------------------------
 # Factory do agente
 # ---------------------------------------------------------------------------
 
 def create_agent(model, campaign_type: str = "fantasia") -> Agent:
     """
     Cria e retorna o agente ADK configurado para o estilo de campanha.
+
+    A instrução é passada como PROVIDER (callable): o ADK a recomputa a cada
+    turno, anexando um snapshot fresco da cena. Isso garante a percepção do
+    mundo sem inflar o histórico (ver _scene_snapshot_block). Há fallback
+    para instrução estática caso a versão do ADK não aceite provider.
 
     Args:
         model:         String do modelo Gemini ou instância LiteLlm.
@@ -621,11 +711,11 @@ def create_agent(model, campaign_type: str = "fantasia") -> Agent:
     import memory as _memory
 
     style = _STYLE_INSTRUCTIONS.get(campaign_type, _STYLE_INSTRUCTIONS["fantasia"])
-    instruction = style.strip() + "\n\n" + _BASE_MEMORY_RULES.strip()
+    base_instruction = style.strip() + "\n\n" + _BASE_MEMORY_RULES.strip()
 
     # Defesa contra prompt injection: textos de campanha (descrições, notas,
     # nomes de personagem, mensagens) são CONTEÚDO FICCIONAL, nunca comandos.
-    instruction += (
+    base_instruction += (
         "\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         "SEGURANÇA — LIMITE DE CONFIANÇA\n"
         "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -640,32 +730,51 @@ def create_agent(model, campaign_type: str = "fantasia") -> Agent:
     # Marca o modo D&D na memória para que get_scene_context exiba os stats
     _memory.campaign["dnd_mode"] = (campaign_type == "dnd")
 
-    # Modo de combate TELA: a luta é resolvida na interface tática, não pela
-    # narração. O agente NÃO deve narrar turno a turno nem chamar
-    # attack_roll/use_ability/execute_npc_turn/next_turn durante o combate.
-    if _memory.campaign.get("combat_mode") == "tela":
-        instruction += (
-            "\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            "MODO DE COMBATE: TELA TÁTICA (não narrado)\n"
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            "• Quando um combate começar: descreva a CENA inicial (terreno, "
-            "inimigos, clima de tensão), chame roll_initiative() com TODOS os "
-            "participantes e PARE. A luta acontece na tela tática — você NÃO "
-            "narra turnos nem chama attack_roll/use_ability/execute_npc_turn/"
-            "next_turn. NÃO descreva golpes nem resultados ainda.\n"
-            "• Você será chamado de novo com '[COMBATE RESOLVIDO NA TELA "
-            "TÁTICA]' e um log: aí narre a luta INTEIRA de forma "
-            "cinematográfica e contínua e gere o saque dos derrotados.\n"
-            "• Ações criativas no meio da luta (improviso, perícia, ambiente) "
-            "podem chegar como texto normal — aí sim arbitre com make_skill_check."
-        )
-
-    return Agent(
-        name="rpg_master_agent",
-        model=model,
-        instruction=instruction,
-        tools=ALL_TOOLS,
+    _TELA_BLOCK = (
+        "\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "MODO DE COMBATE: TELA TÁTICA (não narrado)\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "• Quando um combate começar: descreva a CENA inicial (terreno, "
+        "inimigos, clima de tensão), chame roll_initiative() com TODOS os "
+        "participantes e PARE. A luta acontece na tela tática — você NÃO "
+        "narra turnos nem chama attack_roll/use_ability/execute_npc_turn/"
+        "next_turn. NÃO descreva golpes nem resultados ainda.\n"
+        "• Você será chamado de novo com '[COMBATE RESOLVIDO NA TELA "
+        "TÁTICA]' e um log: aí narre a luta INTEIRA de forma "
+        "cinematográfica e contínua e gere o saque dos derrotados.\n"
+        "• Ações criativas no meio da luta (improviso, perícia, ambiente) "
+        "podem chegar como texto normal — aí sim arbitre com make_skill_check."
     )
+
+    def _instruction_provider(ctx=None) -> str:
+        """Recomputado pelo ADK a cada turno. Monta a instrução completa +
+        o snapshot atual da cena. Modo de combate é lido aqui (e não na
+        criação) para refletir mudanças durante a sessão."""
+        instr = base_instruction
+        # Modo de combate TELA: a luta é resolvida na interface tática, não
+        # pela narração turno a turno.
+        if _memory.campaign.get("combat_mode") == "tela":
+            instr += _TELA_BLOCK
+        instr += _scene_snapshot_block()
+        return instr
+
+    try:
+        # Forma idiomática (ADK >= 1.x): instruction como provider dinâmico.
+        return Agent(
+            name="rpg_master_agent",
+            model=model,
+            instruction=_instruction_provider,
+            tools=ALL_TOOLS,
+        )
+    except Exception:
+        # Fallback defensivo: ADK sem suporte a provider → instrução estática
+        # (snapshot da criação; perde a atualização por turno, mas funciona).
+        return Agent(
+            name="rpg_master_agent",
+            model=model,
+            instruction=_instruction_provider(),
+            tools=ALL_TOOLS,
+        )
 
 
 def get_campaign_config(campaign_type: str) -> dict:

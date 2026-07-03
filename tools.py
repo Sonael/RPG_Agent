@@ -521,45 +521,71 @@ def get_scene_context(extra_characters: str = "", extra_locations: str = "") -> 
         lines  = [f"• #{e['index']}: {e['summary']} → {e['consequence']}" for e in recent]
         parts.append("Eventos recentes:\n" + "\n".join(lines))
 
-    # Status D&D da party (exibido apenas quando algum membro tem ficha)
-    party_names = {m["name"].lower() for m in c["party"]}
-    dnd_chars   = [
-        ch for key, ch in c["characters"].items()
-        if ch.get("sheet") and (key in party_names or ch["name"] == c.get("protagonist", ""))
-    ]
-    if dnd_chars:
-        def _bar(cur, mx, w=8):
-            pct = cur / mx if mx > 0 else 0
-            return "▓" * int(pct * w) + "░" * (w - int(pct * w))
-        def _warn(cur, mx):
-            if cur == 0:    return " ⚠️INCONSCIENTE"
-            if cur <= mx // 4: return " ⚠️CRÍTICO"
-            return ""
-        status_lines = []
-        for ch in dnd_chars:
-            s = ch["sheet"]
-            bar = _bar(s["vida_atual"], s["vida_max"])
-            status_lines.append(
-                f"  {ch['name']} Nv.{s['nivel']} {s['classe']}{_warn(s['vida_atual'], s['vida_max'])}"
-                f"  ❤️[{bar}]{s['vida_atual']}/{s['vida_max']}  ✨{s['mana_atual']}/{s['mana_max']}  🛡️CA{s['ca']}"
-            )
-        parts.append("Status D&D:\n" + "\n".join(status_lines))
+    # ── Status D&D e combate ────────────────────────────────────────────
+    party_names   = {m["name"].lower() for m in c["party"]}
+    cs            = c.get("combat_state", {})
+    combat_active = cs.get("is_active", False)
 
-    # Estado de combate ativo (Iniciativa)
-    cs = c.get("combat_state", {})
-    if cs.get("is_active"):
+    def _bar(cur, mx, w=8):
+        pct    = cur / mx if mx > 0 else 0
+        filled = int(pct * w)
+        return "▓" * filled + "░" * (w - filled)
+
+    def _warn(ch, s):
+        st = (ch.get("status") or "").lower()
+        if st == "morto":                          return " 💀"
+        if s["vida_atual"] == 0:                   return " ⚠️INCONSCIENTE"
+        if s["vida_atual"] <= s["vida_max"] // 4:  return " ⚠️CRÍTICO"
+        return ""
+
+    def _conds(ch):
+        cds = [cd.get("nome", "") for cd in (ch.get("sheet") or {}).get("condicoes", []) if cd.get("nome")]
+        return "  [" + ", ".join(cds) + "]" if cds else ""
+
+    if combat_active:
+        # COMBATE: mostra TODOS os combatentes (grupo E inimigos) com HP/CA/
+        # condições — é a informação que o agente precisa para narrar e decidir.
         order   = cs.get("initiative_order", [])
         idx     = cs.get("current_turn_index", 0)
         round_n = cs.get("round", 1)
-        current = order[idx] if order else "?"
-        order_str = " → ".join(
-            f"[{n}]" if i == idx else n for i, n in enumerate(order)
-        )
+        current = order[idx] if order and 0 <= idx < len(order) else "?"
+        lines = []
+        for i, nome in enumerate(order):
+            mark = "🎯" if i == idx else "  "
+            ch   = c["characters"].get(memory.char_key(nome))
+            if not ch or not ch.get("sheet"):
+                lines.append(f"  {mark} {nome}")
+                continue
+            s    = ch["sheet"]
+            icon = "" if memory.is_party_member(ch) else "👹 "
+            mana = f"  ✨{s['mana_atual']}/{s['mana_max']}" if s.get("mana_max", 0) else ""
+            lines.append(
+                f"  {mark} {icon}{ch['name']} Nv.{s['nivel']} {s['classe']}"
+                f"  ❤️[{_bar(s['vida_atual'], s['vida_max'])}]{s['vida_atual']}/{s['vida_max']}"
+                f"{mana}  🛡️CA{s['ca']}{_warn(ch, s)}{_conds(ch)}"
+            )
+        order_str = " → ".join(f"[{n}]" if i == idx else n for i, n in enumerate(order))
         parts.append(
-            f"⚔️  COMBATE ATIVO — Rodada {round_n}\n"
-            f"   🎯 Vez de: {current}\n"
-            f"   Ordem: {order_str}"
+            f"⚔️  COMBATE ATIVO — Rodada {round_n} | 🎯 Vez de: {current}\n"
+            + "\n".join(lines)
+            + f"\n   Ordem: {order_str}"
         )
+    else:
+        # FORA DE COMBATE: status do grupo (membros com ficha).
+        dnd_chars = [
+            ch for key, ch in c["characters"].items()
+            if ch.get("sheet") and (key in party_names or ch["name"] == c.get("protagonist", ""))
+        ]
+        if dnd_chars:
+            status_lines = []
+            for ch in dnd_chars:
+                s = ch["sheet"]
+                status_lines.append(
+                    f"  {ch['name']} Nv.{s['nivel']} {s['classe']}{_warn(ch, s)}"
+                    f"  ❤️[{_bar(s['vida_atual'], s['vida_max'])}]{s['vida_atual']}/{s['vida_max']}"
+                    f"  ✨{s['mana_atual']}/{s['mana_max']}  🛡️CA{s['ca']}{_conds(ch)}"
+                )
+            parts.append("Status D&D:\n" + "\n".join(status_lines))
 
     return "\n\n".join(parts)
 

@@ -14,9 +14,26 @@ Novidades (v2):
   • roll_death_save estruturado
 """
 
+import os
 import random
 import re
 import memory
+
+# ---------------------------------------------------------------------------
+# Debug do motor de regras (para demonstração ao vivo).
+# Mostra no terminal quando o motor consulta a base externa Open5e (grounding):
+# em vez de "alucinar" stats, o agente busca dados reais de D&D 5e via HTTP.
+# Ligado por padrão; defina RPG_DEBUG=0 para silenciar (ex.: produção/testes).
+# ---------------------------------------------------------------------------
+
+DEBUG_ENGINE = os.environ.get("RPG_DEBUG", "1") not in ("0", "false", "False", "")
+
+
+def _edbg(msg: str = "") -> None:
+    """Imprime uma linha de debug do motor de regras se RPG_DEBUG estiver ligado."""
+    if DEBUG_ENGINE:
+        print(msg, flush=True)
+
 
 # ---------------------------------------------------------------------------
 # Mapeamento de nomes de magias/habilidades PT-BR → EN (para tolerar o AI
@@ -171,6 +188,24 @@ def _log_combat_event(etype: str, actor: str = "", target: str = "",
     log.append(ev)
     if len(log) > _MAX_COMBAT_LOG:
         del log[:-_MAX_COMBAT_LOG]
+
+
+def _mark_at_zero_hp(target: dict, source_name: str = "") -> str:
+    """
+    Resolve um alvo que chegou a 0 HP aplicando a regra de D&D 5e:
+      • Jogador / aliado do grupo → cai INCONSCIENTE (depois faz testes de morte).
+      • Monstro / NPC comum        → MORRE na hora (sem teste de morte).
+    Define o status, registra o evento de combate e devolve o sufixo de texto
+    a ser anexado ao resultado da ferramenta.
+    """
+    name = target.get("name", "")
+    if memory.is_party_member(target):
+        target["status"] = "inconsciente"
+        _log_combat_event("down", source_name, name, msg=f"{name} caiu inconsciente")
+        return " ⚠️  CAIU INCONSCIENTE!"
+    target["status"] = "morto"
+    _log_combat_event("down", source_name, name, msg=f"{name} foi derrotado")
+    return " 💀 DERROTADO!"
 
 
 def _is_out_of_combat(name: str) -> bool:
@@ -2694,6 +2729,22 @@ def create_character_sheet(
 
     char_key_val = memory.char_key(name)
     existing = memory.campaign["characters"].get(char_key_val, {})
+
+    # PROTEÇÃO: não sobrescrever uma ficha D&D que JÁ existe (ex.: criada pelo
+    # wizard de criação). Recriar zeraria CA/atributos/equipamento e duplicaria
+    # itens. Se o personagem já tem ficha, recusa e devolve o estado atual.
+    # (Personagem sem ficha — ex.: NPC salvo só com save_character — segue
+    # normalmente, pois aqui estamos ADICIONANDO a ficha, não sobrescrevendo.)
+    if existing.get("sheet"):
+        s = existing["sheet"]
+        return (
+            f"ℹ️ {name} JÁ possui ficha D&D — não recriei (evita zerar atributos "
+            f"e duplicar itens). Estado atual: {s.get('classe')} {s.get('raca')} "
+            f"Nv.{s.get('nivel')}, ❤️{s.get('vida_atual')}/{s.get('vida_max')} "
+            f"🛡️CA {s.get('ca')}. Para ajustar use set_stat / learn_spell / "
+            f"add_item etc. — NÃO recrie a ficha."
+        )
+
     char_obj = {
         "name":        name,
         "description": description,
@@ -2888,8 +2939,7 @@ def modify_hp(char_name: str, amount: int, reason: str = "") -> str:
 
     extra = ""
     if s["vida_atual"] == 0:
-        char["status"] = "inconsciente"
-        warn = " ⚠️  CAIU INCONSCIENTE!"
+        warn = _mark_at_zero_hp(char, reason or "")
     elif pct <= 0.25:
         warn = " ⚠️  Estado crítico!"
     elif pct <= 0.5:
@@ -3420,10 +3470,7 @@ def attack_roll(
         )
         _was_asleep = (target.get("status", "") or "").lower() == "dormindo"
         if hp_depois == 0:
-            target["status"] = "inconsciente"
-            result += " ⚠️  INCONSCIENTE!"
-            _log_combat_event("down", attacker["name"], target["name"],
-                              msg=f"{target['name']} caiu inconsciente")
+            result += _mark_at_zero_hp(target, attacker["name"])
         elif _was_asleep:
             # 5e: uma criatura dormindo (Sleep) acorda ao sofrer dano.
             _wake_sleeper(target)
@@ -3730,10 +3777,7 @@ def use_ability(
                 st["vida_atual"] = max(0, st["vida_atual"] - total_dano)
                 result += f"\n   {target['name']}: ❤️  {hp_antes} → {st['vida_atual']}/{st['vida_max']}"
                 if st["vida_atual"] == 0:
-                    target["status"] = "inconsciente"
-                    result += " ⚠️  INCONSCIENTE!"
-                    _log_combat_event("down", char["name"], target["name"],
-                                      msg=f"{target['name']} caiu inconsciente")
+                    result += _mark_at_zero_hp(target, char["name"])
 
     # ── Linha do log da habilidade ────────────────────────────────────────
     # Para pool spells (Sleep, Color Spray) o dado representa um POOL de HP,
@@ -3913,11 +3957,13 @@ def apply_condition(char_name: str, condition: str, duration_turns: int = 0) -> 
     # Busca descrição oficial no Open5e
     srd_desc = ""
     en_slug  = CONDITION_PT_TO_EN.get(c_low, c_low)
+    _edbg(f"  🌐 [OPEN5E] Buscando descrição oficial da condição '{condition}' (slug: {en_slug})…")
     try:
         r = _req.get(f"https://api.open5e.com/v1/conditions/{en_slug}/", timeout=4)
         if r.ok:
             raw = r.json().get("desc", "")
             srd_desc = " ".join(raw.split())[:300] if raw else ""
+            _edbg(f"  ✅ [OPEN5E] Descrição da condição '{condition}' obtida do SRD.")
     except Exception:
         pass
 
@@ -4159,11 +4205,13 @@ def _search_open5e_item(item_name: str) -> dict | None:
     import requests as _req
 
     slug = item_name.lower().strip().replace(" ", "-").replace("'", "")
+    _edbg(f"  🌐 [OPEN5E] Buscando item mágico '{item_name}' na base SRD (grounding)…")
 
     try:
         # Tentativa 1: slug exato
         r = _req.get(f"https://api.open5e.com/v1/magicitems/{slug}/", timeout=5)
         if r.ok and r.json().get("name"):
+            _edbg(f"  ✅ [OPEN5E] Item encontrado por slug exato: {r.json().get('name')}")
             return r.json()
     except Exception:
         pass
@@ -4181,10 +4229,12 @@ def _search_open5e_item(item_name: str) -> dict | None:
                 # Prioriza resultado com nome mais próximo
                 item_words = set(item_name.lower().split())
                 best = max(results, key=lambda x: len(item_words & set(x.get("name","").lower().split())))
+                _edbg(f"  ✅ [OPEN5E] Item encontrado por busca textual: {best.get('name')}")
                 return best
     except Exception:
         pass
 
+    _edbg(f"  ⚠️  [OPEN5E] '{item_name}' não encontrado no SRD → tratado como item customizado/homebrew")
     return None
 
 
@@ -5073,8 +5123,7 @@ def resolve_saving_throw(
 
     result += f"   {char['name']}: ❤️  {hp_antes} → {hp_depois}/{s['vida_max']}"
     if hp_depois == 0:
-        char["status"] = "inconsciente"
-        result += " ⚠️  CAIU INCONSCIENTE!"
+        result += _mark_at_zero_hp(char)
     elif pct <= 0.25:
         result += " ⚠️  Estado crítico!"
 
@@ -5273,6 +5322,7 @@ def learn_spell(char_name: str, spell_name: str) -> str:
     en_query = SPELL_PT_TO_EN.get(spell_name.lower().strip(), spell_name.lower().strip())
     # Slug: "magic missile" → "magic-missile"
     slug     = en_query.lower().strip().replace(" ", "-").replace("'", "")
+    _edbg(f"  🌐 [OPEN5E] Buscando magia '{spell_name}' (en: '{en_query}') na base SRD (grounding)…")
 
     try:
         # Tentativa 1: busca por slug exato (mais precisa)
@@ -5428,6 +5478,7 @@ def _fetch_open5e_monsters(cr: float, limit: int = 15) -> list[dict]:
     """Busca monstros do Open5e com CR correto. Retorna lista vazia se falhar."""
     import requests as _req
     cr_str = _cr_to_open5e_str(cr)
+    _edbg(f"  🌐 [OPEN5E] Buscando monstros reais com CR≈{cr_str} na base SRD (grounding)…")
     try:
         r = _req.get(
             "https://api.open5e.com/v1/monsters/",
@@ -5435,14 +5486,19 @@ def _fetch_open5e_monsters(cr: float, limit: int = 15) -> list[dict]:
             timeout=5,
         )
         if not r.ok:
+            _edbg(f"  ⚠️  [OPEN5E] Resposta HTTP {r.status_code} ao buscar monstros CR {cr_str}")
             return []
         results = r.json().get("results", [])
         # Filtra monstros cujo CR real está próximo do solicitado
         # Tolerância: ±0.5 para CRs baixos, ±50% para CRs altos
         target = _cr_str_to_float(cr_str)
         tol    = max(0.5, target * 0.5)
-        return [m for m in results if abs(_cr_str_to_float(m.get("challenge_rating", 0)) - target) <= tol]
-    except Exception:
+        filtrados = [m for m in results if abs(_cr_str_to_float(m.get("challenge_rating", 0)) - target) <= tol]
+        _edbg(f"  ✅ [OPEN5E] {len(filtrados)} monstro(s) com CR compatível: "
+              f"{', '.join(m.get('name', '?') for m in filtrados[:6])}")
+        return filtrados
+    except Exception as e:
+        _edbg(f"  ⚠️  [OPEN5E] Falha de rede ao buscar monstros (API offline?): {e}")
         return []
 
 
