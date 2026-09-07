@@ -4,6 +4,9 @@
 let selectedCampaign = null;
 let isNewCampaign    = false;
 let storyMode        = 'custom';
+// O jogador já tem campanhas salvas? Muda a dica do botão "Iniciar Sessão"
+// entre "escolha uma à esquerda" e "crie uma nova".
+let _temCampanhas    = false;
 
 // ── Init ──
 document.addEventListener('DOMContentLoaded', () => {
@@ -11,11 +14,19 @@ document.addEventListener('DOMContentLoaded', () => {
   loadCampaigns();
   loadOllamaModels();
 
+  // Vale também para a lista de reserva do HTML, caso ela venha a incluir o
+  // modelo padrão um dia. Sem a chave salva, não há como saber o ID real.
+  const _sel = document.getElementById('model-select');
+  if (_sel) _aplicarModeloPadrao(_sel);
+  loadGeminiModels();
+
   document.getElementById('new-campaign-name')?.addEventListener('input', function() {
     const val = this.value.trim();
     if (val) selectCampaign(val, true);
-    else     { selectedCampaign = null; document.getElementById('start-btn').disabled = true; }
+    else     { selectedCampaign = null; atualizarEstadoInicio(); }
   });
+
+  atualizarEstadoInicio();   // dica correta já no primeiro quadro da página
 
   document.getElementById('import-overlay')?.addEventListener('click', function(e) {
     if (e.target === this) closeImportModal();
@@ -41,6 +52,9 @@ async function loadCampaigns() {
     const res  = await authFetch(`${API}/api/campaigns`);
     if (res.status === 401) { clearTokens(); window.location.href = '/login.html'; return; }
     const data = await res.json();
+
+    _temCampanhas = data.length > 0;
+    atualizarEstadoInicio();
 
     if (!data.length) {
       list.innerHTML = '<div style="padding:12px 14px;font-size:12px;color:var(--text-muted);font-style:italic;">Nenhuma campanha salva.</div>';
@@ -73,8 +87,74 @@ async function loadCampaigns() {
 
   } catch (e) {
     list.innerHTML = '<div style="padding:12px;color:var(--red);font-size:12px;">Erro ao conectar com o servidor.</div>';
+    atualizarEstadoInicio();
   }
 }
+
+// Onde está a lista de campanhas em relação ao botão? No desktop o livro abre
+// em duas páginas e ela fica À ESQUERDA; no mobile as páginas empilham e ela
+// fica ACIMA. Medimos a posição real em vez de fixar uma largura de corte —
+// assim a frase continua verdadeira se o CSS mudar de breakpoint.
+function _ondeEstaALista() {
+  const lista = document.getElementById('campaign-list');
+  const btn   = document.getElementById('start-btn');
+  if (!lista || !btn) return 'esquerda';
+  const l = lista.getBoundingClientRect();
+  const b = btn.getBoundingClientRect();
+  return (l.right <= b.left + 1) ? 'esquerda' : 'acima';
+}
+
+// Único lugar que liga/desliga o botão "Iniciar Sessão" — e que diz POR QUE,
+// quando ele está travado. Antes o botão só ficava cinza, sem explicação, e
+// parecia defeito para quem ainda não tinha escolhido uma campanha.
+function atualizarEstadoInicio() {
+  const btn  = document.getElementById('start-btn');
+  const hint = document.getElementById('start-hint');
+  if (!btn) return;
+
+  btn.disabled = !selectedCampaign;
+
+  if (!hint) return;
+
+  if (selectedCampaign) {
+    hint.style.color  = 'var(--text-muted)';
+    hint.style.cursor = 'default';
+    hint.removeAttribute('role');
+    hint.textContent  = `Pronto para jogar “${selectedCampaign}”.`;
+    return;
+  }
+
+  // Travado: além de dizer o que falta, a própria frase leva até lá — no
+  // mobile a lista fica longe, fora da tela, e apontar não bastaria.
+  const acima = _ondeEstaALista() === 'acima';
+  const onde  = acima ? 'acima nesta página' : 'na página à esquerda';
+  const seta  = acima ? '↑' : '↞';
+
+  hint.style.color      = 'var(--ink-user)';
+  hint.style.cursor     = 'pointer';
+  hint.style.textDecoration = 'underline dotted';
+  hint.setAttribute('role', 'button');
+  hint.textContent = _temCampanhas
+    ? `${seta} Escolha uma campanha ${onde} para começar.`
+    : `${seta} Crie uma campanha nova ou importe um arquivo ${onde} para começar.`;
+}
+
+// Toque/clique na dica rola até o que está faltando.
+function irParaAsCampanhas() {
+  if (selectedCampaign) return;
+  const alvo = _temCampanhas
+    ? document.querySelector('.campaign-item') || document.getElementById('campaign-list')
+    : document.querySelector('.bottom-actions button') || document.getElementById('campaign-list');
+  alvo?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+// O livro troca de layout ao girar o aparelho ou redimensionar a janela:
+// a frase precisa acompanhar ("acima" ⇄ "à esquerda").
+let _reavaliarDica = null;
+window.addEventListener('resize', () => {
+  clearTimeout(_reavaliarDica);
+  _reavaliarDica = setTimeout(atualizarEstadoInicio, 150);
+});
 
 function selectCampaign(name, isNew) {
   selectedCampaign = name;
@@ -83,7 +163,7 @@ function selectCampaign(name, isNew) {
   if (!isNew) {
     document.getElementById(`ci-${CSS.escape(name)}`)?.classList.add('selected');
   }
-  document.getElementById('start-btn').disabled = false;
+  atualizarEstadoInicio();
 }
 
 function toggleNewCampaign() {
@@ -99,7 +179,7 @@ async function deleteCampaign(e, name) {
   );
   if (!ok) return;
   await authFetch(`${API}/api/campaigns/${encodeURIComponent(name)}`, { method: 'DELETE' });
-  if (selectedCampaign === name) { selectedCampaign = null; document.getElementById('start-btn').disabled = true; }
+  if (selectedCampaign === name) { selectedCampaign = null; atualizarEstadoInicio(); }
   loadCampaigns();
 }
 
@@ -111,7 +191,14 @@ function setStoryMode(mode) {
 //  Iniciar sessão → redireciona para game.html
 // ═══════════════════════════════════════
 async function startSession() {
-  if (!selectedCampaign) return;
+  if (!selectedCampaign) {
+    // Rede de segurança: o botão fica travado nesse caso, mas se ele for
+    // acionado por outro caminho (teclado, script), o jogador ouve o motivo
+    // em vez de clicar no vazio.
+    atualizarEstadoInicio();
+    if (window.showToast) showToast('Escolha uma campanha na página à esquerda antes de iniciar.');
+    return;
+  }
   const btn = document.getElementById('start-btn');
   btn.disabled    = true;
   btn.textContent = 'Iniciando...';
@@ -193,7 +280,129 @@ async function loadOllamaModels() {
   }
 }
 
+// ═══════════════════════════════════════
+//  Modelos Google (lista ao vivo)
+// ═══════════════════════════════════════
+//
+// O <select> do menu nasce com uma lista fixa no HTML, que serve de RESERVA.
+// Assim que há uma chave Google salva, perguntamos à própria API quais
+// modelos ela enxerga e remontamos as opções com esses IDs. É o que impede a
+// lista de envelhecer a cada modelo novo — e evita IDs adivinhados, já que
+// eles vêm do Google, não de um palpite nosso.
+
+let _modelosCarregados = false;
+let _modeloEscolhidoPeloUsuario = false;
+
+// Modelo preferido quando o jogador ainda não escolheu nenhum. Casamos pelo
+// NOME de exibição, não pelo ID: o ID varia de versão para versão
+// (gemini-3.1-flash-lite-preview tem sufixo, gemini-3-flash não), e quem
+// manda nele é o Google. Pelo nome, o padrão continua valendo quando o ID
+// mudar.
+const MODELO_PADRAO = /3\.5\s*flash[\s-]*lite/i;
+
+function _aplicarModeloPadrao(sel) {
+  const alvo = Array.from(sel.options).find(
+    o => MODELO_PADRAO.test(o.textContent) || MODELO_PADRAO.test(o.value)
+  );
+  if (!alvo) return false;
+  sel.value = alvo.value;
+  return true;
+}
+
+async function loadGeminiModels() {
+  const sel    = document.getElementById('model-select');
+  const status = document.getElementById('apikeys-status');
+  if (!sel) return;
+
+  const chave = (window.getApiKeys ? window.getApiKeys().google_api_key : '') || '';
+  if (!chave) {
+    // Sem chave não dá para consultar: fica a lista de reserva do HTML.
+    if (status && !_modelosCarregados) {
+      status.style.color   = 'var(--text-muted)';
+      status.textContent   = 'Salve a chave do Google para carregar a lista de modelos atualizada.';
+    }
+    return;
+  }
+
+  try {
+    const res  = await authFetch(`${API}/api/gemini/models`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ google_api_key: chave }),
+    });
+    const data = await res.json();
+
+    if (!data.ok || !data.models || !data.models.length) {
+      if (status) {
+        status.style.color = 'var(--gold-dim)';
+        status.textContent = data.error === 'chave_invalida'
+          ? 'A chave Google foi recusada — a lista de modelos está usando a reserva.'
+          : 'Não foi possível consultar os modelos agora — usando a lista de reserva.';
+      }
+      return;
+    }
+
+    // Preserva a escolha atual, se o modelo ainda existir na lista nova.
+    const escolhido = sel.value;
+
+    // As opções não-Google (DeepSeek, Ollama) continuam vindo do HTML.
+    Array.from(sel.querySelectorAll('optgroup')).forEach(g => {
+      const primeira = g.querySelector('option');
+      if (primeira && !primeira.value.includes(':')) g.remove();
+    });
+
+    const porFamilia = {};
+    data.models.forEach(m => {
+      (porFamilia[m.familia] = porFamilia[m.familia] || []).push(m);
+    });
+
+    const fragmento = document.createDocumentFragment();
+    Object.keys(porFamilia).forEach(familia => {
+      const grupo = document.createElement('optgroup');
+      grupo.label = familia;
+      porFamilia[familia].forEach(m => {
+        const op = document.createElement('option');
+        op.value = m.id;
+        // A API de listagem não informa cota; mostramos RPM/RPD só nos
+        // modelos que o servidor conhece (MODEL_LIMITS).
+        op.textContent = (m.rpm && m.rpd)
+          ? `${m.label} — (${m.rpm} RPM / ${m.rpd} RPD)`
+          : m.label;
+        grupo.appendChild(op);
+      });
+      fragmento.appendChild(grupo);
+    });
+    sel.insertBefore(fragmento, sel.firstChild);
+
+    // Se o jogador já escolheu à mão, a escolha dele manda. Caso contrário
+    // cai no padrão (3.5 Flash Lite) e, sem ele na conta, na primeira opção.
+    const aindaExiste = escolhido
+      && sel.querySelector(`option[value="${CSS.escape(escolhido)}"]`);
+    if (_modeloEscolhidoPeloUsuario && aindaExiste) {
+      sel.value = escolhido;
+    } else if (!_aplicarModeloPadrao(sel) && aindaExiste) {
+      sel.value = escolhido;
+    }
+
+    _modelosCarregados = true;
+    if (status) {
+      status.style.color = 'var(--green)';
+      status.textContent = `${data.models.length} modelos disponíveis para a sua chave.`;
+    }
+  } catch (_) {
+    if (status) {
+      status.style.color = 'var(--text-muted)';
+      status.textContent = 'Não foi possível consultar os modelos — usando a lista de reserva.';
+    }
+  }
+}
+
 function onModelChange() {
+  // Só dispara em interação de verdade (evento change) — atribuir o valor por
+  // código não passa por aqui. É o que faz a escolha do jogador vencer o
+  // padrão numa recarga da lista.
+  _modeloEscolhidoPeloUsuario = true;
+
   const val    = document.getElementById('model-select').value;
   const status = document.getElementById('ollama-status');
   if (val.startsWith('ollama:')) {

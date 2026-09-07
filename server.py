@@ -1333,8 +1333,18 @@ def ollama_models():
         return jsonify({"ok": False, "error": str(e), "models": []})
 
 
-# No server.py — Dicionário completo com 8 modelos
-# No server.py — Dicionário completo e corrigido (8 modelos)
+# ---------------------------------------------------------------------------
+# Catálogo de modelos
+#
+# A lista do menu costumava ser fixa no HTML e envelhecia a cada modelo novo
+# que o Google lançava. Agora ela é montada a partir do que a CHAVE DO
+# USUÁRIO realmente enxerga (rota /api/gemini/models abaixo) — os IDs vêm da
+# própria API, então nunca ficam desatualizados nem são adivinhados.
+#
+# MODEL_LIMITS continua existindo para os limites de cota (RPM/RPD), que a
+# API de listagem NÃO informa. Modelo desconhecido cai em "default".
+# ---------------------------------------------------------------------------
+
 MODEL_LIMITS = {
     # Família Gemini 3.x
     "gemini-3.1-flash-lite-preview": {"rpd": 500,   "rpm": 15},
@@ -1345,13 +1355,98 @@ MODEL_LIMITS = {
     "gemini-2.5-flash":              {"rpd": 20,    "rpm": 5},
     "gemini-2.5-flash-lite":         {"rpd": 20,    "rpm": 10},
 
-    # Família Gemma (IDs técnicos com -it
+    # Família Gemma (IDs técnicos com -it)
     "gemma-3-27b-it":                {"rpd": 14400, "rpm": 30},
-    "gemma-4-26b-it":                {"rpd": 1500,  "rpm": 15},
-    "gemma-4-31b-it":                {"rpd": 1500,  "rpm": 15},
-    
+    "gemma-4-26b-it":                {"rpd": 14400, "rpm": 30},
+    "gemma-4-31b-it":                {"rpd": 14400, "rpm": 30},
+
     "default":                       {"rpd": 500,   "rpm": 15}
 }
+
+# Modelos que existem na API mas não servem para narrar uma campanha:
+# geradores de imagem/vídeo/áudio, embeddings e sessões ao vivo. Filtrar aqui
+# evita encher o menu de opções que quebrariam no primeiro turno.
+_MODELOS_IGNORADOS = (
+    "embedding", "aqa", "imagen", "image", "veo", "lyria",
+    "computer-use", "robotics", "live", "learnlm",
+)
+
+
+def _familia_do_modelo(model_id: str) -> str:
+    """Rótulo do optgroup no menu, a partir do ID do modelo."""
+    if model_id.startswith("gemma"):
+        return "Google Gemma"
+    if model_id.startswith("gemini-3"):
+        return "Google Gemini 3.x"
+    if model_id.startswith("gemini-2"):
+        return "Google Gemini 2.x"
+    return "Outros modelos Google"
+
+
+@app.route("/api/gemini/models", methods=["POST"])
+@require_auth
+def gemini_models():
+    """
+    Lista os modelos de texto que a chave Google do usuário enxerga.
+
+    A chave chega no CORPO (nunca na URL) e é repassada ao Google no cabeçalho
+    x-goog-api-key — assim ela não aparece em log de acesso nem no histórico.
+    Nada é guardado no servidor.
+
+    Devolve sempre 200 com {ok, models, error}: sem chave ou com a API fora do
+    ar, o menu simplesmente mantém a lista fixa de reserva do HTML.
+    """
+    import urllib.error
+    import urllib.request
+
+    limited = _rate_guard(f"models:user:{g.user_id}", 20, 300)
+    if limited:
+        return limited
+
+    data    = request.get_json(silent=True) or {}
+    api_key = data.get("google_api_key", "").strip() or os.environ.get("GOOGLE_API_KEY", "")
+    if not api_key:
+        return jsonify({"ok": False, "error": "sem_chave", "models": []})
+
+    modelos, pagina, token = [], 0, ""
+    try:
+        while pagina < 5:                       # teto de segurança na paginação
+            url = "https://generativelanguage.googleapis.com/v1beta/models?pageSize=200"
+            if token:
+                url += f"&pageToken={token}"
+            req = urllib.request.Request(url, headers={"x-goog-api-key": api_key})
+            with urllib.request.urlopen(req, timeout=8) as r:
+                corpo = json.loads(r.read())
+
+            for m in corpo.get("models", []):
+                if "generateContent" not in (m.get("supportedGenerationMethods") or []):
+                    continue
+                mid = (m.get("name") or "").replace("models/", "")
+                if not mid or any(t in mid for t in _MODELOS_IGNORADOS):
+                    continue
+                limites = MODEL_LIMITS.get(mid)
+                modelos.append({
+                    "id":      mid,
+                    "label":   m.get("displayName") or mid,
+                    "familia": _familia_do_modelo(mid),
+                    "rpm":     limites["rpm"] if limites else None,
+                    "rpd":     limites["rpd"] if limites else None,
+                })
+
+            token = corpo.get("nextPageToken") or ""
+            pagina += 1
+            if not token:
+                break
+    except urllib.error.HTTPError as e:
+        motivo = "chave_invalida" if e.code in (400, 401, 403) else f"http_{e.code}"
+        return jsonify({"ok": False, "error": motivo, "models": []})
+    except Exception:
+        # Log interno; para o cliente basta saber que deve usar a reserva.
+        app.logger.warning("Falha ao listar modelos Gemini", exc_info=True)
+        return jsonify({"ok": False, "error": "indisponivel", "models": []})
+
+    modelos.sort(key=lambda m: (m["familia"], m["label"]))
+    return jsonify({"ok": True, "models": modelos, "error": ""})
 
 @app.route("/api/session/start", methods=["POST"])
 @require_auth

@@ -60,6 +60,11 @@
             <h3>Motor de História (IA)</h3>
             <p style="font-size: 14px; color: var(--text-muted); margin-top: 0;">Selecione a inteligência artificial responsável por conduzir a narrativa:</p>
             <div class="field-group" style="margin-top: 15px;">
+              <!-- Lista de RESERVA. Havendo chave Google salva, loadGeminiModels()
+                   substitui os grupos Google por aquilo que a API realmente
+                   oferece — os IDs vêm do Google, não daqui. Estas opções só
+                   aparecem antes de a chave ser preenchida, ou se a consulta
+                   falhar. Os grupos com ":" no valor (DeepSeek) são preservados. -->
               <select id="model-select" onchange="onModelChange()">
                 <optgroup label="Google Gemini 3.x">
                   <option value="gemini-3.1-flash-lite-preview">Gemini 3.1 Flash-Lite — Recomendado (15 RPM / 500 RPD)</option>
@@ -71,9 +76,8 @@
                   <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite — (10 RPM / 20 RPD)</option>
                 </optgroup>
                 <optgroup label="Google Gemma (Alta Performance)">
-                  <option value="gemma-3-27b-it">Gemma 3 27B — (30 RPM / 14.4K RPD)</option>
-                  <option value="gemma-4-26b-it">Gemma 4 26B — (15 RPM / 1.5K RPD)</option>
-                  <option value="gemma-4-31b-it">Gemma 4 31B — (15 RPM / 1.5K RPD)</option>
+                  <option value="gemma-4-26b-it">Gemma 4 26B — (30 RPM / 14.4K RPD)</option>
+                  <option value="gemma-4-31b-it">Gemma 4 31B — (30 RPM / 14.4K RPD)</option>
                 </optgroup>
                 <optgroup label="DeepSeek (API)">
                   <option value="deepseek:deepseek-chat">DeepSeek V3.1 671B</option>
@@ -99,6 +103,12 @@
           </div>
         </div>
 
+        <!-- Diz o que falta enquanto o botão está travado: um botão inerte
+             sem explicação já fez o jogador achar que era defeito. Clicar
+             rola até a lista de campanhas — no mobile ela fica fora da tela. -->
+        <div id="start-hint" onclick="irParaAsCampanhas()"
+          style="font-family: 'Lora', serif; font-size:13px; font-style:italic; text-align:center; margin-bottom:10px;">
+        </div>
         <button id="start-btn" class="btn-main" onclick="startSession()" disabled>Iniciar Sessão</button>
         <div class="page-number right">4</div>
       </div>
@@ -379,7 +389,7 @@
   </div>
 
   <script src="/static/js/utils.js?v=8"></script>
-  <script src="/static/js/menu.js?v=36"></script>
+  <script src="/static/js/menu.js?v=39"></script>
   <script>
     // Animação de volta para a capa quando carregado da cache
     window.addEventListener('pageshow', function(event) {
@@ -406,11 +416,20 @@
       document.getElementById('deepseek-api-key-input').value = localStorage.getItem(DEEPSEEK_KEY_STORAGE) || '';
     }
 
+    let _recarregarModelos = null;
+
     function onApiKeyChange() {
       const gk = document.getElementById('google-api-key-input').value.trim();
       const dk = document.getElementById('deepseek-api-key-input').value.trim();
       if (gk) localStorage.setItem(GOOGLE_KEY_STORAGE, gk); else localStorage.removeItem(GOOGLE_KEY_STORAGE);
       if (dk) localStorage.setItem(DEEPSEEK_KEY_STORAGE, dk); else localStorage.removeItem(DEEPSEEK_KEY_STORAGE);
+
+      // Colar a chave já atualiza a lista de modelos. O atraso evita uma
+      // consulta a cada tecla digitada — só dispara quando a digitação para.
+      if (typeof loadGeminiModels === 'function') {
+        clearTimeout(_recarregarModelos);
+        _recarregarModelos = setTimeout(loadGeminiModels, 800);
+      }
     }
 
     window.getApiKeys = function () {
