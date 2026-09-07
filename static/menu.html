@@ -93,11 +93,23 @@
             <p style="font-size: 14px; color: var(--text-muted); margin-top: 0;">Insira as chaves API necessárias para processar a história:</p>
             <div class="field-group" style="margin-top: 15px;">
               <label style="font-size: 12px;">Google AI Studio:</label>
-              <input id="google-api-key-input" type="password" placeholder="AIza..." oninput="onApiKeyChange()">
+              <!-- O olho existe para conferir uma chave colada: sem ele, um
+                   caractere a mais só aparece como erro genérico do modelo. -->
+              <div class="campo-com-olho">
+                <input id="google-api-key-input" type="password" placeholder="AIza..." oninput="onApiKeyChange()">
+                <button type="button" class="btn-olho" aria-controls="google-api-key-input"
+                  aria-pressed="false" aria-label="Mostrar a chave do Google AI Studio"
+                  title="Mostrar a chave" onclick="alternarChaveVisivel(this)">👁</button>
+              </div>
             </div>
             <div class="field-group">
               <label style="font-size: 12px;">DeepSeek API:</label>
-              <input id="deepseek-api-key-input" type="password" placeholder="sk-..." oninput="onApiKeyChange()">
+              <div class="campo-com-olho">
+                <input id="deepseek-api-key-input" type="password" placeholder="sk-..." oninput="onApiKeyChange()">
+                <button type="button" class="btn-olho" aria-controls="deepseek-api-key-input"
+                  aria-pressed="false" aria-label="Mostrar a chave da DeepSeek"
+                  title="Mostrar a chave" onclick="alternarChaveVisivel(this)">👁</button>
+              </div>
             </div>
             <div id="apikeys-status" style="font-size: 12px; margin-top: 5px;"></div>
           </div>
@@ -414,6 +426,39 @@
     function loadApiKeys() {
       document.getElementById('google-api-key-input').value = localStorage.getItem(GOOGLE_KEY_STORAGE) || '';
       document.getElementById('deepseek-api-key-input').value = localStorage.getItem(DEEPSEEK_KEY_STORAGE) || '';
+    }
+
+    // Revela/esconde a chave do campo ao lado do botão.
+    // Volta sozinha para escondida depois de um tempo: a intenção é conferir
+    // o que foi colado, não deixar a chave exposta na tela.
+    const _SEGUNDOS_VISIVEL = 20;
+    const _timersDoOlho = new WeakMap();
+
+    function alternarChaveVisivel(btn) {
+      const campo = document.getElementById(btn.getAttribute('aria-controls'));
+      if (!campo) return;
+      esconder(btn, campo, campo.type === 'text');
+    }
+
+    function esconder(btn, campo, escondendo) {
+      clearTimeout(_timersDoOlho.get(btn));
+
+      if (escondendo) {
+        campo.type = 'password';
+        btn.textContent = '👁';
+        btn.setAttribute('aria-pressed', 'false');
+        btn.title = 'Mostrar a chave';
+        btn.setAttribute('aria-label', btn.getAttribute('aria-label').replace('Esconder', 'Mostrar'));
+        return;
+      }
+
+      campo.type = 'text';
+      btn.textContent = '🙈';
+      btn.setAttribute('aria-pressed', 'true');
+      btn.title = `Esconder a chave (some sozinha em ${_SEGUNDOS_VISIVEL}s)`;
+      btn.setAttribute('aria-label', btn.getAttribute('aria-label').replace('Mostrar', 'Esconder'));
+      _timersDoOlho.set(btn, setTimeout(
+        () => esconder(btn, campo, true), _SEGUNDOS_VISIVEL * 1000));
     }
 
     let _recarregarModelos = null;
