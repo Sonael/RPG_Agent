@@ -213,6 +213,12 @@ def _migrate_sheet_fields(char: dict) -> None:
         "condicoes":            [],
         "death_saves_sucessos": 0,
         "death_saves_falhas":   0,
+        # v3 — tipos de dano, PV temporários e concentração.
+        "vida_temp":            0,
+        "concentracao":         None,
+        "resistencias":         [],
+        "imunidades":           [],
+        "vulnerabilidades":     [],
     }
 
     for key, default_val in defaults_v2.items():

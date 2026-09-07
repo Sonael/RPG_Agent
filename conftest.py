@@ -65,6 +65,85 @@ def _srd_offline():
 
 
 # ---------------------------------------------------------------------------
+# Fábrica de personagens para os testes do motor
+# ---------------------------------------------------------------------------
+
+def criar_ficha(nome, *, grupo=False, vida=30, vida_max=None, ca=12, nivel=3,
+                forca=16, destreza=12, constituicao=14, inteligencia=10,
+                sabedoria=10, carisma=10, mana=20, arma="espada longa",
+                habilidades=None, **extras):
+    """
+    Personagem completo, com todos os campos que o motor espera.
+    `extras` cai direto na ficha — é por onde os testes injetam resistências,
+    imunidades, PV temporários, concentração, ataques de monstro, etc.
+    """
+    sheet = {
+        "classe": "guerreiro" if grupo else "npc", "raca": "humano",
+        "nivel": nivel, "xp": 0, "xp_proximo": 900,
+        "forca": forca, "destreza": destreza, "constituicao": constituicao,
+        "inteligencia": inteligencia, "sabedoria": sabedoria, "carisma": carisma,
+        "vida_atual": vida, "vida_max": vida_max if vida_max is not None else vida,
+        "mana_atual": mana, "mana_max": mana, "ca": ca,
+        "proficiencia": 2, "hit_die": 10, "ouro": 0, "prata": 0, "cobre": 0,
+        "equipamentos": {"armadura": None, "escudo": None,
+                         "arma_principal": arma, "amuleto": None},
+        "condicoes": [], "death_saves_sucessos": 0, "death_saves_falhas": 0,
+        "vida_temp": 0, "concentracao": None,
+        "resistencias": [], "imunidades": [], "vulnerabilidades": [],
+    }
+    sheet.update(extras)
+    return {
+        "name": nome, "status": "vivo" if grupo else "inimigo",
+        "party_member": grupo, "description": "", "traits": "", "notes": "",
+        "habilidades": habilidades or [], "inventario": [], "sheet": sheet,
+    }
+
+
+@pytest.fixture
+def campanha():
+    """Campanha zerada, com combat_state íntegro. Devolve o dict da campanha."""
+    import memory
+    memory.campaign["characters"] = {}
+    memory.campaign["party"] = []
+    memory.campaign["protagonist"] = ""
+    memory.campaign["combat_state"] = {
+        "is_active": False, "initiative_order": [], "current_turn_index": 0,
+        "round": 1, "turn_resolved": False, "npc_strategies": {},
+        "turn_auto_advanced": False, "turn_token": 0, "log": [], "result": None,
+        "turn_economy": {"acao_usada": False, "bonus_usada": False},
+    }
+    return memory.campaign
+
+
+@pytest.fixture
+def povoar(campanha):
+    """Insere personagens na campanha e devolve o dict deles por nome."""
+    import memory
+
+    def _povoar(*chars):
+        criados = {}
+        for ch in chars:
+            memory.campaign["characters"][memory.char_key(ch["name"])] = ch
+            if ch.get("party_member"):
+                memory.campaign["party"].append(
+                    {"name": ch["name"], "role": "", "notes": ""})
+            criados[ch["name"]] = ch
+        return criados
+
+    return _povoar
+
+
+def iniciar_combate(ordem, indice=0, rodada=1):
+    """Liga o combate com a ordem de iniciativa dada."""
+    import memory
+    cs = memory.campaign["combat_state"]
+    cs.update({"is_active": True, "initiative_order": list(ordem),
+               "current_turn_index": indice, "round": rodada,
+               "turn_resolved": False, "turn_auto_advanced": False})
+    return cs
+
+
+# ---------------------------------------------------------------------------
 # Ponte para as suítes legadas
 # ---------------------------------------------------------------------------
 

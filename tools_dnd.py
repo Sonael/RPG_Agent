@@ -2167,6 +2167,7 @@ def _normalize_sheet(sheet: dict) -> None:
         "forca", "destreza", "constituicao", "inteligencia", "sabedoria", "carisma",
         "ouro", "prata", "cobre",
         "death_saves_sucessos", "death_saves_falhas",
+        "vida_temp",
     )
     for field in INT_FIELDS:
         if field in sheet and not isinstance(sheet[field], int):
@@ -2174,6 +2175,462 @@ def _normalize_sheet(sheet: dict) -> None:
                 sheet[field] = int(sheet[field])
             except (ValueError, TypeError):
                 sheet[field] = 0
+    # Campos da Onda 2 — fichas antigas não os têm.
+    sheet.setdefault("vida_temp", 0)
+    sheet.setdefault("concentracao", None)
+    for campo in ("resistencias", "imunidades", "vulnerabilidades"):
+        sheet.setdefault(campo, [])
+
+
+# ===========================================================================
+# TIPOS DE DANO, PV TEMPORÁRIOS E CONCENTRAÇÃO
+# ---------------------------------------------------------------------------
+# Antes, o dano era subtraído cru do HP: `vida_atual -= dmg`. Sem tipo de
+# dano não existe resistência, imunidade nem vulnerabilidade — o esqueleto
+# morria de veneno, o elemental do fogo se queimava, e a decisão "qual arma
+# eu uso contra ISTO", que é o coração do combate 5e, não existia.
+#
+# Todo dano do jogo passa agora por _apply_damage(), na ordem do PHB:
+#   modificador de tipo (imunidade/resistência/vulnerabilidade)
+#     → PV temporários absorvem
+#       → PV reais
+#         → teste de concentração
+# ===========================================================================
+
+# Os 13 tipos canônicos do 5e. A chave é o nome em inglês (como vem do SRD).
+DAMAGE_TYPES = (
+    "acid", "bludgeoning", "cold", "fire", "force", "lightning", "necrotic",
+    "piercing", "poison", "psychic", "radiant", "slashing", "thunder",
+)
+
+# Aliases PT-BR e variantes → tipo canônico. As descrições de habilidade da
+# ficha estão em português ("3d6 dano de fogo"), o SRD vem em inglês.
+_DAMAGE_TYPE_ALIASES = {
+    "acido": "acid", "ácido": "acid",
+    "concussao": "bludgeoning", "concussão": "bludgeoning",
+    "contundente": "bludgeoning", "esmagamento": "bludgeoning",
+    "frio": "cold", "gelo": "cold", "gelado": "cold",
+    "fogo": "fire", "ígneo": "fire", "igneo": "fire",
+    "forca": "force", "força": "force",
+    "eletrico": "lightning", "elétrico": "lightning",
+    "raio": "lightning", "relampago": "lightning", "relâmpago": "lightning",
+    "necrotico": "necrotic", "necrótico": "necrotic",
+    "perfurante": "piercing", "perfuracao": "piercing", "perfuração": "piercing",
+    "veneno": "poison", "venenoso": "poison", "toxico": "poison", "tóxico": "poison",
+    "psiquico": "psychic", "psíquico": "psychic", "mental": "psychic",
+    "radiante": "radiant", "sagrado": "radiant",
+    "cortante": "slashing", "corte": "slashing",
+    "trovejante": "thunder", "trovao": "thunder", "trovão": "thunder",
+    "sonico": "thunder", "sônico": "thunder",
+}
+
+
+def _norm_damage_type(texto: str) -> str:
+    """Normaliza um nome de tipo de dano (PT ou EN) para o canônico. '' se não reconhecer."""
+    t = _norm_txt(texto)
+    if not t:
+        return ""
+    if t in DAMAGE_TYPES:
+        return t
+    return _DAMAGE_TYPE_ALIASES.get(t, "")
+
+
+def _damage_type_from_text(texto: str) -> str:
+    """
+    Descobre o tipo de dano varrendo um texto livre.
+    Serve tanto para o SRD  ("Hit: 14 (2d8 + 5) slashing damage")
+    quanto para a ficha em PT ("[Evocação] Cone de 4,5m, 3d6 dano de fogo").
+    Devolve '' quando não há tipo — dano sem tipo não sofre nenhum modificador.
+    """
+    t = _norm_txt(texto)
+    if not t:
+        return ""
+    # Inglês: "<tipo> damage" é o padrão do SRD.
+    for tipo in DAMAGE_TYPES:
+        if f"{tipo} damage" in t:
+            return tipo
+    # Português: "dano de fogo", "dano necrótico", "dano radiante".
+    import re as _re
+    m = _re.search(r"dano\s+(?:de\s+|do\s+|da\s+)?([a-z]+)", t)
+    if m:
+        canon = _norm_damage_type(m.group(1))
+        if canon:
+            return canon
+    # Último recurso: qualquer alias solto no texto.
+    for alias, canon in _DAMAGE_TYPE_ALIASES.items():
+        if _norm_txt(alias) in t:
+            return canon
+    for tipo in DAMAGE_TYPES:
+        if tipo in t:
+            return tipo
+    return ""
+
+
+def _parse_damage_traits(raw) -> list[dict]:
+    """
+    Lê um campo de resistência/imunidade do Open5e e devolve entradas
+    estruturadas.
+
+    O SRD escreve coisas como:
+      "poison"
+      "fire, cold"
+      "bludgeoning, piercing, and slashing from nonmagical attacks"
+
+    A última é a armadilha: aplicar essa resistência sem modelar armas
+    mágicas deixaria o lobisomem praticamente imune ao grupo. Então a
+    qualificação é PRESERVADA em `requer_magica`, e _damage_multiplier só
+    ignora a resistência quando o golpe é mágico.
+    """
+    if not raw:
+        return []
+    if isinstance(raw, (list, tuple)):
+        raw = ", ".join(str(x) for x in raw)
+    texto = _norm_txt(str(raw))
+    if not texto:
+        return []
+
+    # "from nonmagical attacks", "that aren't silvered", "nao magicas"…
+    requer_magica = any(marca in texto for marca in (
+        "nonmagical", "non-magical", "nao magic", "silvered", "adamantine",
+    ))
+
+    tipos = []
+    for tipo in DAMAGE_TYPES:
+        if tipo in texto and tipo not in tipos:
+            tipos.append(tipo)
+    for alias, canon in _DAMAGE_TYPE_ALIASES.items():
+        if _norm_txt(alias) in texto and canon not in tipos:
+            tipos.append(canon)
+
+    if not tipos:
+        return []
+    return [{"tipos": tipos, "requer_magica": requer_magica, "origem": str(raw)}]
+
+
+def _traits_lookup(sheet: dict, campo: str) -> list[dict]:
+    """Lê resistencias/imunidades/vulnerabilidades da ficha, tolerando formatos antigos."""
+    bruto = (sheet or {}).get(campo)
+    if not bruto:
+        return []
+    if isinstance(bruto, list) and bruto and isinstance(bruto[0], dict):
+        return bruto
+    # Lista simples de strings (ex.: preenchida à mão) → normaliza.
+    return _parse_damage_traits(bruto)
+
+
+# Materiais que furam a resistência "de ataques não-mágicos" sem a arma ser
+# mágica. O SRD escreve "that aren't silvered" / "that aren't adamantine";
+# sem isto, a espada prateada comprada justamente para caçar lobisomem não
+# faria nada.
+_MATERIAIS_ESPECIAIS = (
+    "prata", "pratead", "silver", "adamant", "gelido", "gélido", "cold iron",
+    "ferro frio",
+)
+
+
+def _bypasses_material_resistance(weapon: str) -> bool:
+    """A arma fura resistências qualificadas — por ser mágica ou pelo material."""
+    nome = _norm_txt(weapon)
+    if not nome:
+        return False
+    if _looks_magic(weapon):
+        return True
+    return any(_norm_txt(m) in nome for m in _MATERIAIS_ESPECIAIS)
+
+
+def _damage_multiplier(sheet: dict, tipo: str,
+                       arma_magica: bool = False) -> tuple[float, str]:
+    """
+    Multiplicador de dano do alvo para um tipo. Devolve (multiplicador, nota).
+
+    Regras 5e: imunidade zera; resistência corta pela metade (arredonda para
+    baixo, feito no chamador); vulnerabilidade dobra. Resistência e
+    vulnerabilidade ao mesmo tipo se cancelam, e imunidade vence as duas.
+    Dano SEM tipo nunca é modificado.
+    """
+    if not tipo:
+        return 1.0, ""
+
+    def _casa(campo: str) -> bool:
+        for entrada in _traits_lookup(sheet, campo):
+            if tipo not in entrada.get("tipos", []):
+                continue
+            if entrada.get("requer_magica") and arma_magica:
+                continue        # arma mágica fura a resistência qualificada
+            return True
+        return False
+
+    imune   = _casa("imunidades")
+    resiste = _casa("resistencias")
+    vulner  = _casa("vulnerabilidades")
+
+    if imune:
+        return 0.0, f"🛡️ IMUNE a dano {tipo} — nenhum dano aplicado"
+    if resiste and vulner:
+        return 1.0, f"⚖️ Resistência e vulnerabilidade a {tipo} se cancelam"
+    if resiste:
+        return 0.5, f"🛡️ Resistente a dano {tipo} — dano pela metade"
+    if vulner:
+        return 2.0, f"💥 VULNERÁVEL a dano {tipo} — dano dobrado"
+    return 1.0, ""
+
+
+# ── PV temporários ─────────────────────────────────────────────────────────
+
+def _temp_hp(sheet: dict) -> int:
+    try:
+        return max(0, int(sheet.get("vida_temp", 0) or 0))
+    except (TypeError, ValueError):
+        return 0
+
+
+# ── Concentração ───────────────────────────────────────────────────────────
+
+def _requires_concentration(hab: dict) -> bool:
+    """A habilidade exige concentração? Lê a descrição (PT e EN)."""
+    if not isinstance(hab, dict):
+        return False
+    if hab.get("concentracao") is not None:
+        return bool(hab["concentracao"])
+    texto = _norm_txt(f"{hab.get('descricao', '')} {hab.get('nome', '')}")
+    return "concentracao" in texto or "concentration" in texto
+
+
+def _break_concentration(char: dict, motivo: str = "") -> str:
+    """Derruba a concentração ativa. Devolve a nota, ou '' se não havia nenhuma."""
+    sheet = char.get("sheet") or {}
+    atual = sheet.get("concentracao")
+    if not atual:
+        return ""
+    sheet["concentracao"] = None
+    magia = (atual or {}).get("magia", "magia")
+    sufixo = f" ({motivo})" if motivo else ""
+    _log_combat_event("concentration_break", char.get("name", ""), "",
+                      msg=f"{char.get('name','')} perdeu a concentração em {magia}{sufixo}")
+    return f"🌀 {char.get('name','')} PERDEU a concentração em {magia}{sufixo}!"
+
+
+def _start_concentration(char: dict, magia: str) -> str:
+    """
+    Passa a concentrar numa magia. Em 5e só se concentra numa por vez — a
+    anterior cai. Antes disto, um clérigo mantinha Bênção, Escudo da Fé e
+    Arma Espiritual ao mesmo tempo.
+    """
+    sheet = char.get("sheet") or {}
+    nota  = ""
+    atual = sheet.get("concentracao")
+    if atual and (atual or {}).get("magia", "").lower() != (magia or "").lower():
+        nota = (f"\n   🌀 {char.get('name','')} solta a concentração em "
+                f"{atual['magia']} para conjurar {magia}.")
+    cs = memory.campaign.get("combat_state", {}) or {}
+    sheet["concentracao"] = {"magia": magia, "rodada": int(cs.get("round", 1) or 1)}
+    return nota
+
+
+def _concentration_save(char: dict, dano: int) -> str:
+    """
+    Teste de CON para manter a concentração ao sofrer dano.
+    CD = maior entre 10 e metade do dano (PHB).
+
+    O dado é rolado pelo sistema, inclusive para personagens jogáveis: o
+    teste dispara no meio do turno do INIMIGO, e parar tudo para pedir um d20
+    ao jogador quebraria o fluxo do combate. O resultado é sempre mostrado.
+    """
+    sheet = char.get("sheet") or {}
+    if not sheet.get("concentracao"):
+        return ""
+    magia = sheet["concentracao"].get("magia", "magia")
+    dc    = max(10, dano // 2)
+    mod   = _modifier(sheet.get("constituicao", 10))
+    d20   = random.randint(1, 20)
+    total = d20 + mod
+    sinal = "+" if mod >= 0 else ""
+
+    if total >= dc:
+        return (f"🌀 Concentração ({magia}): 🎲 {d20}{sinal}{mod} = {total} "
+                f"vs CD {dc} → ✅ mantida")
+    quebra = _break_concentration(char, f"falhou no teste CD {dc}")
+    return (f"🌀 Concentração ({magia}): 🎲 {d20}{sinal}{mod} = {total} "
+            f"vs CD {dc} → ❌ FALHOU\n   {quebra}")
+
+
+# ── Aplicação de dano — caminho único de todo dano do jogo ─────────────────
+
+def _apply_damage(target: dict, amount: int = 0, damage_type: str = "",
+                  source_name: str = "", arma_magica: bool = False,
+                  components: list | None = None) -> dict:
+    """
+    Aplica dano a um alvo na ordem do 5e e devolve o que aconteceu.
+
+    `components` permite um golpe com tipos MISTOS — o caso do Golpe Divino,
+    que soma 1d8 radiante ao corte da arma. Cada componente recebe o próprio
+    modificador de resistência, e só depois a soma encontra os PV temporários
+    e um único teste de concentração (RAW: dano simultâneo de um mesmo ataque
+    provoca um teste, não um por parcela).
+
+    Devolve dict com: dano (efetivo em PV reais), bruto, hp_antes, hp_depois,
+    temp_absorvido e notas (lista de linhas para o texto da ferramenta).
+
+    NÃO mexe em status (inconsciente/morto) nem avança turno — isso continua
+    com quem chamou, que tem o contexto para narrar.
+    """
+    sheet = target.get("sheet") or {}
+    notas: list[str] = []
+
+    if components is None:
+        components = [(int(amount or 0), damage_type)]
+
+    bruto = 0
+    dano  = 0
+    tipo  = _norm_damage_type(damage_type) if damage_type else ""
+    for valor, tipo_comp in components:
+        parcela_bruta = max(0, int(valor or 0))
+        if not parcela_bruta:
+            continue
+        bruto += parcela_bruta
+        canon = _norm_damage_type(tipo_comp) if tipo_comp else ""
+        if not tipo:
+            tipo = canon
+        mult, nota_tipo = _damage_multiplier(sheet, canon, arma_magica)
+        if nota_tipo:
+            if len(components) > 1:
+                nota_tipo += f" ({parcela_bruta} de dano {canon or 'sem tipo'})"
+            notas.append(nota_tipo)
+        parcela = int(parcela_bruta * mult) if mult != 1.0 else parcela_bruta
+        # Resistência nunca zera um golpe que acertou; só imunidade zera.
+        if mult > 0:
+            parcela = max(1, parcela)
+        dano += parcela
+
+    # PV temporários absorvem primeiro e não voltam.
+    temp = _temp_hp(sheet)
+    absorvido = 0
+    if temp > 0 and dano > 0:
+        absorvido = min(temp, dano)
+        sheet["vida_temp"] = temp - absorvido
+        dano -= absorvido
+        restante = sheet["vida_temp"]
+        notas.append(f"🔵 PV temporários absorveram {absorvido} "
+                     f"({'restam ' + str(restante) if restante else 'esgotados'})")
+
+    hp_antes = int(sheet.get("vida_atual", 0) or 0)
+    sheet["vida_atual"] = max(0, hp_antes - dano)
+    hp_depois = sheet["vida_atual"]
+
+    # Concentração: só testa se realmente perdeu PV reais.
+    if dano > 0 and sheet.get("concentracao"):
+        if hp_depois == 0:
+            quebra = _break_concentration(target, "caiu a 0 PV")
+            if quebra:
+                notas.append(quebra)
+        else:
+            nota_conc = _concentration_save(target, dano)
+            if nota_conc:
+                notas.append(nota_conc)
+
+    return {
+        "dano": dano, "bruto": bruto, "hp_antes": hp_antes,
+        "hp_depois": hp_depois, "temp_absorvido": absorvido,
+        "tipo": tipo, "notas": notas,
+    }
+
+
+def _fmt_notas(notas: list[str], indent: str = "   ") -> str:
+    """Formata as notas de _apply_damage como linhas prontas para anexar."""
+    return "".join(f"\n{indent}{n}" for n in notas if n)
+
+
+# ===========================================================================
+# REAÇÃO E ATAQUE DE OPORTUNIDADE
+# ---------------------------------------------------------------------------
+# A economia do turno rastreava só Ação e Ação Bônus. Faltava a terceira
+# perna do 5e: a Reação — a única coisa que acontece FORA do seu turno.
+#
+# Sem posicionamento no jogo, o gatilho honesto para o ataque de oportunidade
+# é a FUGA: sair do combate deixa de ser grátis, que é justamente o que a
+# regra existe para impedir. Quando houver zonas/alcance (onda seguinte),
+# _provoke_opportunity_attacks passa a ser chamado também no movimento.
+#
+# A reação recarrega por RODADA (em 5e, no início do próprio turno) — daí
+# guardarmos o número da rodada em que foi gasta.
+# ===========================================================================
+
+def _reaction_available(char: dict) -> bool:
+    sheet = char.get("sheet") or {}
+    cs    = memory.campaign.get("combat_state", {}) or {}
+    rodada_atual = int(cs.get("round", 1) or 1)
+    usada = sheet.get("reacao_rodada")
+    return usada is None or int(usada) != rodada_atual
+
+
+def _consume_reaction(char: dict) -> None:
+    sheet = char.get("sheet") or {}
+    cs    = memory.campaign.get("combat_state", {}) or {}
+    sheet["reacao_rodada"] = int(cs.get("round", 1) or 1)
+
+
+def _melee_weapon_of(char: dict) -> str:
+    """Arma corpo-a-corpo que a criatura usaria numa reação."""
+    sheet = char.get("sheet") or {}
+    for atk in (sheet.get("ataques") or []):
+        if isinstance(atk, dict) and not atk.get("ranged") and atk.get("nome"):
+            return atk["nome"]
+    equip = sheet.get("equipamentos", {}) or {}
+    return equip.get("arma_principal") or "ataque desarmado"
+
+
+def _provoke_opportunity_attacks(leaving_name: str, motivo: str = "fugir") -> str:
+    """
+    Dispara os ataques de oportunidade contra quem está deixando o combate.
+
+    Cada inimigo consciente que ainda tem a reação da rodada faz UM ataque
+    corpo-a-corpo. Devolve o texto a anexar ('' quando ninguém reagiu).
+    """
+    cs = memory.campaign.get("combat_state", {}) or {}
+    if not cs.get("is_active"):
+        return ""
+
+    chars    = memory.campaign.get("characters", {})
+    saindo   = chars.get(memory.char_key(leaving_name))
+    if not saindo:
+        return ""
+    saindo_e_grupo = memory.is_party_member(saindo)
+
+    linhas = []
+    for nome in list(cs.get("initiative_order", []) or []):
+        oponente = chars.get(memory.char_key(nome))
+        if not oponente or oponente is saindo:
+            continue
+        # Só inimigos do lado oposto reagem.
+        if memory.is_party_member(oponente) == saindo_e_grupo:
+            continue
+        if (oponente.get("status", "vivo") or "").lower() in OUT_OF_COMBAT_STATUSES:
+            continue
+        if int((oponente.get("sheet") or {}).get("vida_atual", 0) or 0) <= 0:
+            continue
+        if not _reaction_available(oponente):
+            continue
+        # O alvo pode ter caído num ataque de oportunidade anterior.
+        if int((saindo.get("sheet") or {}).get("vida_atual", 0) or 0) <= 0:
+            break
+
+        _consume_reaction(oponente)
+        golpe = attack_roll(
+            attacker_name    = oponente.get("name", nome),
+            target_name      = saindo.get("name", leaving_name),
+            weapon           = _melee_weapon_of(oponente),
+            damage_dice_sides= 6,
+            damage_dice_count= 1,
+            end_turn         = False,
+            _skip_turn_check = True,
+        ).replace(_BONUS_ACTION_HINT, "")
+        linhas.append(golpe)
+
+    if not linhas:
+        return ""
+    cabecalho = (f"\n\n⚡ ATAQUE(S) DE OPORTUNIDADE — {leaving_name} tenta "
+                 f"{motivo} e baixa a guarda:")
+    return cabecalho + "\n" + "\n".join(linhas)
 
 
 def _get_char(name: str, allow_dead: bool = False) -> tuple[dict | None, str]:
@@ -2856,11 +3313,35 @@ def get_character_sheet(name: str) -> str:
             f" | ❌ Falhas: {s.get('death_saves_falhas', 0)}/3"
         )
 
+    # PV temporários, concentração e defesas por tipo de dano.
+    temp     = _temp_hp(s)
+    temp_str = f"  🔵 +{temp} PV temporários\n" if temp else ""
+
+    conc     = s.get("concentracao") or {}
+    conc_str = f"  🌀 Concentrado em: {conc.get('magia')}\n" if conc else ""
+
+    def _linha_traits(rotulo: str, campo: str) -> str:
+        entradas = _traits_lookup(s, campo)
+        tipos = sorted({t for e in entradas for t in e.get("tipos", [])})
+        if not tipos:
+            return ""
+        cond = " (exceto de armas mágicas)" if any(
+            e.get("requer_magica") for e in entradas) else ""
+        return f"  {rotulo}: {', '.join(tipos)}{cond}\n"
+
+    defesas_str = (
+        _linha_traits("🛡️ Imunidades",        "imunidades")
+        + _linha_traits("🛡️ Resistências",    "resistencias")
+        + _linha_traits("💥 Vulnerabilidades", "vulnerabilidades")
+    )
+
     return (
         f"╔══ {char['name']} — {s['classe']} {s['raca']} Nível {nivel} ══╗\n"
         f"  XP: {xp}/{xp_p}\n"
         f"  ❤️  Vida [{bar}] {s['vida_atual']}/{s['vida_max']}{death_str}\n"
+        f"{temp_str}"
         f"  ✨ Mana: {s['mana_atual']}/{s['mana_max']}   🛡️  CA: {s['ca']}   Prof: +{s['proficiencia']}\n"
+        f"{conc_str}{defesas_str}"
         f"  ───────────────────────────────────\n"
         f"  FOR {_mod_str(s['forca'])}  DES {_mod_str(s['destreza'])}  CON {_mod_str(s['constituicao'])}\n"
         f"  INT {_mod_str(s['inteligencia'])}  SAB {_mod_str(s['sabedoria'])}  CAR {_mod_str(s['carisma'])}\n"
@@ -2913,25 +3394,40 @@ def get_combat_status() -> str:
 # 4. Vida e Mana
 # ---------------------------------------------------------------------------
 
-def modify_hp(char_name: str, amount: int, reason: str = "") -> str:
+def modify_hp(char_name: str, amount: int, reason: str = "",
+              damage_type: str = "") -> str:
     """
     Modifica os pontos de vida de um personagem.
     Valor NEGATIVO = dano. Valor POSITIVO = cura.
     Atualiza o status automaticamente (vivo / inconsciente).
     Se curar alguém com HP=0, zera os contadores de testes de morte.
 
+    Dano passa pelas resistências/imunidades do alvo e é absorvido primeiro
+    pelos PV temporários; cura, não.
+
     Args:
-        char_name: Nome do personagem.
-        amount:    Quantidade (negativo = dano, positivo = cura).
-        reason:    Causa (ex: 'golpe de espada', 'poção de cura', 'queda').
+        char_name:   Nome do personagem.
+        amount:      Quantidade (negativo = dano, positivo = cura).
+        reason:      Causa (ex: 'golpe de espada', 'poção de cura', 'queda').
+        damage_type: Só para dano. Tipo ('fogo', 'veneno', 'frio', 'radiante'…).
+                     Informe sempre que souber — é o que faz o esqueleto ignorar
+                     veneno e o elemental do fogo se queimar com gelo.
     """
     char, err = _get_char(char_name)
     if not char:
         return err
 
     s        = char["sheet"]
-    hp_antes = s["vida_atual"]
-    s["vida_atual"] = max(0, min(s["vida_max"], s["vida_atual"] + amount))
+    notas: list[str] = []
+
+    if amount < 0:
+        _res     = _apply_damage(char, -amount, damage_type,
+                                 source_name=reason, arma_magica=False)
+        hp_antes = _res["hp_antes"]
+        notas    = _res["notas"]
+    else:
+        hp_antes = s["vida_atual"]
+        s["vida_atual"] = max(0, min(s["vida_max"], s["vida_atual"] + amount))
     delta    = s["vida_atual"] - hp_antes
 
     acao       = "curou" if delta > 0 else "sofreu"
@@ -2956,9 +3452,51 @@ def modify_hp(char_name: str, amount: int, reason: str = "") -> str:
 
     memory.save_campaign()
     return (
-        f"{char['name']} {acao} {abs(delta)} pv{reason_str}.\n"
-        f"❤️  Vida: {hp_antes} → {s['vida_atual']}/{s['vida_max']}{warn}{extra}"
+        f"{char['name']} {acao} {abs(delta)} pv{reason_str}."
+        + _fmt_notas(notas, indent="") +
+        f"\n❤️  Vida: {hp_antes} → {s['vida_atual']}/{s['vida_max']}{warn}{extra}"
     )
+
+
+def grant_temp_hp(char_name: str, amount: int, source: str = "") -> str:
+    """
+    Concede Pontos de Vida Temporários (Ajuda, Falsa Vida, Armadura de Agathys,
+    Inspiração Heroica, Fôlego do Guerreiro…).
+
+    Regra 5e: PV temporários NÃO se acumulam — ao receber uma nova quantia, o
+    alvo fica com a MAIOR das duas, nunca com a soma. Eles absorvem dano antes
+    dos PV reais, não podem ser curados e somem no descanso longo.
+
+    Args:
+        char_name: Nome do personagem.
+        amount:    Quantidade de PV temporários (positivo).
+        source:    Origem (ex: 'Ajuda', 'Armadura de Agathys').
+    """
+    char, err = _get_char(char_name)
+    if not char:
+        return err
+
+    novo = max(0, int(amount or 0))
+    if novo <= 0:
+        return f"❌ Quantidade inválida de PV temporários: {amount}."
+
+    s      = char["sheet"]
+    atual  = _temp_hp(s)
+    origem = f" ({source})" if source else ""
+
+    if novo <= atual:
+        return (f"🔵 {char['name']} já tem {atual} PV temporários — "
+                f"os {novo}{origem} não se acumulam e são descartados "
+                f"(5e: vale o maior, nunca a soma).")
+
+    s["vida_temp"] = novo
+    _log_combat_event("temp_hp", char["name"], "",
+                      msg=f"{char['name']} ganhou {novo} PV temporários{origem}")
+    substituiu = f" (substitui os {atual} anteriores)" if atual else ""
+    memory.save_campaign()
+    return (f"🔵 {char['name']} ganhou **{novo} PV temporários**{origem}"
+            f"{substituiu}.\n"
+            f"   Eles absorvem dano antes dos PV reais e somem no descanso longo.")
 
 
 def modify_mana(char_name: str, amount: int, reason: str = "") -> str:
@@ -3201,6 +3739,19 @@ def social_check(
 _BONUS_ACTION_HINT = "\n   ↩️  Ação bônus disponível — ataque extra pendente neste turno."
 
 
+def _npc_attack_entry(sheet: dict, weapon: str) -> dict | None:
+    """Entrada de `ataques` que corresponde ao golpe pedido, ou None."""
+    if not isinstance(sheet, dict):
+        return None
+    alvo = _norm_txt(weapon)
+    if not alvo:
+        return None
+    for atk in (sheet.get("ataques") or []):
+        if isinstance(atk, dict) and _norm_txt(atk.get("nome", "")) == alvo:
+            return atk
+    return None
+
+
 def _npc_attack_dice(sheet: dict, weapon: str) -> tuple[int, int] | None:
     """
     Dado de dano de um ataque natural de monstro ("bite", "claw", "slam"…),
@@ -3219,12 +3770,10 @@ def _npc_attack_dice(sheet: dict, weapon: str) -> tuple[int, int] | None:
     if not alvo:
         return None
 
-    for atk in (sheet.get("ataques") or []):
-        if not isinstance(atk, dict) or not atk.get("dado"):
-            continue
-        if _norm_txt(atk.get("nome", "")) == alvo:
-            n, s, _bonus = _parse_dice(atk["dado"])
-            return n, s
+    entrada = _npc_attack_entry(sheet, weapon)
+    if entrada and entrada.get("dado"):
+        n, s, _bonus = _parse_dice(entrada["dado"])
+        return n, s
 
     # Compatibilidade com fichas criadas antes do campo "ataques".
     equip = sheet.get("equipamentos", {}) or {}
@@ -3235,6 +3784,61 @@ def _npc_attack_dice(sheet: dict, weapon: str) -> tuple[int, int] | None:
         n, s, _bonus = _parse_dice(sheet["arma_dado_secundaria"])
         return n, s
     return None
+
+
+def _resolve_damage_type(attacker_sheet: dict, weapon: str,
+                         matched_hab: dict | None) -> str:
+    """
+    Tipo de dano de um ataque, na mesma ordem de prioridade do dado:
+      1. habilidade da ficha (campo explícito ou descrição em PT);
+      2. ataque natural do monstro, lido do stat block;
+      3. arma do SRD (tabela local, depois Open5e);
+      4. palpite pelo nome da arma (adaga → perfurante, maça → concussão).
+    Devolve '' quando não dá para saber — dano sem tipo não sofre modificador,
+    que é o comportamento seguro.
+    """
+    if matched_hab:
+        explicito = _norm_damage_type(matched_hab.get("tipo_dano", "") or "")
+        if explicito:
+            return explicito
+        pelo_texto = _damage_type_from_text(matched_hab.get("descricao", ""))
+        if pelo_texto:
+            return pelo_texto
+
+    entrada = _npc_attack_entry(attacker_sheet, weapon)
+    if entrada and entrada.get("tipo"):
+        return entrada["tipo"]
+
+    return _weapon_damage_type(weapon)
+
+
+# Tipo de dano das armas mais comuns, por palavra no nome. Evita um
+# round-trip ao SRD só para descobrir que espada corta e maça esmaga.
+_WEAPON_DAMAGE_TYPE = (
+    ("slashing",    ("espada", "sword", "machado", "axe", "cimitarra", "scimitar",
+                     "foice", "sickle", "scythe", "alabarda", "halberd", "glaive",
+                     "sabre", "falchion", "greataxe", "battleaxe", "handaxe",
+                     "claws", "claw", "garra", "talon")),
+    ("piercing",    ("adaga", "dagger", "arco", "bow", "flecha", "arrow", "besta",
+                     "crossbow", "virote", "bolt", "lanca", "lança", "spear",
+                     "lance", "pike", "rapieira", "rapier", "estoque", "azagaia",
+                     "javelin", "tridente", "trident", "dardo", "dart", "bite",
+                     "mordida", "presa", "sting", "ferrao", "ferrão", "beak")),
+    ("bludgeoning", ("maca", "maça", "mace", "martelo", "hammer", "clava", "club",
+                     "porrete", "cajado", "bordao", "bordão", "quarterstaff",
+                     "staff", "funda", "sling", "flail", "mangual", "slam",
+                     "desarmado", "unarmed", "punho", "fist", "tail", "cauda")),
+)
+
+
+def _weapon_damage_type(weapon: str) -> str:
+    nome = _norm_txt(weapon)
+    if not nome:
+        return ""
+    for tipo, palavras in _WEAPON_DAMAGE_TYPE:
+        if any(p in nome for p in (_norm_txt(x) for x in palavras)):
+            return tipo
+    return ""
 
 
 def attack_roll(
@@ -3339,6 +3943,10 @@ def attack_roll(
             weapon_data = _fetch_weapon_data(weapon)
             if weapon_data:
                 damage_dice_count, damage_dice_sides = weapon_data
+
+    # Tipo de dano do golpe — o que decide se o alvo resiste, é imune ou
+    # vulnerável. '' quando não dá para saber (dano sem tipo, sem modificador).
+    dmg_type = _resolve_damage_type(sa, weapon, matched_hab)
 
     prof = sa.get("proficiencia", _proficiency_bonus(sa.get("nivel", 1))) if is_proficient else 0
 
@@ -3484,7 +4092,10 @@ def attack_roll(
             )
 
         extra_dmg = style_dmg_bonus + favored_bonus
-        dmg    = max(1, sum(rolls) + mod + _hab_bonus + extra_dmg + gd_total)
+        # Dano da ARMA (sem o Golpe Divino, que tem tipo próprio e vira um
+        # componente separado logo abaixo).
+        dmg_arma = max(1, sum(rolls) + mod + _hab_bonus + extra_dmg)
+        dmg    = dmg_arma + gd_total
         detail = " + ".join(str(r) for r in rolls)
         bonus_str = f" +{_hab_bonus}" if _hab_bonus > 0 else (f" {_hab_bonus}" if _hab_bonus < 0 else "")
         if extra_dmg:
@@ -3500,14 +4111,27 @@ def attack_roll(
             result += (f"   ⚡ Golpe Divino: {len(gd_rolls)}d8 "
                        f"[{' + '.join(str(r) for r in gd_rolls)}] = {gd_total} "
                        f"dano {gd_tipo}\n")
-        result += f"   Dano: [{detail}] +{mod}(mod){bonus_str} = **{dmg}**\n"
+        _tipo_str = f" ({dmg_type})" if dmg_type else ""
+        result += f"   Dano{_tipo_str}: [{detail}] +{mod}(mod){bonus_str} = **{dmg}**\n"
 
-        hp_antes       = st["vida_atual"]
-        st["vida_atual"] = max(0, st["vida_atual"] - dmg)
-        hp_depois      = st["vida_atual"]
-        pct            = hp_depois / st["vida_max"] if st["vida_max"] > 0 else 0
+        # Caminho único de dano: tipo → resistência → PV temporários → PV.
+        # O Golpe Divino entra como componente próprio porque seu tipo é
+        # outro (radiante/gélido/…), e um alvo pode resistir a um e não ao
+        # outro dentro do MESMO golpe.
+        _componentes = [(dmg_arma, dmg_type)]
+        if gd_total:
+            _componentes.append((gd_total, gd_info[1] if gd_info else ""))
 
-        result += f"   {target['name']}: ❤️  {hp_antes} → {hp_depois}/{st['vida_max']}"
+        _res = _apply_damage(target, components=_componentes,
+                             source_name=attacker["name"],
+                             arma_magica=_bypasses_material_resistance(weapon))
+        hp_antes  = _res["hp_antes"]
+        hp_depois = _res["hp_depois"]
+        dmg       = _res["dano"]
+        pct       = hp_depois / st["vida_max"] if st["vida_max"] > 0 else 0
+
+        result += _fmt_notas(_res["notas"])
+        result += f"\n   {target['name']}: ❤️  {hp_antes} → {hp_depois}/{st['vida_max']}"
         _dmg_expr = f"[{detail}] +{mod}(mod){bonus_str} = {dmg}"
         _log_combat_event(
             "attack_crit" if critico else "attack_hit",
@@ -3687,6 +4311,12 @@ def use_ability(
         f"   Efeito: {hab['descricao']}"
     )
 
+    # Concentração: só se mantém UMA magia por vez. Antes disto, um clérigo
+    # sustentava Bênção, Escudo da Fé e Arma Espiritual ao mesmo tempo.
+    if _requires_concentration(hab):
+        result += _start_concentration(char, hab["nome"])
+        result += f"\n   🌀 {char['name']} está concentrado em {hab['nome']}."
+
     # ── Aplica efeito ao alvo ────────────────────────────────────────────────
     ctrl_effect = _get_control_effect(hab)
     # Inicializa lista de afetados por pool spell — usada no log mesmo
@@ -3825,8 +4455,13 @@ def use_ability(
                 result += f"\n   🔴 {target['name']}: {cond.upper()}! (sem dano)"
 
             else:
-                # Dano direto
-                st["vida_atual"] = max(0, st["vida_atual"] - total_dano)
+                # Dano direto — passa pelo pipeline de tipo/resistência.
+                _tipo_hab = (_norm_damage_type(hab.get("tipo_dano", "") or "")
+                             or _damage_type_from_text(hab.get("descricao", "")))
+                _res = _apply_damage(target, total_dano, _tipo_hab,
+                                     source_name=char["name"], arma_magica=True)
+                hp_antes = _res["hp_antes"]
+                result += _fmt_notas(_res["notas"])
                 result += f"\n   {target['name']}: ❤️  {hp_antes} → {st['vida_atual']}/{st['vida_max']}"
                 if st["vida_atual"] == 0:
                     result += _mark_at_zero_hp(target, char["name"])
@@ -4665,6 +5300,10 @@ def long_rest(char_name: str) -> str:
     s["hit_dice_remaining"] = s.get("nivel", 1)  # Renova dados de vida no descanso longo
     s["death_saves_sucessos"] = 0
     s["death_saves_falhas"]   = 0
+    # PV temporários expiram no descanso longo; a concentração também cai.
+    temp_perdidos   = _temp_hp(s)
+    s["vida_temp"]  = 0
+    conc_msg        = _break_concentration(char, "descanso longo")
 
     if char.get("status") in ("inconsciente", "ferido"):
         char["status"] = "vivo"
@@ -4687,6 +5326,8 @@ def long_rest(char_name: str) -> str:
         f"   ❤️  Vida restaurada: {s['vida_max']}/{s['vida_max']}\n"
         f"   ✨ Mana restaurada: {s['mana_max']}/{s['mana_max']}"
         f"{cond_msg}"
+        + (f"\n   🔵 {temp_perdidos} PV temporários expiraram." if temp_perdidos else "")
+        + (f"\n   {conc_msg}" if conc_msg else "")
     )
 
 
@@ -5006,6 +5647,11 @@ def end_combat() -> str:
     # luta (jamais deve vazar para o próximo combate ou para a ficha).
     for _ch in memory.campaign.get("characters", {}).values():
         _wake_sleeper(_ch)
+        # Concentração e reação também não vazam para a próxima luta.
+        _sh = _ch.get("sheet") or {}
+        if _sh.get("concentracao"):
+            _sh["concentracao"] = None
+        _sh.pop("reacao_rodada", None)
     memory.save_campaign()
     return "🏳️  Combate encerrado. Iniciativa e rastreador de turnos limpos."
 
@@ -5133,6 +5779,7 @@ def resolve_saving_throw(
     dc: int,
     player_roll: int,
     damage_if_fail: int,
+    damage_type: str = "",
 ) -> str:
     """
     Resolve um Saving Throw interativo após o jogador informar o resultado do dado.
@@ -5147,6 +5794,11 @@ def resolve_saving_throw(
         dc:              Classe de Dificuldade do efeito (ex: 14).
         player_roll:     Valor TOTAL informado pelo jogador (dado + modificador já somados).
         damage_if_fail:  Dano total caso o saving throw falhe.
+        damage_type:     Tipo do dano ('fogo', 'frio', 'veneno', 'radiante', 'ácido',
+                         'elétrico', 'necrótico', 'psíquico', 'trovejante', 'força',
+                         'cortante', 'perfurante', 'concussão'). Informe SEMPRE que
+                         souber — é o que decide se o alvo resiste, é imune ou
+                         vulnerável. Vazio = dano sem tipo, sem modificador.
     """
     char, err = _get_char(target_name)
     if not char:
@@ -5168,11 +5820,13 @@ def resolve_saving_throw(
         f"   Dano aplicado: **{dano_real}**{reducao}\n"
     )
 
-    hp_antes        = s["vida_atual"]
-    s["vida_atual"] = max(0, s["vida_atual"] - dano_real)
-    hp_depois       = s["vida_atual"]
-    pct             = hp_depois / s["vida_max"] if s["vida_max"] > 0 else 0
+    _res      = _apply_damage(char, dano_real, damage_type,
+                              source_name="saving throw", arma_magica=True)
+    hp_antes  = _res["hp_antes"]
+    hp_depois = _res["hp_depois"]
+    pct       = hp_depois / s["vida_max"] if s["vida_max"] > 0 else 0
 
+    result += "".join(f"   {n}\n" for n in _res["notas"])
     result += f"   {char['name']}: ❤️  {hp_antes} → {hp_depois}/{s['vida_max']}"
     if hp_depois == 0:
         result += _mark_at_zero_hp(char)
@@ -6014,7 +6668,10 @@ def _extract_monster_attacks(monster: dict) -> dict:
         if not dado:
             _m  = _re.search(r"(\d+d\d+)", desc)
             dado = _m.group(1) if _m else ""
-        ataques.append({"nome": aname.lower(), "dado": dado,
+        # "Hit: 14 (2d8 + 5) slashing damage" → slashing.
+        tipo = _norm_damage_type(action.get("damage_type") or "") \
+               or _damage_type_from_text(desc)
+        ataques.append({"nome": aname.lower(), "dado": dado, "tipo": tipo,
                         "ranged": bool(is_ranged and not is_melee)})
 
     def _primeiro(*testes):
@@ -6133,6 +6790,12 @@ def spawn_monster(
     elif cr_float >= 5: prof = 3
 
     # Ataques reais do stat block (dado de dano incluso) + Multiattack.
+    # Resistências / imunidades / vulnerabilidades — o Open5e já devolve
+    # esses campos e eles eram simplesmente jogados fora.
+    resistencias      = _parse_damage_traits(m.get("damage_resistances"))
+    imunidades        = _parse_damage_traits(m.get("damage_immunities"))
+    vulnerabilidades  = _parse_damage_traits(m.get("damage_vulnerabilities"))
+
     atk_data        = _extract_monster_attacks(m)
     ataques         = atk_data["ataques"]
     arma_principal  = atk_data["arma_principal"]
@@ -6181,6 +6844,11 @@ def spawn_monster(
             "arma_secundaria":      arma_secundaria or None,
             "arma_dado_secundaria": arma_dado_sec,
             "multiattack":          multiattack,
+            "resistencias":         resistencias,
+            "imunidades":           imunidades,
+            "vulnerabilidades":     vulnerabilidades,
+            "vida_temp":            0,
+            "concentracao":         None,
             "condicoes":            [],
             "death_saves_sucessos": 0,
             "death_saves_falhas":   0,
@@ -6220,10 +6888,25 @@ def spawn_monster(
     ma_info    = f" | 🗡️ Ataque Múltiplo ×{multiattack}" if multiattack > 1 else ""
     qty_label  = f"{quantity}×" if quantity > 1 else ""
 
+    def _traits_line(rotulo: str, entradas: list) -> str:
+        tipos = sorted({t for e in entradas for t in e.get("tipos", [])})
+        if not tipos:
+            return ""
+        cond = " (só de armas não-mágicas)" if any(
+            e.get("requer_magica") for e in entradas) else ""
+        return f"\n   {rotulo}: {', '.join(tipos)}{cond}"
+
+    traits_info = (
+        _traits_line("🛡️ Imunidades",      imunidades)
+        + _traits_line("🛡️ Resistências",  resistencias)
+        + _traits_line("💥 Vulnerabilidades", vulnerabilidades)
+    )
+
     return (
         f"👹 {qty_label}{base_name} criado(s) com stats reais (Open5e)!\n"
         f"   CR {cr_label} | ❤️ HP {hp_max} | 🛡️ CA {ac}{atk_info}{sec_info}{ma_info}\n"
-        f"   FOR {str_}  DES {dex}  CON {con}  INT {int_}  SAB {wis}  CAR {cha}\n"
+        f"   FOR {str_}  DES {dex}  CON {con}  INT {int_}  SAB {wis}  CAR {cha}"
+        f"{traits_info}\n"
         f"   Personagens: {names_str}"
         # Instrução interna à LLM — filtrada antes de exibir na UI (server.py).
         f"\n[[llm]]→ Agora chame roll_initiative() incluindo: {names_str}[[/llm]]"
@@ -6326,6 +7009,8 @@ def execute_npc_turn(npc_name: str = "") -> str:
         hp_pct = (npc_sheet.get("vida_atual", 1) /
                   max(1, npc_sheet.get("vida_max", 1)))
         if hp_pct <= 0.25:
+            # Fugir não é grátis: quem está em contato leva o bote.
+            oportunidade = _provoke_opportunity_attacks(npc_name, "fugir")
             npc["status"] = "fugiu"
             _log_combat_event("flee", npc_name, "",
                               msg=f"{npc_name} fugiu do combate")
@@ -6333,7 +7018,7 @@ def execute_npc_turn(npc_name: str = "") -> str:
             advance = _auto_advance_turn(npc_name)
             return (
                 f"💨 {npc_name} está com {int(hp_pct * 100)}% de HP e FOGE do combate!"
-                f"{advance}"
+                f"{oportunidade}{advance}"
             )
 
     # Monta lista de alvos válidos: membros do grupo vivos e em pé.
@@ -6758,6 +7443,16 @@ def _combatant_snapshot(name: str) -> dict | None:
         "is_party":   bool(memory.is_party_member(ch)),
         "hp":         int(s.get("vida_atual", 0) or 0),
         "hp_max":     int(s.get("vida_max", 0) or 0),
+        # Onda 2 — a tela precisa mostrar por que um golpe deu metade do dano.
+        "hp_temp":    _temp_hp(s),
+        "concentracao": (s.get("concentracao") or {}).get("magia", ""),
+        "reacao_disponivel": _reaction_available(ch),
+        "resistencias":     sorted({t for e in _traits_lookup(s, "resistencias")
+                                    for t in e.get("tipos", [])}),
+        "imunidades":       sorted({t for e in _traits_lookup(s, "imunidades")
+                                    for t in e.get("tipos", [])}),
+        "vulnerabilidades": sorted({t for e in _traits_lookup(s, "vulnerabilidades")
+                                    for t in e.get("tipos", [])}),
         "mp":         int(s.get("mana_atual", 0) or 0),
         "mp_max":     int(s.get("mana_max", 0) or 0),
         "ca":         int(s.get("ca", 10) or 10),
@@ -7003,10 +7698,13 @@ def combat_action(action: str, actor: str = "", target: str = "",
             if not ch:
                 return {"ok": False, "message": f"'{actor}' não encontrado.",
                         "snapshot": combat_snapshot()}
+            # Ataque de oportunidade ANTES de marcar como fugido — senão o
+            # motor considera o alvo fora de combate e ninguém reage.
+            oportunidade = _provoke_opportunity_attacks(actor, "fugir")
             ch["status"] = "fugiu"
             _log_combat_event("flee", actor, "", msg=f"{actor} fugiu do combate")
             memory.save_campaign()
-            msg = f"💨 {actor} fugiu do combate!"
+            msg = f"💨 {actor} fugiu do combate!{oportunidade}"
             force_end = True
 
         elif a in ("pass", "end_turn"):
@@ -7135,6 +7833,7 @@ DND_TOOLS = [
     get_combat_status,
     modify_hp,
     modify_mana,
+    grant_temp_hp,
     make_skill_check,
     social_check,
     attack_roll,

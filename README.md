@@ -402,7 +402,7 @@ navegador. `static/js/utils.js:authFetch` tenta refresh silencioso em 401.
 
 ## Modo D&D, mecânicas
 
-`tools_dnd.py` (~7200 linhas, 38 ferramentas + helpers) é o motor de regras D&D 5e
+`tools_dnd.py` (~7900 linhas, 38 ferramentas + helpers) é o motor de regras D&D 5e
 (usa a variante oficial de Pontos de Magia do DMG p.288 no lugar de spell
 slots; casos comuns cobertos). Resumo:
 
@@ -616,7 +616,7 @@ Cada turno tem:
 - **1 Ação Bônus**, só se algo permitir (Healing Word, Misty Step, Second
   Wind, Action Surge, Cunning Action, Bardic Inspiration, Spiritual Weapon,
   Shillelagh, Healing Spirit, Hex, **Poção de Cura (regra 2024)**)
-- **1 Reação**, fora do próprio turno (não modelada no estado)
+- **1 Reação**, fora do próprio turno (ver "Reação e ataque de oportunidade")
 - Movimento
 
 O turno **só avança** quando:
@@ -627,6 +627,97 @@ O turno **só avança** quando:
 
 Classificadores (`tools_dnd.py:_ability_action_type` e `_item_action_type`)
 detectam Bônus por nome (PT e EN). Default: Ação.
+
+### Tipos de dano, resistência, imunidade e vulnerabilidade
+
+Todo dano do jogo passa por `_apply_damage()`, na ordem do PHB:
+
+```
+modificador de tipo → PV temporários absorvem → PV reais → teste de concentração
+```
+
+Antes, o dano era subtraído cru do HP (`vida_atual -= dmg`). Sem tipo não
+existe resistência: o esqueleto morria de veneno, o elemental do fogo se
+queimava, e escolher a arma certa contra um alvo não mudava nada.
+
+De onde vem o tipo, em ordem de confiança:
+
+1. campo `tipo_dano` da habilidade, se houver;
+2. descrição da habilidade em PT ("3d6 dano de fogo");
+3. `ataques` do stat block do monstro ("slashing damage");
+4. nome da arma (espada → cortante, maça → concussão).
+
+Sem tipo identificado, o dano é aplicado **sem modificador** — o
+comportamento seguro.
+
+`spawn_monster` importa `damage_resistances`, `damage_immunities` e
+`damage_vulnerabilities` do Open5e, que antes eram descartados. Verificado
+contra a API real:
+
+| Monstro | Efeito |
+|---|---|
+| Esqueleto | resiste a veneno, **vulnerável a concussão** (dano dobrado) |
+| Elemental do Fogo | **imune a fogo** — bola de fogo causa 0 |
+| Lobisomem | imune a corte/perfuração/concussão **de armas não-mágicas** |
+
+**A armadilha da qualificação.** O SRD escreve *"bludgeoning, piercing, and
+slashing from nonmagical attacks"*. Aplicar isso sem modelar armas mágicas
+deixaria o lobisomem praticamente imune ao grupo. Então a qualificação é
+preservada em `requer_magica`, e a resistência é ignorada quando o golpe vem
+de arma mágica **ou de material especial** — "espada prateada", "adaga de
+prata", "machado adamantino". A espada de prata existe justamente para caçar
+lobisomem; sem reconhecer o material ela faria zero dano igual a um pau.
+
+Medido ao vivo contra o lobisomem: espada longa comum → **0 de dano**;
+Espada Longa +1 → **8**.
+
+### PV temporários
+
+`grant_temp_hp(char, amount, source)`. Absorvem dano antes dos PV reais, não
+podem ser curados e expiram no descanso longo. **Não se acumulam**: ao
+receber uma nova quantia o alvo fica com a maior das duas, nunca com a soma
+— e a ferramenta avisa quando descarta a menor.
+
+Aplicados **depois** do modificador de tipo, como manda o PHB: 10 de fogo
+contra um alvo resistente com 10 PV temporários consome 5, não 10.
+
+### Concentração
+
+"Concentração" era só texto decorativo nas descrições. Hoje
+`sheet["concentracao"]` guarda a magia ativa, e:
+
+- só **uma** magia de concentração por vez — conjurar outra derruba a
+  anterior, com aviso (antes, um clérigo sustentava Bênção + Escudo da Fé +
+  Arma Espiritual ao mesmo tempo);
+- sofrer dano exige teste de Constituição, CD = maior entre 10 e metade do
+  dano;
+- cair a 0 PV derruba sem teste;
+- dano totalmente absorvido por PV temporários, ou zerado por imunidade, não
+  ameaça a concentração;
+- descanso longo e fim de combate limpam — a concentração nunca vaza para a
+  luta seguinte.
+
+O d20 desse teste é rolado pelo sistema, inclusive para personagens
+jogáveis: ele dispara no meio do turno do inimigo, e parar tudo para pedir um
+dado quebraria o fluxo do combate. O resultado é sempre mostrado.
+
+### Reação e ataque de oportunidade
+
+A economia rastreava só Ação e Bônus. A **Reação** — a única coisa que
+acontece fora do próprio turno — agora existe: uma por rodada, guardada em
+`sheet["reacao_rodada"]`.
+
+Sem posicionamento no jogo, o gatilho honesto para o ataque de oportunidade
+é a **fuga**. Sair do combate deixou de ser grátis, que é exatamente o que a
+regra existe para impedir. Cada inimigo consciente que ainda tem a reação da
+rodada faz um ataque corpo-a-corpo contra quem foge — valendo para os dois
+caminhos, o NPC covarde e o jogador clicando "Fugir" na tela.
+
+O motor redireciona: se o fugitivo cai no primeiro bote, os demais não
+desperdiçam a reação num corpo no chão.
+
+Quando houver zonas/alcance, `_provoke_opportunity_attacks` passa a ser
+chamado também no movimento — o resto já está no lugar.
 
 ### Status "dormindo" (Sleep)
 
@@ -843,8 +934,9 @@ A lista completa exposta ao agente (`tools.py:ALL_TOOLS` = narrativas +
 | `roll_dice(sides, count, modifier)` | Rola dados genéricos |
 | `create_character_sheet(...)` | Cria ficha D&D completa (nível 1–20) |
 | `get_character_sheet` / `get_combat_status` | Lê ficha / status do combate |
-| `modify_hp(char, amount, reason)` | Aplica HP (positivo cura, negativo dano) |
+| `modify_hp(char, amount, reason, damage_type)` | Aplica HP (positivo cura, negativo dano com tipo) |
 | `modify_mana(char, amount, reason)` | Aplica mana |
+| `grant_temp_hp(char, amount, source)` | PV temporários (não acumulam: vale o maior) |
 | `make_skill_check(char, atr, dc, adv/dis, skill, player_roll)` | Teste de atributo (PC informa o d20; NPC o sistema rola) |
 | `social_check(char, skill, dc, player_roll)` | Jogador informa o d20 |
 | `attack_roll(atacante, alvo, arma, dado)` | Ataque completo: d20 → dano → KO |
@@ -867,7 +959,7 @@ A lista completa exposta ao agente (`tools.py:ALL_TOOLS` = narrativas +
 | `recruit_character(npc, role)` | NPC vira aliado (com guarda de nível) |
 | `spawn_monster(slug, display, quantity)` | Cria monstro com stats reais |
 | `set_npc_strategy` / `execute_npc_turn` | Turno de NPC automático |
-| `resolve_saving_throw(target, atr, dc, roll, dmg)` | Macro-tool de save interativo |
+| `resolve_saving_throw(target, atr, dc, roll, dmg, damage_type)` | Macro-tool de save interativo |
 | `suggest_encounter(level, size, difficulty)` | Sugere encontro balanceado |
 
 Cada função tem **docstring detalhada**, a ADK gera o schema JSON
@@ -1067,9 +1159,11 @@ em `utils.js`) é adaptativa:
 
 ## Testes e garantias
 
-A suíte roda com **pytest** (110 testes). O `conftest.py` isola tudo de rede
+A suíte roda com **pytest** (212 testes). O `conftest.py` isola tudo de rede
 e de banco: o `database` (Supabase) vira stub e a camada SRD entra em modo
-offline, então nenhum teste depende da internet.
+offline, então nenhum teste depende da internet. Ele também expõe a fábrica
+`criar_ficha()` e as fixtures `campanha`/`povoar`, para um teste de motor
+montar um combate em três linhas.
 
 ```bash
 pip install -r requirements-dev.txt
@@ -1109,6 +1203,20 @@ Testes nativos das garantias mais recentes:
   uma vez só — inclusive quando o alvo cai no primeiro golpe.
 - Cache do SRD: acerto e 404 são cacheados, erro de rede não é, `get()`
   nunca levanta exceção.
+
+### `test_damage_types.py` / `test_concentration.py` / `test_reactions.py`
+
+- Imunidade zera, resistência corta pela metade (mas **nunca zera um acerto**),
+  vulnerabilidade dobra, resistência e vulnerabilidade se cancelam, imunidade
+  vence as duas, e dano sem tipo nunca é modificado.
+- Arma mágica e material especial furam a resistência qualificada; arma
+  mágica **não** fura resistência incondicional.
+- PV temporários absorvem antes dos PV reais, entram depois do modificador de
+  tipo, e não se acumulam.
+- Só uma concentração por vez; CD do teste = `max(10, dano/2)`; cair a 0 PV
+  derruba sem teste; dano absorvido ou anulado por imunidade não ameaça.
+- Reação recarrega por rodada; aliado não bate em aliado que foge; quem já
+  gastou a reação não reage; o bote para quando o fugitivo cai.
 
 ### `tests_combat_fuzz.py`, fuzzer de invariantes
 
@@ -1160,7 +1268,7 @@ Já descrito, força correção quando a IA narra mecânica sem ferramenta
 ├── server.py              Flask + SSE + endpoints + segurança (~2500 linhas)
 ├── agent.py               Instruções de estilo + create_agent
 ├── tools.py               Tools narrativas + ALL_TOOLS
-├── tools_dnd.py           Motor D&D 5e + combate (~7200 linhas, 38 tools)
+├── tools_dnd.py           Motor D&D 5e + combate (~7900 linhas, 38 tools)
 ├── memory.py              Estado por sessão, proxy, persistência
 ├── database.py            Camada Supabase
 ├── auth.py                Supabase Auth + @require_auth
@@ -1175,6 +1283,9 @@ Já descrito, força correção quando a IA narra mecânica sem ferramenta
 ├── test_fuzz_invariants.py  Portão: roda o fuzzer na suíte
 ├── test_monster_attacks.py  Dado de dano de monstro + Multiattack
 ├── test_open5e_cache.py   Comportamento do cache do SRD
+├── test_damage_types.py   Tipos de dano, resistências e PV temporários
+├── test_concentration.py  Concentração em magias
+├── test_reactions.py      Reação e ataque de oportunidade
 ├── requirements.txt       Dependências fixadas (é o que o Render instala)
 ├── requirements-dev.txt   Dependências de teste (pytest)
 ├── render.yaml            Deploy no Render (gunicorn + envs Supabase)
@@ -1302,18 +1413,30 @@ Documentadas honestamente, coisas que sei que poderiam estar melhores:
 - **Itens consumíveis genéricos** (pergaminhos, ácido, fogo alquímico) são
   consumidos + logados, mas o efeito mecânico é narrado pela IA no recap
   (não tem regra inline). Poções de cura têm regra mecânica direta.
-- **Sem reação modelada** (Shield, Counterspell, ataque de oportunidade)
-  na tela tática, coisas de fora-do-turno ainda não estão na economia.
+- **Reação só dispara na fuga.** A Reação existe na economia e o ataque de
+  oportunidade funciona, mas o único gatilho é sair do combate — sem
+  posicionamento no jogo, não há "afastar-se de um inimigo adjacente" para
+  detectar. Shield e Counterspell (reações *escolhidas* pelo jogador) ainda
+  não existem: exigem interromper o turno de outra criatura para perguntar.
 - **Arma customizada de jogador cai em 1d6.** `combat_action("attack")`
   passa um dado padrão e conta com `_fetch_weapon_data` para corrigi-lo;
   isso funciona para armas reais do SRD, mas uma arma inventada pela
   narrativa ("Lâmina do Crepúsculo") não é encontrada e fica no fallback.
   É a mesma classe de bug já corrigida do lado dos monstros, e o conserto é
   o mesmo: gravar o dado na ficha em vez de redescobri-lo a cada golpe.
-- **Sem tipos de dano**, e portanto sem resistência, imunidade ou
-  vulnerabilidade: o dano é subtraído cru do HP. O esqueleto morre de veneno
-  e o elemental do fogo se queima. `spawn_monster` nem importa os campos
-  `damage_resistances`/`damage_immunities`, que o Open5e já devolve.
+- **Tipo de dano em magia depende da descrição.** Ataques com arma e stat
+  blocks de monstro têm o tipo resolvido com segurança; magias da ficha são
+  lidas do texto ("3d6 dano de fogo"). Uma habilidade caseira com descrição
+  vaga sai sem tipo — e dano sem tipo não sofre modificador nenhum, que é o
+  comportamento seguro, mas silencioso. Fix futuro: campo `tipo_dano`
+  explícito em `learn_ability`.
+- **Teste de concentração é rolado pelo sistema**, inclusive para
+  personagens jogáveis, ao contrário dos testes de perícia e de morte. O
+  gatilho acontece no meio do turno do inimigo, e parar para pedir um d20
+  quebraria o fluxo. O resultado é sempre mostrado.
+- **Prata/adamante são detectados pelo NOME do item.** "espada prateada"
+  fura a imunidade do lobisomem; "espada longa (revestida em prata)" não.
+  Enquanto o inventário não tiver campo de material, é heurística de texto.
 - **Sub-features de arquétipo**, só as de efeito numérico claro têm hook no
   motor (faixa de crítico, Golpe Divino, Resistência Dracônica, Estilo de
   Combate). Manobras, reações e recursos de pool (Ki, Dado de Superioridade)
