@@ -23,10 +23,11 @@ import memory
 # Debug do motor de regras (para demonstração ao vivo).
 # Mostra no terminal quando o motor consulta a base externa Open5e (grounding):
 # em vez de "alucinar" stats, o agente busca dados reais de D&D 5e via HTTP.
-# Ligado por padrão; defina RPG_DEBUG=0 para silenciar (ex.: produção/testes).
+# DESLIGADO por padrão. Para ver o debug ao vivo, rode com RPG_DEBUG=1
+# (ex.: RPG_DEBUG=1 python server.py). Aceita: 1/true/yes/on.
 # ---------------------------------------------------------------------------
 
-DEBUG_ENGINE = os.environ.get("RPG_DEBUG", "1") not in ("0", "false", "False", "")
+DEBUG_ENGINE = os.environ.get("RPG_DEBUG", "0").strip().lower() in ("1", "true", "yes", "on")
 
 
 def _edbg(msg: str = "") -> None:

@@ -13,10 +13,11 @@ from tools import ALL_TOOLS
 # ---------------------------------------------------------------------------
 # Debug do contexto entregue à LLM (para demonstração ao vivo).
 # Mostra no terminal o snapshot de cena injetado na instrução a cada turno.
-# Ligado por padrão; defina RPG_DEBUG=0 para silenciar.
+# DESLIGADO por padrão. Para ver o debug ao vivo, rode com RPG_DEBUG=1
+# (ex.: RPG_DEBUG=1 python server.py). Aceita: 1/true/yes/on.
 # ---------------------------------------------------------------------------
 
-_DEBUG_AGENT = os.environ.get("RPG_DEBUG", "1") not in ("0", "false", "False", "")
+_DEBUG_AGENT = os.environ.get("RPG_DEBUG", "0").strip().lower() in ("1", "true", "yes", "on")
 _last_snapshot_logged = None
 
 

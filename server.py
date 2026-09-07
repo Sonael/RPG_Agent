@@ -29,10 +29,11 @@ from validator import validate
 # Debug do loop do agente (para demonstração ao vivo)
 # Imprime no terminal cada passo do ciclo ReAct do agente: percepção,
 # chamada de ferramenta (ação), resultado observado e resposta final.
-# Ligado por padrão; defina RPG_DEBUG=0 no ambiente para silenciar (ex.: produção).
+# DESLIGADO por padrão. Para ver o debug ao vivo, rode com RPG_DEBUG=1
+# (ex.: RPG_DEBUG=1 python server.py). Aceita: 1/true/yes/on.
 # ---------------------------------------------------------------------------
 
-DEBUG_AGENT = os.environ.get("RPG_DEBUG", "1") not in ("0", "false", "False", "")
+DEBUG_AGENT = os.environ.get("RPG_DEBUG", "0").strip().lower() in ("1", "true", "yes", "on")
 
 
 def _dbg(msg: str = "") -> None:
