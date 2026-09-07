@@ -941,7 +941,7 @@ def update_campaign(name):
 def get_class_spells():
     """Retorna magias de uma classe até um nível máximo (usa Open5e + fallback local)."""
     from tools_dnd import _CLASS_SLUG_MAP, SPELL_MANA_COST, DEFAULT_SPELLS_BY_CLASS
-    import requests as _req
+    from open5e import http as _req   # SRD com cache, sessão e retry
 
     classe          = request.args.get("class", "").lower().strip()
     max_level       = min(int(request.args.get("max_level", 9) or 9), 9)
@@ -1047,7 +1047,7 @@ def get_class_spells():
 @require_auth
 def search_dnd_items():
     """Busca itens D&D no Open5e: armas, armaduras e itens mágicos."""
-    import requests as _req
+    from open5e import http as _req   # SRD com cache, sessão e retry
 
     q         = request.args.get("q", "").strip()
     item_type = request.args.get("type", "all")
@@ -1104,7 +1104,7 @@ def search_dnd_items():
 @require_auth
 def search_dnd_monsters():
     """Busca monstros D&D no Open5e e retorna atributos prontos para a ficha."""
-    import requests as _req
+    from open5e import http as _req   # SRD com cache, sessão e retry
 
     q = request.args.get("q", "").strip()
     if not q or len(q) < 2:
@@ -1117,30 +1117,10 @@ def search_dnd_monsters():
         else:
             ca = int(ac_raw or 10)
 
-        # Extrai arma principal (primeiro ataque corpo-a-corpo) e arma secundária
-        # (primeiro ataque à distância) das ações do monstro.
-        arma_principal  = ""
-        arma_secundaria = ""
-        arma_dado       = ""  # dado de dano da arma principal (ex: "1d6")
-        for action in (m.get("actions") or []):
-            desc = (action.get("desc") or "").lower()
-            name = action.get("name") or ""
-            if not name:
-                continue
-            is_melee  = "melee weapon attack"  in desc or "melee attack" in desc
-            is_ranged = "ranged weapon attack" in desc or "ranged attack" in desc
-            # Extrai dado de dano do campo damage_dice ou da descrição
-            dado = action.get("damage_dice", "")
-            if not dado:
-                m_dado = re.search(r'(\d+d\d+)', desc)
-                dado = m_dado.group(1) if m_dado else ""
-            if is_melee and not arma_principal:
-                arma_principal = name.lower()
-                arma_dado = dado
-            elif is_ranged and not arma_secundaria:
-                arma_secundaria = name.lower()
-            if arma_principal and arma_secundaria:
-                break
+        # Ataques do stat block — mesma extração usada por spawn_monster, para
+        # que a ficha montada pela UI e a criada pelo motor não divirjam.
+        from tools_dnd import _extract_monster_attacks
+        atk = _extract_monster_attacks(m)
 
         return {
             "nome":           m.get("name", ""),
@@ -1156,9 +1136,12 @@ def search_dnd_monsters():
             "ca":             ca,
             "vida":           int(m.get("hit_points",   10) or 10),
             "hit_dice":       m.get("hit_dice", ""),
-            "arma_principal": arma_principal,
-            "arma_secundaria":arma_secundaria,
-            "arma_dado":      arma_dado,
+            "arma_principal": atk["arma_principal"],
+            "arma_secundaria":atk["arma_secundaria"],
+            "arma_dado":      atk["arma_dado"],
+            "arma_dado_secundaria": atk["arma_dado_secundaria"],
+            "ataques":        atk["ataques"],
+            "multiattack":    atk["multiattack"],
         }
 
     try:

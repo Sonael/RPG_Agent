@@ -10,3 +10,5 @@ campanhas/
 .DS_Store
 .claude/
 screenshots/
+.cache/
+.pytest_cache/

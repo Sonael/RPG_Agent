@@ -2013,7 +2013,7 @@ def _fetch_armor_data(armor_name: str) -> dict | None:
     Busca dados de armadura no Open5e como fallback quando o item não está em ARMOR_TABLE.
     Retorna dict no mesmo formato de ARMOR_TABLE ou None se não encontrado.
     """
-    import requests as _req
+    from open5e import http as _req   # SRD com cache, sessão e retry
     slug = armor_name.lower().strip().replace(" ", "-").replace("'", "")
     for attempt in [
         lambda: _req.get(f"https://api.open5e.com/v1/armor/{slug}/", timeout=4),
@@ -2340,7 +2340,7 @@ _ATTR_MAP = {
 
 def _fetch_race_data(race_name: str) -> dict | None:
     """Busca dados da raça no Open5e. Retorna dict com ability_bonuses e traits, ou None."""
-    import requests as _req
+    from open5e import http as _req   # SRD com cache, sessão e retry
     en_name = RACE_PT_TO_EN.get(race_name.lower(), race_name.lower())
     slug    = en_name.replace(" ", "-").replace("'", "")
     try:
@@ -2448,7 +2448,7 @@ def _fetch_weapon_data(weapon_name: str) -> tuple[int, int] | None:
     Retorna (n_dice, sides) ou None se não encontrar.
     Ex: "espada longa" → (1, 8)  |  "arco longo" → (1, 8)
     """
-    import requests as _req
+    from open5e import http as _req   # SRD com cache, sessão e retry
     en_name = WEAPON_PT_TO_EN.get(weapon_name.lower().strip(), weapon_name.lower().strip())
     slug    = en_name.replace(" ", "-").replace("'", "")
     try:
@@ -2558,7 +2558,7 @@ def _fetch_class_spells(classe: str, max_spell_level: int = 1) -> list[dict]:
     Retorna lista de dicts {nome, descricao, custo_mana, dado}.
     Usa DEFAULT_SPELLS_BY_CLASS como fallback.
     """
-    import requests as _req
+    from open5e import http as _req   # SRD com cache, sessão e retry
 
     en_class = _CLASS_SLUG_MAP.get(classe.lower(), "")
     if not en_class:
@@ -3195,6 +3195,48 @@ def social_check(
     return result
 
 
+# Aviso anexado por attack_roll(end_turn=False). Fica numa constante porque o
+# Ataque Múltiplo precisa removê-lo dos golpes intermediários — ali o turno não
+# avança por ser multiattack, não porque sobrou uma ação bônus.
+_BONUS_ACTION_HINT = "\n   ↩️  Ação bônus disponível — ataque extra pendente neste turno."
+
+
+def _npc_attack_dice(sheet: dict, weapon: str) -> tuple[int, int] | None:
+    """
+    Dado de dano de um ataque natural de monstro ("bite", "claw", "slam"…),
+    lido do stat block do Open5e que spawn_monster gravou na ficha.
+
+    Devolve (n_dados, faces) ou None quando o ataque não está na ficha — aí o
+    chamador segue para a busca normal de arma do SRD.
+
+    O bônus fixo do stat block é ignorado de propósito: ele É o modificador de
+    atributo do monstro, que attack_roll já soma. Somar os dois dobraria o
+    bônus de dano de todo inimigo do jogo.
+    """
+    if not isinstance(sheet, dict):
+        return None
+    alvo = _norm_txt(weapon)
+    if not alvo:
+        return None
+
+    for atk in (sheet.get("ataques") or []):
+        if not isinstance(atk, dict) or not atk.get("dado"):
+            continue
+        if _norm_txt(atk.get("nome", "")) == alvo:
+            n, s, _bonus = _parse_dice(atk["dado"])
+            return n, s
+
+    # Compatibilidade com fichas criadas antes do campo "ataques".
+    equip = sheet.get("equipamentos", {}) or {}
+    if _norm_txt(equip.get("arma_principal") or "") == alvo and sheet.get("arma_dado"):
+        n, s, _bonus = _parse_dice(sheet["arma_dado"])
+        return n, s
+    if _norm_txt(sheet.get("arma_secundaria") or "") == alvo and sheet.get("arma_dado_secundaria"):
+        n, s, _bonus = _parse_dice(sheet["arma_dado_secundaria"])
+        return n, s
+    return None
+
+
 def attack_roll(
     attacker_name: str,
     target_name: str,
@@ -3283,11 +3325,20 @@ def attack_roll(
     else:
         mod = _modifier(sa.get(attack_attribute.lower(), sa["forca"]))
 
-    # Busca dado real da arma no Open5e (só se não veio de uma habilidade com dado próprio)
+    # Dado de dano, em ordem de prioridade:
+    #   1. habilidade da ficha que já traz o próprio dado (tratado acima);
+    #   2. ataque natural do monstro, vindo do stat block do Open5e;
+    #   3. arma do SRD, buscada por nome.
+    # O passo 2 é o que impede "bite"/"claw" (que não existem em /weapons/)
+    # de cair no fallback genérico de 1d6 e achatar o dano de todo monstro.
     if not matched_hab or not matched_hab.get("dado"):
-        weapon_data = _fetch_weapon_data(weapon)
-        if weapon_data:
-            damage_dice_count, damage_dice_sides = weapon_data
+        npc_dice = _npc_attack_dice(sa, weapon)
+        if npc_dice:
+            damage_dice_count, damage_dice_sides = npc_dice
+        else:
+            weapon_data = _fetch_weapon_data(weapon)
+            if weapon_data:
+                damage_dice_count, damage_dice_sides = weapon_data
 
     prof = sa.get("proficiencia", _proficiency_bonus(sa.get("nivel", 1))) if is_proficient else 0
 
@@ -3494,7 +3545,7 @@ def attack_roll(
     if end_turn:
         result += _auto_advance_turn(attacker_name)
     else:
-        result += "\n   ↩️  Ação bônus disponível — ataque extra pendente neste turno."
+        result += _BONUS_ACTION_HINT
     memory.save_campaign()
     return result
 
@@ -3937,7 +3988,7 @@ def apply_condition(char_name: str, condition: str, duration_turns: int = 0) -> 
         condition:      Nome da condição (ex: 'Cego', 'Envenenado', 'Paralisado').
         duration_turns: Duração em turnos (0 = indefinida, até ser removida manualmente).
     """
-    import requests as _req
+    from open5e import http as _req   # SRD com cache, sessão e retry
 
     char, err = _get_char(char_name)
     if not char:
@@ -4203,7 +4254,7 @@ def _search_open5e_item(item_name: str) -> dict | None:
     Busca o item mágico no Open5e. Tenta slug exato primeiro, depois search.
     Retorna o dict do item ou None se não encontrado / API offline.
     """
-    import requests as _req
+    from open5e import http as _req   # SRD com cache, sessão e retry
 
     slug = item_name.lower().strip().replace(" ", "-").replace("'", "")
     _edbg(f"  🌐 [OPEN5E] Buscando item mágico '{item_name}' na base SRD (grounding)…")
@@ -5311,7 +5362,7 @@ def learn_spell(char_name: str, spell_name: str) -> str:
         char_name:  Nome do personagem.
         spell_name: Nome da magia (português ou inglês).
     """
-    import requests as _req
+    from open5e import http as _req   # SRD com cache, sessão e retry
 
     char, err = _get_char(char_name)
     if not char:
@@ -5477,7 +5528,7 @@ def _cr_str_to_float(cr) -> float:
 
 def _fetch_open5e_monsters(cr: float, limit: int = 15) -> list[dict]:
     """Busca monstros do Open5e com CR correto. Retorna lista vazia se falhar."""
-    import requests as _req
+    from open5e import http as _req   # SRD com cache, sessão e retry
     cr_str = _cr_to_open5e_str(cr)
     _edbg(f"  🌐 [OPEN5E] Buscando monstros reais com CR≈{cr_str} na base SRD (grounding)…")
     try:
@@ -5641,7 +5692,7 @@ def _fetch_background(bg_name: str) -> dict | None:
     Busca um antecedente no Open5e. Retorna o dict ou None se falhar.
     Usa fallback offline automaticamente.
     """
-    import requests as _req
+    from open5e import http as _req   # SRD com cache, sessão e retry
     en_name = bg_name.lower().strip()
     slug    = en_name.replace(" ", "-").replace("'", "")
     try:
@@ -5794,7 +5845,7 @@ def choose_feat(char_name: str, feat_name: str) -> str:
         char_name: Nome do personagem.
         feat_name: Nome do talento em inglês (como aparece no SRD).
     """
-    import requests as _req
+    from open5e import http as _req   # SRD com cache, sessão e retry
 
     char, err = _get_char(char_name)
     if not char:
@@ -5882,6 +5933,122 @@ def choose_feat(char_name: str, feat_name: str) -> str:
 # Spawn de monstro com dados reais do Open5e
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Leitura do bloco de ações de um monstro do Open5e
+# ---------------------------------------------------------------------------
+
+_MULTIATTACK_WORDS = {
+    "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
+    "um": 1, "dois": 2, "tres": 3, "quatro": 4, "cinco": 5, "seis": 6,
+}
+# Teto defensivo: se o parser interpretar mal uma descrição, o pior caso é
+# um monstro com 4 ataques — não um loop de 40.
+_MULTIATTACK_MAX = 4
+
+
+def _parse_multiattack(actions: list) -> int:
+    """
+    Quantos ataques a ação 'Multiattack' concede. 1 quando o monstro não tem.
+
+    O Open5e traz o Multiattack só como texto em inglês, então lemos a frase:
+      "The owlbear makes two attacks: one with its beak and one with its claws."
+      "The bandit captain makes three attacks: two with its scimitar and one..."
+      "The mage makes 2 ranged attacks."
+    """
+    import re as _re
+    for action in (actions or []):
+        if _norm_txt(action.get("name", "")) not in ("multiattack", "ataque multiplo"):
+            continue
+        desc = _norm_txt(action.get("desc", ""))
+        m = _re.search(r"\bmakes?\s+([\w-]+)\s+(?:[\w-]+\s+){0,3}attacks\b", desc)
+        if not m:
+            continue
+        bruto = m.group(1)
+        n = _MULTIATTACK_WORDS.get(bruto, int(bruto) if bruto.isdigit() else 0)
+        if n >= 2:
+            return min(n, _MULTIATTACK_MAX)
+    return 1
+
+
+def _extract_monster_attacks(monster: dict) -> dict:
+    """
+    Extrai os ataques REAIS do bloco de ações do Open5e.
+
+    Por que isto existe: "bite", "claw", "slam" não são armas do SRD — buscá-las
+    em /weapons/ devolve 404, e o motor caía no fallback genérico de 1d6. Com o
+    dado guardado na ficha, o urso-coruja volta a bater os 2d8 do stat block e o
+    CR do encontro volta a significar alguma coisa.
+
+    Devolve: ataques (lista completa), arma principal/secundária com seus dados,
+    e quantos ataques o Multiattack concede.
+    """
+    import re as _re
+
+    ataques: list[dict] = []
+
+    for action in (monster.get("actions") or []):
+        aname = (action.get("name") or "").strip()
+        if not aname:
+            continue
+        # O próprio Multiattack não é um golpe — e a descrição dele CONTÉM
+        # "melee attacks:" (Bandit Captain: "makes three melee attacks: two
+        # with its scimitar…"). Sem esta guarda ele era classificado como
+        # ataque, virava a arma principal SEM dado, e o motor caía de volta
+        # no 1d6 genérico: exatamente o bug que esta função existe para matar.
+        if _norm_txt(aname) in ("multiattack", "ataque multiplo"):
+            continue
+
+        desc = (action.get("desc") or "").lower()
+        # Marcador confiável de um ataque de verdade: todo ataque do SRD traz
+        # o bônus de acerto ("+7 to hit"). Descrições que apenas CITAM ataques
+        # não têm isso.
+        if "to hit" not in desc:
+            continue
+
+        is_melee  = "melee" in desc
+        is_ranged = "ranged" in desc
+        if not (is_melee or is_ranged):
+            continue
+
+        dado = (action.get("damage_dice") or "").strip()
+        if not dado:
+            _m  = _re.search(r"(\d+d\d+)", desc)
+            dado = _m.group(1) if _m else ""
+        ataques.append({"nome": aname.lower(), "dado": dado,
+                        "ranged": bool(is_ranged and not is_melee)})
+
+    def _primeiro(*testes):
+        """Primeiro ataque que satisfaz algum dos testes, em ordem de preferência."""
+        for teste in testes:
+            for a in ataques:
+                if teste(a):
+                    return a
+        return None
+
+    # Um ataque COM dado vale mais que um sem: arma principal sem dado é o
+    # caminho de volta para o fallback genérico.
+    _com_dado = lambda a: bool(a["dado"])
+    principal = _primeiro(
+        lambda a: not a["ranged"] and _com_dado(a),   # corpo-a-corpo com dado
+        _com_dado,                                    # qualquer um com dado
+        lambda a: not a["ranged"],                    # corpo-a-corpo sem dado
+        lambda a: True,                               # o que houver
+    )
+    secundaria = _primeiro(
+        lambda a: a["ranged"] and _com_dado(a) and a is not principal,
+        lambda a: a["ranged"] and a is not principal,
+    )
+
+    return {
+        "ataques":               ataques,
+        "arma_principal":        (principal  or {}).get("nome", ""),
+        "arma_dado":             (principal  or {}).get("dado", ""),
+        "arma_secundaria":       (secundaria or {}).get("nome", ""),
+        "arma_dado_secundaria":  (secundaria or {}).get("dado", ""),
+        "multiattack":           _parse_multiattack(monster.get("actions") or []),
+    }
+
+
 def spawn_monster(
     monster_name: str,
     display_name: str = "",
@@ -5904,8 +6071,7 @@ def spawn_monster(
                        usa o nome do Open5e.
         quantity:      Quantos exemplares criar (1–10). Se > 1, cria "Nome 1", "Nome 2"…
     """
-    import requests as _req
-    import re as _re
+    from open5e import http as _req   # SRD com cache, sessão e retry
 
     quantity = max(1, min(10, int(quantity)))
 
@@ -5966,26 +6132,14 @@ def spawn_monster(
     elif cr_float >= 9: prof = 4
     elif cr_float >= 5: prof = 3
 
-    # Extrai arma principal das ações
-    arma_principal = ""
-    arma_dado      = ""
-    arma_secundaria = ""
-    for action in (m.get("actions") or []):
-        desc  = (action.get("desc") or "").lower()
-        aname = action.get("name") or ""
-        is_melee  = "melee weapon attack" in desc or "melee attack" in desc
-        is_ranged = "ranged weapon attack" in desc or "ranged attack" in desc
-        dado  = action.get("damage_dice", "")
-        if not dado:
-            _m = _re.search(r'(\d+d\d+)', desc)
-            dado = _m.group(1) if _m else ""
-        if is_melee and not arma_principal:
-            arma_principal  = aname.lower()
-            arma_dado       = dado
-        elif is_ranged and not arma_secundaria:
-            arma_secundaria = aname.lower()
-        if arma_principal and arma_secundaria:
-            break
+    # Ataques reais do stat block (dado de dano incluso) + Multiattack.
+    atk_data        = _extract_monster_attacks(m)
+    ataques         = atk_data["ataques"]
+    arma_principal  = atk_data["arma_principal"]
+    arma_dado       = atk_data["arma_dado"]
+    arma_secundaria = atk_data["arma_secundaria"]
+    arma_dado_sec   = atk_data["arma_dado_secundaria"]
+    multiattack     = atk_data["multiattack"]
 
     created_names = []
     for i in range(quantity):
@@ -6020,8 +6174,13 @@ def spawn_monster(
                 "arma_principal": arma_principal or None,
                 "amuleto":       None,
             },
+            # Ataques do stat block: sem isto, attack_roll não encontra
+            # "bite"/"claw" em /weapons/ e cai no fallback genérico de 1d6.
+            "ataques":              ataques,
             "arma_dado":            arma_dado,
             "arma_secundaria":      arma_secundaria or None,
+            "arma_dado_secundaria": arma_dado_sec,
+            "multiattack":          multiattack,
             "condicoes":            [],
             "death_saves_sucessos": 0,
             "death_saves_falhas":   0,
@@ -6058,11 +6217,12 @@ def spawn_monster(
     names_str  = ", ".join(created_names)
     atk_info   = f" | ⚔️ {arma_principal} ({arma_dado})" if arma_principal else ""
     sec_info   = f" + {arma_secundaria}" if arma_secundaria else ""
+    ma_info    = f" | 🗡️ Ataque Múltiplo ×{multiattack}" if multiattack > 1 else ""
     qty_label  = f"{quantity}×" if quantity > 1 else ""
 
     return (
         f"👹 {qty_label}{base_name} criado(s) com stats reais (Open5e)!\n"
-        f"   CR {cr_label} | ❤️ HP {hp_max} | 🛡️ CA {ac}{atk_info}{sec_info}\n"
+        f"   CR {cr_label} | ❤️ HP {hp_max} | 🛡️ CA {ac}{atk_info}{sec_info}{ma_info}\n"
         f"   FOR {str_}  DES {dex}  CON {con}  INT {int_}  SAB {wis}  CAR {cha}\n"
         f"   Personagens: {names_str}"
         # Instrução interna à LLM — filtrada antes de exibir na UI (server.py).
@@ -6206,29 +6366,74 @@ def execute_npc_turn(npc_name: str = "") -> str:
     else:  # suporte ou padrão
         target = min(targets, key=lambda t: t["hp"])
 
-    # Determina arma equipada
+    # Golpes do turno. O Ataque Múltiplo do urso-coruja é "um com o bico e um
+    # com as garras" — então alternamos entre os ataques do stat block em vez
+    # de repetir o mesmo, que erraria o dado (1d10 vs 2d8) e a narrativa.
     npc_equip = npc_sheet.get("equipamentos", {}) or {}
-    weapon    = npc_equip.get("arma_principal") or "shortsword"
+    repertorio = [a for a in (npc_sheet.get("ataques") or [])
+                  if isinstance(a, dict) and a.get("nome")]
+    if not repertorio:
+        repertorio = [{"nome": npc_equip.get("arma_principal") or "shortsword",
+                       "ranged": False}]
 
-    # Determina atributo de ataque (força por padrão para NPCs)
-    atk_attr = "forca"
-    if any(k in weapon.lower() for k in ("arco", "besta", "dardo", "funda")):
-        atk_attr = "destreza"
+    _RANGED_PT = ("arco", "besta", "dardo", "funda")
 
-    # Executa o ataque (inclui _auto_advance_turn() internamente).
+    def _atributo(atk: dict) -> str:
+        """Destreza para ataques à distância; força para o resto."""
+        if atk.get("ranged"):
+            return "destreza"
+        nome = (atk.get("nome") or "").lower()
+        return "destreza" if any(k in nome for k in _RANGED_PT) else "forca"
+
+    # Ataque Múltiplo: quantos golpes o stat block concede neste turno.
+    n_ataques = max(1, min(_MULTIATTACK_MAX,
+                           int(npc_sheet.get("multiattack", 1) or 1)))
+
+    # Executa o(s) ataque(s). Só o ÚLTIMO avança o turno.
     # _skip_turn_check=True: o motor já garante que está agindo pelo NPC
     # correto do turno — a checagem de ordem não se aplica aqui.
-    return attack_roll(
-        attacker_name    = npc_name,
-        target_name      = target["name"],
-        weapon           = weapon,
-        damage_dice_sides= 6,   # fallback; attack_roll busca via Open5e
-        damage_dice_count= 1,
-        attack_attribute = atk_attr,
-        is_proficient    = True,
-        end_turn         = True,
-        _skip_turn_check = True,
-    )
+    def _alvo_valido(nome: str) -> bool:
+        ch = memory.campaign["characters"].get(memory.char_key(nome))
+        if not ch or (ch.get("status", "vivo") or "").lower() in OUT:
+            return False
+        return int((ch.get("sheet") or {}).get("vida_atual", 0) or 0) > 0
+
+    partes    = []
+    alvo_nome = target["name"]
+    if n_ataques > 1:
+        partes.append(f"🗡️  {npc_name} usa Ataque Múltiplo ({n_ataques} ataques):")
+
+    for i in range(n_ataques):
+        # O alvo pode ter caído no golpe anterior — 5e manda redirecionar os
+        # ataques restantes, não desperdiçá-los num corpo no chão.
+        if not _alvo_valido(alvo_nome):
+            restantes = [t["name"] for t in targets
+                         if t["name"] != alvo_nome and _alvo_valido(t["name"])]
+            if not restantes:
+                partes.append(f"   ⏹️  Sem alvos de pé — {npc_name} interrompe a investida.")
+                partes.append(_auto_advance_turn(npc_name))
+                break
+            alvo_nome = restantes[0]
+
+        ultimo = (i == n_ataques - 1)
+        golpe_atual = repertorio[i % len(repertorio)]
+        golpe  = attack_roll(
+            attacker_name    = npc_name,
+            target_name      = alvo_nome,
+            weapon           = golpe_atual["nome"],
+            damage_dice_sides= 6,   # fallback; sobrescrito pelo stat block/SRD
+            damage_dice_count= 1,
+            attack_attribute = _atributo(golpe_atual),
+            is_proficient    = True,
+            end_turn         = ultimo,
+            _skip_turn_check = True,
+        )
+        if not ultimo:
+            # Não é ação bônus pendente — é o próximo golpe do Multiattack.
+            golpe = golpe.replace(_BONUS_ACTION_HINT, "")
+        partes.append(golpe)
+
+    return "\n".join(partes)
 
 
 # ===========================================================================

@@ -107,12 +107,52 @@ from tools_dnd import (
 )
 
 from tools import get_scene_context
+import open5e
 
 SEP = "=" * 62
-def sec(title): print(f"\n{SEP}\n{title}\n{SEP}")
+
+# ── Coletor de resultados ────────────────────────────────────────────────────
+# Antes, chk() só imprimia: 5 checks falhavam há tempos e o script continuava
+# saindo com código 0, então nenhum CI (e nenhum pytest) percebia. Agora cada
+# check vira um registro, o processo sai com código != 0 se algum falhar, e o
+# modo --json expõe os resultados um a um para o pytest.
+RESULTS: list[dict] = []
+_SECTION = "geral"
+
+def sec(title):
+    global _SECTION
+    _SECTION = title
+    print(f"\n{SEP}\n{title}\n{SEP}")
+
 def ok(label): print(f"  ✓  {label}")
 def fail(label, got, exp): print(f"  ✗  {label} — got {got!r}, expected {exp!r}")
-def chk(label, condition, got='', exp=''): (ok(label) if condition else fail(label, got, exp))
+
+def chk(label, condition, got='', exp=''):
+    passou = bool(condition)
+    RESULTS.append({
+        "section": _SECTION, "label": label, "passed": passou,
+        "got": repr(got), "expected": repr(exp),
+    })
+    (ok(label) if passou else fail(label, got, exp))
+
+
+def revive(nome, hp=None):
+    """
+    Recoloca um personagem de pé entre blocos.
+
+    Necessário porque os blocos deste arquivo compartilham uma única campanha:
+    o Goblin (7 PV) morre nos testes de ataque e os blocos seguintes — crítico
+    forçado, condições — silenciosamente testavam um cadáver, que o motor
+    corretamente recusa.
+    """
+    ch = m.campaign['characters'][m.char_key(nome)]
+    s  = ch['sheet']
+    s['vida_atual'] = hp if hp is not None else s['vida_max']
+    s['condicoes']  = []
+    s['death_saves_sucessos'] = 0
+    s['death_saves_falhas']   = 0
+    ch['status'] = 'inimigo' if s.get('classe') == 'npc' else 'vivo'
+    return ch
 
 
 # ════════════════════════════════════════════════════════════════
@@ -263,6 +303,7 @@ print(f"  Lyra ataca com vantagem: {r[:100]}")
 chk("ataque com vantagem executado", 'Lyra' in r)
 
 # Ataque com crítico forçado — condição "paralisado" dispara auto_crit internamente
+revive('Goblin')   # caiu nos ataques acima; auto_crit exige um alvo de pé
 apply_condition('Goblin', 'paralisado')
 r = attack_roll(
     attacker_name='Kael',
@@ -320,7 +361,9 @@ m.campaign['characters']['ignis']['sheet']['mana_atual'] = 30  # restaurar
 sec("BLOCO 7 — Condições")
 # ════════════════════════════════════════════════════════════════
 
-with mock.patch('requests.get', side_effect=Exception("offline")):
+revive('Goblin')   # condições só se aplicam a quem está de pé
+
+with open5e.offline():
     r = apply_condition('Goblin', 'Envenenado', 2)
 print(f"  apply_condition Envenenado: {r[:100]}")
 chk("condição Envenenado aplicada",
@@ -329,12 +372,12 @@ chk("condição Envenenado aplicada",
 chk("retorno menciona desvantagem", 'desvantagem' in r.lower() or '🔴' in r)
 
 # Duplicata
-with mock.patch('requests.get', side_effect=Exception("offline")):
+with open5e.offline():
     r2 = apply_condition('Goblin', 'Envenenado', 2)
 chk("condição duplicada → aviso", '⚠️' in r2 or 'já possui' in r2.lower())
 
 # Aplicar segunda condição
-with mock.patch('requests.get', side_effect=Exception("offline")):
+with open5e.offline():
     apply_condition('Goblin', 'Caído', 1)
 chk("Goblin tem 2 condições agora",
     len(m.campaign['characters']['goblin']['sheet']['condicoes']) == 2)
@@ -347,7 +390,7 @@ chk("Envenenado removido",
         m.campaign['characters']['goblin']['sheet']['condicoes']))
 
 # Atacante com vantagem contra alvo Paralisado
-with mock.patch('requests.get', side_effect=Exception("offline")):
+with open5e.offline():
     apply_condition('Goblin Chefe', 'Paralisado', 3)
 r = attack_roll('Kael', 'Goblin Chefe', 'espada longa', 8, is_proficient=True)
 chk("ataque contra paralisado menciona crítico ou vantagem",
@@ -544,6 +587,24 @@ m.campaign['combat_state']['is_active'] = False
 
 
 # ════════════════════════════════════════════════════════════════
+# ── Sumário e código de saída ───────────────────────────────────────────────
+_falhas = [r for r in RESULTS if not r["passed"]]
+
+# --json=<caminho>: despeja os resultados num arquivo. O pytest lê esse
+# arquivo e transforma cada check num caso de teste próprio, com nome e
+# mensagem — em vez de tudo virar um único "o script falhou".
+for _arg in sys.argv[1:]:
+    if _arg.startswith("--json="):
+        import json as _json
+        with open(_arg.split("=", 1)[1], "w", encoding="utf-8") as _fh:
+            _json.dump(RESULTS, _fh, ensure_ascii=False)
+
 print(f"\n{SEP}")
-print("TODOS OS TESTES CONCLUÍDOS")
+print(f"TESTES CONCLUÍDOS — {len(RESULTS) - len(_falhas)}/{len(RESULTS)} passaram")
+if _falhas:
+    print(f"{len(_falhas)} FALHA(S):")
+    for _f in _falhas:
+        print(f"  ✗  [{_f['section']}] {_f['label']}")
 print(f"{SEP}")
+
+sys.exit(1 if _falhas else 0)

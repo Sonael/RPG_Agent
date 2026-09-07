@@ -402,7 +402,7 @@ navegador. `static/js/utils.js:authFetch` tenta refresh silencioso em 401.
 
 ## Modo D&D, mecânicas
 
-`tools_dnd.py` (~6900 linhas, 38 ferramentas + helpers) é o motor de regras D&D 5e
+`tools_dnd.py` (~7200 linhas, 38 ferramentas + helpers) é o motor de regras D&D 5e
 (usa a variante oficial de Pontos de Magia do DMG p.288 no lugar de spell
 slots; casos comuns cobertos). Resumo:
 
@@ -432,10 +432,37 @@ slots; casos comuns cobertos). Resumo:
 
 ### Armas
 
+- `_npc_attack_dice` resolve primeiro os **ataques naturais de monstro**
+  ("bite", "claw", "slam") pelo stat block gravado na ficha. Só depois cai
+  para a busca de arma no SRD. Sem esse passo, esses nomes não existem em
+  `/weapons/`, tomam 404 e o motor usava o fallback genérico de 1d6, o que
+  achatava o dano de **todo** inimigo do jogo.
 - `_fetch_weapon_data` busca dano/tipo de armas no Open5e (PT→EN via
   `WEAPON_PT_TO_EN`).
 - `_weapon_attr` decide DEX×STR (ranged→DEX, finesse→max, melee→STR).
 - `ARMOR_TABLE` fixa CA base e bônus de DEX por tipo de armadura.
+
+### Camada de acesso ao SRD (`open5e.py`)
+
+Todas as consultas ao Open5e passam por um módulo único, em vez de
+`requests.get` soltos espalhados pelo motor:
+
+- **Sessão reaproveitada** com pool de conexões e retry/backoff em
+  transitórios (429/5xx), em vez de um handshake TLS novo por consulta.
+- **Cache em memória + disco** (`.cache/open5e.json`). O SRD é estático: um
+  goblin é o mesmo goblin para sempre. Quatro spawns repetidos caem de
+  ~2,8 s para ~1 ms, e isso acontece **dentro** do tempo de resposta do chat.
+- **Cache negativo curto**: "bite" não é arma do SRD e nunca será. Sem ele,
+  todo ataque de monstro repetiria o mesmo 404 no caminho quente. Erro de
+  *rede*, ao contrário, não é cacheado: um timeout é transitório e a próxima
+  chamada tenta de novo.
+- **Modo offline** (`open5e.offline()`, env `RPG_SRD_OFFLINE=1`) para testes
+  e para rodar sem rede.
+- **`open5e.stats()`** expõe hits/misses/erros. Antes, quando a API caía, o
+  motor degradava em silêncio para 1d6 e CA 12 e ninguém ficava sabendo.
+
+Os call sites usam `from open5e import http as _req`: a resposta expõe
+`.ok` e `.json()`, então trocar a camada não mexeu na lógica de ninguém.
 
 ### Inventário e moedas
 
@@ -494,6 +521,13 @@ slots; casos comuns cobertos). Resumo:
 ### NPCs
 
 - `spawn_monster(slug, display_name, quantity)`, stats reais Open5e.
+  `_extract_monster_attacks` lê o bloco de ações e grava na ficha **todos os
+  ataques com seus dados** (`ataques`) e quantos golpes o **Multiattack**
+  concede. A ação "Multiattack" em si é descartada como golpe: a descrição
+  dela contém "melee attacks:" (Bandit Captain: *"makes three melee attacks:
+  two with its scimitar…"*), e sem essa guarda ela virava a arma principal
+  sem dado, de volta ao 1d6. O filtro confiável é o `+X to hit`, presente em
+  todo ataque real do SRD e ausente em descrições que só citam ataques.
 - `recruit_character(npc, role)`, bloqueia recrutamento de NPCs com 10+
   níveis acima do grupo (narrativamente impossível); aviso a partir de 5.
 - `set_npc_strategy` / `execute_npc_turn`, turno automático de NPC com
@@ -734,8 +768,12 @@ turnos NPC consecutivos para evitar loop). O motor:
 
 - Aplica a estratégia (`agressivo`/`tático`/`covarde`/`aleatório`/`suporte`).
 - Covarde foge se HP < 25%.
-- Escolhe alvo + arma equipada (`arma_principal`), chama `attack_roll`.
-- Avança o turno.
+- Escolhe o alvo e executa **quantos golpes o Multiattack conceder**,
+  alternando entre os ataques do stat block: o urso-coruja faz *"um com o
+  bico e um com as garras"* (1d10 e 2d8), não o mesmo golpe duas vezes.
+- Se o alvo cai no meio da investida, os golpes restantes **redirecionam**
+  para outro alvo de pé; não sobrando ninguém, a investida é interrompida.
+- Avança o turno **uma vez**, no último golpe (nunca uma vez por golpe).
 
 ### Painel de fim (não fecha bruscamente)
 
@@ -839,7 +877,7 @@ automaticamente a partir dela, que vira a descrição que o LLM enxerga.
 
 ## Endpoints HTTP
 
-`server.py` (~2200 linhas, todas as rotas atrás de `@require_auth` quando
+`server.py` (~2500 linhas, todas as rotas atrás de `@require_auth` quando
 acessam memória):
 
 ### Autenticação
@@ -1029,6 +1067,16 @@ em `utils.js`) é adaptativa:
 
 ## Testes e garantias
 
+A suíte roda com **pytest** (110 testes). O `conftest.py` isola tudo de rede
+e de banco: o `database` (Supabase) vira stub e a camada SRD entra em modo
+offline, então nenhum teste depende da internet.
+
+```bash
+pip install -r requirements-dev.txt
+pytest                  # tudo
+pytest -m "not slow"    # sem o fuzzer
+```
+
 ### `tests.py`, suíte funcional
 
 13 blocos cobrindo:
@@ -1038,6 +1086,29 @@ em `utils.js`) é adaptativa:
   habilidades e KOs.
 - XP / level-up.
 - Equipamento, condições, descansos, moedas.
+
+Continua rodável à mão (`python tests.py`) e agora **sai com código != 0**
+quando algum check falha. Isso não era verdade antes: o script só imprimia
+`✗` e saía com 0, e tinha 5 checks falhando havia tempos sem ninguém ver —
+higiene de fixture, o Goblin morria num bloco e os seguintes testavam um
+cadáver. Resolvido com o helper `revive()`; hoje são 70/70.
+
+`--json=<caminho>` despeja os resultados. É o que o `conftest.py` usa para
+transformar **cada check num caso de pytest com nome próprio**, em vez de
+tudo virar um único "o script falhou" — sem reescrever ~50 mil caracteres
+de asserts.
+
+### `test_monster_attacks.py` / `test_open5e_cache.py`
+
+Testes nativos das garantias mais recentes:
+
+- O monstro rola o dado do stat block, nunca o 1d6 do fallback (a asserção
+  conta as faces roladas: `[(1,8), (1,8)]` para as garras 2d8).
+- A ação Multiattack não vira arma; arma principal nunca fica sem dado.
+- Multiattack executa N golpes, alterna entre os ataques e avança o turno
+  uma vez só — inclusive quando o alvo cai no primeiro golpe.
+- Cache do SRD: acerto e 404 são cacheados, erro de rede não é, `get()`
+  nunca levanta exceção.
 
 ### `tests_combat_fuzz.py`, fuzzer de invariantes
 
@@ -1086,18 +1157,26 @@ Já descrito, força correção quando a IA narra mecânica sem ferramenta
 
 ```
 .
-├── server.py              Flask + SSE + endpoints + segurança (~2200 linhas)
+├── server.py              Flask + SSE + endpoints + segurança (~2500 linhas)
 ├── agent.py               Instruções de estilo + create_agent
 ├── tools.py               Tools narrativas + ALL_TOOLS
-├── tools_dnd.py           Motor D&D 5e + combate (~6900 linhas, 38 tools)
+├── tools_dnd.py           Motor D&D 5e + combate (~7200 linhas, 38 tools)
 ├── memory.py              Estado por sessão, proxy, persistência
 ├── database.py            Camada Supabase
 ├── auth.py                Supabase Auth + @require_auth
 ├── session.py             Runner ADK
 ├── validator.py           Validador narrativo pós-resposta
-├── tests.py               Suíte funcional (13 blocos)
+├── open5e.py              Acesso ao SRD: sessão, retry, cache, offline
+├── conftest.py            Fixtures do pytest + ponte para as suítes legadas
+├── pytest.ini             Configuração do pytest
+├── tests.py               Suíte funcional (13 blocos, 70 checks)
 ├── tests_combat_fuzz.py   Fuzzer de invariantes de combate
-├── requirements.txt       Dependências fixadas
+├── test_legacy_dnd.py     Portão: um caso de pytest por check do tests.py
+├── test_fuzz_invariants.py  Portão: roda o fuzzer na suíte
+├── test_monster_attacks.py  Dado de dano de monstro + Multiattack
+├── test_open5e_cache.py   Comportamento do cache do SRD
+├── requirements.txt       Dependências fixadas (é o que o Render instala)
+├── requirements-dev.txt   Dependências de teste (pytest)
 ├── render.yaml            Deploy no Render (gunicorn + envs Supabase)
 └── static/
     ├── login.html
@@ -1157,6 +1236,14 @@ postgrest, gotrue, authlib, requests
 pip install -r requirements.txt
 ```
 
+Para desenvolver e rodar os testes, `requirements-dev.txt` acrescenta o
+`pytest`. Ele fica **fora** do `requirements.txt` de propósito: esse é o que
+o Render instala em produção, e o runtime não precisa de pytest.
+
+```bash
+pip install -r requirements-dev.txt
+```
+
 ### Rodar local
 
 ```bash
@@ -1187,11 +1274,18 @@ Gemini/DeepSeek vêm do usuário (localStorage do navegador), não do servidor.
 ### Rodar testes
 
 ```bash
-python tests.py
-python tests_combat_fuzz.py both 10000        # fuzz completo
+pytest                    # suíte completa (110 testes)
+pytest -m "not slow"      # sem o fuzzer
+pytest test_monster_attacks.py -v
+
+python tests.py           # suíte funcional isolada (sai != 0 se falhar)
+python tests_combat_fuzz.py both 10000        # fuzz completo, antes de publicar
 python tests_combat_fuzz.py engine 5000 1234  # só motor
 python tests_combat_fuzz.py screen 5000 1234  # só caminho da tela
 ```
+
+O `pytest` roda o fuzzer com um N modesto para a suíte continuar rápida; o
+fuzz cheio (10k combates) fica como passo manual antes de publicar.
 
 ---
 
@@ -1210,6 +1304,16 @@ Documentadas honestamente, coisas que sei que poderiam estar melhores:
   (não tem regra inline). Poções de cura têm regra mecânica direta.
 - **Sem reação modelada** (Shield, Counterspell, ataque de oportunidade)
   na tela tática, coisas de fora-do-turno ainda não estão na economia.
+- **Arma customizada de jogador cai em 1d6.** `combat_action("attack")`
+  passa um dado padrão e conta com `_fetch_weapon_data` para corrigi-lo;
+  isso funciona para armas reais do SRD, mas uma arma inventada pela
+  narrativa ("Lâmina do Crepúsculo") não é encontrada e fica no fallback.
+  É a mesma classe de bug já corrigida do lado dos monstros, e o conserto é
+  o mesmo: gravar o dado na ficha em vez de redescobri-lo a cada golpe.
+- **Sem tipos de dano**, e portanto sem resistência, imunidade ou
+  vulnerabilidade: o dano é subtraído cru do HP. O esqueleto morre de veneno
+  e o elemental do fogo se queima. `spawn_monster` nem importa os campos
+  `damage_resistances`/`damage_immunities`, que o Open5e já devolve.
 - **Sub-features de arquétipo**, só as de efeito numérico claro têm hook no
   motor (faixa de crítico, Golpe Divino, Resistência Dracônica, Estilo de
   Combate). Manobras, reações e recursos de pool (Ki, Dado de Superioridade)

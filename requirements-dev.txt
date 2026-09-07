@@ -1,0 +1,11 @@
+# Dependências só de desenvolvimento/teste.
+# Ficam FORA de requirements.txt de propósito: o requirements.txt é o que o
+# Render instala em produção, e o runtime não precisa de pytest.
+#
+#   pip install -r requirements-dev.txt
+#   pytest                       # suíte completa
+#   pytest -m "not slow"         # sem o fuzzer
+#   python tests_combat_fuzz.py both 10000 1234   # fuzzer cheio, antes de publicar
+
+-r requirements.txt
+pytest==8.3.4
