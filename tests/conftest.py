@@ -37,23 +37,23 @@ sys.path.insert(0, str(ROOT))
 
 def _stub_database() -> None:
     """
-    `app.memory` importa `app.database` (Supabase). Nos testes, ele não existe.
+    `rpg.memory` importa `rpg.database` (Supabase). Nos testes, ele não existe.
 
     Precisa entrar como dublê do PACOTE (registrar_duble faz sys.modules e o
-    atributo em app): `from app import database` resolve pelo atributo, então
+    atributo em rpg): `from rpg import database` resolve pelo atributo, então
     mexer só em sys.modules não teria efeito.
     """
-    import app
-    if getattr(app, "database", None) is not None:
+    import rpg
+    if getattr(rpg, "database", None) is not None:
         return
-    db = types.ModuleType("app.database")
+    db = types.ModuleType("rpg.database")
     db.get_campaign    = lambda *a, **k: None
     db.save_campaign   = lambda *a, **k: None
     db.list_campaigns  = lambda *a, **k: []
     db.delete_campaign = lambda *a, **k: None
     db.rename_campaign = lambda *a, **k: None
     db.campaign_exists = lambda *a, **k: False
-    app.registrar_duble("database", db)
+    rpg.registrar_duble("database", db)
 
 
 _stub_database()
@@ -66,7 +66,7 @@ os.environ.setdefault("RPG_SRD_CACHE_DISABLED", "1")
 @pytest.fixture(autouse=True)
 def _srd_offline():
     """Garante offline mesmo se um teste anterior tiver ligado a rede."""
-    from app import open5e
+    from rpg import open5e
     open5e.set_offline(True)
     open5e.clear_cache()
     open5e.reset_stats()
@@ -111,7 +111,7 @@ def criar_ficha(nome, *, grupo=False, vida=30, vida_max=None, ca=12, nivel=3,
 @pytest.fixture
 def campanha():
     """Campanha zerada, com combat_state íntegro. Devolve o dict da campanha."""
-    from app import memory
+    from rpg import memory
     memory.campaign["characters"] = {}
     memory.campaign["party"] = []
     memory.campaign["protagonist"] = ""
@@ -127,7 +127,7 @@ def campanha():
 @pytest.fixture
 def povoar(campanha):
     """Insere personagens na campanha e devolve o dict deles por nome."""
-    from app import memory
+    from rpg import memory
 
     def _povoar(*chars):
         criados = {}
@@ -144,7 +144,7 @@ def povoar(campanha):
 
 def iniciar_combate(ordem, indice=0, rodada=1):
     """Liga o combate com a ordem de iniciativa dada."""
-    from app import memory
+    from rpg import memory
     cs = memory.campaign["combat_state"]
     cs.update({"is_active": True, "initiative_order": list(ordem),
                "current_turn_index": indice, "round": rodada,

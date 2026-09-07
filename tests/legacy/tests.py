@@ -92,7 +92,7 @@ m.is_party_member = lambda c: (
            == (c.get('name', '') or '').lower().strip()
            for p in m.campaign.get('party', []))
 )
-# A raiz do repositório precisa estar no path para `import app` funcionar
+# A raiz do repositório precisa estar no path para `import rpg` funcionar
 # quando este script roda direto (python tests/legacy/tests.py).
 import os, pathlib
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
@@ -103,13 +103,13 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
 # offline. Use RPG_SRD_OFFLINE=0 para exercitar a rede de propósito.
 os.environ.setdefault("RPG_SRD_OFFLINE", "1")
 
-# Instala o `memory` falso ANTES de importar qualquer coisa de app.
-# Só mexer em sys.modules não bastaria: `from app import memory` resolve pelo
+# Instala o `memory` falso ANTES de importar qualquer coisa de rpg.
+# Só mexer em sys.modules não bastaria: `from rpg import memory` resolve pelo
 # atributo do pacote, então registrar_duble faz as duas coisas.
-import app as _app
-_app.registrar_duble('memory', m)
+import rpg as _rpg
+_rpg.registrar_duble('memory', m)
 
-from app.tools_dnd import (
+from rpg.tools_dnd import (
     _modifier, _proficiency_bonus, _parse_dice, _roll_d20_with_adv,
     _normalize_sheet,
     attack_roll, use_ability, modify_hp, modify_mana,
@@ -120,8 +120,8 @@ from app.tools_dnd import (
     XP_THRESHOLDS, CLASS_LEVEL_FEATURES,
 )
 
-from app.tools import get_scene_context
-from app import open5e
+from rpg.tools import get_scene_context
+from rpg import open5e
 
 SEP = "=" * 62
 

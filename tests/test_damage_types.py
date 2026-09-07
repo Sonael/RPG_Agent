@@ -12,7 +12,7 @@ específico não tinha efeito nenhum. Todo dano passa agora por _apply_damage().
 
 import pytest
 
-from app import tools_dnd as T
+from rpg import tools_dnd as T
 from conftest import criar_ficha
 
 

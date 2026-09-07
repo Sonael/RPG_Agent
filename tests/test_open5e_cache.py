@@ -13,7 +13,7 @@ que resolvem isso: acerto é cacheado, 404 também é, e erro de REDE não é.
 
 import pytest
 
-from app import open5e
+from rpg import open5e
 
 
 URL = "https://api.open5e.com/v1/monsters/goblin/"

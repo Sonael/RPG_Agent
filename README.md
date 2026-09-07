@@ -53,7 +53,7 @@ gerador de texto passivo, mas uma entidade que **percebe**, **delibera** e
 Mapeando o projeto para o vocabulário de agentes:
 
 - **Ambiente**, o estado do mundo do jogo (personagens, locais, combate,
-  inventário, flags), estruturado e persistente (`app/memory.py` + Supabase).
+  inventário, flags), estruturado e persistente (`rpg/memory.py` + Supabase).
 - **Percepção**, a cada turno o agente *lê* o ambiente por ferramentas de
   consulta (`get_scene_context`, `get_character_sheet`, `get_combat_status`…).
   Ele não age "às cegas": primeiro observa o estado atual.
@@ -265,7 +265,7 @@ turnos, etc.). Os outros são puramente narrativos com memória estruturada.
 
 ## Sistema de memória (estado por sessão)
 
-`app/memory.py` é o coração do estado. Foi redesenhado para ser **multiusuário-safe**.
+`rpg/memory.py` é o coração do estado. Foi redesenhado para ser **multiusuário-safe**.
 
 ### Modelo
 
@@ -362,7 +362,7 @@ preencher campos novos em campanhas antigas.
 
 ## Persistência (Supabase) e autenticação
 
-`app/database.py`, camada fina sobre Postgrest:
+`rpg/database.py`, camada fina sobre Postgrest:
 
 - `list_campaigns(user_id)`, `get_campaign`, `save_campaign` (upsert),
   `delete_campaign`, `rename_campaign`, `campaign_exists`.
@@ -392,7 +392,7 @@ navegador. `static/js/utils.js:authFetch` tenta refresh silencioso em 401.
 - **`/api/auth/confirm`** valida o token contra o Supabase de verdade.
 - **XSS**: a narração da IA passa por DOMPurify antes de ir ao DOM
   (`renderMarkdown`); `marked` sozinho deixaria passar `<script>`.
-- **Escopo de usuário estrutural**: `app/database.py` só acessa a tabela
+- **Escopo de usuário estrutural**: `rpg/database.py` só acessa a tabela
   `campaigns` por helpers que exigem `user_id` válido e embutem o filtro,
   tornando impossível montar uma query sem escopo. Complementado por RLS no Supabase.
 - Headers: HSTS, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`.
@@ -442,7 +442,7 @@ slots; casos comuns cobertos). Resumo:
 - `_weapon_attr` decide DEX×STR (ranged→DEX, finesse→max, melee→STR).
 - `ARMOR_TABLE` fixa CA base e bônus de DEX por tipo de armadura.
 
-### Camada de acesso ao SRD (`app/open5e.py`)
+### Camada de acesso ao SRD (`rpg/open5e.py`)
 
 Todas as consultas ao Open5e passam por um módulo único, em vez de
 `requests.get` soltos espalhados pelo motor:
@@ -625,7 +625,7 @@ O turno **só avança** quando:
 - o jogador foge (consome Ação + sai), ou
 - o sistema detecta que um lado foi todo derrotado.
 
-Classificadores (`app/tools_dnd.py:_ability_action_type` e `_item_action_type`)
+Classificadores (`rpg/tools_dnd.py:_ability_action_type` e `_item_action_type`)
 detectam Bônus por nome (PT e EN). Default: Ação.
 
 ### Tipos de dano, resistência, imunidade e vulnerabilidade
@@ -911,7 +911,7 @@ derrota instrui explicitamente **não** gerar saque nem XP.
 A lista completa exposta ao agente (`tools.py:ALL_TOOLS` = narrativas +
 `tools_dnd.DND_TOOLS`):
 
-### Narrativas (`app/tools.py`)
+### Narrativas (`rpg/tools.py`)
 
 | Função | Função no jogo |
 |---|---|
@@ -1166,10 +1166,10 @@ offline, então nenhum teste depende da internet. Ele também expõe a fábrica
 montar um combate em três linhas.
 
 **Como substituir um submódulo por um dublê.** Com o código dentro do pacote
-`app/`, mexer só em `sys.modules` não basta: `from app import memory` resolve
+`rpg/`, mexer só em `sys.modules` não basta: `from rpg import memory` resolve
 pelo **atributo** do pacote quando ele já existe. Use
-`app.registrar_duble(nome, modulo)`, que faz as duas coisas. É por isso que
-`app/__init__.py` é deliberadamente vazio de imports — se ele importasse os
+`rpg.registrar_duble(nome, modulo)`, que faz as duas coisas. É por isso que
+`rpg/__init__.py` é deliberadamente vazio de imports — se ele importasse os
 submódulos na carga, os verdadeiros venceriam a corrida e a substituição não
 teria efeito.
 
@@ -1257,7 +1257,7 @@ Em cada passo, verifica:
 **Métrica atual** (8000 combates motor + 4000 combates tela, seeds variados):
 ~307k chamadas de tool, **0 violações** em todos os invariantes.
 
-### Validador narrativo (`app/validator.py`)
+### Validador narrativo (`rpg/validator.py`)
 
 Roda em toda resposta do agente; emite avisos (não interrompe) para:
 - Personagem morto narrado como ativo.
@@ -1278,7 +1278,17 @@ Já descrito, força correção quando a IA narra mecânica sem ferramenta
 ## Estrutura de arquivos
 
 A raiz guarda só o ponto de entrada e a configuração. O código da aplicação
-vive no pacote `app/`, os testes em `tests/`, os utilitários em `scripts/`.
+vive no pacote `rpg/`, os testes em `tests/`, os utilitários em `scripts/`.
+
+O pacote se chama `rpg` e não `app` de propósito: `server.py` precisa expor
+uma variável chamada `app` (a instância do Flask que o Render sobe com
+`gunicorn server:app`), e ter as duas coisas com o mesmo nome no mesmo
+arquivo é armadilha de leitura garantida.
+
+**Nada no Render precisa mudar.** `server.py` continua na raiz, então
+`gunicorn server:app` e `pip install -r requirements.txt` seguem idênticos —
+`server:app` aponta para a variável Flask dentro de `server.py`, nunca para
+o nome do pacote. Também não há variável de ambiente nova.
 
 ```
 .
@@ -1289,8 +1299,8 @@ vive no pacote `app/`, os testes em `tests/`, os utilitários em `scripts/`.
 ├── requirements-dev.txt   Dependências de teste (pytest)
 ├── render.yaml            Deploy no Render (gunicorn + envs Supabase)
 │
-├── app/                   Código da aplicação
-│   ├── __init__.py        Pacote vazio de propósito + registrar_duble()
+├── rpg/                   Código da aplicação
+│   ├── __init__.py        Vazio de imports de propósito + registrar_duble()
 │   ├── agent.py           Instruções de estilo + create_agent
 │   ├── tools.py           Tools narrativas + ALL_TOOLS
 │   ├── tools_dnd.py       Motor D&D 5e + combate (~7900 linhas, 38 tools)

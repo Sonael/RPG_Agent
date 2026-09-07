@@ -18,7 +18,7 @@ Uso:
 
 import sys, os, types, random, pathlib
 
-# Raiz do repositório no path, para `import app` funcionar rodando direto.
+# Raiz do repositório no path, para `import rpg` funcionar rodando direto.
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
 
 # Fuzzer não fala com a rede: milhares de combates não podem depender de a
@@ -30,11 +30,11 @@ _db = types.ModuleType("database")
 _db.get_campaign = lambda *a, **k: None
 _db.save_campaign = lambda *a, **k: None
 
-import app as _app
-_app.registrar_duble("database", _db)
+import rpg as _rpg
+_rpg.registrar_duble("database", _db)
 
-from app import memory
-from app import tools_dnd as T
+from rpg import memory
+from rpg import tools_dnd as T
 
 # Sem rede: arma usa os dados passados; sem busca Open5e.
 T._fetch_weapon_data = lambda *a, **k: None

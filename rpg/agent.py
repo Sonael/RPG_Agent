@@ -7,7 +7,7 @@ Suporta múltiplos estilos de RPG com instruções adaptadas para cada um.
 import os
 
 from google.adk.agents import Agent
-from app.tools import ALL_TOOLS
+from rpg.tools import ALL_TOOLS
 
 
 # ---------------------------------------------------------------------------
@@ -706,7 +706,7 @@ def _scene_snapshot_block() -> str:
     agente; ele recai no comportamento de chamar a ferramenta sob demanda).
     """
     try:
-        from app.tools import get_scene_context
+        from rpg.tools import get_scene_context
         snap = (get_scene_context() or "").strip()
     except Exception:
         return ""
@@ -749,7 +749,7 @@ def create_agent(model, campaign_type: str = "fantasia") -> Agent:
         model:         String do modelo Gemini ou instância LiteLlm.
         campaign_type: Estilo da campanha (fantasia, romance, horror, dnd, etc.)
     """
-    from app import memory as _memory
+    from rpg import memory as _memory
 
     style = _STYLE_INSTRUCTIONS.get(campaign_type, _STYLE_INSTRUCTIONS["fantasia"])
     base_instruction = style.strip() + "\n\n" + _BASE_MEMORY_RULES.strip()

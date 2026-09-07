@@ -46,7 +46,7 @@ import time
 from pathlib import Path
 
 # O script vive em scripts/, mas opera sobre a raiz do repositório (é lá que
-# ficam server.py, static/ e o pacote app/).
+# ficam server.py, static/ e o pacote rpg/).
 RAIZ = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RAIZ))
 
@@ -98,9 +98,9 @@ class _ClienteAuthFalso:
 
 def _instalar_dubles(campanha: dict, nome_campanha: str) -> None:
     """Substitui auth e database por versões locais, sem rede."""
-    from app import auth
-    from app import database
-    from app import memory
+    from rpg import auth
+    from rpg import database
+    from rpg import memory
 
     auth._client = lambda: _ClienteAuthFalso()
 
@@ -158,7 +158,7 @@ def _subir_servidor(campanha: dict, nome_campanha: str):
     campanha base e aplica um patch por cima, para que cada tela possa pedir
     o estado de mundo que quer retratar (combate ativo, vitória, etc.).
     """
-    from app import memory
+    from rpg import memory
     from flask import jsonify, request
     from werkzeug.serving import make_server
 

@@ -103,7 +103,7 @@ def require_auth(f):
             # 5. Vincula o contexto de memória À CAMPANHA DESTE USUÁRIO.
             # Centralizado aqui → todo endpoint autenticado opera no
             # estado do seu próprio usuário (isolamento multiusuário).
-            from app import memory
+            from rpg import memory
             memory.bind_request(user.id)
 
         except Exception as e:
