@@ -1835,15 +1835,32 @@ def chat():
                                         result_q.put(("tool_result", {"tool_name": fr.name, "content": visible}))
 
                     if event.usage_metadata:
+                        um = event.usage_metadata
+                        # cached_content_token_count: parte do prompt servida
+                        # do cache do provedor. Os ~11k tokens de schema das
+                        # ferramentas ficam no INÍCIO da requisição, então são
+                        # o bloco mais cacheável que existe — este contador é
+                        # o que diz se eles estão custando 100% ou uma fração.
+                        cached = int(getattr(um, "cached_content_token_count", 0) or 0)
+                        prompt = int(um.prompt_token_count or 0)
                         usage = {
-                            "prompt_tokens":     event.usage_metadata.prompt_token_count,
-                            "candidates_tokens": event.usage_metadata.candidates_token_count,
-                            "total_tokens":      event.usage_metadata.total_token_count,
+                            "prompt_tokens":     prompt,
+                            "candidates_tokens": um.candidates_token_count,
+                            "total_tokens":      um.total_token_count,
+                            "cached_tokens":     cached,
+                            # Fração do prompt que veio do cache, em [0,1].
+                            "cache_hit_ratio":   round(cached / prompt, 3) if prompt else 0.0,
+                            # Tokens de raciocínio (modelos com thinking).
+                            "thoughts_tokens":   int(getattr(um, "thoughts_token_count", 0) or 0),
                         }
+                        _cache_str = (
+                            f" | cache={cached} ({usage['cache_hit_ratio']:.0%} do prompt)"
+                            if cached else " | cache=0 ⚠️ nada aproveitado"
+                        )
                         _dbg(
                             f"  🧮 [TOKENS] prompt={usage['prompt_tokens']} "
                             f"resposta={usage['candidates_tokens']} "
-                            f"total={usage['total_tokens']}"
+                            f"total={usage['total_tokens']}{_cache_str}"
                         )
                         result_q.put(("quota_update", usage))
 

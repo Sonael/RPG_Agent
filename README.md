@@ -911,6 +911,59 @@ derrota instrui explicitamente **não** gerar saque nem XP.
 A lista completa exposta ao agente (`tools.py:ALL_TOOLS` = narrativas +
 `tools_dnd.DND_TOOLS`):
 
+### Conjunto resolvido por turno (`rpg/toolsets.py`)
+
+As 61 ferramentas custam **~11.100 tokens de schema em toda requisição**. Como
+cada chamada de ferramenta é um novo round-trip, um turno de combate com três
+chamadas manda ~33 mil tokens só de definição.
+
+Mas o motivo do filtro não é custo, é **correção**. No modo de combate `tela`,
+a luta é resolvida pela interface via `combat_action()`, e a instrução já
+proibia a LLM de chamar `attack_roll`, `use_ability`, `next_turn`,
+`execute_npc_turn`, `roll_death_save` e `resolve_saving_throw`. Proibir por
+prompt é esperança; **retirar a ferramenta do conjunto é garantia** — o mesmo
+princípio já aplicado ao snapshot de cena. Uma LLM que resolvesse chamar
+`attack_roll` no meio de um combate da tela produziria turno duplicado: o
+motor avançaria por fora da economia que a tela controla.
+
+| Modo | Ferramentas | Schema |
+|---|---|---|
+| `narrado` | 61 | ~11.134 tokens |
+| `tela` | 55 | ~9.050 tokens (−18,7%) |
+
+Ficam de fora do filtro de propósito: `roll_initiative` (é o gatilho que faz a
+tela assumir), `end_combat` (escape barato se a tela não concluir),
+`spawn_monster`/`set_npc_strategy` (usadas antes da luta) e
+`modify_hp`/`apply_condition` (dano e condições fora de combate seguem na
+narração).
+
+**Por que por MODO e não por turno.** Os schemas ficam no início da
+requisição — o bloco mais cacheável que existe. O modo muda poucas vezes por
+sessão, então o prefixo continua válido dentro de uma mesma fase. Filtrar com
+sinais de granularidade fina destruiria o cache e sairia mais caro do que não
+filtrar. Pelo mesmo motivo os `FunctionTool` são construídos uma vez e
+reusados: schema idêntico entre turnos é o que mantém o prefixo cacheável.
+
+O mecanismo é o `BaseToolset` do ADK, cujo `get_tools()` é chamado a cada
+invocação — o conjunto é reavaliado por turno **sem recriar o Agent nem o
+Runner**, e portanto sem perder o histórico da conversa. Falha de forma
+segura: sem contexto de campanha, entrega tudo, porque uma ferramenta
+faltando faz a LLM narrar a mecânica sozinha.
+
+### Contador de cache de prompt
+
+`/api/chat` passou a expor `cached_tokens`, `cache_hit_ratio` e
+`thoughts_tokens` junto do `quota_update`, e o log de debug mostra a fração
+do prompt servida do cache:
+
+```
+🧮 [TOKENS] prompt=14320 resposta=812 total=15132 | cache=11020 (77% do prompt)
+```
+
+É o número que diz se aqueles ~11 mil tokens de schema estão custando integral
+ou uma fração — e portanto se vale a pena mexer em mais alguma coisa. Com
+`cache=0` o aviso é explícito.
+
 ### Narrativas (`rpg/tools.py`)
 
 | Função | Função no jogo |
@@ -1159,7 +1212,7 @@ em `utils.js`) é adaptativa:
 
 ## Testes e garantias
 
-A suíte roda com **pytest** (212 testes). O `tests/conftest.py` isola tudo de rede
+A suíte roda com **pytest** (235 testes). O `tests/conftest.py` isola tudo de rede
 e de banco: o `database` (Supabase) vira stub e a camada SRD entra em modo
 offline, então nenhum teste depende da internet. Ele também expõe a fábrica
 `criar_ficha()` e as fixtures `campanha`/`povoar`, para um teste de motor
@@ -1309,7 +1362,8 @@ o nome do pacote. Também não há variável de ambiente nova.
 │   ├── auth.py            Supabase Auth + @require_auth
 │   ├── session.py         Runner ADK
 │   ├── validator.py       Validador narrativo pós-resposta
-│   └── open5e.py          Acesso ao SRD: sessão, retry, cache, offline
+│   ├── open5e.py          Acesso ao SRD: sessão, retry, cache, offline
+│   └── toolsets.py        Conjunto de ferramentas resolvido por turno
 │
 ├── tests/                 Suíte pytest
 │   ├── conftest.py        Isolamento + fábrica criar_ficha + ponte legada
@@ -1320,6 +1374,7 @@ o nome do pacote. Também não há variável de ambiente nova.
 │   ├── test_damage_types.py     Tipos de dano, resistências, PV temporários
 │   ├── test_concentration.py    Concentração em magias
 │   ├── test_reactions.py        Reação e ataque de oportunidade
+│   ├── test_toolsets.py         Filtro de ferramentas por modo de combate
 │   └── legacy/            Suítes em formato de script (não coletadas)
 │       ├── tests.py             Suíte funcional (13 blocos, 70 checks)
 │       └── tests_combat_fuzz.py Fuzzer de invariantes de combate

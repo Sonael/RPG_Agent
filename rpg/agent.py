@@ -799,13 +799,23 @@ def create_agent(model, campaign_type: str = "fantasia") -> Agent:
         instr += _scene_snapshot_block()
         return instr
 
+    # Conjunto de ferramentas resolvido a cada turno (ver rpg/toolsets.py).
+    # No modo de combate "tela", as ferramentas que a instrução já proíbe
+    # saem do conjunto — proibição por prompt vira garantia de código.
+    try:
+        from rpg.toolsets import FerramentasDoTurno
+        ferramentas = [FerramentasDoTurno(ALL_TOOLS)]
+    except Exception:
+        # Fallback defensivo: versão de ADK sem BaseToolset → lista simples.
+        ferramentas = list(ALL_TOOLS)
+
     try:
         # Forma idiomática (ADK >= 1.x): instruction como provider dinâmico.
         return Agent(
             name="rpg_master_agent",
             model=model,
             instruction=_instruction_provider,
-            tools=ALL_TOOLS,
+            tools=ferramentas,
         )
     except Exception:
         # Fallback defensivo: ADK sem suporte a provider → instrução estática
@@ -814,7 +824,7 @@ def create_agent(model, campaign_type: str = "fantasia") -> Agent:
             name="rpg_master_agent",
             model=model,
             instruction=_instruction_provider(),
-            tools=ALL_TOOLS,
+            tools=ferramentas,
         )
 
 
