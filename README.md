@@ -917,19 +917,22 @@ As 61 ferramentas custam **~11.100 tokens de schema em toda requisição**. Como
 cada chamada de ferramenta é um novo round-trip, um turno de combate com três
 chamadas manda ~33 mil tokens só de definição.
 
-Mas o motivo do filtro não é custo, é **correção**. No modo de combate `tela`,
-a luta é resolvida pela interface via `combat_action()`, e a instrução já
-proibia a LLM de chamar `attack_roll`, `use_ability`, `next_turn`,
-`execute_npc_turn`, `roll_death_save` e `resolve_saving_throw`. Proibir por
-prompt é esperança; **retirar a ferramenta do conjunto é garantia** — o mesmo
-princípio já aplicado ao snapshot de cena. Uma LLM que resolvesse chamar
-`attack_roll` no meio de um combate da tela produziria turno duplicado: o
-motor avançaria por fora da economia que a tela controla.
+| Cenário | Ferramentas | Schema | |
+|---|---|---|---|
+| D&D, combate narrado | 61 | ~11.134 tokens | base |
+| D&D, combate na tela | 55 | ~9.050 tokens | −2.084 |
+| Romance / horror / mistério… | 23 | ~2.353 tokens | **−8.781 (−79%)** |
 
-| Modo | Ferramentas | Schema |
-|---|---|---|
-| `narrado` | 61 | ~11.134 tokens |
-| `tela` | 55 | ~9.050 tokens (−18,7%) |
+São dois filtros, com motivações diferentes.
+
+**1. Modo de combate `tela` — o motivo é correção, não custo.** A luta é
+resolvida pela interface via `combat_action()`, e a instrução já proibia a LLM
+de chamar `attack_roll`, `use_ability`, `next_turn`, `execute_npc_turn`,
+`roll_death_save` e `resolve_saving_throw`. Proibir por prompt é esperança;
+**retirar a ferramenta do conjunto é garantia** — o mesmo princípio já
+aplicado ao snapshot de cena. Uma LLM que resolvesse chamar `attack_roll` no
+meio de um combate da tela produziria turno duplicado: o motor avançaria por
+fora da economia que a tela controla.
 
 Ficam de fora do filtro de propósito: `roll_initiative` (é o gatilho que faz a
 tela assumir), `end_combat` (escape barato se a tela não concluir),
@@ -937,9 +940,26 @@ tela assumir), `end_combat` (escape barato se a tela não concluir),
 `modify_hp`/`apply_condition` (dano e condições fora de combate seguem na
 narração).
 
-**Por que por MODO e não por turno.** Os schemas ficam no início da
-requisição — o bloco mais cacheável que existe. O modo muda poucas vezes por
-sessão, então o prefixo continua válido dentro de uma mesma fase. Filtrar com
+**2. Campanha não-D&D — o motivo é custo, e é o maior dos dois.** Fantasia,
+romance, horror, mistério, scifi e faroeste não têm regras: a contagem de
+menções a `attack_roll`, `create_character_sheet`, `roll_initiative` e afins
+nas instruções desses seis estilos é **zero**, e quase toda ferramenta do
+motor exige `char["sheet"]`, que nem existe ali. Eram 39 ferramentas de peso
+morto.
+
+Exceção deliberada: **`roll_dice` fica em toda campanha**. É o único primitivo
+de aleatoriedade do sistema, não depende de ficha e é genérico de gênero — um
+mistério ou um faroeste podem querer um dado sem ter regras.
+
+Salvaguarda que importa: além da flag `dnd_mode`, o filtro checa se **algum
+personagem tem ficha**. Uma campanha importada de JSON sem a flag, mas com
+fichas salvas, mantém o motor — perder as ferramentas no meio de uma campanha
+em andamento seria bem pior que carregar schema a mais.
+
+**Por que por MODO/TIPO e não por turno.** Os schemas ficam no início da
+requisição — o bloco mais cacheável que existe. O tipo de campanha nunca muda,
+e o modo de combate muda poucas vezes por sessão, então o prefixo continua
+válido dentro de uma mesma fase. Filtrar com
 sinais de granularidade fina destruiria o cache e sairia mais caro do que não
 filtrar. Pelo mesmo motivo os `FunctionTool` são construídos uma vez e
 reusados: schema idêntico entre turnos é o que mantém o prefixo cacheável.
@@ -1212,7 +1232,7 @@ em `utils.js`) é adaptativa:
 
 ## Testes e garantias
 
-A suíte roda com **pytest** (235 testes). O `tests/conftest.py` isola tudo de rede
+A suíte roda com **pytest** (258 testes). O `tests/conftest.py` isola tudo de rede
 e de banco: o `database` (Supabase) vira stub e a camada SRD entra em modo
 offline, então nenhum teste depende da internet. Ele também expõe a fábrica
 `criar_ficha()` e as fixtures `campanha`/`povoar`, para um teste de motor
@@ -1374,7 +1394,7 @@ o nome do pacote. Também não há variável de ambiente nova.
 │   ├── test_damage_types.py     Tipos de dano, resistências, PV temporários
 │   ├── test_concentration.py    Concentração em magias
 │   ├── test_reactions.py        Reação e ataque de oportunidade
-│   ├── test_toolsets.py         Filtro de ferramentas por modo de combate
+│   ├── test_toolsets.py         Filtro de ferramentas por modo e por estilo
 │   └── legacy/            Suítes em formato de script (não coletadas)
 │       ├── tests.py             Suíte funcional (13 blocos, 70 checks)
 │       └── tests_combat_fuzz.py Fuzzer de invariantes de combate
