@@ -14,7 +14,7 @@ zonas/alcance, _provoke_opportunity_attacks passa a ser chamado também no
 movimento — os testes de reação abaixo continuam valendo.
 """
 
-import tools_dnd as T
+from app import tools_dnd as T
 from conftest import criar_ficha, iniciar_combate
 
 

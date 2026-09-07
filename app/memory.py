@@ -263,7 +263,7 @@ def _migrate_spell_descriptions() -> None:
     corrigindo personagens criados antes da correção do wizard.
     """
     try:
-        from tools_dnd import DEFAULT_SPELLS_BY_CLASS
+        from app.tools_dnd import DEFAULT_SPELLS_BY_CLASS
     except ImportError:
         return  # ferramentas não disponíveis ainda
 
@@ -298,7 +298,7 @@ def _migrate_mana_pool() -> None:
     máximo (não recarrega mana gasta).
     """
     try:
-        from tools_dnd import _max_mana_for, CLASS_DATA
+        from app.tools_dnd import _max_mana_for, CLASS_DATA
     except ImportError:
         return
     for char in campaign.get("characters", {}).values():
@@ -366,7 +366,7 @@ def load_campaign() -> bool:
     Usa CURRENT_USER_ID e CAMPAIGN_NAME definidos pelo server.py.
     Retorna True se a campanha contém dados (não é nova).
     """
-    import database
+    from app import database
 
     uid  = current_user_id()
     name = current_campaign_name()
@@ -442,7 +442,7 @@ def save_campaign() -> None:
     """
     Persiste o estado da campanha no Supabase com as travas de segurança originais.
     """
-    import database
+    from app import database
 
     # TRAVA 1: Só salva se tiver nome definido
     if not campaign or not campaign.get("name"):

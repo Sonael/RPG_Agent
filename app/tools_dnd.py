@@ -17,7 +17,7 @@ Novidades (v2):
 import os
 import random
 import re
-import memory
+from app import memory
 
 # ---------------------------------------------------------------------------
 # Debug do motor de regras (para demonstração ao vivo).
@@ -2013,7 +2013,7 @@ def _fetch_armor_data(armor_name: str) -> dict | None:
     Busca dados de armadura no Open5e como fallback quando o item não está em ARMOR_TABLE.
     Retorna dict no mesmo formato de ARMOR_TABLE ou None se não encontrado.
     """
-    from open5e import http as _req   # SRD com cache, sessão e retry
+    from app.open5e import http as _req   # SRD com cache, sessão e retry
     slug = armor_name.lower().strip().replace(" ", "-").replace("'", "")
     for attempt in [
         lambda: _req.get(f"https://api.open5e.com/v1/armor/{slug}/", timeout=4),
@@ -2797,7 +2797,7 @@ _ATTR_MAP = {
 
 def _fetch_race_data(race_name: str) -> dict | None:
     """Busca dados da raça no Open5e. Retorna dict com ability_bonuses e traits, ou None."""
-    from open5e import http as _req   # SRD com cache, sessão e retry
+    from app.open5e import http as _req   # SRD com cache, sessão e retry
     en_name = RACE_PT_TO_EN.get(race_name.lower(), race_name.lower())
     slug    = en_name.replace(" ", "-").replace("'", "")
     try:
@@ -2905,7 +2905,7 @@ def _fetch_weapon_data(weapon_name: str) -> tuple[int, int] | None:
     Retorna (n_dice, sides) ou None se não encontrar.
     Ex: "espada longa" → (1, 8)  |  "arco longo" → (1, 8)
     """
-    from open5e import http as _req   # SRD com cache, sessão e retry
+    from app.open5e import http as _req   # SRD com cache, sessão e retry
     en_name = WEAPON_PT_TO_EN.get(weapon_name.lower().strip(), weapon_name.lower().strip())
     slug    = en_name.replace(" ", "-").replace("'", "")
     try:
@@ -3015,7 +3015,7 @@ def _fetch_class_spells(classe: str, max_spell_level: int = 1) -> list[dict]:
     Retorna lista de dicts {nome, descricao, custo_mana, dado}.
     Usa DEFAULT_SPELLS_BY_CLASS como fallback.
     """
-    from open5e import http as _req   # SRD com cache, sessão e retry
+    from app.open5e import http as _req   # SRD com cache, sessão e retry
 
     en_class = _CLASS_SLUG_MAP.get(classe.lower(), "")
     if not en_class:
@@ -4623,7 +4623,7 @@ def apply_condition(char_name: str, condition: str, duration_turns: int = 0) -> 
         condition:      Nome da condição (ex: 'Cego', 'Envenenado', 'Paralisado').
         duration_turns: Duração em turnos (0 = indefinida, até ser removida manualmente).
     """
-    from open5e import http as _req   # SRD com cache, sessão e retry
+    from app.open5e import http as _req   # SRD com cache, sessão e retry
 
     char, err = _get_char(char_name)
     if not char:
@@ -4889,7 +4889,7 @@ def _search_open5e_item(item_name: str) -> dict | None:
     Busca o item mágico no Open5e. Tenta slug exato primeiro, depois search.
     Retorna o dict do item ou None se não encontrado / API offline.
     """
-    from open5e import http as _req   # SRD com cache, sessão e retry
+    from app.open5e import http as _req   # SRD com cache, sessão e retry
 
     slug = item_name.lower().strip().replace(" ", "-").replace("'", "")
     _edbg(f"  🌐 [OPEN5E] Buscando item mágico '{item_name}' na base SRD (grounding)…")
@@ -6016,7 +6016,7 @@ def learn_spell(char_name: str, spell_name: str) -> str:
         char_name:  Nome do personagem.
         spell_name: Nome da magia (português ou inglês).
     """
-    from open5e import http as _req   # SRD com cache, sessão e retry
+    from app.open5e import http as _req   # SRD com cache, sessão e retry
 
     char, err = _get_char(char_name)
     if not char:
@@ -6182,7 +6182,7 @@ def _cr_str_to_float(cr) -> float:
 
 def _fetch_open5e_monsters(cr: float, limit: int = 15) -> list[dict]:
     """Busca monstros do Open5e com CR correto. Retorna lista vazia se falhar."""
-    from open5e import http as _req   # SRD com cache, sessão e retry
+    from app.open5e import http as _req   # SRD com cache, sessão e retry
     cr_str = _cr_to_open5e_str(cr)
     _edbg(f"  🌐 [OPEN5E] Buscando monstros reais com CR≈{cr_str} na base SRD (grounding)…")
     try:
@@ -6346,7 +6346,7 @@ def _fetch_background(bg_name: str) -> dict | None:
     Busca um antecedente no Open5e. Retorna o dict ou None se falhar.
     Usa fallback offline automaticamente.
     """
-    from open5e import http as _req   # SRD com cache, sessão e retry
+    from app.open5e import http as _req   # SRD com cache, sessão e retry
     en_name = bg_name.lower().strip()
     slug    = en_name.replace(" ", "-").replace("'", "")
     try:
@@ -6499,7 +6499,7 @@ def choose_feat(char_name: str, feat_name: str) -> str:
         char_name: Nome do personagem.
         feat_name: Nome do talento em inglês (como aparece no SRD).
     """
-    from open5e import http as _req   # SRD com cache, sessão e retry
+    from app.open5e import http as _req   # SRD com cache, sessão e retry
 
     char, err = _get_char(char_name)
     if not char:
@@ -6728,7 +6728,7 @@ def spawn_monster(
                        usa o nome do Open5e.
         quantity:      Quantos exemplares criar (1–10). Se > 1, cria "Nome 1", "Nome 2"…
     """
-    from open5e import http as _req   # SRD com cache, sessão e retry
+    from app.open5e import http as _req   # SRD com cache, sessão e retry
 
     quantity = max(1, min(10, int(quantity)))
 

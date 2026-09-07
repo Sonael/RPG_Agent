@@ -92,10 +92,24 @@ m.is_party_member = lambda c: (
            == (c.get('name', '') or '').lower().strip()
            for p in m.campaign.get('party', []))
 )
-sys.modules['memory'] = m
-sys.path.insert(0, '.')
+# A raiz do repositório precisa estar no path para `import app` funcionar
+# quando este script roda direto (python tests/legacy/tests.py).
+import os, pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
 
-from tools_dnd import (
+# Suíte de teste não depende de serviço de terceiros. Sem isto, rodar o script
+# direto sai para a api.open5e.com e trava quando ela está lenta — foi o que
+# aconteceu de fato; sob o pytest nunca apareceu porque o conftest já força
+# offline. Use RPG_SRD_OFFLINE=0 para exercitar a rede de propósito.
+os.environ.setdefault("RPG_SRD_OFFLINE", "1")
+
+# Instala o `memory` falso ANTES de importar qualquer coisa de app.
+# Só mexer em sys.modules não bastaria: `from app import memory` resolve pelo
+# atributo do pacote, então registrar_duble faz as duas coisas.
+import app as _app
+_app.registrar_duble('memory', m)
+
+from app.tools_dnd import (
     _modifier, _proficiency_bonus, _parse_dice, _roll_d20_with_adv,
     _normalize_sheet,
     attack_roll, use_ability, modify_hp, modify_mana,
@@ -106,8 +120,8 @@ from tools_dnd import (
     XP_THRESHOLDS, CLASS_LEVEL_FEATURES,
 )
 
-from tools import get_scene_context
-import open5e
+from app.tools import get_scene_context
+from app import open5e
 
 SEP = "=" * 62
 

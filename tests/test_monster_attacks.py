@@ -15,8 +15,8 @@ import random
 
 import pytest
 
-import memory
-import tools_dnd as T
+from app import memory
+from app import tools_dnd as T
 
 
 # ---------------------------------------------------------------------------

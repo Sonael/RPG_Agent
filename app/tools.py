@@ -4,8 +4,8 @@ Todas as ferramentas expostas ao agente de RPG.
 Inclui as ferramentas base de narrativa e as ferramentas D&D (tools_dnd.py).
 """
 
-import memory
-from tools_dnd import DND_TOOLS
+from app import memory
+from app.tools_dnd import DND_TOOLS
 
 
 # ---------------------------------------------------------------------------

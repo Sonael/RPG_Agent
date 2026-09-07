@@ -9,7 +9,7 @@ Detecta contradições entre o texto gerado e a memória estruturada.
 import re
 from dataclasses import dataclass, field
 
-import memory
+from app import memory
 
 
 # ---------------------------------------------------------------------------

@@ -45,7 +45,10 @@ import threading
 import time
 from pathlib import Path
 
-RAIZ = Path(__file__).resolve().parent
+# O script vive em scripts/, mas opera sobre a raiz do repositório (é lá que
+# ficam server.py, static/ e o pacote app/).
+RAIZ = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(RAIZ))
 
 # O servidor não deve cuspir os logs de debug do agente durante a captura.
 os.environ.setdefault("RPG_DEBUG", "0")
@@ -95,9 +98,9 @@ class _ClienteAuthFalso:
 
 def _instalar_dubles(campanha: dict, nome_campanha: str) -> None:
     """Substitui auth e database por versões locais, sem rede."""
-    import auth
-    import database
-    import memory
+    from app import auth
+    from app import database
+    from app import memory
 
     auth._client = lambda: _ClienteAuthFalso()
 
@@ -155,7 +158,7 @@ def _subir_servidor(campanha: dict, nome_campanha: str):
     campanha base e aplica um patch por cima, para que cada tela possa pedir
     o estado de mundo que quer retratar (combate ativo, vitória, etc.).
     """
-    import memory
+    from app import memory
     from flask import jsonify, request
     from werkzeug.serving import make_server
 
@@ -576,7 +579,7 @@ def main() -> int:
     )
     ap.add_argument("--saida", default="screenshots",
                     help="pasta de destino (padrão: screenshots)")
-    ap.add_argument("--fixture", default="temp.json",
+    ap.add_argument("--fixture", default="scripts/temp.json",
                     help="JSON da campanha de exemplo (padrão: temp.json)")
     ap.add_argument("--nome", default="",
                     help="nome da campanha mostrado nas telas "

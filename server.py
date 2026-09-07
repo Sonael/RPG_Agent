@@ -17,12 +17,18 @@ import os
 from flask import Flask, Response, g, jsonify, request, send_from_directory, stream_with_context
 from google.genai import types as gtypes
 
-import memory
-import database
-from auth import require_auth, register as auth_register, login as auth_login, refresh_session
-from agent import create_agent, get_campaign_config
-from session import APP_NAME, create_runner
-from validator import validate
+# ATENÇÃO ao nome `app` neste arquivo: aqui em cima ele é o PACOTE da
+# aplicação (app/memory.py, app/tools_dnd.py…); da linha ~443 em diante, é a
+# instância do Flask (`app = Flask(...)`, exigida por `gunicorn server:app`).
+# Não há conflito — estes imports já resolveram — mas ao ler o meio do arquivo,
+# `app` é sempre o Flask. Para pegar algo do pacote lá embaixo, importe pelo
+# caminho completo (`from app.tools_dnd import X`), nunca por `import app`.
+from app import memory
+from app import database
+from app.auth import require_auth, register as auth_register, login as auth_login, refresh_session
+from app.agent import create_agent, get_campaign_config
+from app.session import APP_NAME, create_runner
+from app.validator import validate
 
 
 # ---------------------------------------------------------------------------
@@ -351,7 +357,7 @@ def _check_all_level_ups() -> list[str]:
     Não duplica work — grant_xp() já aplica level up internamente.
     Esta função garante que nenhum level up seja perdido por falha do LLM.
     """
-    from tools_dnd import XP_THRESHOLDS, _proficiency_bonus, _apply_class_features, CLASS_DATA, _max_mana_for
+    from app.tools_dnd import XP_THRESHOLDS, _proficiency_bonus, _apply_class_features, CLASS_DATA, _max_mana_for
     import random
 
     if not memory.campaign.get("dnd_mode", False):
@@ -728,7 +734,7 @@ def confirm_email():
     O token é VALIDADO contra o Supabase aqui — não confiamos cegamente no
     que o cliente envia.
     """
-    from auth import get_user_id
+    from app.auth import get_user_id
 
     data         = request.json or {}
     access_token = data.get("access_token", "")
@@ -831,7 +837,7 @@ def create_campaign():
         return jsonify({"error": f"Já existe uma campanha com o nome '{name}'"}), 409
 
     # Normaliza chaves de personagens para lowercase + normaliza sheet.classe
-    from tools_dnd import reconcile_character_archetypes
+    from app.tools_dnd import reconcile_character_archetypes
     raw_chars = campaign_data.get("characters", {})
     normalized_chars = {}
     for k, v in raw_chars.items():
@@ -902,7 +908,7 @@ def update_campaign(name):
 
     # Materializa sub-features de arquétipos escolhidos no editor antes de
     # persistir (o picker do editor só grava a escolha em feature_choices).
-    from tools_dnd import reconcile_character_archetypes
+    from app.tools_dnd import reconcile_character_archetypes
     edited_chars = campaign_data.get("characters", existing.get("characters", {}))
     if isinstance(edited_chars, dict):
         for _ch in edited_chars.values():
@@ -940,8 +946,8 @@ def update_campaign(name):
 @require_auth
 def get_class_spells():
     """Retorna magias de uma classe até um nível máximo (usa Open5e + fallback local)."""
-    from tools_dnd import _CLASS_SLUG_MAP, SPELL_MANA_COST, DEFAULT_SPELLS_BY_CLASS
-    from open5e import http as _req   # SRD com cache, sessão e retry
+    from app.tools_dnd import _CLASS_SLUG_MAP, SPELL_MANA_COST, DEFAULT_SPELLS_BY_CLASS
+    from app.open5e import http as _req   # SRD com cache, sessão e retry
 
     classe          = request.args.get("class", "").lower().strip()
     max_level       = min(int(request.args.get("max_level", 9) or 9), 9)
@@ -1047,7 +1053,7 @@ def get_class_spells():
 @require_auth
 def search_dnd_items():
     """Busca itens D&D no Open5e: armas, armaduras e itens mágicos."""
-    from open5e import http as _req   # SRD com cache, sessão e retry
+    from app.open5e import http as _req   # SRD com cache, sessão e retry
 
     q         = request.args.get("q", "").strip()
     item_type = request.args.get("type", "all")
@@ -1104,7 +1110,7 @@ def search_dnd_items():
 @require_auth
 def search_dnd_monsters():
     """Busca monstros D&D no Open5e e retorna atributos prontos para a ficha."""
-    from open5e import http as _req   # SRD com cache, sessão e retry
+    from app.open5e import http as _req   # SRD com cache, sessão e retry
 
     q = request.args.get("q", "").strip()
     if not q or len(q) < 2:
@@ -1119,7 +1125,7 @@ def search_dnd_monsters():
 
         # Ataques do stat block — mesma extração usada por spawn_monster, para
         # que a ficha montada pela UI e a criada pelo motor não divirjam.
-        from tools_dnd import _extract_monster_attacks
+        from app.tools_dnd import _extract_monster_attacks
         atk = _extract_monster_attacks(m)
 
         return {
@@ -1185,7 +1191,7 @@ def search_dnd_monsters():
 @require_auth
 def get_class_features():
     """Retorna habilidades de classe disponíveis até o nível informado."""
-    from tools_dnd import CLASS_LEVEL_FEATURES, CLASS_FEATURE_DESCS
+    from app.tools_dnd import CLASS_LEVEL_FEATURES, CLASS_FEATURE_DESCS
 
     classe = request.args.get("class", "").lower().strip()
     nivel  = int(request.args.get("level", 1) or 1)
@@ -1219,7 +1225,7 @@ def get_feature_variants():
     Com ?feature=<nome> → só essa feature, com options resolvido (ex.:
     "Inimigo Favorecido Adicional" herda options de "Inimigo Favorecido").
     """
-    from tools_dnd import FEATURE_VARIANTS, _get_variants
+    from app.tools_dnd import FEATURE_VARIANTS, _get_variants
 
     feat = request.args.get("feature", "").strip()
     if feat:
@@ -1247,8 +1253,8 @@ def set_feature_choice_route():
     de validação (pick limit, opção existir, etc.) e recalcula CA quando
     necessário (Defesa).
     """
-    from tools_dnd import set_feature_choice
-    import memory as _mem
+    from app.tools_dnd import set_feature_choice
+    from app import memory as _mem
 
     data    = request.get_json() or {}
     char    = (data.get("char") or "").strip()
@@ -1593,7 +1599,7 @@ def _build_fresh_start_opening() -> str:
     jogador, mas ainda não há nenhuma conversa. O mestre deve começar
     narrando a partir desse setup, sem perguntar nada que já foi informado.
     """
-    from tools import get_full_context
+    from app.tools import get_full_context
     contexto = get_full_context()
     protagonist = (memory.campaign.get("protagonist") or "").strip()
     proto_line  = (
@@ -1639,7 +1645,7 @@ def _build_fresh_start_opening() -> str:
 
 
 def _build_recap() -> str:
-    from tools import get_full_context
+    from app.tools import get_full_context
     contexto = get_full_context()
     hist = memory.campaign["conversation_history"][-40:]
     lines = [
@@ -2465,14 +2471,14 @@ def update_world():
 @app.route("/api/combat/state", methods=["GET"])
 @require_auth
 def combat_state_route():
-    import tools_dnd
+    from app import tools_dnd
     return jsonify(tools_dnd.combat_snapshot())
 
 
 @app.route("/api/combat/action", methods=["POST"])
 @require_auth
 def combat_action_route():
-    import tools_dnd
+    from app import tools_dnd
     d = request.json or {}
     action = (d.get("action") or "").strip()
     if not action:
@@ -2491,7 +2497,7 @@ def combat_action_route():
 @app.route("/api/combat/recap", methods=["GET"])
 @require_auth
 def combat_recap_route():
-    import tools_dnd
+    from app import tools_dnd
     return jsonify({"text": tools_dnd.combat_recap_payload()})
 
 

@@ -12,7 +12,7 @@ vez, e o dano ameaça essa concentração.
 
 import pytest
 
-import tools_dnd as T
+from app import tools_dnd as T
 from conftest import criar_ficha, iniciar_combate
 
 

@@ -15,7 +15,8 @@ from pathlib import Path
 
 import pytest
 
-ROOT = Path(__file__).parent
+ROOT   = Path(__file__).parent.parent
+FUZZER = Path(__file__).parent / "legacy" / "tests_combat_fuzz.py"
 
 # Combates por modo. Baixo o bastante para a suíte rodar em segundos e alto o
 # bastante para exercitar ordem de turno, mortes no meio e ações fora de ordem.
@@ -27,7 +28,7 @@ SEED = 1234
 @pytest.mark.parametrize("modo", ["engine", "screen"])
 def test_invariantes_de_turno(modo):
     proc = subprocess.run(
-        [sys.executable, "tests_combat_fuzz.py", modo, str(N_COMBATES), str(SEED)],
+        [sys.executable, str(FUZZER), modo, str(N_COMBATES), str(SEED)],
         cwd=ROOT, capture_output=True, text=True, timeout=900,
     )
     if proc.returncode != 0:

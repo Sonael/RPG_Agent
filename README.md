@@ -53,7 +53,7 @@ gerador de texto passivo, mas uma entidade que **percebe**, **delibera** e
 Mapeando o projeto para o vocabulário de agentes:
 
 - **Ambiente**, o estado do mundo do jogo (personagens, locais, combate,
-  inventário, flags), estruturado e persistente (`memory.py` + Supabase).
+  inventário, flags), estruturado e persistente (`app/memory.py` + Supabase).
 - **Percepção**, a cada turno o agente *lê* o ambiente por ferramentas de
   consulta (`get_scene_context`, `get_character_sheet`, `get_combat_status`…).
   Ele não age "às cegas": primeiro observa o estado atual.
@@ -265,7 +265,7 @@ turnos, etc.). Os outros são puramente narrativos com memória estruturada.
 
 ## Sistema de memória (estado por sessão)
 
-`memory.py` é o coração do estado. Foi redesenhado para ser **multiusuário-safe**.
+`app/memory.py` é o coração do estado. Foi redesenhado para ser **multiusuário-safe**.
 
 ### Modelo
 
@@ -362,7 +362,7 @@ preencher campos novos em campanhas antigas.
 
 ## Persistência (Supabase) e autenticação
 
-`database.py`, camada fina sobre Postgrest:
+`app/database.py`, camada fina sobre Postgrest:
 
 - `list_campaigns(user_id)`, `get_campaign`, `save_campaign` (upsert),
   `delete_campaign`, `rename_campaign`, `campaign_exists`.
@@ -392,7 +392,7 @@ navegador. `static/js/utils.js:authFetch` tenta refresh silencioso em 401.
 - **`/api/auth/confirm`** valida o token contra o Supabase de verdade.
 - **XSS**: a narração da IA passa por DOMPurify antes de ir ao DOM
   (`renderMarkdown`); `marked` sozinho deixaria passar `<script>`.
-- **Escopo de usuário estrutural**: `database.py` só acessa a tabela
+- **Escopo de usuário estrutural**: `app/database.py` só acessa a tabela
   `campaigns` por helpers que exigem `user_id` válido e embutem o filtro,
   tornando impossível montar uma query sem escopo. Complementado por RLS no Supabase.
 - Headers: HSTS, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`.
@@ -442,7 +442,7 @@ slots; casos comuns cobertos). Resumo:
 - `_weapon_attr` decide DEX×STR (ranged→DEX, finesse→max, melee→STR).
 - `ARMOR_TABLE` fixa CA base e bônus de DEX por tipo de armadura.
 
-### Camada de acesso ao SRD (`open5e.py`)
+### Camada de acesso ao SRD (`app/open5e.py`)
 
 Todas as consultas ao Open5e passam por um módulo único, em vez de
 `requests.get` soltos espalhados pelo motor:
@@ -590,7 +590,7 @@ sem cair num texto de fallback genérico).
 ### Engine determinístico (fundação fuzzada)
 
 O motor de turnos vive em `tools_dnd.py` e tem **garantias formais
-demonstradas por fuzz** (`tests_combat_fuzz.py`, 8k+ combates aleatórios,
+demonstradas por fuzz** (`tests/legacy/tests_combat_fuzz.py`, 8k+ combates aleatórios,
 0 violações de invariantes):
 
 | Garantia | Mecanismo |
@@ -625,7 +625,7 @@ O turno **só avança** quando:
 - o jogador foge (consome Ação + sai), ou
 - o sistema detecta que um lado foi todo derrotado.
 
-Classificadores (`tools_dnd.py:_ability_action_type` e `_item_action_type`)
+Classificadores (`app/tools_dnd.py:_ability_action_type` e `_item_action_type`)
 detectam Bônus por nome (PT e EN). Default: Ação.
 
 ### Tipos de dano, resistência, imunidade e vulnerabilidade
@@ -911,7 +911,7 @@ derrota instrui explicitamente **não** gerar saque nem XP.
 A lista completa exposta ao agente (`tools.py:ALL_TOOLS` = narrativas +
 `tools_dnd.DND_TOOLS`):
 
-### Narrativas (`tools.py`)
+### Narrativas (`app/tools.py`)
 
 | Função | Função no jogo |
 |---|---|
@@ -1159,11 +1159,25 @@ em `utils.js`) é adaptativa:
 
 ## Testes e garantias
 
-A suíte roda com **pytest** (212 testes). O `conftest.py` isola tudo de rede
+A suíte roda com **pytest** (212 testes). O `tests/conftest.py` isola tudo de rede
 e de banco: o `database` (Supabase) vira stub e a camada SRD entra em modo
 offline, então nenhum teste depende da internet. Ele também expõe a fábrica
 `criar_ficha()` e as fixtures `campanha`/`povoar`, para um teste de motor
 montar um combate em três linhas.
+
+**Como substituir um submódulo por um dublê.** Com o código dentro do pacote
+`app/`, mexer só em `sys.modules` não basta: `from app import memory` resolve
+pelo **atributo** do pacote quando ele já existe. Use
+`app.registrar_duble(nome, modulo)`, que faz as duas coisas. É por isso que
+`app/__init__.py` é deliberadamente vazio de imports — se ele importasse os
+submódulos na carga, os verdadeiros venceriam a corrida e a substituição não
+teria efeito.
+
+As duas suítes legadas forçam `RPG_SRD_OFFLINE=1` por padrão. Sem isso,
+rodá-las à mão sai para a api.open5e.com e elas travam quando a API está
+lenta — o que já aconteceu de verdade, e nunca aparecia sob o pytest porque o
+conftest já forçava offline. Para exercitar a rede de propósito:
+`RPG_SRD_OFFLINE=0 python tests/legacy/tests.py`.
 
 ```bash
 pip install -r requirements-dev.txt
@@ -1171,7 +1185,7 @@ pytest                  # tudo
 pytest -m "not slow"    # sem o fuzzer
 ```
 
-### `tests.py`, suíte funcional
+### `tests/legacy/tests.py`, suíte funcional
 
 13 blocos cobrindo:
 - Funções matemáticas base (modifier, proficiência, parse_dice).
@@ -1181,13 +1195,13 @@ pytest -m "not slow"    # sem o fuzzer
 - XP / level-up.
 - Equipamento, condições, descansos, moedas.
 
-Continua rodável à mão (`python tests.py`) e agora **sai com código != 0**
+Continua rodável à mão (`python tests/legacy/tests.py`) e agora **sai com código != 0**
 quando algum check falha. Isso não era verdade antes: o script só imprimia
 `✗` e saía com 0, e tinha 5 checks falhando havia tempos sem ninguém ver —
 higiene de fixture, o Goblin morria num bloco e os seguintes testavam um
 cadáver. Resolvido com o helper `revive()`; hoje são 70/70.
 
-`--json=<caminho>` despeja os resultados. É o que o `conftest.py` usa para
+`--json=<caminho>` despeja os resultados. É o que o `tests/conftest.py` usa para
 transformar **cada check num caso de pytest com nome próprio**, em vez de
 tudo virar um único "o script falhou" — sem reescrever ~50 mil caracteres
 de asserts.
@@ -1218,7 +1232,7 @@ Testes nativos das garantias mais recentes:
 - Reação recarrega por rodada; aliado não bate em aliado que foge; quem já
   gastou a reação não reage; o bote para quando o fugitivo cai.
 
-### `tests_combat_fuzz.py`, fuzzer de invariantes
+### `tests/legacy/tests_combat_fuzz.py`, fuzzer de invariantes
 
 Dois modos:
 
@@ -1243,7 +1257,7 @@ Em cada passo, verifica:
 **Métrica atual** (8000 combates motor + 4000 combates tela, seeds variados):
 ~307k chamadas de tool, **0 violações** em todos os invariantes.
 
-### Validador narrativo (`validator.py`)
+### Validador narrativo (`app/validator.py`)
 
 Roda em toda resposta do agente; emite avisos (não interrompe) para:
 - Personagem morto narrado como ativo.
@@ -1263,32 +1277,47 @@ Já descrito, força correção quando a IA narra mecânica sem ferramenta
 
 ## Estrutura de arquivos
 
+A raiz guarda só o ponto de entrada e a configuração. O código da aplicação
+vive no pacote `app/`, os testes em `tests/`, os utilitários em `scripts/`.
+
 ```
 .
 ├── server.py              Flask + SSE + endpoints + segurança (~2500 linhas)
-├── agent.py               Instruções de estilo + create_agent
-├── tools.py               Tools narrativas + ALL_TOOLS
-├── tools_dnd.py           Motor D&D 5e + combate (~7900 linhas, 38 tools)
-├── memory.py              Estado por sessão, proxy, persistência
-├── database.py            Camada Supabase
-├── auth.py                Supabase Auth + @require_auth
-├── session.py             Runner ADK
-├── validator.py           Validador narrativo pós-resposta
-├── open5e.py              Acesso ao SRD: sessão, retry, cache, offline
-├── conftest.py            Fixtures do pytest + ponte para as suítes legadas
-├── pytest.ini             Configuração do pytest
-├── tests.py               Suíte funcional (13 blocos, 70 checks)
-├── tests_combat_fuzz.py   Fuzzer de invariantes de combate
-├── test_legacy_dnd.py     Portão: um caso de pytest por check do tests.py
-├── test_fuzz_invariants.py  Portão: roda o fuzzer na suíte
-├── test_monster_attacks.py  Dado de dano de monstro + Multiattack
-├── test_open5e_cache.py   Comportamento do cache do SRD
-├── test_damage_types.py   Tipos de dano, resistências e PV temporários
-├── test_concentration.py  Concentração em magias
-├── test_reactions.py      Reação e ataque de oportunidade
+│                          Entrypoint do Render: `gunicorn server:app`
+├── pytest.ini             Configuração do pytest (testpaths, pythonpath)
 ├── requirements.txt       Dependências fixadas (é o que o Render instala)
 ├── requirements-dev.txt   Dependências de teste (pytest)
 ├── render.yaml            Deploy no Render (gunicorn + envs Supabase)
+│
+├── app/                   Código da aplicação
+│   ├── __init__.py        Pacote vazio de propósito + registrar_duble()
+│   ├── agent.py           Instruções de estilo + create_agent
+│   ├── tools.py           Tools narrativas + ALL_TOOLS
+│   ├── tools_dnd.py       Motor D&D 5e + combate (~7900 linhas, 38 tools)
+│   ├── memory.py          Estado por sessão, proxy, persistência
+│   ├── database.py        Camada Supabase
+│   ├── auth.py            Supabase Auth + @require_auth
+│   ├── session.py         Runner ADK
+│   ├── validator.py       Validador narrativo pós-resposta
+│   └── open5e.py          Acesso ao SRD: sessão, retry, cache, offline
+│
+├── tests/                 Suíte pytest
+│   ├── conftest.py        Isolamento + fábrica criar_ficha + ponte legada
+│   ├── test_legacy_dnd.py     Portão: um caso por check do tests.py
+│   ├── test_fuzz_invariants.py  Portão: roda o fuzzer na suíte
+│   ├── test_monster_attacks.py  Dado de dano de monstro + Multiattack
+│   ├── test_open5e_cache.py     Comportamento do cache do SRD
+│   ├── test_damage_types.py     Tipos de dano, resistências, PV temporários
+│   ├── test_concentration.py    Concentração em magias
+│   ├── test_reactions.py        Reação e ataque de oportunidade
+│   └── legacy/            Suítes em formato de script (não coletadas)
+│       ├── tests.py             Suíte funcional (13 blocos, 70 checks)
+│       └── tests_combat_fuzz.py Fuzzer de invariantes de combate
+│
+├── scripts/               Utilitários fora do runtime
+│   ├── capturar_telas.py  Captura screenshots de todas as telas
+│   └── temp.json          Campanha de exemplo usada nas capturas
+│
 └── static/
     ├── login.html
     ├── menu.html
@@ -1387,12 +1416,12 @@ Gemini/DeepSeek vêm do usuário (localStorage do navegador), não do servidor.
 ```bash
 pytest                    # suíte completa (110 testes)
 pytest -m "not slow"      # sem o fuzzer
-pytest test_monster_attacks.py -v
+pytest tests/test_monster_attacks.py -v
 
-python tests.py           # suíte funcional isolada (sai != 0 se falhar)
-python tests_combat_fuzz.py both 10000        # fuzz completo, antes de publicar
-python tests_combat_fuzz.py engine 5000 1234  # só motor
-python tests_combat_fuzz.py screen 5000 1234  # só caminho da tela
+python tests/legacy/tests.py   # suíte funcional isolada (sai != 0 se falhar)
+python tests/legacy/tests_combat_fuzz.py both 10000        # fuzz completo, antes de publicar
+python tests/legacy/tests_combat_fuzz.py engine 5000 1234  # só motor
+python tests/legacy/tests_combat_fuzz.py screen 5000 1234  # só caminho da tela
 ```
 
 O `pytest` roda o fuzzer com um N modesto para a suíte continuar rápida; o

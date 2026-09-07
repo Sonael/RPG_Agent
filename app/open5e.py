@@ -28,7 +28,7 @@ COMO USAR
 Substituto direto de `requests` nos pontos de consulta ao SRD — a resposta
 devolvida expõe `.ok` e `.json()`, então os call sites existentes não mudam:
 
-    from open5e import http as _req
+    from app.open5e import http as _req
     r = _req.get("https://api.open5e.com/v1/monsters/goblin/", timeout=5)
     if r.ok:
         data = r.json()
@@ -264,7 +264,7 @@ def get(url: str, params: dict | None = None, timeout: float = 5.0) -> Response:
 class _HttpShim:
     """
     Fachada com a mesma cara de `requests` para os call sites do motor:
-        from open5e import http as _req
+        from app.open5e import http as _req
         r = _req.get(url, params={...}, timeout=4)
     """
 
