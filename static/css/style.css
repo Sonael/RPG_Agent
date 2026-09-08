@@ -115,7 +115,20 @@ button:disabled { opacity: 0.4; cursor: not-allowed !important; }
 /* =========================================================
    FORMS, BOTÕES E SCROLL
    ========================================================= */
-.scroll-area { overflow-y: auto; height: 100%; padding-right: 10px; }
+/* Sombra de rolagem: aparece SÓ do lado em que há conteúdo escondido.
+   As duas primeiras camadas acompanham o conteúdo (`local`) e apagam a
+   sombra quando não há mais o que rolar; as duas seguintes ficam presas ao
+   quadro (`scroll`). Vale para o corpo dos modais, o wizard e o prompt de
+   importação — todos cortavam texto no meio, sem nenhuma pista de que
+   continuava (o label "Notas" da ficha de personagem era o caso pior). */
+.scroll-area {
+  overflow-y: auto; height: 100%; padding-right: 10px;
+  background:
+    linear-gradient(var(--page-right) 30%, rgba(255,255,255,0)) top / 100% 22px no-repeat local,
+    linear-gradient(rgba(255,255,255,0), var(--page-right) 70%) bottom / 100% 22px no-repeat local,
+    radial-gradient(farthest-side at 50% 0, rgba(0,0,0,.10), transparent) top / 100% 10px no-repeat scroll,
+    radial-gradient(farthest-side at 50% 100%, rgba(0,0,0,.10), transparent) bottom / 100% 10px no-repeat scroll;
+}
 .scroll-area::-webkit-scrollbar { width: 4px; }
 .scroll-area::-webkit-scrollbar-track { background: transparent; }
 .scroll-area::-webkit-scrollbar-thumb { background: #d0c8b8; border-radius: 2px; }
@@ -201,6 +214,22 @@ textarea { resize: vertical; min-height: 40px; }
 .auth-tab::after { content: ''; position: absolute; bottom: -1px; left: 0; right: 0; height: 2px; background: var(--text-main); transform: scaleX(0); transition: transform 0.3s; }
 .auth-tab.active::after { transform: scaleX(1); }
 .auth-error { color: var(--ink-sys); font-size: 15px; font-style: italic; text-align: center; min-height: 20px; margin-bottom: 20px; }
+/* Formulário de login centrado no eixo vertical da página. `margin: auto 0`
+   dentro do flex column da .page-right divide o espaço livre igualmente
+   acima e abaixo — antes os campos colavam no topo e o botão no rodapé,
+   com um vão enorme no meio. */
+.auth-form { margin: auto 0; width: 100%; }
+
+/* Ação destrutiva discreta: mesmo alcance, menos atração visual. */
+.btn-delete-discreto {
+  background: none; border: none; padding: 10px 4px; margin: 0;
+  width: auto; cursor: pointer;
+  font-family: 'Lora', serif; font-size: 14px;
+  color: var(--text-muted); text-decoration: underline;
+  text-underline-offset: 3px; transition: color .2s;
+}
+.btn-delete-discreto:hover { color: var(--ink-sys); }
+
 
 .campaign-list { border: 1px solid var(--page-edge); border-radius: 4px; overflow: hidden; max-height: 250px; overflow-y: auto; margin-bottom: 20px; background: transparent; }
 .campaign-item { padding: 15px 12px; cursor: pointer; border-bottom: 1px solid var(--page-edge); display: flex; align-items: center; justify-content: space-between; transition: background 0.15s; }
@@ -282,7 +311,10 @@ textarea { resize: vertical; min-height: 40px; }
 .ed-pb-budget .over { color: var(--ink-sys); }
 
 .bottom-actions { margin-top: auto; padding-top: 20px; border-top: 1px solid var(--page-edge); display: flex; flex-direction: column; gap: 8px; width: 100%; }
-.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-bottom: 30px; }
+/* `margin: auto 0 30px` centra o bloco no eixo vertical da página: no
+   Prefácio da Sessão as colunas colavam no topo e sobrava metade da
+   página vazia embaixo do botão. */
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin: auto 0 30px 0; }
 .form-section h3 { font-family: 'Playfair Display', serif; font-weight: 700; font-size: 18px; color: var(--text-main); margin: 0 0 15px 0; border-bottom: 1px solid var(--page-edge); padding-bottom: 8px; }
 
 /* =========================================================
@@ -363,6 +395,11 @@ textarea { resize: vertical; min-height: 40px; }
    ========================================================= */
 #chat-area.page-right { padding: 0; display: flex; flex-direction: column; height: 100%; overflow: hidden; }
 #chat-history { flex: 1; overflow-y: auto; padding: 40px 60px 20px 60px; display: flex; flex-direction: column; gap: 25px; }
+/* Ancora a conversa no rodapé: com pouco texto, o mais recente fica logo
+   acima de onde se digita, em vez de colar no topo com um vão enorme no meio.
+   É `margin-top: auto` no primeiro filho, e não `justify-content: flex-end`,
+   porque este último impede de rolar até o topo quando o conteúdo transborda. */
+#chat-history > *:first-child { margin-top: auto; }
 #chat-history::-webkit-scrollbar { width: 6px; }
 #chat-history::-webkit-scrollbar-thumb { background: #d0c8b8; border-radius: 3px; }
 
@@ -492,6 +529,10 @@ textarea { resize: vertical; min-height: 40px; }
 .modal-header, .edit-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
 .modal-title, .edit-name { font-family: 'Playfair Display', serif; font-size: 22px; font-weight: 700; color: var(--text-main); }
 .modal-subtitle, .edit-type { font-family: 'Lora', serif; font-size: 13px; color: var(--text-muted); font-style: italic; text-transform: uppercase; }
+/* Frase explicativa dentro de modal. Diferente de .modal-subtitle, que é
+   um RÓTULO curto ('PERSONAGEM', 'DIÁRIO') e por isso vai em caixa alta —
+   uma frase inteira em maiúsculas grita com o leitor. */
+.modal-hint { font-family: 'Lora', serif; font-size: 13px; color: var(--text-muted); font-style: italic; }
 .close-btn { background: none; border: none; font-size: 20px; color: var(--text-muted); cursor: pointer; }
 .close-btn:hover { color: var(--ink-sys); }
 
@@ -1213,7 +1254,17 @@ body.combat-on { overflow: hidden; }
   /* flex-basis 0 → ocupa TODO o espaço restante do frame; rola por dentro. */
   flex: 1 1 0; min-height: 150px;
   overflow-y: auto;
-  background: radial-gradient(circle at center, rgba(255,255,255,0.85) 0%, transparent 100%);
+  /* Sombras de rolagem: as duas primeiras camadas são "cobertores" que
+     acompanham o conteúdo (local), as duas seguintes são as sombras presas
+     ao quadro (scroll). O efeito é que a sombra SÓ aparece do lado em que há
+     conteúdo escondido — antes o card do último combatente era cortado sem
+     nenhuma pista de que a lista continuava. */
+  background:
+    linear-gradient(var(--cbt-paper) 30%, rgba(255,255,255,0)) top / 100% 26px no-repeat local,
+    linear-gradient(rgba(255,255,255,0), var(--cbt-paper) 70%) bottom / 100% 26px no-repeat local,
+    radial-gradient(farthest-side at 50% 0, rgba(74,37,17,.20), transparent) top / 100% 12px no-repeat scroll,
+    radial-gradient(farthest-side at 50% 100%, rgba(74,37,17,.20), transparent) bottom / 100% 12px no-repeat scroll,
+    radial-gradient(circle at center, rgba(255,255,255,0.85) 0%, transparent 100%);
 }
 .cbt-team {
   flex: 1; display: flex; flex-direction: column; gap: 14px;
@@ -1247,6 +1298,15 @@ body.combat-on { overflow: hidden; }
   box-shadow: 0 0 0 2px var(--cbt-red), 0 8px 15px rgba(139,35,21,0.15);
   transform: scale(1.02);
 }
+/* Aliado x inimigo. Antes os dois eram cards brancos idênticos e o único
+   diferenciador era de que lado do "Vs." estavam — o que some no mobile,
+   onde as colunas viram uma só. */
+.cbt-card.cbt-aliado  { border-left: 4px solid var(--cbt-mp); }
+.cbt-card.cbt-inimigo {
+  border-left: 4px solid var(--cbt-red);
+  background: #fbf6f4;
+}
+.cbt-card.cbt-inimigo .cbt-name { color: #7a2f24; }
 .cbt-card.cbt-out {
   opacity: 0.6; filter: grayscale(0.8);
   background: #f0f0f0;
@@ -1283,10 +1343,38 @@ body.combat-on { overflow: hidden; }
   flex: 1; height: 8px;
   background: #e0d8cc; border-radius: 4px; overflow: hidden;
 }
-.cbt-bar-fill { height: 100%; border-radius: 4px; transition: width .3s; }
+.cbt-bar-fill { height: 100%; border-radius: 4px; transition: width .3s, background .3s; }
 .cbt-bar-fill.hp { background: var(--cbt-hp); }
 .cbt-bar-fill.mp { background: var(--cbt-mp); }
-.cbt-bar-num { width: 54px; text-align: right; flex-shrink: 0; color: var(--cbt-dark); }
+/* HP muda de cor com a porcentagem: antes era sempre vermelho, cheio ou
+   quase vazio, e não dava para ver de relance quem estava prestes a cair. */
+.cbt-bar-fill.hp.cbt-hp-ok       { background: #3f7d44; }
+.cbt-bar-fill.hp.cbt-hp-atencao  { background: #c98a1e; }
+.cbt-bar-fill.hp.cbt-hp-baixo    { background: var(--cbt-hp); }
+.cbt-bar-num { width: 74px; text-align: right; flex-shrink: 0; color: var(--cbt-dark); }
+/* PV temporários: azul, ao lado do número de HP, porque absorvem antes. */
+.cbt-temp {
+  color: var(--cbt-mp); font-weight: 700;
+  font-size: 0.82em; margin-left: 2px;
+}
+/* Concentração ativa — a magia que cai se o personagem levar dano. */
+.cbt-conc {
+  margin-top: 8px; font-size: 0.7rem; font-style: italic;
+  color: #5a4a7a; background: #efeaf7;
+  border-left: 3px solid #8a72b8; border-radius: 0 4px 4px 0;
+  padding: 3px 8px;
+}
+/* Selos de defesa por tipo de dano. */
+.cbt-defs { display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap; }
+.cbt-def {
+  font-size: 0.62rem; padding: 1px 6px; border-radius: 8px;
+  font-weight: 700; text-transform: uppercase; letter-spacing: .3px;
+  border: 1px solid transparent;
+}
+.cbt-def b { font-weight: 900; margin-right: 1px; }
+.cbt-def-imu { background: #dfe7ef; border-color: #8fa6bd; color: #2c4257; }
+.cbt-def-res { background: #e6efe6; border-color: #93b393; color: #2f4a2f; }
+.cbt-def-vul { background: #f6e2df; border-color: #cb8f86; color: #7a2f24; }
 
 .cbt-conds { display: flex; gap: 5px; margin-top: 10px; flex-wrap: wrap; }
 .cbt-cond {
@@ -1306,7 +1394,10 @@ body.combat-on { overflow: hidden; }
   background: #fff;
   flex: 0 0 auto;
   min-height: 0;
-  max-height: 56%;
+  /* 48% e não 56%: abrir o seletor de arma/alvo faz este painel crescer, e
+     o que encolhe em troca é a lista de combatentes — a informação mais
+     importante da tela. O painel rola por dentro (.cbt-action-panel). */
+  max-height: 48%;
   overflow: hidden;
 }
 .cbt-action-panel {
@@ -1320,13 +1411,29 @@ body.combat-on { overflow: hidden; }
   font-size: 1.3rem; color: var(--cbt-dark);
   margin-bottom: 6px; font-weight: 700;
 }
+/* Economia do turno: Ação, Bônus e Reação como selos legíveis.
+   Antes eram dois "○" de 0.88rem sem legenda, governando o turno inteiro. */
 .cbt-economy {
-  font-size: 0.88rem; color: var(--cbt-muted);
-  font-weight: 700; margin-bottom: 18px;
+  display: flex; gap: 8px; flex-wrap: wrap;
+  margin-bottom: 18px;
 }
-.cbt-pip { color: var(--cbt-muted); }
-.cbt-pip.used { color: var(--cbt-red); }
-.cbt-econ-sep { color: var(--cbt-gold); }
+.cbt-slot {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 0.76rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .4px;
+  padding: 3px 10px; border-radius: 12px;
+  border: 1px solid; cursor: default;
+}
+.cbt-slot .cbt-pip {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: currentColor; flex-shrink: 0;
+}
+.cbt-slot.livre { color: #2f6b38; border-color: #9cc0a2; background: #edf5ee; }
+.cbt-slot.gasto {
+  color: var(--cbt-muted); border-color: #d5cec3; background: #f2efe9;
+  text-decoration: line-through; text-decoration-thickness: 1px;
+}
+.cbt-slot.gasto .cbt-pip { background: transparent; box-shadow: inset 0 0 0 1px currentColor; }
 .cbt-enemy-msg {
   font-family: 'Playfair Display', serif;
   font-size: 1.15rem; font-style: italic; color: var(--cbt-red);
@@ -1432,7 +1539,10 @@ body.combat-on { overflow: hidden; }
 .cbt-result-title {
   font-family: 'Playfair Display', serif;
   font-size: 2.3rem; margin-bottom: 18px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center; gap: 12px;
 }
+/* A crista herda a cor do título (verde na vitória, vermelho na derrota). */
+.cbt-crista { width: 1em; height: 1em; flex-shrink: 0; }
 .cbt-result-title.win  { color: var(--cbt-green); }
 .cbt-result-title.lose { color: var(--cbt-red); }
 .cbt-result-cols {

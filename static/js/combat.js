@@ -89,13 +89,57 @@
   }
 
   // ---- Render ------------------------------------------------------
-  function bar(label, cur, max, cls) {
+  function bar(label, cur, max, cls, extra = '') {
     const m = max > 0 ? Math.max(0, Math.min(100, (cur / max) * 100)) : 0;
+    // A barra de HP muda de cor com a porcentagem. Antes era sempre vermelha,
+    // cheia ou quase vazia — não dava para bater o olho e ver quem ia cair.
+    const risco = cls === 'hp'
+      ? (m <= 25 ? ' cbt-hp-baixo' : (m <= 50 ? ' cbt-hp-atencao' : ' cbt-hp-ok'))
+      : '';
     return `<div class="cbt-bar-row">
       <span class="cbt-bar-label">${label}</span>
-      <div class="cbt-bar"><div class="cbt-bar-fill ${cls}" style="width:${m}%"></div></div>
-      <span class="cbt-bar-num">${cur}/${max}</span>
+      <div class="cbt-bar"><div class="cbt-bar-fill ${cls}${risco}" style="width:${m}%"></div></div>
+      <span class="cbt-bar-num">${cur}/${max}${extra}</span>
     </div>`;
+  }
+
+  // Crista do painel de fim. SVG e não emoji: o 🏆 é desenhado pelo sistema
+  // operacional e muda de forma e de cor entre Windows, Android e iOS — num
+  // painel comemorativo isso aparece como remendo.
+  const CRISTA_VITORIA =
+    '<svg class="cbt-crista" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+    + 'stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+    + '<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z"/>'
+    + '<path d="M7 6H4.5a2.5 2.5 0 0 0 2.5 4M17 6h2.5a2.5 2.5 0 0 1-2.5 4"/></svg>';
+  const CRISTA_DERROTA =
+    '<svg class="cbt-crista" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+    + 'stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+    + '<path d="M4 6l8 14 8-14"/><path d="M4 6h16M9 6l3 5 3-5"/></svg>';
+
+  // Tipos de dano em português, para os selos de defesa caberem no card.
+  const TIPO_PT = {
+    acid: 'ácido', bludgeoning: 'concussão', cold: 'frio', fire: 'fogo',
+    force: 'força', lightning: 'elétrico', necrotic: 'necrótico',
+    piercing: 'perfurante', poison: 'veneno', psychic: 'psíquico',
+    radiant: 'radiante', slashing: 'cortante', thunder: 'trovejante',
+  };
+  const tipoPt = t => TIPO_PT[t] || t;
+
+  function selosDeDefesa(c) {
+    // Imunidade, resistência e vulnerabilidade: sem isto o jogador não tem
+    // como saber por que o golpe dele deu metade (ou zero) do dano.
+    // O marcador (0, ½, ×2) vem antes do tipo porque a diferença entre imune
+    // e vulnerável não pode depender só da cor do selo.
+    const grupos = [
+      ['imu', '0',  'Imune a',      c.imunidades],
+      ['res', '½',  'Resiste a',    c.resistencias],
+      ['vul', '×2', 'Vulnerável a', c.vulnerabilidades],
+    ];
+    return grupos.flatMap(([cls, marca, titulo, tipos]) =>
+      (tipos || []).map(t =>
+        `<span class="cbt-def cbt-def-${cls}" title="${titulo} dano ${tipoPt(t)}">`
+        + `<b>${marca}</b> ${esc(tipoPt(t))}</span>`)
+    ).join('');
   }
 
   function card(c) {
@@ -106,7 +150,10 @@
     const dim    = out || asleep;
     const conds  = (c.condicoes || []).map(x => `<span class="cbt-cond">${esc(x)}</span>`).join('');
     const meta   = `${esc(c.classe || '')}${c.nivel ? ' Nv.' + c.nivel : ''}`.trim();
-    return `<div class="cbt-card ${c.is_current ? 'cbt-cur' : ''} ${
+    const temp   = Number(c.hp_temp || 0);
+    const defs   = selosDeDefesa(c);
+    return `<div class="cbt-card ${c.is_party ? 'cbt-aliado' : 'cbt-inimigo'} ${
+      c.is_current ? 'cbt-cur' : ''} ${
       out ? 'cbt-out' : (asleep ? 'cbt-asleep' : '')}">
       <div class="cbt-c-header">
         <span class="cbt-name">${esc(c.name)}</span>
@@ -114,15 +161,18 @@
       </div>
       <div class="cbt-meta">
         <span>${meta || '—'}</span>
-        <span class="cbt-ca">🛡️ ${c.ca}</span>
+        <span class="cbt-ca" title="Classe de Armadura">🛡️ ${c.ca}</span>
       </div>
       <div class="cbt-bars">
-        ${bar('HP', c.hp, c.hp_max, 'hp')}
+        ${bar('HP', c.hp, c.hp_max, 'hp',
+              temp ? ` <span class="cbt-temp" title="PV temporários — absorvem dano antes dos PV reais">+${temp}</span>` : '')}
         ${c.mp_max > 0 ? bar('MP', c.mp, c.mp_max, 'mp') : ''}
       </div>
+      ${c.concentracao ? `<div class="cbt-conc" title="Sofrer dano exige teste de Constituição para manter">Concentrado em ${esc(c.concentracao)}</div>` : ''}
       ${(conds || dim) ? `<div class="cbt-conds">${conds}${
         dim ? `<span class="cbt-cond cbt-cond-out">${esc(c.status)}</span>` : ''
       }</div>` : ''}
+      ${defs ? `<div class="cbt-defs">${defs}</div>` : ''}
     </div>`;
   }
 
@@ -178,14 +228,23 @@
 
     titleEl.textContent = `O que fará ${esc(cur.name)}?`;
 
-    // Economia 5e (Ação + Bônus) do turno atual.
+    // Economia 5e do turno atual: Ação, Ação Bônus e Reação.
+    // Antes eram dois "○" minúsculos sem legenda, governando o turno inteiro.
+    // A Reação é do combatente (uma por rodada) e vale FORA do próprio turno —
+    // por isso vem do card dele, não do turn_economy.
     const eco       = snap.turn_economy || {};
     const acaoUsed  = !!eco.acao_usada;
     const bonusUsed = !!eco.bonus_usada;
+    const reacaoOk  = cur.reacao_disponivel !== false;
+    const slot = (rotulo, gasto, dica) =>
+      `<span class="cbt-slot ${gasto ? 'gasto' : 'livre'}" title="${dica}">`
+      + `<span class="cbt-pip"></span>${rotulo}</span>`;
     promptEl.innerHTML =
-      `Ação <span class="cbt-pip ${acaoUsed ? 'used' : ''}">${acaoUsed ? '●' : '○'}</span>`
-      + ` <span class="cbt-econ-sep">|</span> `
-      + `Bônus <span class="cbt-pip ${bonusUsed ? 'used' : ''}">${bonusUsed ? '●' : '○'}</span>`;
+      slot('Ação', acaoUsed, acaoUsed ? 'Ação já usada neste turno' : 'Ação disponível')
+      + slot('Bônus', bonusUsed, bonusUsed ? 'Ação bônus já usada neste turno' : 'Ação bônus disponível')
+      + slot('Reação', !reacaoOk, reacaoOk
+             ? 'Reação disponível — usada fora do seu turno (ex.: ataque de oportunidade)'
+             : 'Reação já gasta nesta rodada');
 
     const dis      = _busy ? 'disabled' : '';
     const actorEsc = esc(cur.name).replace(/'/g, "\\'");
@@ -199,7 +258,7 @@
     const itemUsable = (hasAcaoItem && !acaoUsed) || (hasBonusItem && !bonusUsed);
 
     let html =
-      `<button class="cbt-btn" ${acaoDis} onclick="window.Combat._sel('attack')">⚔️ Atacar <small>(Ação)</small></button>`;
+      `<button class="cbt-btn" ${acaoDis} onclick="window.Combat._sel('attack')">⚔️ Atacar</button>`;
     if ((cur.habilidades || []).length) {
       const d = (habUsable && !_busy) ? '' : 'disabled';
       html += `<button class="cbt-btn" ${d} onclick="window.Combat._sel('ability')">✨ Habilidade</button>`;
@@ -209,8 +268,8 @@
       html += `<button class="cbt-btn" ${d} onclick="window.Combat._sel('item')">🧪 Item</button>`;
     }
     html +=
-      `<button class="cbt-btn" ${acaoDis} onclick="window.Combat._act({action:'defend',actor:'${actorEsc}'})">🛡️ Defender <small>(Ação)</small></button>` +
-      `<button class="cbt-btn" ${acaoDis} onclick="window.Combat._act({action:'flee',actor:'${actorEsc}'})">💨 Fugir <small>(Ação)</small></button>` +
+      `<button class="cbt-btn" ${acaoDis} onclick="window.Combat._act({action:'defend',actor:'${actorEsc}'})">🛡️ Defender</button>` +
+      `<button class="cbt-btn" ${acaoDis} onclick="window.Combat._act({action:'flee',actor:'${actorEsc}'})">💨 Fugir</button>` +
       `<button class="cbt-btn" ${dis} onclick="window.Combat._free()">💬 Ação Livre</button>` +
       `<button class="cbt-btn cbt-primary" ${dis} onclick="window.Combat._act({action:'end_turn',actor:'${actorEsc}'})">⏭️ Encerrar Turno</button>`;
     btnEl.innerHTML = html;
@@ -301,7 +360,7 @@
     ov.innerHTML = `
       <div class="cbt-end-modal">
         <h2 class="cbt-result-title ${isWin ? 'win' : 'lose'}">
-          ${isWin ? '🏆 ' : '💀 '}${esc(res.title || (isWin ? 'Vitória!' : 'Fim do combate'))}
+          ${isWin ? CRISTA_VITORIA : CRISTA_DERROTA}${esc(res.title || (isWin ? 'Vitória!' : 'Fim do combate'))}
         </h2>
         <div class="cbt-result-cols">
           <div class="cbt-end-col">

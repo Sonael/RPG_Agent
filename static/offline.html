@@ -5,14 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>RPG Agent · Acordando o servidor</title>
   <meta name="theme-color" content="#2b303a">
-  <!-- Tela 100% autossuficiente (CSS inline, emoji em vez de imagem) para
-       renderizar mesmo com o servidor adormecido e sem outros assets. -->
+  <!-- Tela 100% autossuficiente (CSS e SVG inline) para renderizar mesmo com
+       o servidor adormecido e sem nenhum outro asset. Por isso a fonte é
+       serifada DO SISTEMA e não a do tema: buscar a webfont exigiria rede,
+       que é justamente o que não temos aqui. -->
   <style>
     :root { color-scheme: dark; }
     * { box-sizing: border-box; }
     html, body { height: 100%; margin: 0; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-family: Georgia, "Times New Roman", "Liberation Serif", serif;
       background: radial-gradient(circle at center, #2b303a 0%, #101626 100%);
       color: #f0f2f5;
       display: flex; align-items: center; justify-content: center;
@@ -21,9 +23,10 @@
     }
     .box { max-width: 420px; width: 100%; }
     .crest {
-      font-size: 64px; line-height: 1;
+      width: 64px; height: 64px; margin: 0 auto; color: #c9a227;
       animation: sway 2.4s ease-in-out infinite;
     }
+    .crest svg { width: 100%; height: 100%; display: block; }
     @keyframes sway {
       0%,100% { transform: rotate(-6deg); }
       50%     { transform: rotate(6deg); }
@@ -62,7 +65,14 @@
 </head>
 <body>
   <div class="box">
-    <div class="crest">⚔️</div>
+    <div class="crest" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+           stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 3l12.5 12.5M6.5 17.5L3 21l3 0 2.5-2.5"/>
+        <path d="M21 3L8.5 15.5M17.5 17.5L21 21l-3 0-2.5-2.5"/>
+        <path d="M14.5 16.5l3 3M9.5 16.5l-3 3"/>
+      </svg>
+    </div>
     <h1>Acordando o servidor…</h1>
     <p id="msg">O servidor estava em repouso. No primeiro acesso, isso pode levar até cerca de 1 minuto.</p>
     <div class="bar"><i></i></div>

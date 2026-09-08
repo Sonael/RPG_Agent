@@ -340,7 +340,7 @@ TELAS = [
      "espera": 900, "exigir": "#edit-overlay:not(.hidden)"},
     {"nome": "menu-confirmar", "pagina": "/menu.html",
      "exigir": "#dialog-overlay:not(.hidden)",
-     "js": "showConfirm('Apagar campanha', 'Esta acao nao pode ser desfeita.')"},
+     "js": "deleteCampaign(new Event('click'), window.__campanha)"},
     {"nome": "menu-configuracoes", "pagina": "/menu.html",
      "exigir": "#settings-panel.open",
      "js": "toggleSettingsPanel()"},

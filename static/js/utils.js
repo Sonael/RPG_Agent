@@ -127,6 +127,55 @@ const DLG = {
   success: { icon:'✓', ibg:'rgba(74,170,128,0.15)',  ic:'var(--green)',     accent:'linear-gradient(90deg,transparent,var(--green),transparent)' },
 };
 
+// ═══════════════════════════════════════
+//  Revelar campo secreto (chave de API, senha)
+// ═══════════════════════════════════════
+// Vive aqui porque o login e o menu usam o mesmo botão. O ícone (olho /
+// olho cortado) é trocado pelo CSS a partir do aria-pressed — aqui só se
+// mexe no estado, então não há como o ícone divergir dele.
+//
+// A revelação se desfaz sozinha: a intenção do botão é CONFERIR o que foi
+// colado, não deixar a credencial parada na tela. Um clique manual cancela
+// o timer.
+const SEGUNDOS_CAMPO_VISIVEL = 20;
+const _timersDeRevelacao = new WeakMap();
+
+function alternarCampoSecreto(btn) {
+  const campo = document.getElementById(btn.getAttribute('aria-controls'));
+  if (!campo) return;
+  _definirVisibilidade(btn, campo, campo.type === 'text');
+}
+
+function _definirVisibilidade(btn, campo, escondendo) {
+  clearTimeout(_timersDeRevelacao.get(btn));
+  const rotulo = btn.getAttribute('aria-label') || '';
+
+  if (escondendo) {
+    campo.type = 'password';
+    btn.setAttribute('aria-pressed', 'false');
+    btn.title = 'Mostrar';
+    btn.setAttribute('aria-label', rotulo.replace('Esconder', 'Mostrar'));
+    return;
+  }
+
+  campo.type = 'text';
+  btn.setAttribute('aria-pressed', 'true');
+  btn.title = `Esconder (some sozinho em ${SEGUNDOS_CAMPO_VISIVEL}s)`;
+  btn.setAttribute('aria-label', rotulo.replace('Mostrar', 'Esconder'));
+  _timersDeRevelacao.set(btn, setTimeout(
+    () => _definirVisibilidade(btn, campo, true), SEGUNDOS_CAMPO_VISIVEL * 1000));
+}
+
+// Nomes usados pelo onclick inline de cada página.
+// Precisa ser propriedade de `window`: um `const` no topo do script cria uma
+// ligação léxica que NÃO entra no objeto global, e o onclick inline resolve
+// identificadores pela cadeia elemento → document → window — ou seja, não
+// enxergaria a função. (Antes era `function alternarChaveVisivel`, que vira
+// propriedade de window; ao mover para cá, isso se perdeu.)
+window.alternarCampoSecreto = alternarCampoSecreto;
+window.alternarChaveVisivel = alternarCampoSecreto;
+window.alternarSenhaVisivel = alternarCampoSecreto;
+
 function showAlert(title, msg, type = 'info') {
   return new Promise(r => { _dlgResolve = r; _openDlg(title, msg, type, [{label:'OK', primary:true, value:true}]); });
 }

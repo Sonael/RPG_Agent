@@ -19,6 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const _sel = document.getElementById('model-select');
   if (_sel) _aplicarModeloPadrao(_sel);
   loadGeminiModels();
+  mostrarRotuloCompletoDoModelo();
 
   document.getElementById('new-campaign-name')?.addEventListener('input', function() {
     const val = this.value.trim();
@@ -385,6 +386,7 @@ async function loadGeminiModels() {
     }
 
     _modelosCarregados = true;
+    mostrarRotuloCompletoDoModelo();
     if (status) {
       status.style.color = 'var(--green)';
       status.textContent = `${data.models.length} modelos disponíveis para a sua chave.`;
@@ -403,8 +405,10 @@ function onModelChange() {
   // padrão numa recarga da lista.
   _modeloEscolhidoPeloUsuario = true;
 
-  const val    = document.getElementById('model-select').value;
+  const sel    = document.getElementById('model-select');
+  const val    = sel.value;
   const status = document.getElementById('ollama-status');
+  mostrarRotuloCompletoDoModelo();
   if (val.startsWith('ollama:')) {
     const name   = val.replace('ollama:','').split(':')[0];
     const good   = ['qwen2.5','llama3.2','mistral','qwen3','deepseek'].some(g => name.toLowerCase().includes(g));
@@ -4512,4 +4516,16 @@ async function saveEditedCampaign() {
     btn.disabled = false;
     btn.textContent = 'Salvar Alterações';
   }
+}
+
+// O <select> nativo corta a opção quando ela não cabe na coluna — e o que fica
+// de fora são justamente os limites de uso do modelo (RPM/RPD). Esta função
+// repete o rótulo inteiro logo abaixo, onde ele pode quebrar em várias linhas.
+function mostrarRotuloCompletoDoModelo() {
+  const sel  = document.getElementById('model-select');
+  const alvo = document.getElementById('model-full-label');
+  if (!sel || !alvo) return;
+  const opt = sel.options[sel.selectedIndex];
+  alvo.textContent = opt ? opt.textContent.trim() : '';
+  sel.title = alvo.textContent;
 }

@@ -1843,9 +1843,16 @@ function openEditModal(type, key, data, index = null) {
   } else {
     _gameHabState = null;
   }
-  const labels = { character: 'Personagem', party: 'Grupo', location: 'Local', flag: 'Flag', event: 'Evento', diary: 'Diário', world: 'Resumo' };
+  const labels = { character: 'Personagem', party: 'Grupo', location: 'Local', flag: 'Flag', event: 'Evento', diary: 'Diário', world: 'Estado do Mundo' };
+  // Título do registro. O editor de mundo não tem name/title/summary — sem o
+  // caso explícito abaixo ele caía no `key` e mostrava "current_location",
+  // que é o nome do campo no JSON, para o jogador.
+  const titulos = {
+    world: 'Onde a história está agora',
+  };
   document.getElementById('edit-type').textContent = labels[type] || type;
-  document.getElementById('edit-name').textContent = data.name || data.title || data.summary || key || '—';
+  document.getElementById('edit-name').textContent =
+    titulos[type] || data.name || data.title || data.summary || key || '—';
   document.getElementById('edit-body').innerHTML = buildEditFields(type, data);
   document.getElementById('edit-del-btn').style.display = type === 'world' ? 'none' : '';
   document.getElementById('edit-overlay').classList.remove('hidden');

@@ -35,7 +35,7 @@
        Sem isso, a narração da IA (ou texto injetado) poderia conter
        <script>/<img onerror> e executar — XSS. -->
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.7/dist/purify.min.js"></script>
-  <link rel="stylesheet" href="/static/css/style.css?v=35">
+  <link rel="stylesheet" href="/static/css/style.css?v=36">
 </head>
 
 <body class="game-page">
@@ -69,11 +69,11 @@
               style="width: 100%; padding: 10px; background: rgba(0,0,0,0.03); border-radius: 4px; border: 1px solid var(--page-edge);">
               <div
                 style="font-family: 'Lora', serif; font-size: 10px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 5px; letter-spacing: 0.05em; font-weight: 600;">
-                Status do Oráculo</div>
+                Uso do modelo</div>
               <div
                 style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-family: 'Lora', serif; font-size: 11px;">
-                <div>REQ: <span id="stat-req">0</span></div>
-                <div>TOK: <span id="stat-tokens">0</span></div>
+                <div title="Requisições feitas nesta sessão, do limite diário do seu modelo">Requisições: <span id="stat-req">0</span></div>
+                <div title="Tokens consumidos nesta sessão">Tokens: <span id="stat-tokens">0</span></div>
               </div>
               <div
                 style="height: 3px; background: var(--page-edge); margin-top: 8px; border-radius: 2px; overflow: hidden;">
@@ -255,15 +255,14 @@
               <button id="dice-tray-btn" title="Rolar dado (jogador)" onclick="toggleDiceTray()">🎲</button>
               <textarea id="chat-input" placeholder="O que fará a seguir? (/ para comandos)"
                 onkeydown="handleKey(event)" oninput="onInputChange(this)"></textarea>
-              <button id="send-btn" onclick="sendMessage()">ADICIONAR</button>
+              <button id="send-btn" onclick="sendMessage()">Enviar</button>
             </div>
 
             <div id="dice-tray" class="hidden"
               style="margin-top:15px; padding:20px; background:rgba(0,0,0,0.02); border-radius:6px; border:1px solid var(--page-edge);">
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
                 <span
-                  style="font-family: 'Playfair Display', serif; font-size:16px; font-weight:600; color:var(--text-main);">Lançamento
-                  de Dados (Verificado)</span>
+                  style="font-family: 'Playfair Display', serif; font-size:16px; font-weight:600; color:var(--text-main);">Rolar um dado</span>
                 <div style="display:flex; align-items:center; gap:8px;">
                   <label
                     style="font-family: 'Lora', serif; font-size:12px; font-weight: 600; color:var(--text-muted);">Modificador:</label>
@@ -287,6 +286,11 @@
                   onclick="rollPlayerDie(20)">d20</button>
                 <button class="clean-button" style="width:auto; padding:8px 15px; margin:0;"
                   onclick="rollPlayerDie(100)">d%</button>
+              </div>
+              <!-- O dado rola no próprio clique; sem esta linha não havia
+                   nada indicando isso, e o jogador procurava um botão "Rolar". -->
+              <div style="font-family:'Lora',serif; font-size:11px; color:var(--text-dim); margin-top:10px; font-style:italic;">
+                Clique num dado para rolar — o resultado vai direto para o Mestre.
               </div>
             </div>
 
@@ -336,9 +340,11 @@
       <div id="edit-body" class="scroll-area" style="max-height: 60vh; padding: 10px 0;"></div>
       <div
         style="display:flex; justify-content:space-between; margin-top:20px; border-top: 1px solid var(--page-edge); padding-top: 20px;">
-        <button id="edit-del-btn" class="clean-button"
-          style="width:auto; color:var(--ink-sys); border-color:var(--ink-sys); margin:0;"
-          onclick="deleteCurrentItem()">Deletar Registro</button>
+        <!-- Destrutivo com MENOS peso que "Salvar", não igual: sem borda e em
+             texto, para não competir com a ação que o jogador quase sempre
+             quer. A confirmação é que segura o erro, não o tamanho do botão. -->
+        <button id="edit-del-btn" class="btn-delete-discreto"
+          onclick="deleteCurrentItem()">Deletar registro</button>
         <div style="display:flex; gap:10px;">
           <button class="clean-button" style="width:auto; margin:0;" onclick="closeEditModal()">Cancelar</button>
           <button class="btn-main" style="width:auto; padding: 10px 25px; font-size: 16px;"
@@ -348,9 +354,9 @@
     </div>
   </div>
 
-  <script src="/static/js/utils.js?v=8"></script>
-  <script src="/static/js/game.js?v=24"></script>
-  <script src="/static/js/combat.js?v=9"></script>
+  <script src="/static/js/utils.js?v=9"></script>
+  <script src="/static/js/game.js?v=25"></script>
+  <script src="/static/js/combat.js?v=10"></script>
 
   <script>
     (function() {

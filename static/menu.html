@@ -24,7 +24,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;600&family=Lora:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Playfair+Display:ital,wght@0,500;0,700;1,500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/css/style.css?v=35">
+  <link rel="stylesheet" href="/static/css/style.css?v=36">
 </head>
 <body>
   <div class="scene">
@@ -46,7 +46,7 @@
         <div class="bottom-actions">
           <button class="clean-button" onclick="openWizard()">Nova Campanha</button>
           <button class="clean-button" onclick="openImportModal()">Importar Arquivo</button>
-          <button class="clean-button" style="color: var(--ink-sys); border-color: var(--ink-sys);" onclick="logout()">Fechar do Livro</button>
+          <button class="clean-button" style="color: var(--ink-sys); border-color: var(--ink-sys);" onclick="logout()">Fechar o Livro</button>
         </div>
         <div class="page-number left">3</div>
       </div>
@@ -85,6 +85,11 @@
                 </optgroup>
               </select>
             </div>
+            <!-- O <select> nativo trunca a opção quando ela é maior que a
+                 coluna, e é justamente no fim que estão os limites de uso
+                 (RPM/RPD). Esta linha mostra o rótulo inteiro do que está
+                 selecionado. -->
+            <div id="model-full-label" style="font-family:'Lora',serif; font-size:12px; color:var(--text-muted); margin-top:6px; font-style:italic;"></div>
             <div id="ollama-status" style="font-size: 12px; margin-top: 5px;"></div>
           </div>
 
@@ -278,7 +283,7 @@
           <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
             <div>
               <div class="modal-title" style="font-size:18px;">Grupo & NPCs</div>
-              <div id="wz-char-mode-hint" class="modal-subtitle"></div>
+              <div id="wz-char-mode-hint" class="modal-hint"></div>
             </div>
             <button class="clean-button" style="width:auto; margin:0;" onclick="addWzChar()">+ Personagem</button>
           </div>
@@ -420,8 +425,8 @@
     </div>
   </div>
 
-  <script src="/static/js/utils.js?v=8"></script>
-  <script src="/static/js/menu.js?v=39"></script>
+  <script src="/static/js/utils.js?v=9"></script>
+  <script src="/static/js/menu.js?v=40"></script>
   <script>
     // Animação de volta para a capa quando carregado da cache
     window.addEventListener('pageshow', function(event) {
@@ -448,38 +453,8 @@
       document.getElementById('deepseek-api-key-input').value = localStorage.getItem(DEEPSEEK_KEY_STORAGE) || '';
     }
 
-    // Revela/esconde a chave do campo ao lado do botão.
-    // Volta sozinha para escondida depois de um tempo: a intenção é conferir
-    // o que foi colado, não deixar a chave exposta na tela.
-    const _SEGUNDOS_VISIVEL = 20;
-    const _timersDoOlho = new WeakMap();
-
-    function alternarChaveVisivel(btn) {
-      const campo = document.getElementById(btn.getAttribute('aria-controls'));
-      if (!campo) return;
-      esconder(btn, campo, campo.type === 'text');
-    }
-
-    function esconder(btn, campo, escondendo) {
-      clearTimeout(_timersDoOlho.get(btn));
-
-      // O ícone (olho / olho cortado) é trocado pelo CSS a partir do
-      // aria-pressed — aqui só se mexe no estado.
-      if (escondendo) {
-        campo.type = 'password';
-        btn.setAttribute('aria-pressed', 'false');
-        btn.title = 'Mostrar a chave';
-        btn.setAttribute('aria-label', btn.getAttribute('aria-label').replace('Esconder', 'Mostrar'));
-        return;
-      }
-
-      campo.type = 'text';
-      btn.setAttribute('aria-pressed', 'true');
-      btn.title = `Esconder a chave (some sozinha em ${_SEGUNDOS_VISIVEL}s)`;
-      btn.setAttribute('aria-label', btn.getAttribute('aria-label').replace('Mostrar', 'Esconder'));
-      _timersDoOlho.set(btn, setTimeout(
-        () => esconder(btn, campo, true), _SEGUNDOS_VISIVEL * 1000));
-    }
+    // A lógica de revelar campo secreto vive em utils.js (alternarCampoSecreto),
+    // compartilhada com a tela de login.
 
     let _recarregarModelos = null;
 
