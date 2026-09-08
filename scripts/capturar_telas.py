@@ -716,6 +716,25 @@ def main() -> int:
     finally:
         parar()
 
+    # Numeração é POSIÇÃO na lista: inserir uma tela no meio renomeia todas as
+    # seguintes, e a versão antiga fica na pasta para sempre. O resultado são
+    # duas cópias da mesma tela com números diferentes, uma delas
+    # desatualizada — e quem abrir a pasta não tem como saber qual é qual.
+    #
+    # Só na captura COMPLETA: com --apenas ou --viewport, o que não foi gerado
+    # é o que o filtro deixou de fora, não lixo.
+    if not args.apenas and args.viewport == "ambos" and not falhas:
+        gerados = {Path(f).resolve() for f in feitos}
+        sobrando = [f for f in sorted(saida.rglob("*.png"))
+                    if f.resolve() not in gerados]
+        for f in sobrando:
+            f.unlink()
+        if sobrando:
+            print(f"\n{len(sobrando)} imagem(ns) de uma numeração antiga "
+                  f"apagada(s):")
+            for f in sobrando:
+                print(f"  - {f.relative_to(saida)}")
+
     print(f"\n{len(feitos)} imagem(ns) em {saida}")
     if falhas:
         print(f"{len(falhas)} tela(s) não capturada(s):")
