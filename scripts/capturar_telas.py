@@ -435,11 +435,16 @@ TELAS = [
      "js": "toggleSidebar()", "viewport": "mobile"},
 
     {"nome": "jogo-missoes-e-tempo", "pagina": "/game.html",
-     "estado": MUNDO_ONDA4, "espera": 600,
-     # A lateral tem rolagem própria e o painel de missões nasce abaixo da
-     # dobra — sem isto o print sai mostrando o topo, não o que ele retrata.
-     "js": "document.getElementById('sb-missoes-secao')"
-           ".scrollIntoView({block:'center'})",
+     "estado": MUNDO_ONDA4, "espera": 900,
+     # Duas coisas atrapalhavam o print. No MOBILE a lateral é uma gaveta
+     # fechada — sem abrir, a captura chamada "missões" saía sem nenhuma
+     # missão à vista. E no desktop o painel nasce abaixo da dobra da
+     # lateral, que tem rolagem própria.
+     # 900px é o mesmo corte que o game.js usa para decidir se a lateral é
+     # gaveta (ver toggleSidebar(true) ao abrir um modal).
+     "js": "if (window.innerWidth <= 900) toggleSidebar();"
+           "setTimeout(() => document.getElementById('sb-missoes-secao')"
+           ".scrollIntoView({block:'center'}), 250)",
      "exigir": "#sb-missoes-secao:not(.hidden)"},
 
     # ── Combate ──────────────────────────────────────────────────────
