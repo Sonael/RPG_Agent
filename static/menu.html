@@ -99,7 +99,17 @@
                 <input id="google-api-key-input" type="password" placeholder="AIza..." oninput="onApiKeyChange()">
                 <button type="button" class="btn-olho" aria-controls="google-api-key-input"
                   aria-pressed="false" aria-label="Mostrar a chave do Google AI Studio"
-                  title="Mostrar a chave" onclick="alternarChaveVisivel(this)">👁</button>
+                  title="Mostrar a chave" onclick="alternarChaveVisivel(this)">
+                  <svg class="icone-olho" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+                  </svg>
+                  <svg class="icone-olho-off" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                    <line x1="1" y1="1" x2="23" y2="23"/>
+                  </svg>
+                </button>
               </div>
             </div>
             <div class="field-group">
@@ -108,7 +118,17 @@
                 <input id="deepseek-api-key-input" type="password" placeholder="sk-..." oninput="onApiKeyChange()">
                 <button type="button" class="btn-olho" aria-controls="deepseek-api-key-input"
                   aria-pressed="false" aria-label="Mostrar a chave da DeepSeek"
-                  title="Mostrar a chave" onclick="alternarChaveVisivel(this)">👁</button>
+                  title="Mostrar a chave" onclick="alternarChaveVisivel(this)">
+                  <svg class="icone-olho" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+                  </svg>
+                  <svg class="icone-olho-off" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                    <line x1="1" y1="1" x2="23" y2="23"/>
+                  </svg>
+                </button>
               </div>
             </div>
             <div id="apikeys-status" style="font-size: 12px; margin-top: 5px;"></div>
@@ -443,9 +463,10 @@
     function esconder(btn, campo, escondendo) {
       clearTimeout(_timersDoOlho.get(btn));
 
+      // O ícone (olho / olho cortado) é trocado pelo CSS a partir do
+      // aria-pressed — aqui só se mexe no estado.
       if (escondendo) {
         campo.type = 'password';
-        btn.textContent = '👁';
         btn.setAttribute('aria-pressed', 'false');
         btn.title = 'Mostrar a chave';
         btn.setAttribute('aria-label', btn.getAttribute('aria-label').replace('Esconder', 'Mostrar'));
@@ -453,7 +474,6 @@
       }
 
       campo.type = 'text';
-      btn.textContent = '🙈';
       btn.setAttribute('aria-pressed', 'true');
       btn.title = `Esconder a chave (some sozinha em ${_SEGUNDOS_VISIVEL}s)`;
       btn.setAttribute('aria-label', btn.getAttribute('aria-label').replace('Mostrar', 'Esconder'));
