@@ -51,7 +51,10 @@ async function loadCampaigns() {
   const list = document.getElementById('campaign-list');
   try {
     const res  = await authFetch(`${API}/api/campaigns`);
-    if (res.status === 401) { clearTokens(); window.location.href = '/login.html'; return; }
+    // O authFetch já decide sozinho se a sessão morreu (e redireciona).
+    // Limpar os tokens aqui derrubava quem só tinha perdido a corrida de
+    // renovação, ou quem levou um 401 do próprio endpoint.
+    if (res.status === 401) return;
     const data = await res.json();
 
     _temCampanhas = data.length > 0;

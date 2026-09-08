@@ -61,39 +61,81 @@ function requireAuth() {
   return true; 
 }
 
-async function authFetch(url, opts = {}) {
-  const tokens = getTokens();
-  const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
-  
-  if (tokens.access) headers['Authorization'] = `Bearer ${tokens.access}`;
+// O Supabase GIRA o refresh token: cada uso invalida o anterior e devolve um
+// novo. E a tela dispara várias chamadas ao mesmo tempo — o /api/chat, que é
+// longo, mais um refreshMemory() a cada tool_result, mais o Combat.sync() que
+// vem junto com ele. Quando o access token vence, TODAS levam 401 quase juntas
+// e cada uma tentava renovar com o MESMO refresh token. A primeira vencia; as
+// outras recebiam "Invalid Refresh Token: Already Used" e derrubavam a sessão
+// inteira — inclusive a que acabara de ser renovada com sucesso.
+//
+// Daí o sintoma: o jogo funcionava, e de repente caía no login no meio da
+// cena. Não era o token "não resetar" — era resetar mais de uma vez.
+let _renovacaoEmVoo = null;
 
-  let response = await fetch(url, { ...opts, headers });
+// Uma renovação por vez. Quem chegar durante ela espera a MESMA promessa em
+// vez de abrir a sua, então o refresh token só é gasto uma vez.
+function renovarSessao() {
+  if (_renovacaoEmVoo) return _renovacaoEmVoo;
 
-  // Se o token expirou (erro 401) e temos um refresh token, tenta renovar silenciosamente
-  if (response.status === 401 && tokens.refresh) {
-    const refreshRes = await fetch(`${API}/api/auth/refresh`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refresh_token: tokens.refresh })
-    });
-
-    if (refreshRes.ok) {
-      const newData = await refreshRes.json();
-      
-      // Atualiza as chaves no navegador
-      setTokens(newData.access_token, newData.refresh_token);
-      
-      // Refaz a requisição original com a nova chave de acesso válida
-      headers['Authorization'] = `Bearer ${newData.access_token}`;
-      response = await fetch(url, { ...opts, headers });
-    } else {
-      // Se o refresh falhar (ex: ficou dias sem jogar e expirou tudo), desloga o usuário
-      clearTokens();
-      window.location.href = '/login.html';
+  _renovacaoEmVoo = (async () => {
+    // Lido agora, não no início da requisição: se outra chamada renovou no
+    // meio do caminho, o token guardado já é o novo.
+    const refresh = localStorage.getItem('rpg_refresh_token');
+    if (!refresh) return null;
+    try {
+      const res = await fetch(`${API}/api/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: refresh })
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (!data.access_token) return null;
+      setTokens(data.access_token, data.refresh_token);
+      return data.access_token;
+    } catch (_) {
+      return null;   // rede caiu: não é motivo para deslogar
     }
+  })();
+
+  // O finally limpa a referência, mas quem já está esperando segue com a
+  // promessa em mãos — só as chamadas FUTURAS abrem uma renovação nova.
+  _renovacaoEmVoo.finally(() => { _renovacaoEmVoo = null; });
+  return _renovacaoEmVoo;
+}
+
+function _encerrarSessao() {
+  // Não redireciona se já estamos no login — senão vira laço.
+  if (window.location.pathname.endsWith('/login.html')) return;
+  clearTokens();
+  window.location.href = '/login.html';
+}
+
+async function authFetch(url, opts = {}) {
+  const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+  const usado = localStorage.getItem('rpg_access_token');
+  if (usado) headers['Authorization'] = `Bearer ${usado}`;
+
+  const response = await fetch(url, { ...opts, headers });
+  if (response.status !== 401) return response;
+
+  // Outra chamada renovou enquanto esta estava no ar? Então não há o que
+  // renovar: basta repetir com o token novo. Sem esta comparação, uma
+  // requisição que saiu ANTES da renovação gastaria um refresh token à toa.
+  let novo = localStorage.getItem('rpg_access_token');
+  if (novo === usado) novo = await renovarSessao();
+
+  if (!novo) {
+    // Só derruba a sessão se ninguém conseguiu renovar. Se o token guardado
+    // mudou, alguém renovou e esta chamada apenas perdeu a corrida — deslogar
+    // aqui jogaria fora uma sessão válida.
+    if (localStorage.getItem('rpg_access_token') === usado) _encerrarSessao();
+    return response;
   }
 
-  return response;
+  headers['Authorization'] = `Bearer ${novo}`;
+  return fetch(url, { ...opts, headers });
 }
 
 // ═══════════════════════════════════════

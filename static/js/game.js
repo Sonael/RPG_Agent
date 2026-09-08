@@ -1024,7 +1024,10 @@ function renderTurnTracker(cs) {
 async function refreshMemory() {
   try {
     const res = await authFetch(`${API}/api/memory`);
-    if (res.status === 401) { clearTokens(); window.location.href = '/login.html'; return; }
+    // O authFetch já decide sozinho se a sessão morreu (e redireciona).
+    // Limpar os tokens aqui derrubava quem só tinha perdido a corrida de
+    // renovação, ou quem levou um 401 do próprio endpoint.
+    if (res.status === 401) return;
     const mem = await res.json();
     if (mem.campaign_config) applyCampaignConfig(mem.campaign_config);
     renderMemory(mem);
