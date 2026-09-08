@@ -168,6 +168,24 @@ def _defaults() -> dict:
         "quest_flags":          {},
         "party":                [],
         "diary":                [],
+        # ── Onda 4 ────────────────────────────────────────────────────────
+        # Estas chaves PRECISAM estar aqui, e não é detalhe de organização:
+        # load_campaign() percorre _defaults() e copia só as chaves que
+        # encontra nele. O que não estiver aqui é gravado no banco e
+        # DESCARTADO na leitura seguinte — foi o que aconteceu com missões,
+        # relógio e lojas até esta correção.
+        #
+        # relogio vazio = a campanha nunca chamou advance_time(). É diferente
+        # de "dia 1, 8h": a linha de Tempo na lateral só aparece quando o
+        # relógio existe de verdade.
+        "relogio":              {},
+        "quests":               {},
+        "lojas":                {},
+        # Manutenção de memória (ver memory.marcar_upkeep). O prefixo _ marca
+        # que é contabilidade do sistema, não conteúdo da história.
+        "_turno":               0,
+        "_upkeep":              {},
+        "_pendencias":          [],
         # "narrado" = LLM narra turno a turno (padrão, comportamento atual).
         # "tela"    = combate resolvido na tela tática; LLM só emoldura.
         "combat_mode":          "narrado",

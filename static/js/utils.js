@@ -797,14 +797,91 @@ const _GUIDE_HTML = `
               próprio chat, como o resto da história.</li>
             <li><b>⚔️ Tela tática</b> — abre uma tela dedicada (o "Pergaminho
               Épico") com cards de Vida/Mana e botões: <b>Atacar, Habilidade,
-              Item, Defender, Fugir</b> e <b>Encerrar Turno</b>. Os inimigos
-              agem sozinhos. No fim da luta, o Mestre narra a batalha inteira
-              de uma vez.</li>
+              Item, Mover, Defender, Fugir</b> e <b>Encerrar Turno</b>. Os
+              inimigos agem sozinhos. No fim da luta, o Mestre narra a batalha
+              inteira de uma vez.</li>
           </ul>
+
+          <h4 class="guide-h4">🗺️ Onde cada um está</h4>
+          <p>
+            Quando o lugar importa (uma ponte, um pátio com arqueiros no alto),
+            o Mestre divide o campo em <b>zonas</b> — uma trilha que aparece no
+            alto da tela tática, com quem está em cada uma.
+          </p>
+          <ul>
+            <li><b>Corpo a corpo só na mesma zona.</b> Para alcançar quem está
+              longe, use <b>Mover</b> primeiro.</li>
+            <li><b>Tiro de longe sai com desvantagem</b> — e atirar com um
+              inimigo colado em você também.</li>
+            <li><b>Sair de uma zona onde há inimigo dá a ele um ataque
+              livre.</b> O seletor de movimento avisa quem está esperando no
+              destino, para você decidir sabendo o preço.</li>
+          </ul>
+          <p class="guide-tip">
+            Mover <b>não gasta a sua Ação</b> — é um recurso à parte, com selo
+            próprio na régua do turno. Só a Disparada (duas zonas de uma vez)
+            custa a Ação.
+          </p>
+
+          <h4 class="guide-h4">👑 Chefes</h4>
+          <p>
+            Criaturas lendárias agem <b>fora do próprio turno</b>: entre uma
+            vez e outra, o chefe emenda um golpe. E poderes de <b>recarga</b>
+            (o sopro do dragão) voltam quando um dado favorece — não é uma vez
+            por luta, é um relógio que ninguém controla. Fique de olho no
+            Diário de Combate: é lá que essas ações aparecem.
+          </p>
           <p class="guide-tip">
             Na tela tática você pode fechar a tela no meio da luta (botão ✕) e
             <b>retomar depois</b> de onde parou — o combate fica pausado e
             salvo.
+          </p>
+        </div>
+      </details>
+
+      <details class="guide-sec">
+        <summary>🌍 O mundo entre as aventuras</summary>
+        <div class="guide-sec-body">
+          <h4 class="guide-h4">🕰️ O tempo passa</h4>
+          <p>
+            Viagem, vigília, espera pelo anoitecer: tudo consome horas, e a
+            barra lateral mostra o <b>dia e a hora</b> quando a sua campanha
+            usa o relógio. Isso existe por um motivo concreto: o
+            <b>descanso longo vale uma vez a cada 24 horas</b> e consome 8
+            delas. Dormir depois de cada luta deixou de ser de graça.
+          </p>
+          <p>
+            Se o grupo empurrar sem dormir, o preço é a <b>exaustão</b>: no
+            nível 1 já atrapalha os testes, no 3 os ataques, no 4 corta o seu
+            máximo de Vida pela metade. Um descanso longo devolve um nível —
+            só um.
+          </p>
+
+          <h4 class="guide-h4">📜 Missões</h4>
+          <p>
+            Quando você aceita uma tarefa, ela vira uma <b>missão</b> na barra
+            lateral, com os objetivos e o progresso de cada um. Não precisa
+            mais lembrar de cabeça o que foi combinado nem com quem — está
+            escrito, junto com a recompensa prometida.
+          </p>
+
+          <h4 class="guide-h4">🤝 O que os NPCs lembram</h4>
+          <p>
+            Cada personagem guarda uma <b>atitude</b> em relação ao grupo, de
+            hostil a leal, que sobe e desce conforme o que vocês fazem. E ela
+            pesa: <b>convencer quem lhe deve a vida é mais fácil que convencer
+            quem você roubou</b> — a dificuldade dos testes sociais muda de
+            verdade.
+          </p>
+
+          <h4 class="guide-h4">🎒 Peso e dinheiro</h4>
+          <p>
+            O que você carrega tem peso. Passando da metade do que aguenta,
+            você fica <b>sobrecarregado</b>: desvantagem em ataques e em
+            esforço físico. Saquear tudo passou a ser uma escolha, não um
+            reflexo. Nas lojas, o Mestre abre um estoque com preços, e a
+            compra desconta da bolsa trocando ouro, prata e cobre sozinha —
+            quem vende recebe metade da tabela.
           </p>
         </div>
       </details>

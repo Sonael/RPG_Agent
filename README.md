@@ -152,7 +152,7 @@ combate, vive num estado central que tanto a IA quanto a interface enxergam.
 └─────────────────────────────────────────────────────────────┘
                     │
 ┌─────────────────────────────────────────────────────────────┐
-│  tools.py + tools_dnd.py  (60 ferramentas expostas)         │
+│  tools.py + tools_dnd.py  (84 ferramentas expostas)         │
 │  Operam sobre memory.campaign (proxy resolvido por contexto)│
 └─────────────────────────────────────────────────────────────┘
                     │
@@ -329,9 +329,28 @@ memory.load_campaign() / memory.save_campaign()
     "log": [...],                     # eventos estruturados (até 300)
     "result": {...} | None,           # painel de fim na tela
     "npc_strategies": {npc: estrategia},
+    # Onda 3 — posicionamento. Ausentes = combate sem zonas.
+    "zonas":      [str],              # trilha; vizinhas são adjacentes
+    "zona_desc":  {zona: str},
+    "posicoes":   {char_key: zona},
   },
+  # ── Onda 4 ───────────────────────────────────────────────────────────
+  "relogio":  {"dia": int, "hora": int},   # {} = campanha nunca usou relógio
+  "quests":   {chave: {titulo, descricao, status, objetivos,
+                       quem_deu, recompensa, cap_inicio}},
+  "lojas":    {chave: {nome, local, estoque: [{nome, preco, qtd}]}},
+  "_turno":   int,                          # contador de turnos concluídos
+  "_upkeep":  {tarefa: turno},              # quando cada manutenção foi feita
 }
 ```
+
+**Toda chave nova precisa entrar em `memory._defaults()`.** Não é organização:
+`load_campaign` percorre `_defaults()` e copia só o que encontra nele. O que
+ficar de fora é gravado no banco e **descartado na leitura seguinte** — foi
+exatamente o que aconteceu com missões, relógio e lojas entre a onda 4 e a
+correção que veio depois dela. O mesmo vale para
+`server._payload_de_campanha`, a lista branca por onde passa toda campanha
+criada pelo wizard ou importada de arquivo.
 
 Migrações automáticas em `_migrate_*` rodam no `load_campaign` para
 preencher campos novos em campanhas antigas.
@@ -472,6 +491,51 @@ Os call sites usam `from open5e import http as _req`: a resposta expõe
 - `identify_item` busca o item no SRD via Open5e, distingue **mágicos
   canônicos** de **customizados** e marca pra IA não exceder no efeito.
 
+### Carga e loja
+
+O inventário era uma lista sem peso e sem preço: dava para carregar oito
+armaduras de placas e uma bigorna, e "comprar" era o mestre digitar um número
+de ouro de cabeça. Duas consequências chatas — saque nunca era **escolha**
+(leva tudo), e o preço do mesmo item variava conforme o humor da cena.
+
+Peso e preço vêm do **SRD** quando o item existe lá: `/v1/weapons/` e
+`/v1/armor/` trazem `weight` (`"8 lb."`) e `cost` (`"25 gp"`) de verdade, e a
+conversão para quilo e para peças de ouro é feita no motor. Fora do SRD, uma
+tabela curta só do que aparece numa mesa — inventar um catálogo completo
+seria peso morto.
+
+Capacidade = **FOR × 7,5 kg**. Acima da metade o personagem fica
+**sobrecarregado**: desvantagem em ataques e em testes de FOR, DES e CON — não
+em INT, SAB ou CAR, porque a mochila atrapalha o corpo, não o raciocínio.
+Acima do total, não anda. `check_encumbrance` mostra a conta e os itens mais
+pesados.
+
+Lojas: `open_shop`, `list_shop`, `buy_item`, `sell_item`. A compra desconta da
+bolsa **trocando ouro/prata/cobre sozinha** (50 pp pagam 5 po) e uma compra
+recusada por falta de dinheiro não tira nada do estoque. A venda paga
+**metade** da tabela: sem isso, comprar e revender pelo mesmo preço seria uma
+torneira de ouro.
+
+### Missões como objetos
+
+Missão era `quest_flags`: um dicionário plano de string para string. Cabia
+`escoltar_princesa = aceito` e mais nada — sem objetivos, sem quem mandou, sem
+recompensa combinada, sem saber o que já foi feito. Na prática o jogador
+perguntava "o que a gente tinha que fazer mesmo?" e a resposta dependia de o
+LLM lembrar de uma conversa de vinte cenas atrás.
+
+`add_quest`, `update_quest_objective`, `complete_quest`, `list_quests`,
+`get_quest`. Um objetivo é casado por **trecho** do texto, e um objetivo que
+não existe é **registrado** em vez de recusado: missão que só aceita o plano
+original não sobrevive à mesa.
+
+As flags continuam intactas e não foram tocadas — elas são boas no que fazem,
+que é guardar um fato do mundo ("a ponte caiu"). Missão é outra coisa: tem
+estado, partes e um fim.
+
+As missões ativas entram no bloco de cena que o agente recebe todo turno, com
+o próximo passo pendente, e aparecem na barra lateral do jogo.
+
 ### Testes e dados
 
 - `roll_dice(sides, count, modifier)`.
@@ -513,10 +577,36 @@ Os call sites usam `from open5e import http as _req`: a resposta expõe
 - Safety net (`_check_all_level_ups`) roda no servidor, se a IA esqueceu de
   conceder XP, aplica o level up de qualquer forma.
 
-### Descanso
+### Descanso, relógio e exaustão
 
 - `short_rest` (gasta metade dos hit dice; recupera HP), `use_hit_die`,
   `long_rest` (full HP/MP + hit dice + condições; bloqueado em combate).
+- **Um descanso longo por 24 horas do relógio**, e ele consome 8 delas. Antes
+  disso `long_rest` era um botão de vida cheia: bastava chamá-lo depois de
+  cada luta, infinitas vezes por "dia", porque não havia dia. O *dia de
+  aventura* do 5e — o que faz mana e poderes diários serem recurso — não tinha
+  como existir. Quando o grupo inteiro dorme, o relógio anda uma vez só, não
+  8 horas por personagem.
+- `advance_time(horas, motivo)` / `get_world_time`. O relógio é grosso de
+  propósito: **dia e hora, sem minutos**. Numa mesa narrativa o que importa é
+  "amanheceu" e "vocês estão acordados há 20 horas".
+- `add_exhaustion` / `remove_exhaustion`, os seis níveis do 5e com só os
+  efeitos que o motor consegue cobrar:
+
+  | nível | efeito | onde é aplicado |
+  |---|---|---|
+  | 1 | desvantagem em testes | `make_skill_check` |
+  | 2 | deslocamento pela metade | sem Disparada |
+  | 3 | desvantagem em ataques e saves | `attack_roll`, `_concentration_save` |
+  | 4 | PV máximo pela metade | `_hp_max_efetivo` |
+  | 5 | deslocamento zero | não sai da zona |
+  | 6 | morte | `status = "morto"` |
+
+  O nível 4 é **calculado, nunca gravado** em `vida_max`: gravar destruiria o
+  valor real da ficha e não teria como voltar quando a exaustão baixasse.
+  O nível 3 vale no teste de concentração porque ali o motor é quem rola —
+  nos demais saves o d20 chega já rolado pelo jogador, então não há o que
+  aplicar, e cobrar seria mentira. Descanso longo remove um nível.
 
 ### NPCs
 
@@ -531,8 +621,20 @@ Os call sites usam `from open5e import http as _req`: a resposta expõe
 - `recruit_character(npc, role)`, bloqueia recrutamento de NPCs com 10+
   níveis acima do grupo (narrativamente impossível); aviso a partir de 5.
 - `set_npc_strategy` / `execute_npc_turn`, turno automático de NPC com
-  estratégias (agressivo, tático, covarde, aleatório, suporte). Covarde
-  foge quando HP<25%.
+  estratégias (agressivo, tático, covarde, aleatório, suporte, **atirador**).
+  Covarde foge quando HP<25%; atirador recua uma zona quando o corpo a corpo
+  o alcança, e leva o ataque de oportunidade por isso.
+- **Suporte cura de verdade.** A estratégia estava documentada como "cura
+  aliados com HP < 50%" desde sempre e nunca curou ninguém: caía no `else` e
+  atacava. Agora procura a magia de cura na ficha, confere mana e trata o
+  aliado mais ferido.
+- **Atitude** (`adjust_attitude`, `get_attitude`, `list_attitudes`): o que
+  cada NPC sente pelo grupo, de -100 (hostil) a +100 (leal), com histórico
+  curto do motivo de cada mudança. Antes isso não existia em lugar nenhum —
+  ficava no texto livre de `notes`, se o mestre escrevesse. E tem peso
+  mecânico: cada 20 pontos valem 1 de CD nos testes sociais contra aquele
+  NPC, com teto de ±5. Vive em `rpg/tools.py`, fora do filtro do motor:
+  atitude é matéria de romance e de mistério tanto quanto de masmorra.
 
 ### Encontros
 
@@ -707,8 +809,8 @@ A economia rastreava só Ação e Bônus. A **Reação** — a única coisa que
 acontece fora do próprio turno — agora existe: uma por rodada, guardada em
 `sheet["reacao_rodada"]`.
 
-Sem posicionamento no jogo, o gatilho honesto para o ataque de oportunidade
-é a **fuga**. Sair do combate deixou de ser grátis, que é exatamente o que a
+Na onda 2, sem posicionamento no jogo, o único gatilho honesto era a
+**fuga**: sair do combate deixou de ser grátis, que é exatamente o que a
 regra existe para impedir. Cada inimigo consciente que ainda tem a reação da
 rodada faz um ataque corpo-a-corpo contra quem foge — valendo para os dois
 caminhos, o NPC covarde e o jogador clicando "Fugir" na tela.
@@ -716,8 +818,73 @@ caminhos, o NPC covarde e o jogador clicando "Fugir" na tela.
 O motor redireciona: se o fugitivo cai no primeiro bote, os demais não
 desperdiçam a reação num corpo no chão.
 
-Quando houver zonas/alcance, `_provoke_opportunity_attacks` passa a ser
-chamado também no movimento — o resto já está no lugar.
+Com as zonas da onda 3 a regra ganhou o gatilho de verdade: **sair de uma
+zona onde há inimigo consciente também provoca**, e só reage quem está
+naquela zona — senão o arqueiro do outro lado do pátio daria bote em quem
+nunca esteve ao alcance dele.
+
+### Zonas: posicionamento sem grid
+
+O combate não tinha lugar nenhum. Todos alcançavam todos, corpo a corpo
+acertava o arqueiro do outro lado do salão, e o ataque de oportunidade só
+existia na fuga porque não havia movimento que ele pudesse punir.
+
+Grid quadriculado seria pior que o problema: exigiria coordenadas do LLM a
+cada turno e uma tela de tabuleiro. Zonas dão o que importa — perto/longe,
+quem está trancado com quem, terreno com nome — ao custo de uma palavra por
+combatente.
+
+Topologia **linear**: as zonas formam uma trilha e a adjacência são os
+vizinhos na lista. `["Portão", "Pátio", "Sacada"]` → Portão↔Pátio = 1,
+Portão↔Sacada = 2.
+
+| distância | regra |
+|---|---|
+| mesma zona | corpo a corpo vale; tiro sai com **desvantagem** (inimigo colado) |
+| adjacente | só à distância, sem penalidade |
+| 2 ou mais | só à distância, com desvantagem (alcance longo) |
+
+Ferramentas: `set_battlefield` (2 a 6 zonas; grupo na primeira, inimigos na
+última), `describe_battlefield`, `move_combatant` (uma zona; `dash=True` para
+duas, gastando a Ação).
+
+Três decisões que valem registro:
+
+- **Distância desconhecida devolve `None`, não "longe".** Quem nunca foi
+  posicionado não sofre penalidade inventada: o motor não pode cobrar uma
+  regra a partir de dado que não tem.
+- **A recusa de alcance vem antes de qualquer rolagem.** Recusar depois já
+  teria mudado o estado.
+- **Tudo é opcional.** Sem `set_battlefield` chamado, `cs["zonas"]` não existe
+  e o combate se comporta como na onda 2. Campanhas em andamento não mudam de
+  regra no meio do caminho.
+
+### Chefes: recarga e ações lendárias
+
+Duas coisas que separam um chefe de um saco de PV.
+
+**Recarga** (`set_recharge_ability`) é o "Recharge 5–6" do 5e: o sopro do
+dragão não é usável todo turno nem uma vez por luta — no início de cada turno
+dele rola-se 1d6 e o poder volta se der 5 ou 6. É o que faz o grupo jogar
+contra um relógio que ninguém controla. `execute_npc_turn` usa o poder assim
+que ele estiver carregado: é a jogada mais forte que a criatura tem.
+
+**Ações lendárias** (`set_legendary_actions`, `legendary_action`): um único
+inimigo contra quatro jogadores age 1 vez a cada 5 turnos, e a luta vira
+execução. O chefe passa a agir **fora do próprio turno**, no fim do turno dos
+outros; o contador volta ao cheio no início do turno dele. Agir no próprio
+turno é recusado — lá ele já tem ação, bônus e ataque múltiplo, e permitir
+seria dar-lhe um turno duplo.
+
+O motor gasta as ações **sozinho, uma por virada**. Isso não é conveniência:
+no modo tela a luta corre sem LLM nenhum, então uma ação lendária que
+dependesse de alguém lembrar de chamá-la nunca seria usada ali. Uma por
+virada também é como um mestre humano joga — espalha as três pela rodada. Só
+NPCs: um personagem lendário do grupo continua sendo jogado pelo jogador.
+
+Os dois efeitos caem no mesmo gancho, `_inicio_de_turno()`, pendurado em
+`_reset_turn_economy` — o único ponto por onde os três avanços de turno
+passam (`next_turn`, `_auto_advance_turn` e a auto-cura do ponteiro).
 
 ### Status "dormindo" (Sleep)
 
@@ -799,10 +966,19 @@ Quando `combat_mode == "tela"`:
 │ │ [R3] Goblin 2 → Elara: d20=8 +1 = 9 vs CA 16 • ERROU │  │
 │ └──────────────────────────────────────────────────────┘  │
 │                                                            │
-│ Sua vez: Elara , Ação ○ Bônus ○                          │
-│ [⚔️ Atacar (Ação)] [✨ Habilidade] [🧪 Item] [🛡️ Defender] │
-│ [💨 Fugir]  [💬 Ação Livre]  [⏭️ Encerrar Turno]          │
+│ Sua vez: Elara , Ação ● Bônus ● Movimento ● Reação ●      │
+│ [⚔️ Atacar] [✨ Habilidade] [🧪 Item] [🏃 Mover]           │
+│ [🛡️ Defender] [💨 Fugir] [💬 Ação Livre] [⏭️ Encerrar]    │
 └────────────────────────────────────────────────────────────┘
+```
+
+Com zonas em jogo, uma faixa aparece acima do campo com a trilha e quem está
+em cada ponto — o destaque marca a zona de quem joga agora:
+
+```
+┌ Portão ─────────┐ → ┌ Pátio ──────────┐ → ┌ Sacada ─────────┐
+│ Helena  Natasha │   │ Stelar ◀ é a vez│   │ Victoria        │
+└─────────────────┘   └─────────────────┘   └─────────────────┘
 ```
 
 ### Submenu ⚔️ Atacar, escolha de arma
@@ -913,15 +1089,22 @@ A lista completa exposta ao agente (`tools.py:ALL_TOOLS` = narrativas +
 
 ### Conjunto resolvido por turno (`rpg/toolsets.py`)
 
-As 61 ferramentas custam **~11.100 tokens de schema em toda requisição**. Como
+As 84 ferramentas custam **~10.500 tokens de schema em toda requisição**. Como
 cada chamada de ferramenta é um novo round-trip, um turno de combate com três
-chamadas manda ~33 mil tokens só de definição.
+chamadas manda ~31 mil tokens só de definição. As ondas 3 e 4 acrescentaram 23
+ferramentas, e é justamente por isso que o filtro importa mais agora, não
+menos.
 
-| Cenário | Ferramentas | Schema | |
-|---|---|---|---|
-| D&D, combate narrado | 61 | ~11.134 tokens | base |
-| D&D, combate na tela | 55 | ~9.050 tokens | −2.084 |
-| Romance / horror / mistério… | 23 | ~2.353 tokens | **−8.781 (−79%)** |
+| Cenário | Ferramentas | |
+|---|---|---|
+| D&D, combate narrado | 84 | base |
+| D&D, combate na tela | 76 | −8 |
+| Romance / horror / mistério… | 33 | **−51 (−61%)** |
+
+O corte para campanhas sem regras encolheu em proporção porque missões,
+atitude e relógio de mundo **não são regras de D&D** e ficam em toda campanha
+— um mistério precisa que o prazo corra e que o suspeito guarde rancor tanto
+quanto uma masmorra precisa do descanso longo.
 
 São dois filtros, com motivações diferentes.
 
@@ -944,12 +1127,19 @@ narração).
 romance, horror, mistério, scifi e faroeste não têm regras: a contagem de
 menções a `attack_roll`, `create_character_sheet`, `roll_initiative` e afins
 nas instruções desses seis estilos é **zero**, e quase toda ferramenta do
-motor exige `char["sheet"]`, que nem existe ali. Eram 39 ferramentas de peso
+motor exige `char["sheet"]`, que nem existe ali. São 51 ferramentas de peso
 morto.
 
-Exceção deliberada: **`roll_dice` fica em toda campanha**. É o único primitivo
-de aleatoriedade do sistema, não depende de ficha e é genérico de gênero — um
-mistério ou um faroeste podem querer um dado sem ter regras.
+Exceções deliberadas, três: **`roll_dice`**, o único primitivo de
+aleatoriedade do sistema, que não depende de ficha e é genérico de gênero; e
+**`advance_time` / `get_world_time`**, porque relógio de mundo não é regra de
+D&D — um horror precisa que anoiteça e um mistério precisa que o prazo corra,
+e nenhum dos dois toca em ficha.
+
+O `test_toolsets.py` escreve esse carve-out **à mão**, em vez de importar a
+constante: importar tornaria o teste tautológico, e a graça dele é obrigar
+quem mexer no carve-out a passar por ali e justificar a exceção. Foi o que
+aconteceu quando o relógio saiu do filtro — o teste ficou vermelho na hora.
 
 Salvaguarda que importa: além da flag `dnd_mode`, o filtro checa se **algum
 personagem tem ficha**. Uma campanha importada de JSON sem a flag, mas com
@@ -999,6 +1189,12 @@ ou uma fração — e portanto se vale a pena mexer em mais alguma coisa. Com
 | `add_diary_entry` / `get_diary` | Diário da campanha |
 | `get_scene_context` | Contexto da cena (uso a cada turno) |
 | `get_full_context` | Dump completo (reancoragem após retomar) |
+| `add_quest` / `update_quest_objective` / `complete_quest` | Missões como objetos |
+| `list_quests` / `get_quest` | Lê missões |
+| `adjust_attitude` / `get_attitude` / `list_attitudes` | Memória social dos NPCs |
+
+As seis últimas valem em **qualquer estilo de campanha**, não só D&D: missão e
+atitude são matéria de romance e de mistério tanto quanto de masmorra.
 
 ### D&D (`tools_dnd.py`)
 
@@ -1161,10 +1357,32 @@ acessam memória):
 
 ### Tema
 
-`static/css/style.css` (~1640 linhas), visual de livro/tomo (Lora,
-Playfair Display, Caveat) + tela de combate "Pergaminho Épico", 7 temas
-alternáveis, totalmente responsivo (`--app-height` cobre o quirk do iOS
-Safari).
+`static/css/style.css`, visual de livro/tomo (Lora, Playfair Display,
+Caveat) + tela de combate "Pergaminho Épico", 7 temas alternáveis, totalmente
+responsivo (`--app-height` cobre o quirk do iOS Safari).
+
+**Escala de espaçamento.** Havia 34 valores distintos de padding/margin/gap em
+428 declarações e nenhuma variável de espaçamento: 10, 11 e 12px faziam o
+mesmo trabalho, assim como 14, 15 e 16, e 24, 25 e 26. Cada elemento tinha
+sido espaçado no olho, isolado dos outros. Sem ritmo comum tudo fica "quase
+certo", e o olho lê a tela como apertada.
+
+Hoje é uma grade de 4px em `:root`, e **o número do nome é o multiplicador**:
+`--esp-3` = 12px. Use sempre um degrau; se nenhum servir, o problema
+provavelmente é outro (alinhamento, hierarquia, tamanho de fonte) e não meio
+pixel de padding.
+
+Ficam fora da escala, de propósito:
+
+- **1px e 2px** — fio de cabelo, abaixo da grade;
+- **espaço reservado para elemento fixo ou absoluto** (a folga da barra de
+  rodapé, o padding que abre lugar para o botão do olho). Ali o número casa
+  com o tamanho de *outra coisa*, não com o ritmo da página;
+- **margens negativas de sangria**, que são pares — mexer num lado só descola
+  os dois.
+
+Ainda há ~114 espaçamentos escritos direto no `style=` do HTML, fora do
+alcance da grade. Puxá-los para classes é o passo que fecha o sistema.
 
 ---
 
@@ -1232,7 +1450,7 @@ em `utils.js`) é adaptativa:
 
 ## Testes e garantias
 
-A suíte roda com **pytest** (258 testes). O `tests/conftest.py` isola tudo de rede
+A suíte roda com **pytest** (382 testes). O `tests/conftest.py` isola tudo de rede
 e de banco: o `database` (Supabase) vira stub e a camada SRD entra em modo
 offline, então nenhum teste depende da internet. Ele também expõe a fábrica
 `criar_ficha()` e as fixtures `campanha`/`povoar`, para um teste de motor
@@ -1245,6 +1463,19 @@ pelo **atributo** do pacote quando ele já existe. Use
 `rpg/__init__.py` é deliberadamente vazio de imports — se ele importasse os
 submódulos na carga, os verdadeiros venceriam a corrida e a substituição não
 teria efeito.
+
+O `conftest.campanha` zera também `quests`, `lojas` e `relogio`. Sem isso uma
+missão criada num teste vazava para o seguinte, e a falha saía no teste
+errado, longe da causa — foi assim que apareceu escrevendo a onda 4.
+
+**Verificação de JS.** `tests/js/authfetch_refresh.mjs` carrega o bloco de
+auth real do `static/js/utils.js` num contexto isolado e o submete a um
+Supabase simulado que gira o refresh token como o de verdade. A ponte
+`tests/test_js_auth.py` transforma cada check num caso do pytest; sem `node`
+no PATH os casos são **pulados**, não falham. O script é escrito para Node
+antigo (o do apt no Ubuntu 22.04 é o 12): sem top-level await, sem
+`import.meta.dirname`, e com uma `Response` própria em vez da global do
+fetch — o alvo do teste é o utils.js, não o runtime.
 
 As duas suítes legadas forçam `RPG_SRD_OFFLINE=1` por padrão. Sem isso,
 rodá-las à mão sai para a api.open5e.com e elas travam quando a API está

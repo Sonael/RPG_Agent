@@ -888,6 +888,54 @@ def list_campaigns():
         return jsonify({"error": str(e)}), 500
 
 
+def _payload_de_campanha(name: str, dados: dict, personagens: dict) -> dict:
+    """
+    Monta o dict que vai para o banco, a partir de um JSON de campanha vindo
+    de fora (wizard de criação ou importação de arquivo).
+
+    UM lugar só, de propósito. Antes as duas rotas repetiam a mesma lista
+    branca de chaves, e foi assim que a onda 4 passou: missões, relógio e
+    lojas eram gravados pelo jogo e sumiam ao importar, porque as duas listas
+    não sabiam deles. Chave nova entra AQUI e as duas rotas ganham junto.
+
+    A lista de chaves espelha memory._defaults() — se você acrescentar uma
+    coisa lá, acrescente aqui também, ou ela não sobrevive à importação.
+    """
+    return {
+        "name":                 name,
+        "campaign_type":        dados.get("campaign_type", "fantasia"),
+        "dnd_mode":             dados.get("dnd_mode", False),
+        # Preferência de como o combate é jogado ("narrado" ou "tela"). Não
+        # estava aqui: quem importava uma campanha do modo tela caía no
+        # narrado sem entender por quê.
+        "combat_mode":          dados.get("combat_mode", "narrado"),
+        "protagonist":          dados.get("protagonist", ""),
+        "chapter":              dados.get("chapter", 1),
+        "current_location":     dados.get("current_location", ""),
+        "current_scene":        dados.get("current_scene", ""),
+        "story_summary":        dados.get("story_summary", ""),
+        "quest_flags":          dados.get("quest_flags", {}),
+        "party":                dados.get("party", []),
+        "characters":           personagens,
+        "locations":            dados.get("locations", {}),
+        "events":               dados.get("events", []),
+        "diary":                dados.get("diary", []),
+        "conversation_history": [],
+        "combat_state":         dados.get("combat_state", {
+            "is_active": False, "initiative_order": [],
+            "current_turn_index": 0, "round": 1,
+        }),
+        # Onda 4 — mundo, missões e economia. Sem estas linhas, exportar e
+        # reimportar uma campanha jogava fora tudo o que o grupo construiu:
+        # o diário de missões, a hora do mundo, as lojas abertas.
+        "relogio":              dados.get("relogio", {}),
+        "quests":               dados.get("quests", {}),
+        "lojas":                dados.get("lojas", {}),
+        "_turno":               dados.get("_turno", 0),
+        "_upkeep":              dados.get("_upkeep", {}),
+    }
+
+
 @app.route("/api/campaigns", methods=["POST"])
 @require_auth
 def create_campaign():
@@ -920,27 +968,7 @@ def create_campaign():
         reconcile_character_archetypes(char)
         normalized_chars[k.lower().strip().replace("_", " ")] = char
 
-    payload = {
-        "name":                 name,
-        "campaign_type":        campaign_data.get("campaign_type", "fantasia"),
-        "dnd_mode":             campaign_data.get("dnd_mode", False),
-        "protagonist":          campaign_data.get("protagonist", ""),
-        "chapter":              campaign_data.get("chapter", 1),
-        "current_location":     campaign_data.get("current_location", ""),
-        "current_scene":        campaign_data.get("current_scene", ""),
-        "story_summary":        campaign_data.get("story_summary", ""),
-        "quest_flags":          campaign_data.get("quest_flags", {}),
-        "party":                campaign_data.get("party", []),
-        "characters":           normalized_chars,
-        "locations":            campaign_data.get("locations", {}),
-        "events":               campaign_data.get("events", []),
-        "diary":                campaign_data.get("diary", []),
-        "conversation_history": [],
-        "combat_state":         campaign_data.get("combat_state", {
-            "is_active": False, "initiative_order": [],
-            "current_turn_index": 0, "round": 1,
-        }),
-    }
+    payload = _payload_de_campanha(name, campaign_data, normalized_chars)
 
     try:
         database.save_campaign(g.user_id, name, payload)
@@ -2374,27 +2402,7 @@ def import_campaign():
             char["sheet"]["classe"] = char["sheet"]["classe"].lower()
         normalized_chars[k.lower().strip().replace("_", " ")] = char
 
-    payload = {
-        "name":                 name,
-        "campaign_type":        campaign_data.get("campaign_type", "fantasia"),
-        "dnd_mode":             campaign_data.get("dnd_mode", False),
-        "protagonist":          campaign_data.get("protagonist", ""),
-        "chapter":              campaign_data.get("chapter", 1),
-        "current_location":     campaign_data.get("current_location", ""),
-        "current_scene":        campaign_data.get("current_scene", ""),
-        "story_summary":        campaign_data.get("story_summary", ""),
-        "quest_flags":          campaign_data.get("quest_flags", {}),
-        "party":                campaign_data.get("party", []),
-        "characters":           normalized_chars,
-        "locations":            campaign_data.get("locations", {}),
-        "events":               campaign_data.get("events", []),
-        "diary":                campaign_data.get("diary", []),
-        "conversation_history": [],
-        "combat_state":         campaign_data.get("combat_state", {
-            "is_active": False, "initiative_order": [],
-            "current_turn_index": 0, "round": 1,
-        }),
-    }
+    payload = _payload_de_campanha(name, campaign_data, normalized_chars)
 
     database.save_campaign(g.user_id, name, payload)
     return jsonify({"ok": True, "name": name})
