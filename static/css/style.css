@@ -322,6 +322,8 @@ textarea { resize: vertical; min-height: 40px; }
    ========================================================= */
 .sidebar-header { flex-shrink: 0; }
 .sidebar-header-row { display: flex; flex-direction: column; width: 100%; }
+/* Puxador e fechar da folha inferior — só no mobile (ver media query). */
+.sidebar-grab, .sidebar-close { display: none; }
 .sidebar-content { flex: 1; min-height: 0; overflow-y: auto; padding-right: 10px; }
 .sidebar-content::-webkit-scrollbar { width: 4px; }
 .sidebar-content::-webkit-scrollbar-track { background: transparent; }
@@ -495,6 +497,9 @@ textarea { resize: vertical; min-height: 40px; }
 #chat-input:focus { border-bottom-color: var(--ink-user); }
 #send-btn { background: transparent; border: 1px solid var(--input-border); color: var(--text-main); font-family: 'Lora', serif; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; padding: 0 20px; height: 44px; border-radius: 4px; cursor: pointer; transition: 0.2s; margin: 0; }
 #send-btn:hover { background: var(--text-main); color: var(--page-right); border-color: var(--text-main); }
+/* Dica sob o compositor: a de teclado só no desktop. */
+.composer-dica { font-family: 'Lora', serif; font-size: 11px; color: var(--text-muted); margin-top: 8px; text-align: center; }
+.composer-dica-toque { display: none; }
 
 /* =========================================================
    MENU DE COMANDOS (/)
@@ -677,6 +682,14 @@ textarea { resize: vertical; min-height: 40px; }
   .page-number { display: none; }
   .book-title { font-size: 24px; margin-bottom: 10px; padding-bottom: 10px; text-align: center; }
   .page-left:not(#sidebar) > div[style*="text-transform"] { font-size: 13px; margin-bottom: 12px !important; }
+  /* No login, o formulário sobe: as duas folhas do livro empilham, e o
+     texto de boas-vindas tomava a primeira tela inteira antes de aparecer
+     onde entrar. A apresentação continua logo abaixo, para quem chega
+     pela primeira vez. */
+  body.auth-page .tome { display: flex; flex-direction: column; }
+  body.auth-page .page-right { order: -1; border-bottom: 2px solid var(--page-edge); }
+  body.auth-page .page-left  { border-bottom: none; }
+
   .auth-tabs { margin-bottom: 28px; }
   .auth-tab { font-size: 16px; padding: 14px 0; }
   .field-group { margin-bottom: 22px; }
@@ -684,6 +697,30 @@ textarea { resize: vertical; min-height: 40px; }
   input, select, textarea { font-size: 20px; padding: 8px 0; }
   .btn-main { padding: 14px 20px; font-size: 17px; width: 100%; }
   .auth-error { font-size: 14px; margin-bottom: 16px; }
+
+  /* No menu, "Iniciar Sessão" ficava depois da lista inteira de campanhas
+     e de todo o Prefácio — muito scroll até a ação principal. Vira barra
+     fixa no rodapé, junto com a dica que explica por que está travado.
+
+     `fixed` e não `sticky`: o botão é o ÚLTIMO elemento do container, e
+     sticky-bottom só prende enquanto houver conteúdo depois para rolar —
+     sem isso ele simplesmente aparece quando você chega nele, que é
+     exatamente o problema. */
+  body:not(.game-page):not(.auth-page) .barra-iniciar {
+    position: fixed; left: 0; right: 0; z-index: 5;
+    bottom: 0;
+    background: var(--page-right);
+    border-top: 1px solid var(--page-edge);
+    padding: 10px 20px calc(env(safe-area-inset-bottom, 0px) + 12px);
+    box-shadow: 0 -6px 18px rgba(0,0,0,0.08);
+  }
+  body:not(.game-page):not(.auth-page) .barra-iniciar #start-hint {
+    margin-bottom: 6px;
+  }
+  /* Espaço para o fim da página não ficar atrás da barra. */
+  body:not(.game-page):not(.auth-page) .page-right:not(#chat-area) {
+    padding-bottom: 140px;
+  }
 
   /* ─────────────────────────────────────────
      EXCEÇÃO PARA A SESSÃO DO JOGO (game.html)
@@ -721,7 +758,29 @@ textarea { resize: vertical; min-height: 40px; }
     border-right: none; display: flex; flex-direction: column; overflow-y: auto;
   }
   #sidebar.page-left.active { bottom: 0; }
-  
+
+  /* Puxador e ✕ da folha inferior: antes ela só fechava tocando fora, o que
+     não tem nenhuma pista visual — quem não descobre fica preso no painel. */
+  /* `sticky` e não `absolute`: a gaveta tem overflow-y auto, e um filho
+     absoluto rolaria junto com o conteúdo e sumiria de vista. */
+  #sidebar.page-left { padding-top: 12px; }
+  .sidebar-grab {
+    display: block; position: sticky; top: 0; z-index: 3;
+    width: 44px; height: 4px; margin: 0 auto; border-radius: 2px;
+    background: var(--page-edge);
+  }
+  .sidebar-close {
+    display: flex; align-items: center; justify-content: center;
+    position: sticky; top: 0; z-index: 4;
+    width: 40px; height: 40px; padding: 0;
+    /* sobe para a mesma linha do puxador e cola na direita */
+    margin: -22px -6px 4px auto;
+    background: none; border: none; cursor: pointer;
+    font-size: 20px; line-height: 1; color: var(--text-muted);
+  }
+  .sidebar-close:active { color: var(--ink-sys); }
+
+
   #sidebar-overlay {
     display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
     z-index: 999; backdrop-filter: blur(2px);
@@ -776,7 +835,13 @@ textarea { resize: vertical; min-height: 40px; }
     background: var(--page-right);
     border-top: 1px solid rgba(0,0,0,0.05);
   }
-  #chat-input { font-size: 22px; height: auto; min-height: 40px; padding: 5px; }
+  /* Em 375px a caixa de texto ficava com 182px — menos da metade da tela —
+     disputando espaço com o dado e o botão de enviar, e o placeholder
+     quebrava em duas linhas. */
+  #chat-input { font-size: 20px; height: auto; min-height: 40px; padding: 5px; }
+  #send-btn { padding: 0 12px; font-size: 12px; letter-spacing: .5px; }
+  .composer-dica-desktop { display: none; }
+  .composer-dica-toque   { display: block; }
 
   /* ─────────────────────────────────────────
      Tipografia e Modais Mobile
@@ -796,6 +861,14 @@ textarea { resize: vertical; min-height: 40px; }
   .cmd-sheet-bars, .cmd-sheet-stats { flex-wrap: wrap; gap: 8px; }
 
   /* Animações Mobile (Folha Arrancada) */
+  /* No mobile a capa usa tearPageUp, que é 2D — o 3D do livro não existe
+     aqui. E tanto a `perspective` da .scene quanto o `transform-style:
+     preserve-3d` do .tome ANCORAM todo `position: fixed` descendente neles
+     em vez de na viewport (mesma regra do `transform`). Era isso que
+     impedia a barra "Iniciar Sessão" e qualquer outra barra fixa de
+     grudar no rodapé. */
+  .scene { perspective: none; }
+  .tome  { transform-style: flat; }
   .animate-open { animation: tearPageUp 1.2s ease-in forwards; transform-origin: top left; border-radius: 0; }
   .animate-close { animation: tearPageDown 1.2s ease-out forwards; transform-origin: top left; border-radius: 0; }
 
@@ -1594,11 +1667,39 @@ body.combat-on { overflow: hidden; }
     max-width: none; height: auto; min-height: 100vh;
     border-radius: 0; border: none;
   }
-  /* No mobile, tudo flui na vertical e a página inteira rola. */
+  /* No mobile, o campo de batalha e o diário fluem e a página rola — mas o
+     PAINEL DE AÇÃO fica fixo no rodapé.
+
+     Antes ele vinha depois da lista inteira de combatentes: numa tela de
+     812px o "Encerrar Turno" caía em 868px e, ao tocar "Atacar", o seletor
+     de arma abria em 924px — fora da tela. O jogador tocava e nada
+     acontecia à vista. Agora os controles estão sempre visíveis e o seletor
+     abre DENTRO da barra, que rola por dentro. */
   .cbt-lower { max-height: none; overflow: visible; }
-  .cbt-action-panel { overflow-y: visible; }
+  .cbt-action-panel {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+    max-height: 52vh; overflow-y: auto;
+    background: #fff;
+    border-top: 2px solid var(--cbt-gold);
+    border-bottom: none;
+    box-shadow: 0 -8px 24px rgba(74,37,17,0.25);
+    padding-bottom: calc(20px + env(safe-area-inset-bottom));
+  }
   .cbt-picker { max-height: none; }
+  /* Espaço para o último card não ficar escondido atrás da barra fixa. */
+  .cbt-battlefield { padding-bottom: 24px; }
+  #cbt-frame { padding-bottom: 46vh; }
+  /* O painel de fim precisa cobrir a barra fixa. */
+  .cbt-end-overlay { z-index: 40; }
   .cbt-title { font-size: 1.3rem; }
+  /* Régua de iniciativa: rola na horizontal em vez de quebrar em duas
+     linhas e deixar o último nome centralizado sozinho. */
+  .cbt-initiative {
+    flex-wrap: nowrap; overflow-x: auto; justify-content: flex-start;
+    padding-bottom: 4px; -webkit-overflow-scrolling: touch;
+  }
+  .cbt-initiative::-webkit-scrollbar { height: 0; }
+  .cbt-ord { flex-shrink: 0; }
   .cbt-battlefield {
     flex-direction: column; padding: 16px; gap: 12px;
     flex: none; overflow: visible; min-height: 0;
@@ -1607,7 +1708,6 @@ body.combat-on { overflow: hidden; }
   .cbt-vs      { order: 2; font-size: 1.8rem; }
   #cbt-party   { order: 3; width: 100%; }
   .cbt-lower { flex-direction: column; }
-  .cbt-action-panel { border-right: none; border-bottom: 2px solid var(--cbt-gold); }
   .cbt-log-content { max-height: 200px; }
   .cbt-result-cols { flex-direction: column; }
   .cbt-result-title { font-size: 1.9rem; }

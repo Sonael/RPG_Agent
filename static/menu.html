@@ -24,7 +24,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;600&family=Lora:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Playfair+Display:ital,wght@0,500;0,700;1,500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/css/style.css?v=36">
+  <link rel="stylesheet" href="/static/css/style.css?v=37">
 </head>
 <body>
   <div class="scene">
@@ -143,10 +143,12 @@
         <!-- Diz o que falta enquanto o botão está travado: um botão inerte
              sem explicação já fez o jogador achar que era defeito. Clicar
              rola até a lista de campanhas — no mobile ela fica fora da tela. -->
-        <div id="start-hint" onclick="irParaAsCampanhas()"
-          style="font-family: 'Lora', serif; font-size:13px; font-style:italic; text-align:center; margin-bottom:10px;">
+        <div class="barra-iniciar">
+          <div id="start-hint" onclick="irParaAsCampanhas()"
+            style="font-family: 'Lora', serif; font-size:13px; font-style:italic; text-align:center; margin-bottom:10px;">
+          </div>
+          <button id="start-btn" class="btn-main" onclick="startSession()" disabled>Iniciar Sessão</button>
         </div>
-        <button id="start-btn" class="btn-main" onclick="startSession()" disabled>Iniciar Sessão</button>
         <div class="page-number right">4</div>
       </div>
     </div>
@@ -217,7 +219,7 @@
           <div class="wz-ai-box">
             <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
               <span style="font-family:'Playfair Display', serif; font-weight:700;">Deixe o Oráculo Criar</span>
-              <label style="font-size:13px; display:flex; align-items:center; gap:5px; cursor:pointer;"><input type="checkbox" id="wz-ai-toggle" onchange="toggleAiCreate(this.checked)"> Ativar IA</label>
+              <label style="font-size:13px; display:flex; align-items:center; gap:5px; cursor:pointer; white-space:nowrap;"><input type="checkbox" id="wz-ai-toggle" onchange="toggleAiCreate(this.checked)"> Ativar IA</label>
             </div>
             <div id="wz-ai-section" class="hidden field-group">
               <textarea id="wz-ai-prompt" rows="2" placeholder="Descreva a ideia básica. Ex: Um grupo de mercenários..."></textarea>

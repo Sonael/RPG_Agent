@@ -35,7 +35,7 @@
        Sem isso, a narração da IA (ou texto injetado) poderia conter
        <script>/<img onerror> e executar — XSS. -->
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.7/dist/purify.min.js"></script>
-  <link rel="stylesheet" href="/static/css/style.css?v=36">
+  <link rel="stylesheet" href="/static/css/style.css?v=37">
 </head>
 
 <body class="game-page">
@@ -53,6 +53,11 @@
       <div id="sidebar-overlay" onclick="toggleSidebar(true)"></div>
 
       <aside id="sidebar" class="page-left">
+        <!-- Puxador e botão de fechar: no mobile a barra abre como folha
+             inferior e só fechava tocando fora dela, o que não é visível. -->
+        <div class="sidebar-grab" aria-hidden="true"></div>
+        <button class="sidebar-close" onclick="toggleSidebar(true)"
+                aria-label="Fechar o painel">✕</button>
         <div class="sidebar-header">
           <div class="sidebar-header-row">
             <h2 id="sb-campaign" class="book-title">—</h2>
@@ -295,9 +300,12 @@
             </div>
 
           </div>
-          <div
-            style="font-family: 'Lora', serif; font-size:11px; color:var(--text-muted); margin-top:8px; text-align:center;">
+          <!-- Duas dicas: a de teclado não faz sentido num celular, onde o
+               Enter do teclado virtual normalmente insere quebra de linha. -->
+          <div class="composer-dica composer-dica-desktop">
             / comandos · Enter para enviar · Shift+Enter para nova linha</div>
+          <div class="composer-dica composer-dica-toque">
+            Digite / para ver os comandos</div>
         </div>
 
         <div class="page-number right">15</div>
@@ -356,7 +364,7 @@
 
   <script src="/static/js/utils.js?v=9"></script>
   <script src="/static/js/game.js?v=25"></script>
-  <script src="/static/js/combat.js?v=10"></script>
+  <script src="/static/js/combat.js?v=11"></script>
 
   <script>
     (function() {

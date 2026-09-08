@@ -295,6 +295,18 @@
       + `<button class="cbt-btn cbt-cancel" onclick="window.Combat._cancel()">✕ Cancelar</button>`
       + `</div>`;
     tgtEl.classList.remove('hidden');
+    trazerParaVista(tgtEl);
+  }
+
+  // No mobile o painel de ação é uma barra fixa que rola por dentro: se o
+  // seletor abre além da altura dela, o jogador toca e não vê nada mudar.
+  // `block: 'nearest'` só rola o necessário e não mexe se já estiver visível.
+  function trazerParaVista(el) {
+    if (!el) return;
+    requestAnimationFrame(() => {
+      try { el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
+      catch (_) { el.scrollIntoView(false); }
+    });
   }
 
   // ---- Loop / sincronização ---------------------------------------
@@ -459,6 +471,7 @@
         + `<button class="cbt-btn cbt-cancel" onclick="window.Combat._cancel()">✕ Cancelar</button>`
         + `</div>`;
       tgtEl.classList.remove('hidden');
+      trazerParaVista(tgtEl);
       return;
     }
 
@@ -484,6 +497,7 @@
         + `<button class="cbt-btn cbt-cancel" onclick="window.Combat._cancel()">✕ Cancelar</button>`
         + `</div>`;
       tgtEl.classList.remove('hidden');
+      trazerParaVista(tgtEl);
       return;
     }
 
@@ -510,6 +524,7 @@
       + `<button class="cbt-btn cbt-cancel" onclick="window.Combat._cancel()">✕ Cancelar</button>`
       + `</div>`;
     tgtEl.classList.remove('hidden');
+    trazerParaVista(tgtEl);
   }
 
   function _selItem(name, kind) {
@@ -532,6 +547,7 @@
         + `<button class="cbt-btn cbt-cancel" onclick="window.Combat._cancel()">✕ Cancelar</button>`
         + `</div>`;
       tgtEl.classList.remove('hidden');
+      trazerParaVista(tgtEl);
     } else {
       act({ action: 'item', actor: cur.name, item: name });
     }
