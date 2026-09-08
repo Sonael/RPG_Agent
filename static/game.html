@@ -35,7 +35,7 @@
        Sem isso, a narração da IA (ou texto injetado) poderia conter
        <script>/<img onerror> e executar — XSS. -->
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.7/dist/purify.min.js"></script>
-  <link rel="stylesheet" href="/static/css/style.css?v=45">
+  <link rel="stylesheet" href="/static/css/style.css?v=46">
 </head>
 
 <body class="game-page">
@@ -83,7 +83,7 @@
                 style="font-family: 'Lora', serif; font-size: 10px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 5px; letter-spacing: 0.05em; font-weight: 600;">
                 Uso do modelo</div>
               <div
-                style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-family: 'Lora', serif; font-size: 11px;">
+                style="display: flex; justify-content: space-between; gap: 8px; font-family: 'Lora', serif; font-size: 11px; white-space: nowrap;">
                 <div title="Requisições feitas nesta sessão, do limite diário do seu modelo">Requisições: <span id="stat-req">0</span></div>
                 <div title="Tokens consumidos nesta sessão">Tokens: <span id="stat-tokens">0</span></div>
               </div>
