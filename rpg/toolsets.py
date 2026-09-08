@@ -78,7 +78,11 @@ FERRAMENTAS_SO_DO_MODO_NARRADO = frozenset({
 # Exceção deliberada: roll_dice fica em TODA campanha. É o único primitivo de
 # aleatoriedade do sistema, não depende de ficha nenhuma e é genérico de
 # gênero — um mistério ou um faroeste podem querer um dado sem ter regras.
-_CARVE_OUT_GENERICAS = frozenset({"roll_dice"})
+# advance_time/get_world_time entram junto pela mesma razão: relógio de mundo
+# não é regra de D&D. Um horror precisa que anoiteça e um mistério precisa que
+# o prazo corra tanto quanto uma masmorra precisa do descanso longo — e nenhum
+# dos dois toca em ficha.
+_CARVE_OUT_GENERICAS = frozenset({"roll_dice", "advance_time", "get_world_time"})
 
 
 def _nomes_das_ferramentas_dnd() -> frozenset:

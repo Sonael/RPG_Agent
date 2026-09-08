@@ -435,6 +435,347 @@ def get_diary(last: int = 5) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Missões como objetos
+# ---------------------------------------------------------------------------
+#
+# Missão era `quest_flags`: um dicionário plano de string para string. Cabia
+# "escoltar_princesa = aceito" e mais nada — sem objetivos, sem quem mandou,
+# sem recompensa combinada, sem saber o que já foi feito. Na prática o jogador
+# perguntava "o que a gente tinha que fazer mesmo?" e a resposta dependia do
+# LLM lembrar de uma conversa de vinte cenas atrás.
+#
+# As flags CONTINUAM existindo e não foram tocadas: elas são boas no que
+# fazem, que é guardar um fato do mundo ("a ponte caiu"). Missão é outra
+# coisa — tem estado, partes e um fim.
+
+_STATUS_MISSAO = ("ativa", "concluida", "falhou", "abandonada")
+
+
+def _missoes() -> dict:
+    return memory.campaign.setdefault("quests", {})
+
+
+def _chave_missao(titulo: str) -> str:
+    return (titulo or "").lower().strip().replace("_", " ")
+
+
+def add_quest(title: str, description: str, objectives: str = "",
+              giver: str = "", reward: str = "") -> str:
+    """
+    Registra uma missão. Chame no momento em que o grupo ACEITA a tarefa —
+    não quando alguém apenas menciona um problema no mundo.
+
+    Args:
+        title:       Nome curto e reconhecível ('Escoltar a Princesa Elara').
+        description: O que é a missão, em uma ou duas frases.
+        objectives:  Passos separados por ';'. Ex: "Chegar a Luminas; Entregar
+                     a carta ao regente". Deixe vazio se for um passo só.
+        giver:       Quem encomendou (nome do NPC).
+        reward:      O que foi combinado ('200 po e a espada do pai dela').
+    """
+    titulo = (title or "").strip()
+    if not titulo:
+        return "⚠️ A missão precisa de um título."
+
+    chave = _chave_missao(titulo)
+    if chave in _missoes():
+        return (f"⚠️ Já existe a missão '{titulo}'. Use update_quest_objective() "
+                f"para marcar progresso ou complete_quest() para encerrá-la.")
+
+    passos = [o.strip() for o in (objectives or "").split(";") if o.strip()]
+    _missoes()[chave] = {
+        "titulo":     titulo,
+        "descricao":  description,
+        "status":     "ativa",
+        "objetivos":  [{"texto": o, "feito": False} for o in passos],
+        "quem_deu":   giver,
+        "recompensa": reward,
+        "cap_inicio": memory.campaign.get("chapter", 1),
+    }
+    memory.save_campaign()
+
+    linhas = [f"📜 Missão aceita: **{titulo}**"]
+    if giver:
+        linhas.append(f"   De: {giver}")
+    for o in passos:
+        linhas.append(f"   ☐ {o}")
+    if reward:
+        linhas.append(f"   Recompensa combinada: {reward}")
+    return "\n".join(linhas)
+
+
+def update_quest_objective(title: str, objective: str, done: bool = True) -> str:
+    """
+    Marca (ou desmarca) um objetivo de uma missão.
+
+    Args:
+        title:     Título da missão.
+        objective: Texto do objetivo, ou parte dele — casa por trecho.
+        done:      True para concluir, False para reabrir.
+    """
+    missao = _missoes().get(_chave_missao(title))
+    if not missao:
+        return f"⚠️ Missão '{title}' não encontrada. Veja list_quests()."
+
+    alvo = (objective or "").lower().strip()
+    achou = None
+    for o in missao["objetivos"]:
+        if alvo and alvo in o["texto"].lower():
+            achou = o
+            break
+    if not achou:
+        # Objetivo novo descoberto no meio da missão: registra em vez de
+        # recusar. Missão que só aceita o plano original não sobrevive à mesa.
+        achou = {"texto": objective, "feito": False}
+        missao["objetivos"].append(achou)
+
+    achou["feito"] = bool(done)
+    memory.save_campaign()
+
+    feitos = sum(1 for o in missao["objetivos"] if o["feito"])
+    total  = len(missao["objetivos"])
+    marca  = "☑" if done else "☐"
+    fim = ""
+    if feitos == total and total > 0 and missao["status"] == "ativa":
+        fim = ("\n   ⭐ Todos os objetivos concluídos — encerre com "
+               "complete_quest() e entregue a recompensa.")
+    return (f"{marca} {missao['titulo']}: {achou['texto']}  "
+            f"({feitos}/{total}){fim}")
+
+
+def complete_quest(title: str, outcome: str = "concluida", notes: str = "") -> str:
+    """
+    Encerra uma missão.
+
+    Args:
+        title:   Título da missão.
+        outcome: 'concluida', 'falhou' ou 'abandonada'.
+        notes:   Como terminou (uma linha) — fica no registro.
+    """
+    missao = _missoes().get(_chave_missao(title))
+    if not missao:
+        return f"⚠️ Missão '{title}' não encontrada. Veja list_quests()."
+
+    fim = (outcome or "concluida").lower().strip()
+    if fim not in _STATUS_MISSAO or fim == "ativa":
+        return (f"⚠️ Desfecho '{outcome}' inválido. Use: concluida, falhou "
+                f"ou abandonada.")
+
+    missao["status"]   = fim
+    missao["cap_fim"]  = memory.campaign.get("chapter", 1)
+    if notes:
+        missao["desfecho"] = notes
+    memory.save_campaign()
+
+    icone = {"concluida": "🏆", "falhou": "💀", "abandonada": "🚪"}[fim]
+    linha = f"{icone} Missão **{missao['titulo']}** — {fim}."
+    if fim == "concluida" and missao.get("recompensa"):
+        linha += (f"\n   Recompensa combinada: {missao['recompensa']} "
+                  f"— entregue com add_item()/modify_currency().")
+    if notes:
+        linha += f"\n   {notes}"
+    return linha
+
+
+def list_quests(include_closed: bool = False) -> str:
+    """
+    Lista as missões. Por padrão só as ativas — é o que o jogador quer saber
+    quando pergunta "o que a gente tinha que fazer mesmo?".
+
+    Args:
+        include_closed: True para incluir concluídas, falhadas e abandonadas.
+    """
+    todas = _missoes()
+    if not todas:
+        return "Nenhuma missão registrada."
+
+    ativas  = [m for m in todas.values() if m["status"] == "ativa"]
+    fechadas = [m for m in todas.values() if m["status"] != "ativa"]
+
+    linhas = []
+    if ativas:
+        linhas.append("📜 Missões ativas:")
+        for m in ativas:
+            feitos = sum(1 for o in m["objetivos"] if o["feito"])
+            total  = len(m["objetivos"])
+            cabeca = f"  • **{m['titulo']}**"
+            if total:
+                cabeca += f"  ({feitos}/{total})"
+            if m.get("quem_deu"):
+                cabeca += f" — de {m['quem_deu']}"
+            linhas.append(cabeca)
+            for o in m["objetivos"]:
+                linhas.append(f"      {'☑' if o['feito'] else '☐'} {o['texto']}")
+    else:
+        linhas.append("Nenhuma missão ativa.")
+
+    if include_closed and fechadas:
+        linhas.append("\nEncerradas:")
+        for m in fechadas:
+            icone = {"concluida": "🏆", "falhou": "💀", "abandonada": "🚪"}.get(
+                m["status"], "•")
+            linhas.append(f"  {icone} {m['titulo']} — {m['status']}")
+    elif fechadas:
+        linhas.append(f"\n({len(fechadas)} encerrada(s) — "
+                      f"list_quests(include_closed=True) para ver)")
+    return "\n".join(linhas)
+
+
+def get_quest(title: str) -> str:
+    """
+    Detalhe de uma missão: objetivos, quem encomendou, recompensa, desfecho.
+
+    Args:
+        title: Título da missão.
+    """
+    missao = _missoes().get(_chave_missao(title))
+    if not missao:
+        return f"⚠️ Missão '{title}' não encontrada. Veja list_quests()."
+    linhas = [f"📜 **{missao['titulo']}** ({missao['status']})",
+              f"   {missao.get('descricao', '')}"]
+    if missao.get("quem_deu"):
+        linhas.append(f"   Encomendada por: {missao['quem_deu']}")
+    for o in missao["objetivos"]:
+        linhas.append(f"   {'☑' if o['feito'] else '☐'} {o['texto']}")
+    if missao.get("recompensa"):
+        linhas.append(f"   Recompensa: {missao['recompensa']}")
+    if missao.get("desfecho"):
+        linhas.append(f"   Desfecho: {missao['desfecho']}")
+    linhas.append(f"   Começou no capítulo {missao.get('cap_inicio', '?')}"
+                  + (f", terminou no {missao['cap_fim']}" if missao.get("cap_fim") else ""))
+    return "\n".join(linhas)
+
+
+# ---------------------------------------------------------------------------
+# Atitude de NPC — a memória social da campanha
+# ---------------------------------------------------------------------------
+#
+# O que um NPC achava do grupo não existia em lugar nenhum. Ficava no texto
+# livre de `notes` (se o mestre escrevesse) ou na cabeça dele — ou seja, na
+# prática se perdia. Salvar o ferreiro depois virava um "obrigado" e nada mais;
+# roubar dele também não custava nada dez cenas depois.
+#
+# Aqui vira NÚMERO, de -100 a +100, com um rótulo derivado. O número é o que
+# sobrevive à conversa; o rótulo é o que o mestre lê.
+#
+# Vale em QUALQUER campanha, não só D&D: atitude é matéria de romance, de
+# mistério e de faroeste tanto quanto de masmorra.
+
+_FAIXAS_ATITUDE = (
+    (-100, -60, "hostil",       "Ataca, denuncia ou sabota se puder"),
+    ( -59, -20, "desconfiado",  "Recusa favores, cobra caro, vigia"),
+    ( -19,  19, "neutro",       "Trata como estranho"),
+    (  20,  59, "amistoso",     "Ajuda quando é barato, dá desconto"),
+    (  60, 100, "leal",         "Arrisca-se pelo grupo"),
+)
+
+
+def _faixa_atitude(valor: int):
+    for baixo, alto, rotulo, conduta in _FAIXAS_ATITUDE:
+        if baixo <= valor <= alto:
+            return rotulo, conduta
+    return "neutro", "Trata como estranho"
+
+
+def atitude_de(char: dict) -> int:
+    """Atitude atual de um personagem (0 quando nunca foi mexida)."""
+    try:
+        return max(-100, min(100, int(char.get("atitude", 0) or 0)))
+    except (TypeError, ValueError):
+        return 0
+
+
+def adjust_attitude(name: str, delta: int, reason: str = "") -> str:
+    """
+    Move a atitude de um NPC em relação ao grupo. Chame quando o grupo fizer
+    algo que um NPC notaria: cumprir a palavra, trair, salvar, roubar, humilhar.
+
+    A escala vai de -100 (hostil) a +100 (leal). Sugestão de peso:
+      ±5   cortesia, uma piada boa, uma grosseria
+      ±15  um favor pequeno cumprido, uma promessa quebrada
+      ±30  salvar a vida, roubar, entregar às autoridades
+      ±50  traição grave ou sacrifício pelo NPC
+
+    Args:
+        name:   Nome do NPC.
+        delta:  Quanto somar (negativo para piorar).
+        reason: O que causou a mudança — fica registrado na ficha.
+    """
+    key  = memory.char_key(name)
+    char = memory.campaign["characters"].get(key)
+    if not char:
+        return (f"Personagem '{name}' não encontrado. "
+                f"Use save_character primeiro — atitude é memória, e memória "
+                f"precisa de alguém para lembrar.")
+    try:
+        d = int(delta)
+    except (TypeError, ValueError):
+        return "⚠️ Informe delta como número inteiro (ex: -15, 30)."
+
+    antes  = atitude_de(char)
+    depois = max(-100, min(100, antes + d))
+    char["atitude"] = depois
+
+    # Histórico curto: o mestre precisa saber POR QUE alguém odeia o grupo,
+    # não só que odeia. Cinco entradas bastam para a cena; mais que isso é
+    # peso morto no contexto.
+    if reason:
+        hist = char.setdefault("atitude_historico", [])
+        hist.append({"delta": d, "motivo": reason,
+                     "cap": memory.campaign.get("chapter", 1)})
+        del hist[:-5]
+
+    r_antes, _        = _faixa_atitude(antes)
+    r_depois, conduta = _faixa_atitude(depois)
+    seta   = "📈" if d > 0 else "📉"
+    motivo = f" — {reason}" if reason else ""
+    linha  = (f"{seta} {char['name']}: atitude {antes:+d} → **{depois:+d}** "
+              f"({r_depois}){motivo}")
+    if r_antes != r_depois:
+        linha += f"\n   ⚡ Mudou de faixa: {r_antes} → **{r_depois}**. {conduta}."
+    memory.save_campaign()
+    return linha
+
+
+def get_attitude(name: str) -> str:
+    """
+    Mostra a atitude de um NPC e o que a construiu.
+
+    Args:
+        name: Nome do NPC.
+    """
+    char = memory.campaign["characters"].get(memory.char_key(name))
+    if not char:
+        return f"Personagem '{name}' não encontrado."
+    valor           = atitude_de(char)
+    rotulo, conduta = _faixa_atitude(valor)
+    linhas = [f"{char['name']}: **{valor:+d}** ({rotulo}) — {conduta}."]
+    hist = char.get("atitude_historico") or []
+    if hist:
+        linhas.append("   Como chegou aí:")
+        for h in hist:
+            linhas.append(f"     {h.get('delta', 0):+d}  {h.get('motivo', '')} "
+                          f"(cap. {h.get('cap', '?')})")
+    return "\n".join(linhas)
+
+
+def list_attitudes() -> str:
+    """Todos os NPCs que já formaram opinião sobre o grupo, do pior ao melhor."""
+    com_opiniao = [
+        (atitude_de(c), c) for c in memory.campaign["characters"].values()
+        if c.get("atitude") not in (None, 0)
+    ]
+    if not com_opiniao:
+        return "Nenhum NPC formou opinião sobre o grupo ainda."
+    com_opiniao.sort(key=lambda par: par[0])
+    linhas = []
+    for valor, c in com_opiniao:
+        rotulo, _ = _faixa_atitude(valor)
+        linhas.append(f"  {valor:+4d}  {c['name']} ({rotulo})")
+    return "Atitude dos NPCs em relação ao grupo:\n" + "\n".join(linhas)
+
+
+# ---------------------------------------------------------------------------
 # Contexto dinâmico por cena (mais barato que get_full_context)
 # ---------------------------------------------------------------------------
 
@@ -459,6 +800,14 @@ def get_scene_context(extra_characters: str = "", extra_locations: str = "") -> 
         f"[Cap.{c['chapter']} | {c['current_location'] or 'local desconhecido'}]\n"
         f"Cena: {c['current_scene'] or 'não definida'}"
     )
+
+    # Relógio: sem ele na cena o agente não tem como saber que anoiteceu nem
+    # há quanto tempo ninguém dorme — e voltaria a tratar descanso como grátis.
+    rel = c.get("relogio")
+    if rel:
+        from rpg.tools_dnd import _periodo
+        h = int(rel.get("hora", 8) or 8)
+        parts.append(f"Tempo: Dia {rel.get('dia', 1)}, {h:02d}h ({_periodo(h)})")
 
     # Resumo (só as primeiras 3 linhas para economizar tokens)
     summary = c.get("story_summary", "")
@@ -539,6 +888,33 @@ def get_scene_context(extra_characters: str = "", extra_locations: str = "") -> 
             if loc.get("details"):
                 lines.append(f"  Detalhes: {loc['details'][:80]}")
         parts.append("Locais:\n" + "\n".join(lines))
+
+    # Missões ativas — o jogador pergunta "o que a gente tinha que fazer?" e a
+    # resposta não pode depender de o agente lembrar de vinte cenas atrás.
+    ativas = [m for m in (c.get("quests") or {}).values()
+              if m.get("status") == "ativa"]
+    if ativas:
+        linhas = []
+        for m in ativas[:5]:
+            feitos = sum(1 for o in m.get("objetivos", []) if o.get("feito"))
+            total  = len(m.get("objetivos", []))
+            passo  = next((o["texto"] for o in m.get("objetivos", [])
+                           if not o.get("feito")), "")
+            linhas.append(f"• {m['titulo']} ({feitos}/{total})"
+                          + (f" → falta: {passo}" if passo else ""))
+        parts.append("Missões ativas:\n" + "\n".join(linhas))
+
+    # Quem já formou opinião sobre o grupo. Só os que saíram do neutro — o
+    # resto seria ruído.
+    opinioes = [
+        (atitude_de(ch), ch) for ch in c["characters"].values()
+        if ch.get("atitude") not in (None, 0)
+    ]
+    if opinioes:
+        opinioes.sort(key=lambda par: par[0])
+        parts.append("Atitude dos NPCs: " + " | ".join(
+            f"{ch['name']} {valor:+d} ({_faixa_atitude(valor)[0]})"
+            for valor, ch in opinioes[:8]))
 
     # Flags ativas
     if c["quest_flags"]:
@@ -726,6 +1102,16 @@ ALL_TOOLS = [
     # Diário
     add_diary_entry,
     get_diary,
+    # Onda 4 — missões como objetos (qualquer estilo de campanha)
+    add_quest,
+    update_quest_objective,
+    complete_quest,
+    list_quests,
+    get_quest,
+    # Onda 4 — atitude de NPC (idem)
+    adjust_attitude,
+    get_attitude,
+    list_attitudes,
     # Contexto (dinâmico e completo)
     get_scene_context,
     get_full_context,

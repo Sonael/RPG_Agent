@@ -1034,6 +1034,46 @@ async function refreshMemory() {
   } catch (_) { }
 }
 
+// Relógio de mundo (onda 4). Campanha que nunca chamou advance_time() não
+// tem `relogio` — a linha inteira some, em vez de mostrar um "Dia 1" falso.
+const _PERIODOS_DIA = [[0, 6, 'madrugada'], [6, 12, 'manhã'],
+                       [12, 18, 'tarde'], [18, 24, 'noite']];
+
+function renderTempo(relogio) {
+  const linha = document.getElementById('sb-tempo-linha');
+  const alvo  = document.getElementById('sb-tempo');
+  if (!linha || !alvo) return;
+  if (!relogio || relogio.dia === undefined) { linha.classList.add('hidden'); return; }
+  const h = Number(relogio.hora || 0);
+  const p = (_PERIODOS_DIA.find(([a, b]) => h >= a && h < b) || [0, 0, ''])[2];
+  alvo.textContent = `Dia ${relogio.dia}, ${String(h).padStart(2, '0')}h · ${p}`;
+  linha.classList.remove('hidden');
+}
+
+// Missões ativas, com o progresso dos objetivos. As encerradas ficam de fora:
+// a barra lateral é "o que fazer agora", não histórico — para isso há o diário.
+function renderMissoes(quests) {
+  const secao = document.getElementById('sb-missoes-secao');
+  const alvo  = document.getElementById('sb-missoes');
+  if (!secao || !alvo) return;
+
+  const ativas = (quests || []).filter(q => q && q.status === 'ativa');
+  if (!ativas.length) { secao.classList.add('hidden'); alvo.innerHTML = ''; return; }
+
+  alvo.innerHTML = ativas.map(q => {
+    const objs   = q.objetivos || [];
+    const feitos = objs.filter(o => o.feito).length;
+    const passos = objs.map(o =>
+      `<div class="missao-passo ${o.feito ? 'feito' : ''}">`
+      + `${o.feito ? '☑' : '☐'} ${escapeHtml(o.texto || '')}</div>`).join('');
+    const contador = objs.length ? `<span class="missao-contagem">${feitos}/${objs.length}</span>` : '';
+    const dono = q.quem_deu ? `<div class="missao-dono">de ${escapeHtml(q.quem_deu)}</div>` : '';
+    return `<div class="missao-item"><div class="missao-titulo">`
+         + `${escapeHtml(q.titulo || '')}${contador}</div>${dono}${passos}</div>`;
+  }).join('');
+  secao.classList.remove('hidden');
+}
+
 function renderMemory(mem) {
   // Normaliza campos que podem faltar em dados antigos/parciais — sem isso,
   // um Object.keys(undefined) abortaria toda a renderização da sidebar.
@@ -1050,6 +1090,9 @@ function renderMemory(mem) {
   document.getElementById('sb-summary').textContent = mem.story_summary || 'Nenhum resumo ainda.';
 
   renderTurnTracker(mem.combat_state);
+
+  renderTempo(mem.relogio);
+  renderMissoes(mem.quests);
 
   const fEl = document.getElementById('sb-flags');
   fEl.innerHTML = !Object.keys(mem.quest_flags).length ? '<span class="empty-state">Nenhuma observação.</span>' :

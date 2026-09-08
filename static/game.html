@@ -35,7 +35,7 @@
        Sem isso, a narração da IA (ou texto injetado) poderia conter
        <script>/<img onerror> e executar — XSS. -->
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.7/dist/purify.min.js"></script>
-  <link rel="stylesheet" href="/static/css/style.css?v=44">
+  <link rel="stylesheet" href="/static/css/style.css?v=45">
 </head>
 
 <body class="game-page">
@@ -67,6 +67,13 @@
                 style="display:flex;justify-content:space-between;font-family: 'Lora', serif; font-size:13px;margin-bottom:5px;">
                 <span style="color:var(--text-main); font-weight: 600;">Local:</span>
                 <span id="sb-location" style="color:var(--text-muted); text-align:right;">—</span>
+              </div>
+              <!-- Relógio de mundo. Some quando a campanha nunca chamou
+                   advance_time() — nem toda mesa quer contar as horas. -->
+              <div id="sb-tempo-linha" class="hidden"
+                style="display:flex;justify-content:space-between;font-family:'Lora',serif;font-size:13px;">
+                <span style="color:var(--text-main); font-weight: 600;">Tempo:</span>
+                <span id="sb-tempo" style="color:var(--text-muted); text-align:right;">—</span>
               </div>
             </div>
 
@@ -129,6 +136,14 @@
               <div id="sb-summary"
                 style="font-family: 'Lora', serif; font-size: 14px; line-height: 1.6; text-align: justify; color: var(--text-muted);">
                 —</div>
+            </div>
+
+            <!-- Missões. O painel inteiro some sem missão registrada: a
+                 onda 4 é aditiva e campanha antiga não pode ganhar uma seção
+                 vazia do nada. -->
+            <div id="sb-missoes-secao" class="sb-section hidden" style="margin-top: 20px;">
+              <h3 class="sb-section-title">MISSÕES</h3>
+              <div id="sb-missoes"></div>
             </div>
 
             <div class="sb-section" style="margin-top: 20px;">
@@ -363,7 +378,7 @@
   </div>
 
   <script src="/static/js/utils.js?v=10"></script>
-  <script src="/static/js/game.js?v=26"></script>
+  <script src="/static/js/game.js?v=27"></script>
   <script src="/static/js/combat.js?v=15"></script>
 
   <script>

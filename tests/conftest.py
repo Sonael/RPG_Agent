@@ -119,8 +119,14 @@ def campanha():
         "is_active": False, "initiative_order": [], "current_turn_index": 0,
         "round": 1, "turn_resolved": False, "npc_strategies": {},
         "turn_auto_advanced": False, "turn_token": 0, "log": [], "result": None,
-        "turn_economy": {"acao_usada": False, "bonus_usada": False},
+        "turn_economy": {"acao_usada": False, "bonus_usada": False,
+                         "movimento_usado": False},
     }
+    # Estado de mundo da onda 4. Sem zerar aqui, uma missão criada num teste
+    # aparecia no seguinte — e a falha saía no teste errado, longe da causa.
+    memory.campaign["quests"] = {}
+    memory.campaign["lojas"]  = {}
+    memory.campaign.pop("relogio", None)
     return memory.campaign
 
 

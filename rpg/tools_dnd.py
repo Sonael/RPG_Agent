@@ -2442,16 +2442,21 @@ def _concentration_save(char: dict, dano: int) -> str:
     magia = sheet["concentracao"].get("magia", "magia")
     dc    = max(10, dano // 2)
     mod   = _modifier(sheet.get("constituicao", 10))
-    d20   = random.randint(1, 20)
+    # Exaustão 3+: desvantagem em testes de resistência. Este é o único save
+    # que o MOTOR rola (os demais chegam com o d20 já rolado pelo jogador),
+    # então é o único em que dá para cobrar a regra em vez de só avisar.
+    exausto = _exaustao(sheet) >= 3
+    d20, log_d20 = _roll_d20_with_adv(False, exausto)
     total = d20 + mod
     sinal = "+" if mod >= 0 else ""
+    marca = " (desvantagem: exaustão)" if exausto else ""
 
     if total >= dc:
-        return (f"🌀 Concentração ({magia}): 🎲 {d20}{sinal}{mod} = {total} "
-                f"vs CD {dc} → ✅ mantida")
+        return (f"🌀 Concentração ({magia}): 🎲 {log_d20}{sinal}{mod} = {total} "
+                f"vs CD {dc}{marca} → ✅ mantida")
     quebra = _break_concentration(char, f"falhou no teste CD {dc}")
-    return (f"🌀 Concentração ({magia}): 🎲 {d20}{sinal}{mod} = {total} "
-            f"vs CD {dc} → ❌ FALHOU\n   {quebra}")
+    return (f"🌀 Concentração ({magia}): 🎲 {log_d20}{sinal}{mod} = {total} "
+            f"vs CD {dc}{marca} → ❌ FALHOU\n   {quebra}")
 
 
 # ── Aplicação de dano — caminho único de todo dano do jogo ─────────────────
@@ -4164,6 +4169,13 @@ def make_skill_check(
     # Condições forçam desvantagem nos testes
     if _has_condition_effect(char, "check_disadvantage"):
         disadvantage = True
+    # Exaustão nível 1+: desvantagem em testes de perícia e atributo.
+    if _exaustao(s) >= 1:
+        disadvantage = True
+    # Sobrecarga pesa em Força, Destreza e Constituição — não em Inteligência,
+    # Sabedoria ou Carisma: a mochila atrapalha o corpo, não o raciocínio.
+    if attr_key in ("forca", "destreza", "constituicao")             and _estado_de_carga(char)[0] != "livre":
+        disadvantage = True
 
     attr_val = s[attr_key]
     mod      = _modifier(attr_val)
@@ -4257,20 +4269,40 @@ def social_check(
     is_proficient = skill_lower in PROF_BY_CLASS.get(classe, set())
     total_mod    = mod + (prof if is_proficient else 0)
 
+    # A ATITUDE DO ALVO mexe na CD. É o que faz a memória social ter peso
+    # mecânico: convencer quem te deve a vida não pode custar o mesmo que
+    # convencer quem você roubou. Cada 20 pontos de atitude valem 1 de CD,
+    # com teto de ±5 — o suficiente para importar, longe de decidir sozinho.
+    ajuste_atitude, alvo_rotulo = 0, ""
+    if target_name:
+        from rpg.tools import atitude_de as _atitude, _faixa_atitude as _faixa
+        alvo = memory.campaign["characters"].get(memory.char_key(target_name))
+        if alvo:
+            valor = _atitude(alvo)
+            if valor:
+                ajuste_atitude = max(-5, min(5, -(valor // 20)))
+                alvo_rotulo    = _faixa(valor)[0]
+    dc_efetiva = max(1, dc + ajuste_atitude)
+
     d20          = max(1, min(20, int(player_roll)))
     total        = d20 + total_mod
     sign         = "+" if total_mod >= 0 else ""
 
     critico      = d20 == 20
     falha_critica= d20 == 1
-    sucesso      = critico or (not falha_critica and total >= dc)
+    sucesso      = critico or (not falha_critica and total >= dc_efetiva)
 
     target_str   = f" com {target_name}" if target_name else ""
+    if ajuste_atitude:
+        nota_atitude = (f"  (base {dc} {ajuste_atitude:+d} — {target_name} está "
+                        f"{alvo_rotulo})")
+    else:
+        nota_atitude = ""
     prof_tag     = " (com prof.)" if is_proficient else ""
     skill_cap    = skill.capitalize()
 
     result = (
-        f"🎭 Teste de {skill_cap}{prof_tag} — CD {dc}\n"
+        f"🎭 Teste de {skill_cap}{prof_tag} — CD {dc_efetiva}{nota_atitude}\n"
         f"   {char['name']}{target_str}: d20={d20} {sign}{total_mod}(mod) = **{total}**\n"
     )
     if critico:
@@ -4278,9 +4310,9 @@ def social_check(
     elif falha_critica:
         result += "   💀 FALHA CRÍTICA! Falha total — reação negativa ou hostil."
     elif sucesso:
-        result += f"   ✅ SUCESSO! ({total} ≥ CD {dc})"
+        result += f"   ✅ SUCESSO! ({total} ≥ CD {dc_efetiva})"
     else:
-        result += f"   ❌ FALHA. ({total} < CD {dc})"
+        result += f"   ❌ FALHA. ({total} < CD {dc_efetiva})"
 
     memory.save_campaign()
     return result
@@ -4460,6 +4492,17 @@ def attack_roll(
     if _recusa_alcance:
         return _recusa_alcance
     if _desv_alcance:
+        disadvantage = True
+
+    # Exaustão nível 3+: desvantagem em ataques (e em saves, ver
+    # resolve_saving_throw). É o degrau em que ficar de pé sem dormir começa
+    # a custar a luta, não só a perícia.
+    if _exaustao(attacker.get("sheet") or {}) >= 3:
+        disadvantage = True
+
+    # Sobrecarga: desvantagem em ataques. É o que faz o saque ser uma ESCOLHA
+    # — levar tudo passa a custar a próxima luta.
+    if _estado_de_carga(attacker)[0] != "livre":
         disadvantage = True
 
     sa = attacker["sheet"]
@@ -5747,6 +5790,606 @@ def grant_xp(char_name: str, amount: int, reason: str = "") -> str:
     return result
 
 
+# ===========================================================================
+# CARGA E LOJA
+# ---------------------------------------------------------------------------
+# O inventário era uma lista sem peso e sem preço: dava para carregar oito
+# armaduras de placas e uma bigorna, e "comprar" era o mestre digitar um
+# número de ouro de cabeça. Duas consequências chatas — saque nunca era uma
+# ESCOLHA (leva tudo), e o preço de um item variava conforme o humor da cena.
+#
+# PESO vem do SRD quando o item existe lá (armas e armaduras trazem `weight`
+# e `cost` de verdade), e de uma tabela curta para o resto. Em quilos, porque
+# a mesa é em português — o SRD dá libras e a conversão é feita aqui.
+#
+# CAPACIDADE segue o 5e: FOR × 7,5 kg. Acima da metade disso o personagem
+# fica SOBRECARREGADO (desvantagem em testes e ataques de FOR/DES/CON);
+# acima do total, não anda.
+# ===========================================================================
+
+_LB_PARA_KG = 0.4536
+
+# Fallback para o que não está no SRD ou não tem peso lá. Só o que aparece de
+# verdade numa mesa — inventar uma tabela completa seria peso morto.
+_PESO_PADRAO_KG = {
+    "poção": 0.25, "pocao": 0.25, "frasco": 0.25, "ampola": 0.25,
+    "pergaminho": 0.05, "rolo": 0.05, "livro": 2.3, "grimório": 1.4,
+    "corda": 4.5, "tocha": 0.5, "lampião": 0.9, "lanterna": 0.9,
+    "ração": 0.9, "racao": 0.9, "odre": 2.3, "saco": 0.2,
+    "chave": 0.05, "moeda": 0.01, "gema": 0.01, "anel": 0.02,
+    "amuleto": 0.5, "escudo": 2.7, "elmo": 1.4, "manto": 1.8,
+    "armadura": 9.0, "espada": 1.4, "adaga": 0.5, "arco": 0.9,
+    "machado": 2.0, "martelo": 1.4, "lança": 1.4, "besta": 2.3,
+    "flecha": 0.05, "virote": 0.07,
+}
+
+
+def _peso_do_srd(nome: str) -> float | None:
+    """Peso em kg vindo do SRD (armas e armaduras trazem 'weight'). None se não achar."""
+    from rpg.open5e import http as _req
+    for rota in ("weapons", "armor"):
+        try:
+            r = _req.get(f"https://api.open5e.com/v1/{rota}/",
+                         params={"search": nome, "limit": 3}, timeout=4)
+            if not r.ok:
+                continue
+            for item in (r.json().get("results") or []):
+                bruto = (item.get("weight") or "").strip()
+                if not bruto:
+                    continue
+                numero = "".join(c for c in bruto if c.isdigit() or c == ".")
+                if numero:
+                    return round(float(numero) * _LB_PARA_KG, 2)
+        except Exception:
+            continue
+    return None
+
+
+def _peso_do_item(item: dict) -> float:
+    """
+    Peso de UMA unidade, em kg. A ordem importa: o que o mestre gravou no
+    item manda; depois o SRD; depois a tabela; e 0,5 kg como último recurso —
+    um número pequeno e honesto, que não faz a mochila estourar sozinha.
+    """
+    if item.get("peso") is not None:
+        try:
+            return max(0.0, float(item["peso"]))
+        except (TypeError, ValueError):
+            pass
+    nome = _norm_txt(item.get("nome", ""))
+    for termo, kg in _PESO_PADRAO_KG.items():
+        if _norm_txt(termo) in nome:
+            return kg
+    return 0.5
+
+
+def _capacidade_kg(sheet: dict) -> float:
+    """Capacidade de carga do 5e: FOR × 15 lb, em quilos."""
+    return round(int(sheet.get("forca", 10) or 10) * 15 * _LB_PARA_KG, 1)
+
+
+def _carga_atual(char: dict) -> float:
+    total = 0.0
+    for item in (char.get("inventario") or []):
+        if not isinstance(item, dict):
+            continue
+        total += _peso_do_item(item) * max(0, int(item.get("qtd", 1) or 1))
+    return round(total, 2)
+
+
+def _estado_de_carga(char: dict) -> tuple[str, float, float]:
+    """('livre'|'sobrecarregado'|'imovel', carga, capacidade)."""
+    sheet = char.get("sheet") or {}
+    carga = _carga_atual(char)
+    cap   = _capacidade_kg(sheet)
+    if carga > cap:
+        return "imovel", carga, cap
+    if carga > cap / 2:
+        return "sobrecarregado", carga, cap
+    return "livre", carga, cap
+
+
+def check_encumbrance(char_name: str) -> str:
+    """
+    Quanto o personagem está carregando e o que isso custa.
+
+    Acima de METADE da capacidade: sobrecarregado (desvantagem em ataques e
+    testes de Força, Destreza e Constituição). Acima do total: não anda.
+
+    Args:
+        char_name: Nome do personagem.
+    """
+    char, err = _get_char(char_name, allow_dead=True)
+    if not char:
+        return err
+    estado, carga, cap = _estado_de_carga(char)
+    barra = {"livre": "✅", "sobrecarregado": "⚠️", "imovel": "🛑"}[estado]
+    linhas = [f"{barra} {char['name']}: **{carga:.1f} kg** de {cap:.1f} kg "
+              f"(FOR {(char.get('sheet') or {}).get('forca', 10)}) — {estado}"]
+    if estado == "sobrecarregado":
+        linhas.append("   Desvantagem em ataques e testes de FOR/DES/CON.")
+    elif estado == "imovel":
+        linhas.append("   Carga acima da capacidade — não consegue se mover.")
+    pesados = sorted(
+        ((_peso_do_item(i) * int(i.get("qtd", 1) or 1), i) for i in (char.get("inventario") or [])
+         if isinstance(i, dict)),
+        key=lambda par: par[0], reverse=True)[:5]
+    if pesados:
+        linhas.append("   Mais pesados:")
+        for kg, i in pesados:
+            if kg <= 0:
+                continue
+            q = int(i.get("qtd", 1) or 1)
+            linhas.append(f"     {kg:5.1f} kg  {i.get('nome')}" + (f" ×{q}" if q > 1 else ""))
+    return "\n".join(linhas)
+
+
+# ── Loja ───────────────────────────────────────────────────────────────────
+
+def _lojas() -> dict:
+    return memory.campaign.setdefault("lojas", {})
+
+
+def _preco_do_srd(nome: str) -> int | None:
+    """Preço em PEÇAS DE OURO vindo do SRD. None quando não há."""
+    from rpg.open5e import http as _req
+    for rota in ("weapons", "armor"):
+        try:
+            r = _req.get(f"https://api.open5e.com/v1/{rota}/",
+                         params={"search": nome, "limit": 3}, timeout=4)
+            if not r.ok:
+                continue
+            for item in (r.json().get("results") or []):
+                bruto = (item.get("cost") or "").strip().lower()
+                if not bruto:
+                    continue
+                numero = "".join(c for c in bruto if c.isdigit() or c == ".")
+                if not numero:
+                    continue
+                valor = float(numero)
+                if "sp" in bruto:      # prata
+                    valor /= 10
+                elif "cp" in bruto:    # cobre
+                    valor /= 100
+                return max(1, int(round(valor)))
+        except Exception:
+            continue
+    return None
+
+
+def open_shop(shop_name: str, items: str, location: str = "") -> str:
+    """
+    Monta uma loja com estoque e preços. O preço sai do SRD quando o item
+    existe lá (armas e armaduras têm custo oficial); informe você mesmo o que
+    o SRD não conhece.
+
+    Args:
+        shop_name: Nome da loja ('Forja do Torbin').
+        items:     Itens separados por ';'. Formato por item:
+                   "nome" ou "nome:preço_em_ouro" ou "nome:preço:quantidade".
+                   Ex: "Espada Longa; Poção de Cura:50:3; Corda de Seda:10"
+        location:  Onde fica (padrão: o local atual do grupo).
+    """
+    nome_loja = (shop_name or "").strip()
+    if not nome_loja:
+        return "⚠️ A loja precisa de um nome."
+
+    estoque = []
+    sem_preco = []
+    for bruto in (items or "").split(";"):
+        bruto = bruto.strip()
+        if not bruto:
+            continue
+        partes = [p.strip() for p in bruto.split(":")]
+        nome   = partes[0]
+        if not nome:
+            continue
+        preco = None
+        if len(partes) > 1 and partes[1]:
+            try:
+                preco = max(0, int(float(partes[1])))
+            except ValueError:
+                preco = None
+        if preco is None:
+            preco = _preco_do_srd(nome)
+        if preco is None:
+            sem_preco.append(nome)
+            continue
+        try:
+            qtd = max(1, int(partes[2])) if len(partes) > 2 and partes[2] else 99
+        except ValueError:
+            qtd = 99
+        estoque.append({"nome": nome, "preco": preco, "qtd": qtd})
+
+    if not estoque:
+        return ("⚠️ Nenhum item com preço. O SRD não conhece: "
+                + ", ".join(sem_preco) + ". Informe o preço no formato "
+                "'nome:preço' (ex: 'Amuleto do Corvo:75').") if sem_preco else \
+               "⚠️ Informe ao menos um item."
+
+    _lojas()[_norm_txt(nome_loja)] = {
+        "nome":   nome_loja,
+        "local":  location or memory.campaign.get("current_location", ""),
+        "estoque": estoque,
+    }
+    memory.save_campaign()
+
+    linhas = [f"🏪 **{nome_loja}** aberta"
+              + (f" em {location}" if location else "") + ":"]
+    for i in estoque:
+        q = "" if i["qtd"] >= 99 else f"  (x{i['qtd']})"
+        linhas.append(f"   • {i['nome']} — {i['preco']} po{q}")
+    if sem_preco:
+        linhas.append("   ⚠️ Sem preço (fora do SRD, não entraram): "
+                      + ", ".join(sem_preco))
+    return "\n".join(linhas)
+
+
+def list_shop(shop_name: str) -> str:
+    """
+    Mostra o estoque e os preços de uma loja.
+
+    Args:
+        shop_name: Nome da loja.
+    """
+    loja = _lojas().get(_norm_txt(shop_name))
+    if not loja:
+        abertas = ", ".join(l["nome"] for l in _lojas().values()) or "nenhuma"
+        return f"⚠️ Loja '{shop_name}' não encontrada. Abertas: {abertas}."
+    linhas = [f"🏪 **{loja['nome']}**"
+              + (f" — {loja['local']}" if loja.get("local") else "")]
+    for i in loja["estoque"]:
+        q = "" if i["qtd"] >= 99 else f"  (restam {i['qtd']})"
+        linhas.append(f"   • {i['nome']} — {i['preco']} po{q}")
+    return "\n".join(linhas)
+
+
+def _cobre_total(sheet: dict) -> int:
+    return (int(sheet.get("ouro", 0) or 0) * 100
+            + int(sheet.get("prata", 0) or 0) * 10
+            + int(sheet.get("cobre", 0) or 0))
+
+
+def _pagar(sheet: dict, cobre: int) -> bool:
+    """Debita `cobre` da bolsa, trocando moeda quando preciso. False se falta."""
+    total = _cobre_total(sheet)
+    if total < cobre:
+        return False
+    resto = total - cobre
+    sheet["ouro"]  = resto // 100
+    sheet["prata"] = (resto % 100) // 10
+    sheet["cobre"] = resto % 10
+    return True
+
+
+def buy_item(char_name: str, shop_name: str, item_name: str, quantity: int = 1) -> str:
+    """
+    Compra um item de uma loja: confere o estoque, cobra da bolsa (trocando
+    ouro/prata/cobre sozinho) e põe no inventário.
+
+    Args:
+        char_name: Quem compra.
+        shop_name: Nome da loja.
+        item_name: Item desejado.
+        quantity:  Quantas unidades (padrão 1).
+    """
+    char, err = _get_char(char_name)
+    if not char:
+        return err
+    loja = _lojas().get(_norm_txt(shop_name))
+    if not loja:
+        return f"⚠️ Loja '{shop_name}' não encontrada."
+
+    linha = next((i for i in loja["estoque"]
+                  if _norm_txt(i["nome"]) == _norm_txt(item_name)), None)
+    if not linha:
+        return (f"⚠️ '{item_name}' não está à venda em {loja['nome']}. "
+                f"Use list_shop('{loja['nome']}').")
+
+    try:
+        qtd = max(1, int(quantity))
+    except (TypeError, ValueError):
+        qtd = 1
+    if linha["qtd"] < qtd:
+        return f"⚠️ {loja['nome']} tem só {linha['qtd']}x {linha['nome']}."
+
+    sheet = char["sheet"]
+    custo_cobre = linha["preco"] * 100 * qtd
+    if not _pagar(sheet, custo_cobre):
+        tem = _cobre_total(sheet)
+        return (f"💸 {char['name']} não tem como pagar: "
+                f"{linha['preco'] * qtd} po pedidos, "
+                f"{tem // 100} po e {(tem % 100) // 10} pp na bolsa.")
+
+    linha["qtd"] -= qtd
+    if linha["qtd"] <= 0:
+        loja["estoque"].remove(linha)
+    add_item(char["name"], linha["nome"], qtd)
+
+    estado, carga, cap = _estado_de_carga(char)
+    aviso = ""
+    if estado != "livre":
+        aviso = (f"\n   ⚠️ Carga: {carga:.1f}/{cap:.1f} kg — **{estado}**. "
+                 f"Veja check_encumbrance().")
+    return (f"🪙 {char['name']} comprou {qtd}x {linha['nome']} por "
+            f"{linha['preco'] * qtd} po em {loja['nome']}.\n"
+            f"   Bolsa: {sheet['ouro']} po, {sheet['prata']} pp, {sheet['cobre']} pc{aviso}")
+
+
+def sell_item(char_name: str, shop_name: str, item_name: str, quantity: int = 1) -> str:
+    """
+    Vende um item para uma loja. Pela regra da mesa, a loja paga METADE do
+    preço de tabela — é o que impede o inventário de virar uma torneira de
+    ouro (comprar e revender pelo mesmo valor seria dinheiro de graça).
+
+    Args:
+        char_name: Quem vende.
+        shop_name: Nome da loja.
+        item_name: Item a vender.
+        quantity:  Quantas unidades (padrão 1).
+    """
+    char, err = _get_char(char_name)
+    if not char:
+        return err
+    loja = _lojas().get(_norm_txt(shop_name))
+    if not loja:
+        return f"⚠️ Loja '{shop_name}' não encontrada."
+
+    inv  = char.get("inventario") or []
+    item = next((i for i in inv
+                 if isinstance(i, dict)
+                 and _norm_txt(i.get("nome", "")) == _norm_txt(item_name)), None)
+    if not item:
+        return f"⚠️ {char['name']} não tem '{item_name}'."
+
+    try:
+        qtd = max(1, int(quantity))
+    except (TypeError, ValueError):
+        qtd = 1
+    if int(item.get("qtd", 1) or 1) < qtd:
+        return f"⚠️ {char['name']} tem só {item.get('qtd', 1)}x {item['nome']}."
+
+    na_loja = next((i for i in loja["estoque"]
+                    if _norm_txt(i["nome"]) == _norm_txt(item_name)), None)
+    tabela  = na_loja["preco"] if na_loja else (_preco_do_srd(item["nome"]) or 0)
+    if tabela <= 0:
+        return (f"⚠️ Sem preço de referência para '{item['nome']}'. "
+                f"Ponha o item na loja com open_shop() informando o preço.")
+
+    ganho = max(1, (tabela // 2)) * qtd
+    sheet = char["sheet"]
+    sheet["ouro"] = int(sheet.get("ouro", 0) or 0) + ganho
+
+    item["qtd"] = int(item.get("qtd", 1) or 1) - qtd
+    if item["qtd"] <= 0:
+        inv.remove(item)
+    if na_loja:
+        na_loja["qtd"] = min(99, na_loja["qtd"] + qtd)
+    memory.save_campaign()
+
+    return (f"🪙 {char['name']} vendeu {qtd}x {item_name} por {ganho} po "
+            f"(metade da tabela: {tabela} po) em {loja['nome']}.\n"
+            f"   Bolsa: {sheet['ouro']} po, {sheet.get('prata', 0)} pp, "
+            f"{sheet.get('cobre', 0)} pc")
+
+
+# ===========================================================================
+# RELÓGIO DE MUNDO E EXAUSTÃO
+# ---------------------------------------------------------------------------
+# Sem tempo, descansar era de graça: bastava pedir long_rest() depois de cada
+# luta e o grupo voltava inteiro, infinitas vezes por "dia". O recurso que o
+# 5e usa para dar peso ao dia de aventura — o descanso longo ser um por 24h —
+# não tinha como existir, porque não havia 24h.
+#
+# O relógio é deliberadamente grosso: DIA e HORA, sem minutos. Numa mesa
+# narrativa o que importa é "amanheceu", "a caravana parte ao meio-dia",
+# "vocês estão acordados há 20 horas" — minuto a minuto seria ruído que o
+# mestre teria de inventar a cada turno.
+#
+# EXAUSTÃO é o outro lado: o custo de não dormir, da marcha forçada, da fome.
+# Os seis níveis do 5e, com só os efeitos que o motor consegue mesmo cobrar.
+# ===========================================================================
+
+_PERIODOS = (
+    (0,  6,  "madrugada"),
+    (6,  12, "manhã"),
+    (12, 18, "tarde"),
+    (18, 24, "noite"),
+)
+
+# Nível → (efeito legível, o que o motor cobra)
+EXAUSTAO_EFEITOS = {
+    1: "Desvantagem em testes de perícia e atributo",
+    2: "Deslocamento pela metade — não pode usar a Disparada",
+    3: "Desvantagem em ataques e testes de resistência",
+    4: "PV máximo pela metade",
+    5: "Deslocamento zero — não sai da zona em que está",
+    6: "Morte",
+}
+
+
+def _relogio() -> dict:
+    return memory.campaign.setdefault("relogio", {"dia": 1, "hora": 8})
+
+
+def _periodo(hora: int) -> str:
+    for ini, fim, nome in _PERIODOS:
+        if ini <= hora < fim:
+            return nome
+    return "madrugada"
+
+
+def _agora_em_horas() -> int:
+    """Instante atual como horas absolutas desde o dia 1 — facilita subtrair."""
+    r = _relogio()
+    return int(r.get("dia", 1) or 1) * 24 + int(r.get("hora", 8) or 8)
+
+
+def _hora_legivel() -> str:
+    r = _relogio()
+    h = int(r.get("hora", 8) or 8)
+    return f"Dia {int(r.get('dia', 1) or 1)}, {h:02d}h ({_periodo(h)})"
+
+
+def advance_time(hours: int, reason: str = "") -> str:
+    """
+    Faz o tempo passar no mundo. Chame sempre que a ficção consumir horas:
+    viagem, vigília, pesquisa na biblioteca, espera pelo anoitecer.
+
+    O relógio é o que torna o descanso longo um recurso (um por 24 horas) e o
+    que deixa "amanheceu" ser um fato, não uma escolha de narração.
+
+    Args:
+        hours:  Horas a avançar (1 a 720 — 30 dias).
+        reason: O que consumiu esse tempo (aparece no registro).
+    """
+    try:
+        h = int(hours)
+    except (TypeError, ValueError):
+        return "⚠️ Informe as horas como número inteiro."
+    if h <= 0:
+        return "⚠️ Informe pelo menos 1 hora."
+    if h > 720:
+        return "⚠️ No máximo 720 horas (30 dias) por chamada."
+
+    r     = _relogio()
+    antes = _hora_legivel()
+    total = int(r.get("hora", 8) or 8) + h
+    r["dia"]  = int(r.get("dia", 1) or 1) + total // 24
+    r["hora"] = total % 24
+    memory.save_campaign()
+
+    motivo = f" — {reason}" if reason else ""
+    virou  = "\n   🌅 O dia virou." if total >= 24 else ""
+    return f"🕰️  {antes} → **{_hora_legivel()}**{motivo}{virou}"
+
+
+def get_world_time() -> str:
+    """Que horas são no mundo, e há quanto tempo o grupo não dorme."""
+    linhas = [f"🕰️  {_hora_legivel()}"]
+    agora  = _agora_em_horas()
+    for ch in memory.campaign.get("characters", {}).values():
+        if not memory.is_party_member(ch) or not ch.get("sheet"):
+            continue
+        ultimo = (ch.get("sheet") or {}).get("ultimo_descanso_longo")
+        nome   = ch.get("name", "?")
+        if ultimo is None:
+            linhas.append(f"   • {nome}: ainda não fez descanso longo nesta campanha.")
+            continue
+        horas = agora - int(ultimo)
+        aviso = "  ⚠️ acima de 24h" if horas >= 24 else ""
+        linhas.append(f"   • {nome}: {horas}h desde o último descanso longo{aviso}")
+    exaustos = [
+        f"{c.get('name')} ({(c.get('sheet') or {}).get('exaustao')})"
+        for c in memory.campaign.get("characters", {}).values()
+        if int(((c.get("sheet") or {}).get("exaustao") or 0)) > 0
+    ]
+    if exaustos:
+        linhas.append("   😩 Exaustão: " + ", ".join(exaustos))
+    return "\n".join(linhas)
+
+
+# ── Exaustão ───────────────────────────────────────────────────────────────
+
+def _exaustao(sheet: dict) -> int:
+    try:
+        return max(0, min(6, int(sheet.get("exaustao", 0) or 0)))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _hp_max_efetivo(sheet: dict) -> int:
+    """
+    PV máximo depois da exaustão. Nível 4+ corta pela metade.
+
+    O corte é CALCULADO, nunca gravado em vida_max: gravar destruiria o valor
+    real da ficha e não teria como voltar quando a exaustão baixasse.
+    """
+    bruto = int(sheet.get("vida_max", 0) or 0)
+    return max(1, bruto // 2) if _exaustao(sheet) >= 4 else bruto
+
+
+def add_exhaustion(char_name: str, levels: int = 1, reason: str = "") -> str:
+    """
+    Adiciona níveis de exaustão. É o custo de marcha forçada, noite em claro,
+    fome, sede, frio — e de alguns poderes (o Frenesi do bárbaro).
+
+    Escala 5e:
+      1 Desvantagem em testes de perícia
+      2 Deslocamento pela metade (sem Disparada)
+      3 Desvantagem em ataques e saves
+      4 PV máximo pela metade
+      5 Deslocamento zero
+      6 Morte
+
+    Um descanso longo remove UM nível.
+
+    Args:
+        char_name: Nome do personagem.
+        levels:    Quantos níveis somar (padrão 1).
+        reason:    Por quê (marcha forçada, sem dormir, fome…).
+    """
+    char, err = _get_char(char_name)
+    if not char:
+        return err
+    s     = char["sheet"]
+    antes = _exaustao(s)
+    try:
+        n = max(1, int(levels))
+    except (TypeError, ValueError):
+        n = 1
+    depois = min(6, antes + n)
+    s["exaustao"] = depois
+
+    motivo = f" ({reason})" if reason else ""
+    linhas = [f"😩 {char['name']}: exaustão {antes} → **{depois}**{motivo}"]
+    for nivel in range(1, depois + 1):
+        linhas.append(f"   {nivel}. {EXAUSTAO_EFEITOS[nivel]}")
+
+    if depois >= 6:
+        char["status"] = "morto"
+        s["vida_atual"] = 0
+        linhas.append("   💀 Exaustão nível 6 — o personagem MORRE.")
+        _log_combat_event("death", char["name"], "",
+                          msg=f"{char['name']} morreu de exaustão")
+    elif depois >= 4:
+        # O teto caiu; a vida atual não pode ficar acima dele.
+        teto = _hp_max_efetivo(s)
+        if int(s.get("vida_atual", 0) or 0) > teto:
+            s["vida_atual"] = teto
+            linhas.append(f"   ❤️  PV máximo efetivo agora é {teto} — vida ajustada.")
+
+    memory.save_campaign()
+    return "\n".join(linhas)
+
+
+def remove_exhaustion(char_name: str, levels: int = 1) -> str:
+    """
+    Remove níveis de exaustão (comida quente, magia, uma noite de verdade).
+
+    Args:
+        char_name: Nome do personagem.
+        levels:    Quantos níveis tirar (padrão 1).
+    """
+    char, err = _get_char(char_name)
+    if not char:
+        return err
+    s     = char["sheet"]
+    antes = _exaustao(s)
+    if antes == 0:
+        return f"✅ {char['name']} não está exausto."
+    try:
+        n = max(1, int(levels))
+    except (TypeError, ValueError):
+        n = 1
+    s["exaustao"] = max(0, antes - n)
+    memory.save_campaign()
+    if s["exaustao"] == 0:
+        return f"✅ {char['name']}: exaustão {antes} → **0**. Recuperado."
+    return (f"😌 {char['name']}: exaustão {antes} → **{s['exaustao']}** "
+            f"({EXAUSTAO_EFEITOS[s['exaustao']]}).")
+
+
 # ---------------------------------------------------------------------------
 # 13. Descanso
 # ---------------------------------------------------------------------------
@@ -5858,6 +6501,34 @@ def long_rest(char_name: str) -> str:
         )
 
     s = char["sheet"]
+
+    # UM POR 24 HORAS. Sem o relógio, long_rest() era um botão de vida cheia
+    # que o grupo apertava depois de cada luta — o "dia de aventura" do 5e,
+    # que é o recurso que faz mana e habilidades diárias significarem algo,
+    # simplesmente não existia.
+    agora  = _agora_em_horas()
+    ultimo = s.get("ultimo_descanso_longo")
+    if ultimo is not None and agora - int(ultimo) < 24:
+        faltam = 24 - (agora - int(ultimo))
+        return (
+            f"❌ {char['name']} já descansou nas últimas 24 horas "
+            f"({agora - int(ultimo)}h atrás). Faltam **{faltam}h**.\n"
+            f"   Agora: {_hora_legivel()}. Um descanso longo por dia — é o que\n"
+            f"   faz mana e poderes diários serem recurso.\n"
+            f"   Se o grupo forçar a marcha sem dormir, use "
+            f"add_exhaustion('{char['name']}', 1, 'noite em claro')."
+        )
+
+    # O descanso CONSOME 8 horas do mundo. Avança o relógio uma vez só, no
+    # primeiro personagem a descansar — os outros dormem na mesma noite.
+    if ultimo is None or agora - int(ultimo) >= 24:
+        _grupo_ja_avancou = any(
+            (c.get("sheet") or {}).get("ultimo_descanso_longo") == agora
+            for c in memory.campaign.get("characters", {}).values()
+        )
+        if not _grupo_ja_avancou:
+            advance_time(8, "descanso longo")
+    s["ultimo_descanso_longo"] = _agora_em_horas()
     s["vida_atual"] = s["vida_max"]
     s["mana_atual"] = s["mana_max"]
     s["hit_dice_remaining"] = s.get("nivel", 1)  # Renova dados de vida no descanso longo
@@ -5867,6 +6538,12 @@ def long_rest(char_name: str) -> str:
     temp_perdidos   = _temp_hp(s)
     s["vida_temp"]  = 0
     conc_msg        = _break_concentration(char, "descanso longo")
+
+    # Descanso longo remove UM nível de exaustão (PHB). É o único jeito de
+    # sair dela sem magia — e por isso o relógio importa: sem 24h, sem alívio.
+    _exa_antes = _exaustao(s)
+    if _exa_antes > 0:
+        s["exaustao"] = _exa_antes - 1
 
     if char.get("status") in ("inconsciente", "ferido"):
         char["status"] = "vivo"
@@ -8739,6 +9416,16 @@ DND_TOOLS = [
     set_recharge_ability,
     set_legendary_actions,
     legendary_action,
+    # Onda 4 — relógio, exaustão, carga e loja
+    advance_time,
+    get_world_time,
+    add_exhaustion,
+    remove_exhaustion,
+    check_encumbrance,
+    open_shop,
+    list_shop,
+    buy_item,
+    sell_item,
     # Macro-tools (v4)
     resolve_saving_throw,
 ]

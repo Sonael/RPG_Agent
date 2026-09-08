@@ -153,9 +153,23 @@ def test_roll_dice_fica_em_toda_campanha(romance, conjunto):
 
 
 def test_o_filtro_cobre_o_motor_inteiro():
-    """FERRAMENTAS_SO_DO_MODO_DND deve ser DND_TOOLS menos o carve-out."""
+    """
+    FERRAMENTAS_SO_DO_MODO_DND deve ser DND_TOOLS menos o carve-out.
+
+    O carve-out é escrito à mão AQUI de propósito, em vez de importado de
+    _CARVE_OUT_GENERICAS: importar tornaria o teste tautológico, e a graça
+    dele é justamente obrigar quem mexer no carve-out a passar por este
+    ponto e justificar a exceção.
+
+    Quem está de fora, e por quê:
+      roll_dice      único primitivo de aleatoriedade do sistema; não depende
+                     de ficha e serve a qualquer gênero.
+      advance_time   relógio de mundo não é regra de D&D — um horror precisa
+      get_world_time que anoiteça e um mistério precisa que o prazo corra.
+    """
     todas_dnd = {f.__name__ for f in DND_TOOLS}
-    assert FERRAMENTAS_SO_DO_MODO_DND == todas_dnd - {"roll_dice"}
+    carve_out = {"roll_dice", "advance_time", "get_world_time"}
+    assert FERRAMENTAS_SO_DO_MODO_DND == todas_dnd - carve_out
 
 
 # ---------------------------------------------------------------------------

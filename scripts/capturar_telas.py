@@ -238,6 +238,38 @@ COMBATE_ATIVO = {
     },
 }
 
+# Mundo da onda 4: relógio andando e duas missões na barra lateral.
+MUNDO_ONDA4 = {
+    "relogio": {"dia": 4, "hora": 19},
+    "quests": {
+        "escoltar a princesa elara": {
+            "titulo": "Escoltar a Princesa Elara",
+            "descricao": "Levar Elara a Luminas em segurança.",
+            "status": "ativa",
+            "quem_deu": "Princesa Elara",
+            "recompensa": "200 po",
+            "cap_inicio": 2,
+            "objetivos": [
+                {"texto": "Sair de Oakhaven", "feito": True},
+                {"texto": "Atravessar o Passo de Vhar", "feito": True},
+                {"texto": "Entregar em Luminas", "feito": False},
+            ],
+        },
+        "a divida de torbin": {
+            "titulo": "A dívida de Torbin",
+            "descricao": "O ferreiro deve a agiotas do porto.",
+            "status": "ativa",
+            "quem_deu": "Torbin",
+            "recompensa": "a espada do pai dele",
+            "cap_inicio": 3,
+            "objetivos": [
+                {"texto": "Descobrir quem cobra a dívida", "feito": False},
+            ],
+        },
+    },
+}
+
+
 # Combate COM ZONAS (onda 3): o campo dividido em trilha, cada um em sua zona.
 COMBATE_ZONAS = copy.deepcopy(COMBATE_ATIVO)
 COMBATE_ZONAS["characters"]["natasha"] = {"sheet": {"vida_atual": 21}}
@@ -401,6 +433,14 @@ TELAS = [
      "js": "openGuide()"},
     {"nome": "jogo-sidebar-mobile", "pagina": "/game.html",
      "js": "toggleSidebar()", "viewport": "mobile"},
+
+    {"nome": "jogo-missoes-e-tempo", "pagina": "/game.html",
+     "estado": MUNDO_ONDA4, "espera": 600,
+     # A lateral tem rolagem própria e o painel de missões nasce abaixo da
+     # dobra — sem isto o print sai mostrando o topo, não o que ele retrata.
+     "js": "document.getElementById('sb-missoes-secao')"
+           ".scrollIntoView({block:'center'})",
+     "exigir": "#sb-missoes-secao:not(.hidden)"},
 
     # ── Combate ──────────────────────────────────────────────────────
     {"nome": "combate-regua-de-turnos", "pagina": "/game.html",

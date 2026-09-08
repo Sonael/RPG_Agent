@@ -2146,6 +2146,11 @@ def get_memory_state():
             "round":              1,
         }),
         "conversation_history": c.get("conversation_history", []),
+        # Onda 4 — o que a tela precisa para mostrar mundo e missões.
+        # Campanha antiga não tem essas chaves; o default mantém o front
+        # funcionando sem migração nenhuma.
+        "relogio":          c.get("relogio", {}),
+        "quests":           list((c.get("quests") or {}).values()),
     })
 
 

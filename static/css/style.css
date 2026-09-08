@@ -1330,6 +1330,29 @@ body.combat-on { overflow: hidden; }
 .cbt-ord-sep { color: var(--cbt-gold); }
 
 /* Campo de batalha */
+/* ── Missões na barra lateral (onda 4) ─────────────────────────────────
+   O que o jogador quer da lateral é "o que fazer agora": só missões ativas,
+   com o próximo passo à vista. Histórico é papel do diário. */
+.missao-item {
+  border-left: 2px solid var(--page-edge);
+  padding: 4px 0 6px 8px;
+  margin-bottom: 10px;
+}
+.missao-titulo {
+  font-family: 'Lora', serif; font-size: 13px; font-weight: 600;
+  color: var(--text-main);
+  display: flex; justify-content: space-between; gap: 6px; align-items: baseline;
+}
+.missao-contagem {
+  font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums;
+  flex: 0 0 auto;
+}
+.missao-dono { font-size: 11px; color: var(--text-muted); font-style: italic; }
+.missao-passo { font-size: 12px; color: var(--text-main); margin-top: 3px; }
+/* Objetivo concluído fica apagado, não riscado: riscar sugere "cancelado",
+   e o que aconteceu foi o contrário. */
+.missao-passo.feito { color: var(--text-muted); opacity: 0.7; }
+
 /* ── Faixa de zonas (onda 3) ────────────────────────────────────────────
    O campo é uma TRILHA, não um tabuleiro: as zonas ficam lado a lado na
    ordem em que set_battlefield() as recebeu, e a adjacência é visual —
