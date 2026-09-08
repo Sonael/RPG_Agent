@@ -25,17 +25,27 @@ NODE = shutil.which("node")
 
 
 def _rodar():
+    """
+    Devolve a lista de checks do script. Um erro do próprio runner (node velho
+    demais, script quebrado) vira UM check reprovado em vez de exceção: erro
+    aqui dentro do pytest_generate_tests aborta a COLETA da suíte inteira, e
+    uma verificação de JS não pode derrubar os testes do motor de D&D.
+    """
     with tempfile.TemporaryDirectory() as tmp:
         saida = Path(tmp) / "res.json"
-        proc = subprocess.run(
-            [NODE, str(SCRIPT), f"--json={saida}"],
-            cwd=RAIZ, capture_output=True, text=True, timeout=120,
-        )
-        if not saida.exists():
-            raise RuntimeError(
-                f"o script não gerou resultados (saída {proc.returncode})\n"
-                f"{proc.stdout}\n{proc.stderr}"
+        try:
+            proc = subprocess.run(
+                [NODE, str(SCRIPT), f"--json={saida}"],
+                cwd=RAIZ, capture_output=True, text=True, timeout=120,
             )
+        except subprocess.TimeoutExpired:
+            return [{"label": "o script de JS respondeu a tempo", "passed": False,
+                     "got": "estourou 120s", "expected": "terminar"}]
+        if not saida.exists():
+            detalhe = ((proc.stdout or "") + (proc.stderr or "")).strip()
+            return [{"label": "o script de JS rodou", "passed": False,
+                     "got": f"saída {proc.returncode}\n{detalhe}",
+                     "expected": "resultados em JSON"}]
         return json.loads(saida.read_text(encoding="utf-8"))
 
 
