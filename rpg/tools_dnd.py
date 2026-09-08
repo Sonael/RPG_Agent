@@ -5464,13 +5464,41 @@ def roll_death_save(char_name: str, player_roll: int = 0) -> str:
 # Detecção e identificação de itens mágicos (Open5e)
 # ---------------------------------------------------------------------------
 
-# Palavras que sugerem que um item pode ser mágico
-_MAGIC_ITEM_KEYWORDS = {
-    "mágico", "encantado", "amaldiçoado", "sagrado", "profano", "divino",
-    "arcano", "rúnico", "élfico", "amaldiçoada", "bendito", "abençoado",
+# RAÍZES, não palavras inteiras — e sem acento, porque a comparação passa por
+# _norm_txt.
+#
+# A lista antiga era de palavras completas e SÓ NO MASCULINO: "mágico",
+# "encantado", "rúnico", "sagrado", "arcano", "divino", "abençoado". Em
+# português metade do vocabulário de item mágico é feminino — espada, lâmina,
+# adaga, armadura, coroa, varinha, relíquia — então "Espada Mágica",
+# "Lâmina Rúnica" e "Coroa Sagrada" passavam sem nenhuma conferência.
+# Medido: 7 de 8 pares só detectavam a forma masculina. "amaldiçoada" era a
+# única exceção, acrescentada à mão — sinal de que alguém tropeçou nela e
+# corrigiu só aquele caso.
+#
+# Casar pela raiz resolve gênero e plural de uma vez: "magic" pega mágico,
+# mágica, mágicos, magical.
+_MAGIC_ITEM_ROOTS = (
+    "magic", "encantad", "amaldicoad", "sagrad", "profan", "divin",
+    "arcan", "runic", "elfic", "bendit", "abencoad", "lendari",
     "ancient", "legendary", "of the", "da tempestade", "do fogo", "do caos",
-    "da sombra", "da luz", "da escuridão", "da morte", "da vida",
-}
+    "da sombra", "da luz", "da escuridao", "da morte", "da vida",
+)
+
+# O que denuncia EFEITO MECÂNICO na descrição, mesmo num item de nome comum.
+# Uma "Bússola de Osso" não preocupa ninguém; uma que "dá vantagem em testes
+# de Sobrevivência" preocupa — e o nome dela não tem uma única palavra mágica.
+_EFEITO_MECANICO_ROOTS = (
+    "dano", "cura", "curar", "vantagem", "desvantagem", "resistenc",
+    "imunidad", "bonus", "penalidad", "recarga", "por dia", "por descanso",
+    "aumenta", "reduz", "concede", "ignora", "absorve",
+)
+# As siglas precisam de FRONTEIRA DE PALAVRA, não de substring. Com "ca " na
+# lista acima, "lembrança do pai" virava efeito mecânico — porque "lembranca "
+# contém "ca ". Um punhal de recordação era cobrado como item desequilibrado.
+_SIGLA_REGRA_RE = re.compile(r"\b(?:cd|ca|pv|hp|xp|mp)\b", re.IGNORECASE)
+_DADO_RE = re.compile(r"\b\d*d(?:4|6|8|10|12|20|100)\b", re.IGNORECASE)
+_BONUS_NUM_RE = re.compile(r"[+\-][1-9]\d*\b")
 _MAGIC_BONUS_RE = re.compile(r'\+[1-5]\b')
 _MAGIC_OF_RE    = re.compile(
     r'\b(?:espada|machado|arco|adaga|cajado|anel|amuleto|manto|armadura|elmo|luvas|botas|cinto|varinha|orbe)\s+'
@@ -5479,15 +5507,45 @@ _MAGIC_OF_RE    = re.compile(
 )
 
 def _looks_magic(item_name: str, description: str = "") -> bool:
-    """True se o item parece mágico pelo nome ou descrição."""
-    combined = (item_name + " " + description).lower()
+    """True se o item parece mágico pelo nome ou pela descrição."""
+    combinado = _norm_txt(item_name + " " + description)
     if _MAGIC_BONUS_RE.search(item_name):
         return True
-    if any(kw in combined for kw in _MAGIC_ITEM_KEYWORDS):
+    if any(raiz in combinado for raiz in _MAGIC_ITEM_ROOTS):
         return True
     if _MAGIC_OF_RE.search(item_name):
         return True
     return False
+
+
+def _tem_efeito_mecanico(item_name: str, description: str = "") -> bool:
+    """
+    A descrição promete algo que o motor teria de sustentar (dano, cura,
+    vantagem, bônus numérico, dado)?
+
+    Isto é o que separa sabor de regra. "Aponta para a pessoa amada" é sabor:
+    não muda nenhuma conta e não precisa de balanceamento. "Dá vantagem em
+    testes de Sobrevivência" é regra, e regra inventada desequilibra a mesa
+    sem ninguém perceber.
+    """
+    texto = _norm_txt(item_name + " " + description)
+    if any(raiz in texto for raiz in _EFEITO_MECANICO_ROOTS):
+        return True
+    bruto = item_name + " " + description
+    return bool(_DADO_RE.search(bruto) or _BONUS_NUM_RE.search(bruto)
+                or _SIGLA_REGRA_RE.search(bruto))
+
+
+def _precisa_de_conferencia(item_name: str, description: str = "") -> bool:
+    """
+    Vale gastar uma consulta ao SRD por este item?
+
+    Sim quando ele parece mágico OU quando a descrição promete efeito. Não
+    para o resto: corda, tocha e ração não estão no SRD de itens mágicos, e
+    marcá-las como "customizadas" seria gritar lobo a cada saque.
+    """
+    return (_looks_magic(item_name, description)
+            or _tem_efeito_mecanico(item_name, description))
 
 
 def _search_open5e_item(item_name: str) -> dict | None:
@@ -5618,7 +5676,10 @@ def add_item(char_name: str, item_name: str, quantity: int = 1, description: str
     item_dict: dict = {"nome": item_name, "qtd": quantity, "descricao": description}
     warning = ""
 
-    if _looks_magic(item_name, description):
+    # A conferência dispara pelo NOME mágico OU pelo EFEITO descrito. Só o
+    # nome não bastava: uma "Bússola de Osso que dá vantagem em Sobrevivência"
+    # não tem uma única palavra mágica e mexe na regra do mesmo jeito.
+    if _precisa_de_conferencia(item_name, description):
         srd_data = _search_open5e_item(item_name)
         if srd_data:
             # Item canônico do SRD — enriquece com dados reais
@@ -5630,18 +5691,97 @@ def add_item(char_name: str, item_name: str, quantity: int = 1, description: str
             item_dict["descricao"] = f"[{rarity}{attune_s}] {desc_srd or description}"
             item_dict["custom"]    = False
         else:
-            # Não encontrado no SRD — marca como customizado
+            # Fora do SRD: fica marcado. A marca é FATO, não julgamento — vale
+            # tanto para um item de sabor quanto para um que mexe na regra.
             item_dict["custom"] = True
             nivel = char.get("sheet", {}).get("nivel", 1)
-            warning = (
-                f"\n⚠️  '{item_name}' não encontrado no banco D&D 5e (SRD). "
-                f"Item adicionado como **customizado**. "
-                f"Certifique-se de que seus efeitos são balanceados para um grupo nível {nivel}."
-            )
+            if _tem_efeito_mecanico(item_name, description):
+                # Este o motor vai cobrar: item inventado COM regra é o que
+                # desequilibra a mesa sem ninguém perceber.
+                item_dict["efeito_mecanico"] = True
+                warning = (
+                    f"\n⚠️  '{item_name}' NÃO EXISTE no SRD de D&D 5e e a "
+                    f"descrição promete efeito mecânico.\n"
+                    f"   Ou troque por um item real do SRD, ou declare aqui "
+                    f"por que ele é equilibrado para um grupo de nível {nivel} "
+                    f"— e prefira efeitos pequenos (+1, 1d4, uma vez por "
+                    f"descanso) a números redondos e grandes."
+                )
+            else:
+                warning = (
+                    f"\n📎 '{item_name}' não está no SRD — registrado como "
+                    f"item próprio da sua campanha. Sem efeito mecânico "
+                    f"declarado, então é sabor: nada a balancear."
+                )
 
     inv.append(item_dict)
     memory.save_campaign()
     return f"📦 {item_name} (×{quantity}) adicionado ao inventário de {char['name']}.{warning}"
+
+
+def justify_custom_item(char_name: str, item_name: str, reason: str) -> str:
+    """
+    Registra por que um item inventado é equilibrado, e encerra a cobrança.
+
+    Use quando decidir MANTER um item que não existe no SRD e que tem efeito
+    mecânico. A justificativa fica na ficha: quem abrir a campanha meses
+    depois vê por que aquele item existe e com que critério foi calibrado.
+
+    Args:
+        char_name: Dono do item.
+        item_name: Nome do item.
+        reason:    Por que é equilibrado (ex: "+1 só contra mortos-vivos,
+                   equivalente a uma arma +1 de nível 3").
+    """
+    char = memory.campaign["characters"].get(memory.char_key(char_name))
+    if not char:
+        return f"Personagem '{char_name}' não encontrado."
+    if not (reason or "").strip():
+        return ("⚠️ Informe a justificativa. Um item inventado sem critério "
+                "declarado é exatamente o que esta trava existe para pegar.")
+
+    for it in (char.get("inventario") or []):
+        if isinstance(it, dict) and _norm_txt(it.get("nome", "")) == _norm_txt(item_name):
+            if not it.get("custom"):
+                return (f"✅ '{it.get('nome')}' é item canônico do SRD — "
+                        f"não precisa de justificativa.")
+            it["balanco_justificado"] = reason.strip()
+            memory.save_campaign()
+            return (f"📝 Balanço de '{it.get('nome')}' registrado: "
+                    f"{reason.strip()}")
+    return f"⚠️ '{item_name}' não está no inventário de {char.get('name', char_name)}."
+
+
+def list_custom_items() -> str:
+    """
+    Lista TODOS os itens da campanha que não existem no SRD de D&D 5e,
+    separando os que só têm sabor dos que prometem efeito mecânico.
+
+    Serve de auditoria: é aqui que se vê, de uma vez, o que foi inventado ao
+    longo da campanha e quanto disso mexe nas regras.
+    """
+    com_regra, so_sabor = [], []
+    for ch in memory.campaign.get("characters", {}).values():
+        dono = ch.get("name", "?")
+        for it in (ch.get("inventario") or []):
+            if not isinstance(it, dict) or not it.get("custom"):
+                continue
+            linha = (f"  • {it.get('nome')} ×{it.get('qtd', 1)}  "
+                     f"({dono})\n      {(it.get('descricao') or '—')[:110]}")
+            (com_regra if it.get("efeito_mecanico") else so_sabor).append(linha)
+
+    if not com_regra and not so_sabor:
+        return ("✅ Nenhum item fora do SRD nesta campanha — tudo o que o "
+                "grupo carrega é canônico.")
+
+    partes = []
+    if com_regra:
+        partes.append(f"⚠️  COM EFEITO MECÂNICO ({len(com_regra)}) — "
+                      f"inventados E mexendo na regra:\n" + "\n".join(com_regra))
+    if so_sabor:
+        partes.append(f"📎 Só sabor ({len(so_sabor)}) — inventados, sem efeito "
+                      f"declarado:\n" + "\n".join(so_sabor))
+    return "\n\n".join(partes)
 
 
 def remove_item(char_name: str, item_name: str, quantity: int = 1) -> str:
@@ -9388,6 +9528,8 @@ DND_TOOLS = [
     roll_death_save,
     add_item,
     remove_item,
+    list_custom_items,
+    justify_custom_item,
     list_inventory,
     identify_item,
     choose_feat,

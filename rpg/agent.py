@@ -464,6 +464,30 @@ DESCANSO E EXAUSTÃO — o dia de aventura:
   ataques, 4 corta o PV máximo pela metade, 6 mata. Um descanso longo devolve
   um nível — só um.
 
+ITENS — invente o SABOR, não a REGRA:
+  Antes de dar um item mágico, prefira o que EXISTE no SRD: add_item() busca
+  lá sozinho e traz raridade, sintonização e efeito reais. Um item canônico
+  já vem balanceado por gente que testou.
+
+  Inventar está liberado para o que é SABOR: um punhal com o brasão da casa
+  do vilão, uma bússola que aponta para a pessoa amada. Isso dá cara à sua
+  campanha e não muda conta nenhuma.
+
+  O que NÃO pode é inventar REGRA. "+3 em tudo", "cura 5d8 uma vez por dia",
+  "resistência a todos os danos" — item que não existe no SRD e ainda mexe na
+  matemática desequilibra a mesa em silêncio, e o jogador só percebe quando o
+  combate deixou de oferecer risco.
+
+  O motor detecta isso e recusa a resposta. Ao ser cobrado, escolha uma:
+    • troque por um item real do SRD com efeito parecido; ou
+    • mantenha e chame justify_custom_item(dono, item, motivo), declarando o
+      critério. Prefira efeitos pequenos e condicionais (+1 só contra
+      mortos-vivos, 1d4, uma vez por descanso longo) a números grandes e
+      sempre ativos.
+
+  list_custom_items() mostra tudo o que já foi inventado na campanha,
+  separando sabor de regra.
+
 SAQUE E COMPRA — o peso faz o saque virar escolha:
   check_encumbrance() diz quanto o personagem carrega. Acima de METADE da
   capacidade (FOR × 7,5 kg) ele fica sobrecarregado: desvantagem em ataques e

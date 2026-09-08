@@ -270,6 +270,50 @@ def _check_combatants_offscene(text: str) -> list[str]:
     ]
 
 
+_ITEM_TOOLS = {"add_item"}
+
+
+def _check_itens_inventados(tools_called: set) -> list[str]:
+    """
+    Item que NÃO existe no SRD e ainda por cima promete efeito mecânico.
+
+    Um item de sabor inventado é bom: é assim que uma campanha ganha cara
+    própria. O problema é o inventado que mexe na CONTA — "+3 em tudo", "cura
+    5d8 por dia" — porque desequilibra a mesa sem ninguém perceber, e o
+    jogador só descobre quando o combate já não oferece risco.
+
+    A marca vem do add_item, que a grava na ficha. Aqui ela vira cobrança:
+    ou o mestre troca por um item real do SRD, ou declara por que o dele é
+    equilibrado.
+    """
+    if not _ITEM_TOOLS.intersection(tools_called):
+        return []
+
+    achados = []
+    for ch in memory.campaign.get("characters", {}).values():
+        for it in (ch.get("inventario") or []):
+            if isinstance(it, dict) and it.get("custom") and it.get("efeito_mecanico"):
+                if not it.get("balanco_justificado"):
+                    achados.append((ch.get("name", "?"), it))
+
+    if not achados:
+        return []
+
+    nomes = ", ".join(f"'{it.get('nome')}' ({dono})" for dono, it in achados[:4])
+    nivel = max((int(((c.get("sheet") or {}).get("nivel", 1)) or 1)
+                 for c in memory.campaign.get("characters", {}).values()
+                 if memory.is_party_member(c)), default=1)
+    return [
+        f"Criou item que NÃO existe no SRD de D&D 5e e promete efeito "
+        f"mecânico: {nomes}. Item inventado com regra desequilibra a mesa em "
+        f"silêncio. Faça UMA das duas coisas e narre de novo: (a) troque por "
+        f"um item real do SRD com efeito equivalente, ou (b) mantenha o item "
+        f"e declare no texto por que ele é equilibrado para o nível "
+        f"{nivel} — efeitos pequenos (+1, 1d4, uma vez por descanso longo) "
+        f"em vez de números grandes e sempre ativos."
+    ]
+
+
 def _verify_agent_response(
     text: str,
     tools_called: set,
@@ -308,6 +352,9 @@ def _verify_agent_response(
     #     pontos da história apareceram no meio da luta.
     if _INIT_TOOLS.intersection(tools_called):
         violations.extend(_check_combatants_offscene(text))
+
+    # 1c. Item inventado que mexe na regra.
+    violations.extend(_check_itens_inventados(tools_called))
 
     # 2. HP modificado narrativamente
     if (not _HP_TOOLS.intersection(tools_called)
@@ -494,6 +541,8 @@ def _build_correction_prompt(violations: list[str], already_called: set | None =
     # (ordem, rodada, log, turno) em vez de somar efeito, então re-chamá-la no
     # mesmo turno não duplica nada — e é justamente o conserto quando a
     # iniciativa saiu com gente que não estava na cena.
+    # add_item fica de fora: quando a correção é sobre um item inventado, o
+    # conserto passa por remove_item + add_item com o item certo.
     stateful = {"attack_roll", "modify_hp", "use_ability", "modify_mana",
                 "apply_condition", "learn_spell", "learn_ability",
                 "grant_xp", "set_flag", "clear_flag"}
