@@ -238,6 +238,27 @@ COMBATE_ATIVO = {
     },
 }
 
+# Combate COM ZONAS (onda 3): o campo dividido em trilha, cada um em sua zona.
+COMBATE_ZONAS = copy.deepcopy(COMBATE_ATIVO)
+COMBATE_ZONAS["characters"]["natasha"] = {"sheet": {"vida_atual": 21}}
+COMBATE_ZONAS["combat_state"].update({
+    "zonas": ["Portão", "Pátio", "Sacada"],
+    "zona_desc": {
+        "Portão":  "portas de ferro arrombadas",
+        "Pátio":   "lama, barris tombados",
+        "Sacada":  "arqueiros no alto",
+    },
+    "posicoes": {
+        "stelar":   "Pátio",
+        "helena":   "Portão",
+        "natasha":  "Portão",
+        "victoria": "Sacada",
+    },
+    "turn_economy": {"acao_usada": False, "bonus_usada": False,
+                     "movimento_usado": False},
+})
+
+
 # Painel de fim de combate (vitória do grupo).
 COMBATE_ENCERRADO = copy.deepcopy(COMBATE_ATIVO)
 COMBATE_ENCERRADO["combat_state"].update({
@@ -389,6 +410,12 @@ TELAS = [
     {"nome": "combate-escolher-alvo", "pagina": "/game.html",
      "estado": COMBATE_ATIVO, "espera": 700,
      "js": "window.Combat._sel('attack')", "exigir": "#cbt-targets:not(.hidden)"},
+    {"nome": "combate-zonas", "pagina": "/game.html",
+     "estado": COMBATE_ZONAS, "espera": 700,
+     "exigir": "#cbt-zonas:not(.hidden)"},
+    {"nome": "combate-escolher-zona", "pagina": "/game.html",
+     "estado": COMBATE_ZONAS, "espera": 700,
+     "js": "window.Combat._sel('move')", "exigir": "#cbt-targets:not(.hidden)"},
     {"nome": "combate-vitoria", "pagina": "/game.html",
      "estado": COMBATE_ATIVO, "espera": 700,
      "estado2": COMBATE_ENCERRADO, "js2": "window.Combat.sync()",

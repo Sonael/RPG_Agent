@@ -1330,6 +1330,53 @@ body.combat-on { overflow: hidden; }
 .cbt-ord-sep { color: var(--cbt-gold); }
 
 /* Campo de batalha */
+/* ── Faixa de zonas (onda 3) ────────────────────────────────────────────
+   O campo é uma TRILHA, não um tabuleiro: as zonas ficam lado a lado na
+   ordem em que set_battlefield() as recebeu, e a adjacência é visual —
+   vizinhas na faixa são vizinhas na regra. Some quando o combate não usa
+   zonas, porque a onda 3 é opcional. */
+.cbt-zonas {
+  display: flex; align-items: stretch; gap: 6px;
+  padding: 10px 30px 0;
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
+  /* Item flex do #cbt-frame: sem travar o encolhimento, o mobile (onde o
+     frame tem altura fixa e rola por dentro) espremia a faixa até sobrar só
+     o padding — 10px de altura, com as zonas invisíveis. */
+  flex: 0 0 auto;
+}
+.cbt-zonas.hidden { display: none; }
+.cbt-zona {
+  flex: 1 1 0; min-width: 120px;
+  border: 1px solid #dcd3c6; border-radius: 8px;
+  background: rgba(255,255,255,0.55);
+  padding: 7px 9px;
+}
+/* A zona de quem está jogando agora — é o que decide o turno. */
+.cbt-zona-aqui {
+  border-color: var(--cbt-gold);
+  background: rgba(184,153,71,0.13);
+  box-shadow: inset 0 0 0 1px rgba(184,153,71,0.35);
+}
+.cbt-zona-nome {
+  font-family: 'Playfair Display', serif; font-weight: 700;
+  font-size: 0.82rem; color: var(--cbt-dark); margin-bottom: 5px;
+}
+.cbt-zona-pins { display: flex; flex-wrap: wrap; gap: 4px; }
+.cbt-zona-vazia { font-size: 0.72rem; color: var(--cbt-muted); font-style: italic; }
+.cbt-pin {
+  font-size: 0.72rem; padding: 2px 7px; border-radius: 999px;
+  border: 1px solid transparent; white-space: nowrap;
+}
+.cbt-pin-aliado  { background: #e6eef6; color: #204a72; }
+.cbt-pin-inimigo { background: #f6e6e4; color: #7a2318; }
+/* Contorno, e não outra cor de fundo: o pino já usa a cor para dizer de que
+   lado está, e trocá-la para marcar a vez apagaria essa informação. */
+.cbt-pin-vez { border-color: var(--cbt-dark); font-weight: 700; }
+.cbt-zona-liga {
+  align-self: center; color: var(--cbt-gold);
+  font-size: 1.1rem; flex: 0 0 auto;
+}
+
 .cbt-battlefield {
   display: flex; gap: 20px; align-items: flex-start;
   padding: 26px 30px;
@@ -1750,6 +1797,8 @@ body.combat-on { overflow: hidden; }
   }
   .cbt-initiative::-webkit-scrollbar { height: 0; }
   .cbt-ord { flex-shrink: 0; }
+  .cbt-zonas { padding: 10px 16px 0; gap: 4px; }
+  .cbt-zona  { min-width: 108px; padding: 6px 8px; }
   .cbt-battlefield {
     flex-direction: column; padding: 16px; gap: 12px;
     flex: none; overflow: visible; min-height: 0;

@@ -2541,15 +2541,559 @@ def _fmt_notas(notas: list[str], indent: str = "   ") -> str:
 
 
 # ===========================================================================
+# ZONAS — posicionamento sem grid
+# ---------------------------------------------------------------------------
+# O combate não tinha lugar nenhum: todos podiam acertar todos, corpo-a-corpo
+# alcançava o arqueiro do outro lado do salão e o ataque de oportunidade só
+# existia na fuga, porque não havia movimento que ele pudesse punir.
+#
+# Grid quadriculado seria pior que o problema — exigiria coordenadas do LLM a
+# cada turno e uma tela de tabuleiro. Zonas dão o que importa (perto/longe,
+# quem está trancado com quem, terreno com nome) a um custo de uma palavra por
+# combatente.
+#
+# Topologia LINEAR: as zonas formam uma trilha, e a adjacência são os vizinhos
+# na lista. Distância = diferença de índice.
+#
+#     ["Portão", "Pátio", "Sacada"]     Portão↔Pátio = 1     Portão↔Sacada = 2
+#
+# Regras que isso passa a sustentar:
+#     mesma zona (0)   corpo-a-corpo vale; à distância fica com desvantagem
+#                      (5e: atirar com inimigo colado em você)
+#     adjacente (1)    só à distância, sem penalidade
+#     2 ou mais        só à distância, com desvantagem (alcance longo)
+#     sair de uma zona com inimigo consciente provoca ataque de oportunidade
+#
+# TUDO É OPCIONAL. Sem set_battlefield() chamado, cs["zonas"] não existe e o
+# combate se comporta exatamente como antes — campanhas antigas e o modo
+# narrado não mudam de regra no meio do caminho.
+# ===========================================================================
+
+def _zonas() -> list[str]:
+    cs = memory.campaign.get("combat_state") or {}
+    z  = cs.get("zonas")
+    return list(z) if isinstance(z, list) else []
+
+
+def _zonas_ativas() -> bool:
+    return len(_zonas()) > 1
+
+
+def _zona_canonica(nome: str) -> str:
+    """Casa o nome informado com uma zona existente, ignorando caixa/acento."""
+    alvo = _norm_txt(nome or "")
+    for z in _zonas():
+        if _norm_txt(z) == alvo:
+            return z
+    return ""
+
+
+def _zona_de(char_name: str) -> str:
+    cs = memory.campaign.get("combat_state") or {}
+    return (cs.get("posicoes") or {}).get(memory.char_key(char_name), "")
+
+
+def _por_zona(char_name: str, zona: str) -> None:
+    cs = memory.campaign.setdefault("combat_state", {})
+    cs.setdefault("posicoes", {})[memory.char_key(char_name)] = zona
+
+
+def _distancia(a: str, b: str) -> int | None:
+    """
+    Zonas entre dois combatentes. None quando não há como saber — sem zonas
+    definidas, ou alguém que ninguém posicionou. None significa "a regra de
+    alcance não se aplica", nunca "estão longe": o motor não pode inventar
+    uma penalidade a partir de dado que não tem.
+    """
+    zonas = _zonas()
+    if len(zonas) < 2:
+        return None
+    za, zb = _zona_de(a), _zona_de(b)
+    if za not in zonas or zb not in zonas:
+        return None
+    return abs(zonas.index(za) - zonas.index(zb))
+
+
+def _inimigos_na_zona(char_name: str, zona: str = "") -> list[str]:
+    """Adversários conscientes na mesma zona — quem 'tranca' o combatente."""
+    if not _zonas_ativas():
+        return []
+    chars = memory.campaign.get("characters", {})
+    eu    = chars.get(memory.char_key(char_name))
+    if not eu:
+        return []
+    zona = zona or _zona_de(char_name)
+    if not zona:
+        return []
+    eu_grupo = memory.is_party_member(eu)
+    cs = memory.campaign.get("combat_state") or {}
+    presos = []
+    for nome in cs.get("initiative_order", []) or []:
+        outro = chars.get(memory.char_key(nome))
+        if not outro or outro is eu:
+            continue
+        if memory.is_party_member(outro) == eu_grupo:
+            continue
+        if (outro.get("status", "vivo") or "").lower() in OUT_OF_COMBAT_STATUSES:
+            continue
+        if int((outro.get("sheet") or {}).get("vida_atual", 0) or 0) <= 0:
+            continue
+        if _zona_de(nome) == zona:
+            presos.append(outro.get("name", nome))
+    return presos
+
+
+def _checar_alcance(attacker_name: str, target_name: str, weapon: str) -> tuple[str, bool]:
+    """
+    Aplica a regra de alcance a um ataque.
+
+    Devolve (recusa, desvantagem):
+      recusa != ""  → o ataque não pode acontecer (corpo-a-corpo fora da zona)
+      desvantagem   → acontece, mas com desvantagem
+
+    Sem zonas em jogo devolve ("", False) — nada muda.
+    """
+    dist = _distancia(attacker_name, target_name)
+    if dist is None:
+        return "", False
+
+    a_ranged = _weapon_is_ranged(weapon)
+    if not a_ranged:
+        if dist > 0:
+            za, zb = _zona_de(attacker_name), _zona_de(target_name)
+            return (
+                f"❌ FORA DE ALCANCE: {attacker_name} está em **{za}** e "
+                f"{target_name}, em **{zb}**. Corpo-a-corpo só na mesma zona — "
+                f"use move_combatant('{attacker_name}', '{zb}') primeiro "
+                f"(sair de uma zona com inimigo provoca ataque de oportunidade)."
+            ), False
+        return "", False
+
+    # À distância: colado no inimigo atrapalha; muito longe também.
+    if dist == 0 and _inimigos_na_zona(attacker_name):
+        return "", True
+    if dist >= 2:
+        return "", True
+    return "", False
+
+
+def _weapon_is_ranged(weapon: str) -> bool:
+    """
+    Arma à distância? Usa a lista do motor (RANGED_WEAPONS, em inglês do SRD)
+    mais os termos em português que a mesa usa.
+    """
+    w = _norm_txt(weapon or "")
+    if not w:
+        return False
+    if any(_norm_txt(r) in w for r in RANGED_WEAPONS):
+        return True
+    return any(t in w for t in ("arco", "besta", "dardo", "funda", "azagaia",
+                                "lanca arremess", "flecha", "virote"))
+
+
+def set_battlefield(zones: str, description: str = "") -> str:
+    """
+    Define as ZONAS do campo de batalha — o terreno em que o combate acontece.
+
+    As zonas formam uma trilha na ordem informada: vizinhas na lista são
+    adjacentes. Corpo-a-corpo só funciona dentro da MESMA zona; ataques à
+    distância alcançam qualquer zona, com desvantagem a partir de duas de
+    distância. Sair de uma zona ocupada por inimigo provoca ataque de
+    oportunidade.
+
+    Chame ANTES ou logo depois de roll_initiative(). Por padrão o grupo entra
+    na primeira zona e os inimigos na última — mova quem começar em outro
+    lugar com move_combatant().
+
+    Args:
+        zones:       Zonas separadas por vírgula, da frente para o fundo.
+                     Ex: "Portão, Pátio, Sacada"
+        description: Opcional. Descrições na MESMA ordem, separadas por ';'.
+                     Ex: "portas de ferro; lama e barris; arqueiros no alto"
+    """
+    cs = memory.campaign.get("combat_state", {})
+    if not cs.get("is_active"):
+        return "⚠️ Nenhum combate ativo. Chame roll_initiative() primeiro."
+
+    nomes = [z.strip() for z in (zones or "").split(",") if z.strip()]
+    if len(nomes) < 2:
+        return ("⚠️ Informe pelo menos DUAS zonas separadas por vírgula "
+                "(ex: 'Portão, Pátio, Sacada'). Com uma só não há distância.")
+    if len(nomes) > 6:
+        return "⚠️ No máximo 6 zonas — acima disso a mesa perde o mapa de vista."
+    if len({_norm_txt(n) for n in nomes}) != len(nomes):
+        return "⚠️ Há zonas com o mesmo nome. Dê nomes distintos."
+
+    descs = [d.strip() for d in (description or "").split(";")]
+    cs["zonas"]     = nomes
+    cs["zona_desc"] = {n: (descs[i] if i < len(descs) else "")
+                       for i, n in enumerate(nomes)}
+
+    # Posicionamento inicial: grupo na frente, inimigos no fundo. É o arranjo
+    # de quase todo encontro, e sem um padrão o campo nasceria vazio.
+    chars = memory.campaign.get("characters", {})
+    cs["posicoes"] = {}
+    for nome in cs.get("initiative_order", []) or []:
+        ch = chars.get(memory.char_key(nome))
+        if not ch:
+            continue
+        _por_zona(nome, nomes[0] if memory.is_party_member(ch) else nomes[-1])
+
+    _log_combat_event("battlefield", msg="Campo dividido em zonas: " + " → ".join(nomes),
+                      zonas=nomes)
+    memory.save_campaign()
+    return "🗺️  " + describe_battlefield()
+
+
+def describe_battlefield() -> str:
+    """
+    Mostra as zonas do combate e quem está em cada uma.
+    Use para se situar antes de decidir movimento e alvos.
+    """
+    zonas = _zonas()
+    if not zonas:
+        return ("Sem zonas definidas — o combate está sendo resolvido sem "
+                "posicionamento. Use set_battlefield() para dividir o terreno.")
+    cs    = memory.campaign.get("combat_state") or {}
+    descs = cs.get("zona_desc") or {}
+    chars = memory.campaign.get("characters", {})
+
+    linhas = ["**Campo de batalha:** " + " → ".join(zonas)]
+    for z in zonas:
+        ocupantes = []
+        for nome in cs.get("initiative_order", []) or []:
+            if _zona_de(nome) != z:
+                continue
+            ch = chars.get(memory.char_key(nome))
+            if not ch:
+                continue
+            caido = ((ch.get("status", "vivo") or "").lower() in OUT_OF_COMBAT_STATUSES
+                     or int((ch.get("sheet") or {}).get("vida_atual", 0) or 0) <= 0)
+            marca = "🟦" if memory.is_party_member(ch) else "🟥"
+            ocupantes.append(f"{marca} {ch.get('name', nome)}" + (" (fora)" if caido else ""))
+        desc = descs.get(z) or ""
+        linhas.append(f"  • **{z}**{' — ' + desc if desc else ''}: "
+                      + (", ".join(ocupantes) if ocupantes else "vazia"))
+    return "\n".join(linhas)
+
+
+def move_combatant(name: str, zone: str, dash: bool = False) -> str:
+    """
+    Move um combatente para outra zona.
+
+    Move UMA zona por turno (as zonas vizinhas na trilha). Com dash=True
+    (ação de Disparada) move DUAS, gastando a ação do turno.
+
+    Sair de uma zona onde há inimigo consciente provoca ataque de
+    oportunidade de cada um deles — é a regra que dá peso ao posicionamento.
+
+    Args:
+        name: Nome do combatente.
+        zone: Zona de destino.
+        dash: True para usar a ação de Disparada e mover duas zonas.
+    """
+    cs = memory.campaign.get("combat_state", {})
+    if not cs.get("is_active"):
+        return "⚠️ Nenhum combate ativo."
+    if not _zonas_ativas():
+        return ("⚠️ O campo não tem zonas. Chame set_battlefield() antes de "
+                "mover alguém.")
+
+    ch, err = _get_char(name)
+    if not ch:
+        return f"⚠️ {err}"
+    nome_real = ch.get("name", name)
+
+    if (ch.get("status", "vivo") or "").lower() in OUT_OF_COMBAT_STATUSES:
+        return f"❌ {nome_real} está fora de combate e não se move."
+
+    destino = _zona_canonica(zone)
+    if not destino:
+        return (f"⚠️ Zona '{zone}' não existe. Zonas do combate: "
+                + ", ".join(_zonas()))
+
+    origem = _zona_de(nome_real)
+    if origem == destino:
+        return f"⚠️ {nome_real} já está em **{destino}**."
+
+    zonas = _zonas()
+    if origem not in zonas:
+        # Nunca foi posicionado: entra direto, sem gastar movimento.
+        _por_zona(nome_real, destino)
+        memory.save_campaign()
+        return f"📍 {nome_real} entra em **{destino}**."
+
+    passos  = abs(zonas.index(destino) - zonas.index(origem))
+    maximo  = 2 if dash else 1
+    if passos > maximo:
+        extra = "" if dash else " — ou passe dash=True para usar a Disparada"
+        return (f"❌ **{destino}** está a {passos} zonas de **{origem}**. "
+                f"O movimento alcança {maximo}{extra}.")
+
+    # O bote de quem fica: só dispara se havia inimigo trancando a origem.
+    oportunidade = ""
+    if _inimigos_na_zona(nome_real, origem):
+        oportunidade = _provoke_opportunity_attacks(nome_real, "sair da zona")
+
+    # Um ataque de oportunidade pode ter derrubado quem estava saindo.
+    if int((ch.get("sheet") or {}).get("vida_atual", 0) or 0) <= 0:
+        memory.save_campaign()
+        return (f"🏃 {nome_real} tenta ir de **{origem}** para **{destino}**…"
+                f"{oportunidade}\n   ⏹️  Cai antes de chegar.")
+
+    _por_zona(nome_real, destino)
+    verbo = "dispara" if dash else "avança"
+    _log_combat_event("move", nome_real, "",
+                      msg=f"{nome_real} move-se de {origem} para {destino}",
+                      de=origem, para=destino)
+    memory.save_campaign()
+
+    trancado = _inimigos_na_zona(nome_real, destino)
+    aviso = ""
+    if trancado:
+        aviso = "\n   ⚔️  Em contato com: " + ", ".join(trancado)
+    return (f"🏃 {nome_real} {verbo} de **{origem}** para **{destino}**."
+            f"{oportunidade}{aviso}")
+
+
+# ===========================================================================
+# RECARGA E AÇÕES LENDÁRIAS
+# ---------------------------------------------------------------------------
+# Duas coisas que separam um chefe de 5e de um saco de PV, e que faltavam:
+#
+# RECARGA ("Recharge 5–6"): o sopro do dragão não é usável todo turno nem uma
+# vez por luta — no início de cada turno dele rola-se 1d6 e o poder volta se
+# der 5 ou 6. É o que faz o grupo jogar contra um relógio que ninguém controla.
+#
+# AÇÕES LENDÁRIAS: o chefe age FORA do próprio turno, no fim do turno dos
+# outros. Sem isso, um único inimigo contra quatro jogadores age 1 vez a cada
+# 5 turnos e a luta vira execução. O contador volta ao cheio no início do turno
+# do chefe — as duas coisas caem no mesmo gancho, _inicio_de_turno().
+# ===========================================================================
+
+def _rolar_recargas(char: dict) -> list[str]:
+    """
+    Rola a recarga dos poderes gastos deste combatente. Devolve os avisos dos
+    que voltaram (lista vazia quando não há nada a recarregar).
+    """
+    sheet = char.get("sheet") or {}
+    recs  = sheet.get("recargas")
+    if not isinstance(recs, dict):
+        return []
+    voltaram = []
+    for nome, cfg in recs.items():
+        if not isinstance(cfg, dict) or cfg.get("pronto", True):
+            continue
+        minimo = int(cfg.get("min", 5) or 5)
+        d6     = random.randint(1, 6)
+        cfg["ultimo_d6"] = d6
+        if d6 >= minimo:
+            cfg["pronto"] = True
+            voltaram.append(f"🔄 **{nome}** recarregou (d6={d6}, precisa {minimo}+).")
+    if voltaram:
+        for aviso in voltaram:
+            _log_combat_event("recharge", char.get("name", ""), "", msg=aviso)
+    return voltaram
+
+
+def _repor_lendarias(char: dict) -> None:
+    """Devolve as ações lendárias ao cheio no início do turno do chefe."""
+    lend = (char.get("sheet") or {}).get("lendarias")
+    if isinstance(lend, dict) and lend.get("total"):
+        lend["restantes"] = int(lend["total"])
+
+
+def set_recharge_ability(name: str, ability: str, min_roll: int = 5) -> str:
+    """
+    Marca um poder como sendo de RECARGA ("Recharge 5–6" do 5e).
+
+    Depois de usado, o poder fica indisponível até que, no início de um turno
+    do dono, um d6 role min_roll ou mais. É o que dá ritmo a um sopro de dragão.
+
+    Args:
+        name:     Nome da criatura.
+        ability:  Nome do poder (ex: 'Sopro de Fogo').
+        min_roll: Valor mínimo no d6 para recarregar (5 = 'Recarga 5–6').
+    """
+    ch, err = _get_char(name)
+    if not ch:
+        return f"⚠️ {err}"
+    if not ability.strip():
+        return "⚠️ Informe o nome do poder."
+    minimo = max(2, min(6, int(min_roll or 5)))
+    sheet  = ch.setdefault("sheet", {}) or ch["sheet"]
+    sheet.setdefault("recargas", {})[ability.strip()] = {"min": minimo, "pronto": True}
+    memory.save_campaign()
+    chance = int(round((7 - minimo) / 6 * 100))
+    return (f"🔄 **{ability.strip()}** de {ch.get('name', name)} agora é poder de "
+            f"recarga {minimo}–6 (~{chance}% por turno).")
+
+
+def _recarga_pronta(char: dict, ability: str) -> bool:
+    recs = (char.get("sheet") or {}).get("recargas") or {}
+    for nome, cfg in recs.items():
+        if _norm_txt(nome) == _norm_txt(ability):
+            return bool(cfg.get("pronto", True))
+    return True     # poder sem recarga configurada está sempre disponível
+
+
+def _gastar_recarga(char: dict, ability: str) -> None:
+    recs = (char.get("sheet") or {}).get("recargas") or {}
+    for nome, cfg in recs.items():
+        if _norm_txt(nome) == _norm_txt(ability):
+            cfg["pronto"] = False
+            return
+
+
+def set_legendary_actions(name: str, options: str, count: int = 3) -> str:
+    """
+    Torna uma criatura LENDÁRIA: ela passa a agir fora do próprio turno.
+
+    Uma criatura lendária tem `count` ações lendárias por rodada, gastas ao
+    FINAL do turno de outro combatente (nunca no próprio turno), com
+    legendary_action(). O contador volta ao cheio no início do turno dela.
+
+    Args:
+        name:    Nome do chefe.
+        options: Opções separadas por vírgula. Custo opcional após ':'
+                 (padrão 1). Ex: "Ataque de Cauda, Investida Alada:2"
+        count:   Ações lendárias por rodada (padrão 3).
+    """
+    ch, err = _get_char(name)
+    if not ch:
+        return f"⚠️ {err}"
+
+    opcoes = []
+    for bruto in (options or "").split(","):
+        bruto = bruto.strip()
+        if not bruto:
+            continue
+        nome, _, custo = bruto.partition(":")
+        nome = nome.strip()
+        if not nome:
+            continue
+        try:
+            c = max(1, int(custo.strip())) if custo.strip() else 1
+        except ValueError:
+            c = 1
+        opcoes.append({"nome": nome, "custo": c})
+
+    if not opcoes:
+        return ("⚠️ Informe pelo menos uma opção. "
+                "Ex: set_legendary_actions('Dragão', 'Ataque de Cauda, Investida Alada:2')")
+
+    total = max(1, min(5, int(count or 3)))
+    sheet = ch.setdefault("sheet", {}) or ch["sheet"]
+    sheet["lendarias"] = {"total": total, "restantes": total, "opcoes": opcoes}
+    memory.save_campaign()
+
+    lista = ", ".join(f"{o['nome']} ({o['custo']})" for o in opcoes)
+    return (f"👑 {ch.get('name', name)} agora é LENDÁRIA — {total} ações "
+            f"lendárias por rodada.\n   Opções: {lista}\n"
+            f"   Gaste com legendary_action() no fim do turno de OUTRO "
+            f"combatente; o contador volta ao cheio no turno dela.")
+
+
+def legendary_action(boss_name: str, option: str, target_name: str = "") -> str:
+    """
+    Gasta uma ação lendária do chefe, ao final do turno de outro combatente.
+
+    Se a opção casar com um ataque da ficha (ou uma arma), o motor rola o
+    ataque de verdade contra o alvo. Caso contrário, apenas debita o custo —
+    a opção é narrativa (mover-se, detectar, uivar) e quem narra é você.
+
+    Args:
+        boss_name:   Nome da criatura lendária.
+        option:      Nome da opção (como definido em set_legendary_actions).
+        target_name: Alvo, quando a opção for um ataque.
+    """
+    cs = memory.campaign.get("combat_state", {})
+    if not cs.get("is_active"):
+        return "⚠️ Nenhum combate ativo."
+
+    ch, err = _get_char(boss_name)
+    if not ch:
+        return f"⚠️ {err}"
+    nome_real = ch.get("name", boss_name)
+
+    lend = (ch.get("sheet") or {}).get("lendarias")
+    if not isinstance(lend, dict) or not lend.get("opcoes"):
+        return (f"⚠️ {nome_real} não é uma criatura lendária. "
+                f"Use set_legendary_actions() antes.")
+
+    if (ch.get("status", "vivo") or "").lower() in OUT_OF_COMBAT_STATUSES:
+        return f"❌ {nome_real} está fora de combate."
+    if int((ch.get("sheet") or {}).get("vida_atual", 0) or 0) <= 0:
+        return f"❌ {nome_real} está caído e não age."
+
+    # A regra: ação lendária acontece no turno DOS OUTROS. No próprio turno o
+    # chefe já tem ação, bônus e ataque múltiplo — deixar passar aqui daria a
+    # ele um turno duplo.
+    order = cs.get("initiative_order") or []
+    idx   = cs.get("current_turn_index", 0)
+    atual = order[idx] if 0 <= idx < len(order) else ""
+    if memory.char_key(atual) == memory.char_key(nome_real):
+        return (f"❌ É o turno de {nome_real}. Ação lendária é gasta no fim do "
+                f"turno de OUTRO combatente — use as ações normais dela agora.")
+
+    escolhida = None
+    for o in lend["opcoes"]:
+        if _norm_txt(o["nome"]) == _norm_txt(option):
+            escolhida = o
+            break
+    if not escolhida:
+        disponiveis = ", ".join(o["nome"] for o in lend["opcoes"])
+        return f"⚠️ Opção '{option}' não existe. Disponíveis: {disponiveis}"
+
+    restantes = int(lend.get("restantes", 0) or 0)
+    custo     = int(escolhida.get("custo", 1) or 1)
+    if restantes < custo:
+        return (f"❌ {nome_real} tem {restantes} ação(ões) lendária(s) nesta "
+                f"rodada e '{escolhida['nome']}' custa {custo}. "
+                f"O contador volta ao cheio no turno dela.")
+
+    lend["restantes"] = restantes - custo
+    sobra = lend["restantes"]
+
+    # Ataque de verdade quando a opção casa com algo que a criatura empunha.
+    ataque = _npc_attack_entry(ch.get("sheet") or {}, escolhida["nome"])
+    e_ataque = bool(ataque) or _weapon_is_ranged(escolhida["nome"]) or bool(target_name)
+
+    cabecalho = (f"👑 **Ação lendária** — {nome_real} usa "
+                 f"**{escolhida['nome']}** ({custo}; restam {sobra}).")
+    _log_combat_event("legendary", nome_real, target_name,
+                      msg=f"{nome_real} usa ação lendária: {escolhida['nome']}",
+                      custo=custo, restantes=sobra)
+
+    if not (e_ataque and target_name):
+        memory.save_campaign()
+        return cabecalho
+
+    golpe = attack_roll(
+        attacker_name     = nome_real,
+        target_name       = target_name,
+        weapon            = escolhida["nome"],
+        damage_dice_sides = 6,     # sobrescrito pelo stat block / SRD
+        damage_dice_count = 1,
+        attack_attribute  = "destreza" if _weapon_is_ranged(escolhida["nome"]) else "forca",
+        is_proficient     = True,
+        end_turn          = False,   # não é o turno dele: não avança nada
+        _skip_turn_check  = True,
+    )
+    memory.save_campaign()
+    return f"{cabecalho}\n{golpe}"
+
+
+# ===========================================================================
 # REAÇÃO E ATAQUE DE OPORTUNIDADE
 # ---------------------------------------------------------------------------
 # A economia do turno rastreava só Ação e Ação Bônus. Faltava a terceira
 # perna do 5e: a Reação — a única coisa que acontece FORA do seu turno.
 #
-# Sem posicionamento no jogo, o gatilho honesto para o ataque de oportunidade
-# é a FUGA: sair do combate deixa de ser grátis, que é justamente o que a
-# regra existe para impedir. Quando houver zonas/alcance (onda seguinte),
-# _provoke_opportunity_attacks passa a ser chamado também no movimento.
+# Na onda 2, sem posicionamento no jogo, o único gatilho honesto era a FUGA:
+# sair do combate deixava de ser grátis. Com as zonas da onda 3 a regra ganhou
+# o gatilho de verdade — sair de uma zona onde há inimigo consciente também
+# provoca (ver move_combatant), e só reage quem está NAQUELA zona.
 #
 # A reação recarrega por RODADA (em 5e, no início do próprio turno) — daí
 # guardarmos o número da rodada em que foi gasta.
@@ -2581,10 +3125,15 @@ def _melee_weapon_of(char: dict) -> str:
 
 def _provoke_opportunity_attacks(leaving_name: str, motivo: str = "fugir") -> str:
     """
-    Dispara os ataques de oportunidade contra quem está deixando o combate.
+    Dispara os ataques de oportunidade contra quem está deixando o combate
+    (fuga) ou saindo de uma zona ocupada por inimigos.
 
     Cada inimigo consciente que ainda tem a reação da rodada faz UM ataque
     corpo-a-corpo. Devolve o texto a anexar ('' quando ninguém reagiu).
+
+    Com zonas em jogo, só reage quem está NA MESMA ZONA de quem sai — do
+    contrário o arqueiro do outro lado do pátio daria bote em quem nunca
+    esteve ao alcance dele.
     """
     cs = memory.campaign.get("combat_state", {}) or {}
     if not cs.get("is_active"):
@@ -2595,6 +3144,7 @@ def _provoke_opportunity_attacks(leaving_name: str, motivo: str = "fugir") -> st
     if not saindo:
         return ""
     saindo_e_grupo = memory.is_party_member(saindo)
+    zona_saida     = _zona_de(leaving_name) if _zonas_ativas() else ""
 
     linhas = []
     for nome in list(cs.get("initiative_order", []) or []):
@@ -2609,6 +3159,9 @@ def _provoke_opportunity_attacks(leaving_name: str, motivo: str = "fugir") -> st
         if int((oponente.get("sheet") or {}).get("vida_atual", 0) or 0) <= 0:
             continue
         if not _reaction_available(oponente):
+            continue
+        # Só dá bote quem está em contato — a zona é o "alcance" aqui.
+        if zona_saida and _zona_de(nome) != zona_saida:
             continue
         # O alvo pode ter caído num ataque de oportunidade anterior.
         if int((saindo.get("sheet") or {}).get("vida_atual", 0) or 0) <= 0:
@@ -3898,6 +4451,16 @@ def attack_roll(
         _viol = _combat_turn_violation(attacker_name)
         if _viol:
             return _viol
+
+    # ALCANCE: quando o campo tem zonas, corpo-a-corpo exige a mesma zona e
+    # tiro longo (ou com inimigo colado) sai com desvantagem. Vem antes de
+    # qualquer dado — recusar depois de rolar já teria mudado o estado.
+    # Sem zonas definidas, _checar_alcance devolve ("", False) e nada muda.
+    _recusa_alcance, _desv_alcance = _checar_alcance(attacker_name, target_name, weapon)
+    if _recusa_alcance:
+        return _recusa_alcance
+    if _desv_alcance:
+        disadvantage = True
 
     sa = attacker["sheet"]
     st = target["sheet"]
@@ -5618,8 +6181,10 @@ def next_turn() -> str:
 
         skip_msg  = f"\n⏩ Pulados: {', '.join(skipped)}" if skipped else ""
         round_msg = f"\n🔔 Nova rodada! Rodada {round_num} começa." if new_round else ""
+        # O que os chefes lendários fizeram na virada (ver _inicio_de_turno).
+        lend_msg = "".join("\n" + m for m in (cs.pop("_lendarias_msg", None) or []))
         return (
-            f"⏭️  Turno avançado — Rodada {round_num}{round_msg}{skip_msg}\n"
+            f"⏭️  Turno avançado — Rodada {round_num}{round_msg}{skip_msg}{lend_msg}\n"
             f"🎯 Vez de: **{current_name}**\n"
             f"   Ordem: {' → '.join(f'[{n}]' if i == idx else n for i, n in enumerate(order))}"
         )
@@ -6923,6 +7488,7 @@ NPC_STRATEGIES = {
     "covarde":    "Foge quando HP < 25%; senão ataca o mais fraco.",
     "aleatório":  "Escolhe alvo e ação aleatoriamente.",
     "suporte":    "Cura aliados com HP < 50% se possível; senão ataca.",
+    "atirador":   "Recua da zona se estiver no corpo-a-corpo; depois atira no mais fraco.",
 }
 
 
@@ -6937,10 +7503,14 @@ def set_npc_strategy(npc_name: str, strategy: str) -> str:
     • covarde    — foge quando HP < 25%; senão ataca o mais fraco
     • aleatório  — escolhe alvo aleatoriamente
     • suporte    — cura aliados com HP < 50%; senão ataca
+    • atirador   — recua da zona se estiver trancado no corpo-a-corpo, depois atira
+
+    Todas usam o poder de RECARGA (set_recharge_ability) assim que ele estiver
+    carregado — é a jogada mais forte que a criatura tem.
 
     Args:
         npc_name: Nome do NPC.
-        strategy: Nome da estratégia (agressivo, tático, covarde, aleatório, suporte).
+        strategy: Nome da estratégia (agressivo, tático, covarde, aleatório, suporte, atirador).
     """
     cs = memory.campaign.get("combat_state", {})
     if not cs.get("is_active"):
@@ -6952,6 +7522,131 @@ def set_npc_strategy(npc_name: str, strategy: str) -> str:
     cs.setdefault("npc_strategies", {})[npc_name.lower()] = strategy
     memory.save_campaign()
     return f"🎯 Estratégia de {npc_name} definida: **{strategy}** — {NPC_STRATEGIES[strategy]}"
+
+
+# ── Repertório do NPC ──────────────────────────────────────────────────────
+# O turno automático sabia fazer uma coisa só: escolher alvo e bater. Um
+# clérigo inimigo com Curar Ferimentos na ficha batia; um dragão com sopro
+# carregado batia; um arqueiro trancado no corpo-a-corpo continuava atirando
+# com desvantagem. Estes três auxiliares dão ao motor as jogadas que a ficha
+# já prometia.
+
+def _npc_habilidade(char: dict, *termos: str) -> dict | None:
+    """Primeira habilidade da ficha cujo nome contenha um dos termos."""
+    for hab in (char.get("habilidades") or []):
+        nome = _norm_txt(hab.get("nome", ""))
+        if nome and any(_norm_txt(t) in nome for t in termos):
+            return hab
+    return None
+
+
+def _npc_tentar_curar(npc: dict, npc_name: str) -> str:
+    """
+    Suporte: cura o aliado mais ferido abaixo de 50% de PV.
+    Devolve "" quando não há quem curar, com o que curar, ou mana para isso.
+    """
+    hab = _npc_habilidade(npc, "cura", "curar", "cure", "heal", "palavra curativa")
+    if not hab:
+        return ""
+    sheet = npc.get("sheet") or {}
+    custo = int(hab.get("custo_mana", 0) or 0)
+    if custo and int(sheet.get("mana_atual", 0) or 0) < custo:
+        return ""
+
+    cs      = memory.campaign.get("combat_state", {}) or {}
+    chars   = memory.campaign.get("characters", {})
+    do_lado = memory.is_party_member(npc)
+
+    ferido, pior = None, 1.0
+    for nome in cs.get("initiative_order", []) or []:
+        outro = chars.get(memory.char_key(nome))
+        if not outro:
+            continue
+        if memory.is_party_member(outro) != do_lado:
+            continue
+        if (outro.get("status", "vivo") or "").lower() in OUT_OF_COMBAT_STATUSES:
+            continue
+        s = outro.get("sheet") or {}
+        atual, maximo = int(s.get("vida_atual", 0) or 0), int(s.get("vida_max", 1) or 1)
+        if atual <= 0:
+            continue
+        pct = atual / max(1, maximo)
+        if pct < 0.5 and pct < pior:
+            ferido, pior = outro, pct
+
+    if not ferido:
+        return ""
+
+    return use_ability(
+        char_name        = npc_name,
+        ability_name     = hab.get("nome", ""),
+        target_name      = ferido.get("name", ""),
+        end_turn         = True,
+        _skip_turn_check = True,
+    )
+
+
+def _npc_poder_de_recarga(npc: dict) -> str:
+    """Nome do poder de recarga que está carregado agora (ou "")."""
+    for nome, cfg in ((npc.get("sheet") or {}).get("recargas") or {}).items():
+        if isinstance(cfg, dict) and cfg.get("pronto", False):
+            return nome
+    return ""
+
+
+def _npc_usar_poder(npc: dict, npc_name: str, poder: str, alvo: str) -> str:
+    """
+    Dispara um poder de recarga e o marca como gasto.
+    Devolve "" se a ficha não tiver a habilidade correspondente — sem ela o
+    motor não sabe dado nem custo, e inventar seria pior que não usar.
+    """
+    hab = None
+    for h in (npc.get("habilidades") or []):
+        if _norm_txt(h.get("nome", "")) == _norm_txt(poder):
+            hab = h
+            break
+    if not hab:
+        return ""
+
+    _gastar_recarga(npc, poder)
+    resultado = use_ability(
+        char_name        = npc_name,
+        ability_name     = hab.get("nome", ""),
+        target_name      = alvo,
+        end_turn         = True,
+        _skip_turn_check = True,
+    )
+    return f"💥 {npc_name} descarrega **{poder}**!\n{resultado}"
+
+
+def _npc_recuar_para_atirar(npc: dict, npc_name: str) -> str:
+    """
+    Atirador trancado no corpo-a-corpo recua uma zona para atirar limpo.
+    Sai vazio se não houver zonas, se ninguém o estiver trancando, ou se não
+    houver para onde ir. O recuo provoca ataque de oportunidade, como deve.
+    """
+    if not _zonas_ativas():
+        return ""
+    if not _inimigos_na_zona(npc_name):
+        return ""
+
+    zonas  = _zonas()
+    atual  = _zona_de(npc_name)
+    if atual not in zonas:
+        return ""
+    i = zonas.index(atual)
+
+    # Recua para o lado oposto ao grosso do inimigo: se o NPC é do fundo da
+    # trilha, afasta-se para o fundo; se está na ponta, tenta o outro sentido.
+    candidatos = []
+    if memory.is_party_member(npc):
+        candidatos = [i - 1, i + 1]
+    else:
+        candidatos = [i + 1, i - 1]
+    for j in candidatos:
+        if 0 <= j < len(zonas) and not _inimigos_na_zona(npc_name, zonas[j]):
+            return "🏹 " + move_combatant(npc_name, zonas[j]).lstrip("🏃 ")
+    return ""
 
 
 def execute_npc_turn(npc_name: str = "") -> str:
@@ -7004,6 +7699,14 @@ def execute_npc_turn(npc_name: str = "") -> str:
     strategy = cs.get("npc_strategies", {}).get(npc_name.lower(), "agressivo")
     npc_sheet = npc.get("sheet", {}) or {}
 
+    # O que voltou a estar disponível neste turno. _inicio_de_turno já rolou os
+    # d6 quando o ponteiro chegou aqui; isto só traz o aviso para a narração.
+    avisos_recarga = []
+    for _nome_rec, _cfg in (npc_sheet.get("recargas") or {}).items():
+        if _cfg.get("pronto") and _cfg.get("ultimo_d6"):
+            avisos_recarga.append(
+                f"🔄 **{_nome_rec}** recarregou (d6={_cfg.pop('ultimo_d6')}).")
+
     # Lógica de fuga (covarde)
     if strategy == "covarde":
         hp_pct = (npc_sheet.get("vida_atual", 1) /
@@ -7044,12 +7747,38 @@ def execute_npc_turn(npc_name: str = "") -> str:
     # Seleção de alvo por estratégia
     if strategy == "agressivo":
         target = max(targets, key=lambda t: t["hp"])
-    elif strategy in ("tático", "covarde"):
+    elif strategy in ("tático", "covarde", "atirador"):
         target = min(targets, key=lambda t: t["hp"])
     elif strategy == "aleatório":
         target = random.choice(targets)
     else:  # suporte ou padrão
         target = min(targets, key=lambda t: t["hp"])
+
+    # ── Repertório: o NPC não é só uma sequência de ataques com arma ────────
+    #
+    # 1) SUPORTE curando de verdade. A estratégia estava documentada como
+    #    "cura aliados com HP < 50%" desde sempre e nunca curou ninguém: caía
+    #    no `else` e atacava. A promessa agora é cumprida.
+    if strategy == "suporte":
+        socorro = _npc_tentar_curar(npc, npc_name)
+        if socorro:
+            return "\n".join(avisos_recarga + [socorro])
+
+    # 2) PODER DE RECARGA pronto (sopro de dragão e afins). É a jogada mais
+    #    forte disponível e a razão de o poder existir — se está carregado,
+    #    o monstro usa.
+    poder = _npc_poder_de_recarga(npc)
+    if poder:
+        disparo = _npc_usar_poder(npc, npc_name, poder, target["name"])
+        if disparo:
+            return "\n".join(avisos_recarga + [disparo])
+
+    # 3) ATIRADOR trancado no corpo-a-corpo recua antes de atirar. Sem isso,
+    #    um arqueiro com inimigo colado ficava atirando com desvantagem para
+    #    sempre, que nenhum arqueiro faria.
+    aviso_recuo = ""
+    if strategy == "atirador":
+        aviso_recuo = _npc_recuar_para_atirar(npc, npc_name)
 
     # Golpes do turno. O Ataque Múltiplo do urso-coruja é "um com o bico e um
     # com as garras" — então alternamos entre os ataques do stat block em vez
@@ -7083,7 +7812,9 @@ def execute_npc_turn(npc_name: str = "") -> str:
             return False
         return int((ch.get("sheet") or {}).get("vida_atual", 0) or 0) > 0
 
-    partes    = []
+    partes    = list(avisos_recarga)
+    if aviso_recuo:
+        partes.append(aviso_recuo)
     alvo_nome = target["name"]
     if n_ataques > 1:
         partes.append(f"🗡️  {npc_name} usa Ataque Múltiplo ({n_ataques} ataques):")
@@ -7244,9 +7975,100 @@ def _item_action_type(name: str) -> str:
 
 
 def _reset_turn_economy(cs: dict) -> None:
-    """Zera Ação/Bônus do novo combatente que entra em seu turno."""
-    if isinstance(cs, dict):
-        cs["turn_economy"] = {"acao_usada": False, "bonus_usada": False}
+    """
+    Início do turno de um combatente: zera Ação/Bônus e roda o que a regra
+    manda acontecer "no início do seu turno" — recarga de poderes e recomposição
+    das ações lendárias.
+
+    É o único ponto por onde os três avanços de turno passam (next_turn,
+    _auto_advance_turn e a auto-cura do ponteiro), e nos três o
+    current_turn_index já está no combatente novo quando chega aqui.
+    """
+    if not isinstance(cs, dict):
+        return
+    cs["turn_economy"] = {"acao_usada": False, "bonus_usada": False,
+                          "movimento_usado": False}
+    _inicio_de_turno(cs)
+
+
+def _inicio_de_turno(cs: dict) -> None:
+    """Efeitos de 'no início do seu turno' do combatente da vez."""
+    order = cs.get("initiative_order") or []
+    idx   = cs.get("current_turn_index", 0)
+    if not (isinstance(idx, int) and 0 <= idx < len(order)):
+        return
+    ch = memory.campaign.get("characters", {}).get(memory.char_key(order[idx]))
+    if not ch:
+        return
+    _rolar_recargas(ch)
+    _repor_lendarias(ch)
+    cs["_lendarias_msg"] = _gastar_lendarias_dos_chefes(order[idx])
+
+
+def _gastar_lendarias_dos_chefes(quem_comeca: str) -> list[str]:
+    """
+    Chefes inimigos gastam UMA ação lendária na virada de turno.
+
+    Sem isto, ação lendária só existiria se a LLM lembrasse de chamá-la — e no
+    modo tela, onde a luta corre sem LLM, nunca seria usada. Uma por virada é
+    também como um mestre humano joga: espalha as três pela rodada em vez de
+    despejar tudo de uma vez.
+
+    Só NPCs. Um personagem lendário do GRUPO continua sendo jogado pelo
+    jogador — o motor não decide por ele.
+    """
+    cs    = memory.campaign.get("combat_state") or {}
+    chars = memory.campaign.get("characters", {})
+    avisos = []
+
+    for nome in cs.get("initiative_order", []) or []:
+        if memory.char_key(nome) == memory.char_key(quem_comeca):
+            continue                      # nunca no próprio turno
+        chefe = chars.get(memory.char_key(nome))
+        if not chefe or memory.is_party_member(chefe):
+            continue
+        lend = (chefe.get("sheet") or {}).get("lendarias")
+        if not isinstance(lend, dict) or not lend.get("opcoes"):
+            continue
+        if int(lend.get("restantes", 0) or 0) <= 0:
+            continue
+        if (chefe.get("status", "vivo") or "").lower() in OUT_OF_COMBAT_STATUSES:
+            continue
+        if int((chefe.get("sheet") or {}).get("vida_atual", 0) or 0) <= 0:
+            continue
+
+        # A opção mais cara que ainda cabe no saldo — é a mais forte.
+        cabem = [o for o in lend["opcoes"]
+                 if int(o.get("custo", 1) or 1) <= int(lend["restantes"])]
+        if not cabem:
+            continue
+        escolha = max(cabem, key=lambda o: int(o.get("custo", 1) or 1))
+
+        alvo = _alvo_de_lendaria(chefe)
+        saida = legendary_action(chefe.get("name", nome), escolha["nome"], alvo)
+        if not saida.startswith(("❌", "⚠️")):
+            avisos.append(saida)
+    return avisos
+
+
+def _alvo_de_lendaria(chefe: dict) -> str:
+    """Adversário consciente com menos PV — o alvo que um chefe escolheria."""
+    cs    = memory.campaign.get("combat_state") or {}
+    chars = memory.campaign.get("characters", {})
+    lado  = memory.is_party_member(chefe)
+    melhor, menos = "", None
+    for nome in cs.get("initiative_order", []) or []:
+        outro = chars.get(memory.char_key(nome))
+        if not outro or memory.is_party_member(outro) == lado:
+            continue
+        if (outro.get("status", "vivo") or "").lower() in OUT_OF_COMBAT_STATUSES:
+            continue
+        hp = int((outro.get("sheet") or {}).get("vida_atual", 0) or 0)
+        if hp <= 0:
+            continue
+        if menos is None or hp < menos:
+            melhor, menos = outro.get("name", nome), hp
+    return melhor
 
 
 # Marcadores de habilidade PASSIVA (não aparecem como botão de ação na tela).
@@ -7441,6 +8263,14 @@ def _combatant_snapshot(name: str) -> dict | None:
         "name":       ch.get("name", name),
         "status":     (ch.get("status", "vivo") or "vivo"),
         "is_party":   bool(memory.is_party_member(ch)),
+        # Onda 3 — posição no campo. "" quando o combate não usa zonas.
+        "zona":       _zona_de(ch.get("name", name)),
+        "trancado":   _inimigos_na_zona(ch.get("name", name)),
+        "lendarias":  ((s.get("lendarias") or {}).get("restantes")
+                       if isinstance(s.get("lendarias"), dict) else None),
+        "recargas":   {k: bool(v.get("pronto", True))
+                       for k, v in (s.get("recargas") or {}).items()
+                       if isinstance(v, dict)},
         "hp":         int(s.get("vida_atual", 0) or 0),
         "hp_max":     int(s.get("vida_max", 0) or 0),
         # Onda 2 — a tela precisa mostrar por que um golpe deu metade do dano.
@@ -7496,11 +8326,15 @@ def combat_snapshot() -> dict:
             )
         ) if current else False,
         "order":       order,
+        # Campo de batalha: lista vazia = combate sem posicionamento.
+        "zonas":       _zonas(),
+        "zona_desc":   dict(cs.get("zona_desc") or {}),
         "combatants":  combatants,
         "log":         list(cs.get("log", []) or [])[-60:],
         "result":      cs.get("result"),   # painel de fim (None até acabar)
         "turn_economy": dict(cs.get("turn_economy") or
-                             {"acao_usada": False, "bonus_usada": False}),
+                             {"acao_usada": False, "bonus_usada": False,
+                              "movimento_usado": False}),
     }
 
 
@@ -7510,7 +8344,11 @@ def combat_action(action: str, actor: str = "", target: str = "",
     Aplica UMA intenção de combate vinda da tela, delegando ao motor
     determinístico já fuzzado. Retorna {ok, message, snapshot}.
 
-    actions: attack | ability | enemy | pass | defend | flee | death_save | end
+    actions: attack | ability | item | move | enemy | pass | defend | flee |
+             death_save | end
+
+    move: `target` é a zona de destino; weapon="dash" usa a Disparada
+    (custa a Ação) para cruzar duas zonas.
     """
     cs = memory.campaign.get("combat_state", {}) or {}
     if action not in ("end",) and not cs.get("is_active"):
@@ -7681,6 +8519,32 @@ def combat_action(action: str, actor: str = "", target: str = "",
                 try: inv.remove(slot_inv)
                 except ValueError: pass
             memory.save_campaign()
+
+        elif a == "move":
+            # Movimento NÃO é Ação em 5e: acontece ao lado dela, uma vez por
+            # turno. Só a Disparada (dash) custa a Ação — e é o que permite
+            # cruzar duas zonas.
+            destino = (target or item or "").strip()
+            if not destino:
+                return {"ok": False, "message": "Movimento exige a zona de destino.",
+                        "snapshot": combat_snapshot()}
+            if eco.get("movimento_usado"):
+                return {"ok": False,
+                        "message": f"❌ {actor} já se moveu neste turno.",
+                        "snapshot": combat_snapshot()}
+            dash = bool(weapon and weapon.lower() == "dash")
+            if dash:
+                err = _use_slot(eco, "acao")
+                if err:
+                    return {"ok": False, "message": err, "snapshot": combat_snapshot()}
+            msg = move_combatant(actor, destino, dash=dash)
+            # Só marca o movimento como gasto se ele realmente aconteceu —
+            # uma recusa (zona inexistente, longe demais) não pode queimar o
+            # turno do jogador.
+            if not msg.startswith(("❌", "⚠️")):
+                eco["movimento_usado"] = True
+            elif dash:
+                eco["acao_usada"] = False
 
         elif a == "defend":
             err = _use_slot(eco, "acao")  # Dodge = Ação
@@ -7867,6 +8731,14 @@ DND_TOOLS = [
     # NPC strategy system
     set_npc_strategy,
     execute_npc_turn,
+    # Onda 3 — posicionamento por zonas
+    set_battlefield,
+    describe_battlefield,
+    move_combatant,
+    # Onda 3 — chefes: recarga e ações lendárias
+    set_recharge_ability,
+    set_legendary_actions,
+    legendary_action,
     # Macro-tools (v4)
     resolve_saving_throw,
 ]

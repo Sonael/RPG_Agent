@@ -61,6 +61,11 @@ FERRAMENTAS_SO_DO_MODO_NARRADO = frozenset({
     "execute_npc_turn",
     "roll_death_save",
     "resolve_saving_throw",
+    # Onda 3: movimento e ação lendária são mecânica de DENTRO da luta. A tela
+    # move pelo intent "move" do combat_action, e os chefes gastam as ações
+    # lendárias sozinhos na virada de turno (_gastar_lendarias_dos_chefes).
+    "move_combatant",
+    "legendary_action",
 })
 
 
@@ -108,6 +113,9 @@ def _campanha_usa_dnd(camp) -> bool:
 #   • end_combat      — barata (204 chars) e serve de escape se a tela não
 #     concluir a luta por algum motivo.
 #   • spawn_monster / set_npc_strategy — usadas ANTES da luta começar.
+#   • set_battlefield / set_recharge_ability / set_legendary_actions — também
+#     montagem do encontro, chamadas antes do primeiro turno.
+#   • describe_battlefield — leitura pura; a narração final precisa dela.
 #   • modify_hp / apply_condition — dano e condições fora de combate
 #     continuam sendo responsabilidade da narração.
 

@@ -432,6 +432,41 @@ QUEM ENTRA NA INICIATIVA — regra dura:
     NÃO chame recruit_character/add_party_member para ele — foi assim que um
     acólito inimigo apareceu do lado do grupo.
 
+TERRENO — dê um lugar à luta (opcional, mas quase sempre vale):
+  Logo depois de roll_initiative(), chame set_battlefield() com 2 a 4 zonas
+  tiradas da cena que você acabou de descrever:
+
+      set_battlefield("Portão, Pátio, Sacada",
+                      "portas de ferro; lama e barris; arqueiros no alto")
+
+  As zonas ficam numa TRILHA: vizinhas são adjacentes. A partir daí o motor
+  cobra a distância sozinho —
+    • corpo-a-corpo só na MESMA zona (ataque de longe é recusado);
+    • tiro de duas zonas ou mais sai com desvantagem, e tiro com inimigo
+      colado também;
+    • sair de uma zona ocupada por inimigo provoca ataque de oportunidade.
+  O grupo entra na primeira zona e os inimigos na última; use
+  move_combatant() para quem começa em outro lugar (o arqueiro na sacada, o
+  refém no fundo). describe_battlefield() mostra o campo a qualquer momento.
+
+  Sem set_battlefield() o combate corre sem posicionamento, como antes — use
+  quando o lugar importa (emboscada, ponte, sala com altura), não numa briga
+  de taverna em que todo mundo está a um passo.
+
+CHEFES — o que separa um chefe de um saco de PV:
+  • set_recharge_ability("Dragão", "Sopro de Fogo", 5) — o poder volta quando
+    um d6 der 5+ no início do turno dele. Use para sopros e explosões.
+  • set_legendary_actions("Dragão", "Ataque de Cauda, Investida Alada:2", 3)
+    — o chefe passa a agir FORA do próprio turno. O motor gasta essas ações
+    sozinho na virada de cada turno; você só narra o que apareceu no log.
+  Ambas ANTES do primeiro turno, junto com create_character_sheet().
+
+ESTRATÉGIA DOS NPCs — set_npc_strategy() muda como execute_npc_turn() joga:
+  agressivo · tático · covarde · aleatório · suporte (cura de verdade) ·
+  atirador (recua da zona quando o corpo-a-corpo o alcança, depois atira).
+  Um clérigo inimigo com magia de cura na ficha DEVE ser "suporte"; um
+  arqueiro, "atirador". É o que faz o inimigo parecer jogado, não sorteado.
+
 FIM — VITÓRIA (todos os inimigos derrotados): sequência OBRIGATÓRIA:
   1. end_combat()
   2. grant_xp(personagem, xp, motivo)  ← para CADA membro do grupo
@@ -855,8 +890,12 @@ def create_agent(model, campaign_type: str = "fantasia") -> Agent:
         "• Quando um combate começar: descreva a CENA inicial (terreno, "
         "inimigos, clima de tensão), chame roll_initiative() com os "
         "participantes QUE VOCÊ ACABOU DE NARRAR NA CENA — e só eles; nunca a "
-        "lista inteira de personagens conhecidos — e PARE. A luta acontece na "
-        "tela tática — você NÃO "
+        "lista inteira de personagens conhecidos. Em seguida monte o encontro: "
+        "set_battlefield() com as zonas do lugar, e para os chefes "
+        "set_recharge_ability()/set_legendary_actions(). Depois PARE. "
+        "A tela mostra as zonas e o jogador move com o botão Mover; as ações "
+        "lendárias o motor gasta sozinho na virada de turno. "
+        "A luta acontece na tela tática — você NÃO "
         "narra turnos nem chama attack_roll/use_ability/execute_npc_turn/"
         "next_turn. NÃO descreva golpes nem resultados ainda.\n"
         "• Você será chamado de novo com '[COMBATE RESOLVIDO NA TELA "

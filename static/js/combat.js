@@ -38,6 +38,8 @@
           <div id="cbt-order" class="cbt-initiative"></div>
         </header>
 
+        <div id="cbt-zonas" class="cbt-zonas hidden"></div>
+
         <div class="cbt-battlefield">
           <div id="cbt-party"   class="cbt-team"></div>
           <div id="cbt-stage"   class="cbt-vs">Vs.</div>
@@ -196,6 +198,8 @@
     document.getElementById('cbt-enemies').innerHTML = enemies.map(card).join('') || '<div class="cbt-empty">—</div>';
     document.getElementById('cbt-party').innerHTML   = party.map(card).join('')   || '<div class="cbt-empty">—</div>';
 
+    renderZonas(snap);
+
     const log = (snap.log || []).slice(-12).map(e =>
       `<div class="cbt-logline">[R${e.round}] ${esc(e.msg || e.type || '')}</div>`).join('');
     const lg = document.getElementById('cbt-log');
@@ -203,6 +207,30 @@
     lg.scrollTop = lg.scrollHeight;
 
     renderActionBar(snap);
+  }
+
+  // Faixa do campo de batalha. Fica escondida quando o combate nao usa
+  // zonas: a onda 3 e opcional, e uma trilha vazia so ocuparia espaco.
+  function renderZonas(snap) {
+    const faixa = document.getElementById('cbt-zonas');
+    if (!faixa) return;
+    const zonas = snap.zonas || [];
+    if (zonas.length < 2) { faixa.classList.add('hidden'); faixa.innerHTML = ''; return; }
+
+    const desc  = snap.zona_desc || {};
+    const atual = (snap.combatants || []).find(c => c.is_current);
+    faixa.innerHTML = zonas.map(z => {
+      const dentro = (snap.combatants || []).filter(c => c.zona === z && !isOut(c.status));
+      const fichas = dentro.map(c =>
+        `<span class="cbt-pin ${c.is_party ? 'cbt-pin-aliado' : 'cbt-pin-inimigo'}`
+        + `${c.is_current ? ' cbt-pin-vez' : ''}">${esc(c.name)}</span>`).join('');
+      const aqui = (atual && atual.zona === z) ? ' cbt-zona-aqui' : '';
+      return `<div class="cbt-zona${aqui}" title="${esc(desc[z] || '')}">`
+           + `<div class="cbt-zona-nome">${esc(z)}</div>`
+           + `<div class="cbt-zona-pins">${fichas || '<span class="cbt-zona-vazia">vazia</span>'}</div>`
+           + `</div>`;
+    }).join('<span class="cbt-zona-liga">→</span>');
+    faixa.classList.remove('hidden');
   }
 
   function renderActionBar(snap) {
@@ -239,9 +267,17 @@
     const slot = (rotulo, gasto, dica) =>
       `<span class="cbt-slot ${gasto ? 'gasto' : 'livre'}" title="${dica}">`
       + `<span class="cbt-pip"></span>${rotulo}</span>`;
+    // Movimento só entra na régua quando o combate tem zonas — sem campo
+    // dividido não há o que mover, e um selo permanentemente apagado só
+    // confundiria.
+    const temZonas  = (snap.zonas || []).length > 1;
+    const moveUsed  = !!eco.movimento_usado;
     promptEl.innerHTML =
       slot('Ação', acaoUsed, acaoUsed ? 'Ação já usada neste turno' : 'Ação disponível')
       + slot('Bônus', bonusUsed, bonusUsed ? 'Ação bônus já usada neste turno' : 'Ação bônus disponível')
+      + (temZonas ? slot('Movimento', moveUsed, moveUsed
+             ? 'Já se moveu neste turno'
+             : 'Movimento disponível — não custa a Ação') : '')
       + slot('Reação', !reacaoOk, reacaoOk
              ? 'Reação disponível — usada fora do seu turno (ex.: ataque de oportunidade)'
              : 'Reação já gasta nesta rodada');
@@ -266,6 +302,10 @@
     if ((cur.itens_combate || []).length) {
       const d = (itemUsable && !_busy) ? '' : 'disabled';
       html += `<button class="cbt-btn" ${d} onclick="window.Combat._sel('item')">🧪 Item</button>`;
+    }
+    if (temZonas) {
+      const d = (moveUsed || _busy) ? 'disabled' : '';
+      html += `<button class="cbt-btn" ${d} onclick="window.Combat._sel('move')">🏃 Mover</button>`;
     }
     html +=
       `<button class="cbt-btn" ${acaoDis} onclick="window.Combat._act({action:'defend',actor:'${actorEsc}'})">🛡️ Defender</button>` +
@@ -507,6 +547,45 @@
     const dis = slot => (slot === 'bonus' ? eco.bonus_usada : eco.acao_usada) ? 'disabled' : '';
     const tag = slot => slot === 'bonus' ? 'Bônus' : 'Ação';
 
+    if (kind === 'move') {
+      const snap  = _last || {};
+      const zonas = snap.zonas || [];
+      const aqui  = (cur && cur.zona) || '';
+      const i     = zonas.indexOf(aqui);
+      // Uma zona e movimento comum; duas exigem a Disparada, que custa a
+      // Acao: por isso essas somem quando a Acao ja foi gasta.
+      const opcoes = zonas
+        .map((z, j) => ({ z, passos: i < 0 ? 1 : Math.abs(j - i) }))
+        .filter(o => o.passos >= 1 && o.passos <= 2)
+        .filter(o => o.passos === 1 || !eco.acao_usada);
+      if (!opcoes.length) {
+        if (window.showToast) window.showToast('Nenhuma zona ao alcance.');
+        return;
+      }
+      tgtEl.innerHTML =
+        `<div class="cbt-tgt-title">Mover para${aqui ? ' (de ' + esc(aqui) + ')' : ''}:</div>`
+        + `<div class="cbt-picker-btns">`
+        + opcoes.map(o => {
+            const dash = o.passos === 2;
+            // Avisa quem espera la: entrar numa zona ocupada tranca o
+            // combatente, e sair depois provoca ataque de oportunidade.
+            const ocupada = (snap.combatants || [])
+              .filter(c => c.zona === o.z && !isOut(c.status)
+                        && c.is_party !== (cur && cur.is_party))
+              .map(c => c.name);
+            const risco = ocupada.length ? ` <small>· ${esc(ocupada.join(', '))}</small>` : '';
+            return `<button class="cbt-btn" onclick="window.Combat._mover('${esc(o.z).replace(/'/g,"\'")}',${dash})">`
+                 + `🏃 ${esc(o.z)}${risco}`
+                 + (dash ? ` <em class="cbt-eco-tag eco-acao">Disparada</em>` : '')
+                 + `</button>`;
+          }).join('')
+        + `<button class="cbt-btn cbt-cancel" onclick="window.Combat._cancel()">✕ Cancelar</button>`
+        + `</div>`;
+      tgtEl.classList.remove('hidden');
+      trazerParaVista(tgtEl);
+      return;
+    }
+
     if (kind === 'item') {
       const itens = (cur && cur.itens_combate) || [];
       if (!itens.length) {
@@ -626,6 +705,16 @@
     if (pill) pill.classList.add('hidden');
     sync();   // reabre e re-renderiza o estado atual
   }
+  function _mover(zona, dash) {
+    const cur = (_last && (_last.combatants || []).find(c => c.is_current)) || null;
+    if (!cur) return;
+    _cancel();
+    // O "dash" viaja em `weapon` porque esse campo ja e o qualificador da
+    // intencao no dispatcher (e ele que leva a arma no ataque).
+    _act({ action: 'move', actor: cur.name, target: zona,
+           weapon: dash ? 'dash' : '' });
+  }
+
   function _cancel() {
     const t = document.getElementById('cbt-targets');
     if (t) { t.classList.add('hidden'); t.innerHTML = ''; }
@@ -672,7 +761,7 @@
   // ---- API pública -------------------------------------------------
   window.Combat = {
     sync,
-    _sel, _selHab, _selWeapon, _selItem, _target, _cancel, _free,
+    _sel, _selHab, _selWeapon, _selItem, _target, _mover, _cancel, _free,
     _act: act,
     _continue, _closeOnly, _dismiss, _reopen,
     _close: () => close(false),
