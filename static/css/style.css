@@ -194,6 +194,11 @@ textarea { resize: vertical; min-height: 40px; }
   font-size: 16px; font-weight: 500; letter-spacing: 1px; padding: 10px 20px; cursor: pointer; border-radius: 4px; transition: all 0.3s;
   text-align: center;
 }
+/* A barra precisa ser flex column: o #start-btn era filho direto da
+   .page-right (flex column) e esticava por align-items:stretch. Envolvido
+   num <div> comum, o <button> volta a ser inline-block e encolhe para o
+   tamanho do texto. */
+.barra-iniciar { display: flex; flex-direction: column; }
 .btn-main:hover:not(:disabled), .btn-save:hover { background: var(--ink-user); box-shadow: 0 4px 10px rgba(38, 75, 130, 0.2); }
 .btn-danger:hover { background: var(--red); box-shadow: 0 4px 10px rgba(196, 68, 68, 0.2); }
 
@@ -1664,8 +1669,21 @@ body.combat-on { overflow: hidden; }
 @media (max-width: 760px) {
   #combat-overlay { padding: 0; align-items: stretch; }
   #cbt-frame {
-    max-width: none; height: auto; min-height: 100vh;
-    border-radius: 0; border: none;
+    max-width: none; border-radius: 0; border: none;
+    /* QUEM ROLA É O FRAME, não o overlay: o painel de ação é `fixed`, mas
+       o #combat-overlay tem `backdrop-filter`, que cria bloco de contenção
+       para descendentes fixos. Se o overlay rolasse, a barra rolaria
+       junto e sairia da tela. Antes o frame ficava preso na altura da
+       viewport com o `overflow: hidden` da regra base, então 1300px de
+       conteúdo eram simplesmente cortados: nem os últimos cards do grupo
+       nem o diário tinham como ser alcançados. */
+    height: 100vh; min-height: 0;
+    overflow: hidden auto;
+    /* Respiro no fim: o conteúdo termina acima da barra fixa em vez de
+       ficar preso atrás dela. A altura real da barra vem do combat.js
+       (ela muda quando um seletor abre); o 52vh é o teto dela, usado
+       enquanto o JS não mediu. */
+    padding-bottom: calc(var(--cbt-bar-h, 52vh) + 16px);
   }
   /* No mobile, o campo de batalha e o diário fluem e a página rola — mas o
      PAINEL DE AÇÃO fica fixo no rodapé.
@@ -1686,9 +1704,6 @@ body.combat-on { overflow: hidden; }
     padding-bottom: calc(20px + env(safe-area-inset-bottom));
   }
   .cbt-picker { max-height: none; }
-  /* Espaço para o último card não ficar escondido atrás da barra fixa. */
-  .cbt-battlefield { padding-bottom: 24px; }
-  #cbt-frame { padding-bottom: 46vh; }
   /* O painel de fim precisa cobrir a barra fixa. */
   .cbt-end-overlay { z-index: 40; }
   .cbt-title { font-size: 1.3rem; }

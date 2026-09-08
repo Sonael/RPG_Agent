@@ -273,6 +273,7 @@
       `<button class="cbt-btn" ${dis} onclick="window.Combat._free()">💬 Ação Livre</button>` +
       `<button class="cbt-btn cbt-primary" ${dis} onclick="window.Combat._act({action:'end_turn',actor:'${actorEsc}'})">⏭️ Encerrar Turno</button>`;
     btnEl.innerHTML = html;
+    acompanharAlturaDaBarra();
   }
 
   function showTargets(kind, opts) {
@@ -303,10 +304,37 @@
   // `block: 'nearest'` só rola o necessário e não mexe se já estiver visível.
   function trazerParaVista(el) {
     if (!el) return;
+    // Fora do rAF de propósito: o seletor já está no DOM e visível, então a
+    // barra já tem a altura nova. Dentro do rAF a reserva de espaço ficaria
+    // refém do ciclo de renderização (que não roda com a aba oculta).
+    acompanharAlturaDaBarra();
     requestAnimationFrame(() => {
       try { el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
       catch (_) { el.scrollIntoView(false); }
     });
+  }
+
+  // A barra de ação do mobile é `position: fixed`, então o conteúdo do frame
+  // passa por trás dela. O CSS reserva esse espaço com
+  // `padding-bottom: calc(var(--cbt-bar-h) + 16px)`, mas a altura da barra
+  // varia bastante — ela cresce quando um seletor (arma, alvo, item) abre.
+  // Sem medir, ou sobra um vão enorme ou o diário fica inalcançável.
+  let _obsBarra = null;
+  function acompanharAlturaDaBarra() {
+    const painel = document.querySelector('.cbt-action-panel');
+    const frame  = document.getElementById('cbt-frame');
+    if (!painel || !frame) return;
+    const medir = () => {
+      const h = painel.getBoundingClientRect().height;
+      if (h > 0) frame.style.setProperty('--cbt-bar-h', h + 'px');
+    };
+    // Mede já: o ResizeObserver só entrega no ciclo de renderização, que fica
+    // suspenso enquanto a aba está oculta. Sem esta medida direta o respiro
+    // dependeria dele para existir.
+    medir();
+    if (_obsBarra || typeof ResizeObserver === 'undefined') return;
+    _obsBarra = new ResizeObserver(medir);   // a barra cresce quando um seletor abre
+    _obsBarra.observe(painel);
   }
 
   // ---- Loop / sincronização ---------------------------------------
@@ -602,6 +630,7 @@
     const t = document.getElementById('cbt-targets');
     if (t) { t.classList.add('hidden'); t.innerHTML = ''; }
     _pick = null;
+    acompanharAlturaDaBarra();
   }
   function _free() {
     close(false);
