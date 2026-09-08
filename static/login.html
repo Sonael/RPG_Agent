@@ -26,7 +26,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;600&family=Lora:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Playfair+Display:ital,wght@0,500;0,700;1,500&display=swap" rel="stylesheet">
   
-  <link rel="stylesheet" href="/static/css/style.css?v=46">
+  <link rel="stylesheet" href="/static/css/style.css?v=47">
 </head>
 <body class="auth-page">
   
@@ -42,8 +42,8 @@
 
       <div class="page-left">
         <h1 class="book-title">RPG Agent</h1>
-        <div style="text-align: center; color: var(--page-edge); font-size: 24px; margin-bottom: 10px;">❦</div>
-        <div style="font-size: 16px; line-height: 1.8; color: var(--text-muted); text-align: justify; margin-top: 20px;">
+        <div class="auth-ornamento">❦</div>
+        <div class="auth-apresentacao">
           Bem-vindo ao RPG Agent. Este livro guarda os registros de incontáveis aventuras, mistérios não resolvidos, romances perdidos no tempo e explorações galácticas.<br><br>
           Identifique-se para acessar as suas crônicas ou inicie um novo capítulo criando um registro.
         </div>
@@ -88,7 +88,7 @@
 
           <div class="auth-error" id="auth-error"></div>
 
-          <button id="auth-submit-btn" class="btn-main" style="width: 100%; max-width: 400px; margin: 10px auto 0 auto; display: block;" onclick="submitAuth()">Abrir o Livro</button>
+          <button id="auth-submit-btn" class="btn-main" onclick="submitAuth()">Abrir o Livro</button>
         </div>
 
         <div class="page-number right">II</div>
@@ -101,15 +101,15 @@
       <div id="dialog-accent" style="height: 4px; border-radius: 8px 8px 0 0; position: absolute; top: 0; left: 0; right: 0;"></div>
       
       <div id="dialog-inner">
-        <div id="dialog-head" class="modal-header" style="justify-content: center; margin-bottom: 20px; position: relative; margin-top: 10px;">
+        <div id="dialog-head" class="modal-header dialogo-cabeca">
           <div id="dialog-icon" style="position: absolute; left: 0; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: bold;"></div>
-          <div class="modal-title" id="dialog-title" style="margin: 0 auto;"></div>
+          <div class="modal-title dialogo-titulo" id="dialog-title"></div>
         </div>
         
-        <div id="dialog-message" style="font-family: 'Lora', serif; font-size: 16px; margin-bottom: 25px; line-height: 1.5; color: var(--text-muted); text-align: center;"></div>
+        <div id="dialog-message" class="dialogo-mensagem"></div>
       </div>
       
-      <div id="dialog-buttons" style="display: flex; gap: 10px; justify-content: center;"></div>
+      <div id="dialog-buttons" class="acoes-centro"></div>
     </div>
   </div>
 

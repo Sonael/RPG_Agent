@@ -372,11 +372,16 @@ textarea { resize: vertical; min-height: 40px; }
 .tab-panel.active { display: block; animation: fadeIn 0.3s ease; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
-.sidebar-tabs { display: flex; gap: var(--esp-2); margin-bottom: var(--esp-6); flex-shrink: 0; }
+.sidebar-tabs { display: flex; gap: var(--esp-2);
+                margin-top: var(--esp-4); margin-bottom: var(--esp-6);
+                flex-shrink: 0; }
 .tab-btn { flex: 1; background: transparent; border: 1px solid var(--page-edge); padding: var(--esp-2); font-family: 'Lora', serif; font-size: 13px; cursor: pointer; border-radius: 4px; color: var(--text-muted); transition: 0.2s; }
 .tab-btn.active { background: rgba(0,0,0,0.04); font-weight: 600; color: var(--text-main); border-color: var(--input-border); }
 
-.sb-section { background: transparent; border: none; padding: 0; margin-bottom: var(--esp-6); }
+/* margin-top estava inline nas 8 seções, sempre com o mesmo valor —
+   é propriedade da seção, não de cada uso. */
+.sb-section { background: transparent; border: none; padding: 0;
+              margin-top: var(--esp-5); margin-bottom: var(--esp-6); }
 .sb-section-title { font-family: 'Playfair Display', serif; font-size: 14px; font-weight: 700; text-transform: uppercase; margin-bottom: var(--esp-3); color: var(--text-main); }
 .empty-state { font-size: 14px; color: var(--text-muted); font-style: italic; text-align: left; display: block; }
 
@@ -720,7 +725,10 @@ textarea { resize: vertical; min-height: 40px; }
   .bottom-actions .clean-button { padding: var(--esp-3) var(--esp-4); font-size: 15px; text-align: center; width: 100%; }
   .page-number { display: none; }
   .book-title { font-size: 24px; margin-bottom: var(--esp-3); padding-bottom: var(--esp-3); text-align: center; }
-  .page-left:not(#sidebar) > div[style*="text-transform"] { font-size: 13px; margin-bottom: var(--esp-3) !important; }
+  /* Selecionava por `div[style*="text-transform"]`, ou seja, dependia de
+     o estilo estar inline no HTML. Ao extrair o inline, a regra deixaria
+     de casar em silêncio. Agora aponta para a classe. */
+  .lista-legenda { font-size: 13px; margin-bottom: var(--esp-3); }
   /* No login, o formulário sobe: as duas folhas do livro empilham, e o
      texto de boas-vindas tomava a primeira tela inteira antes de aparecer
      onde entrar. A apresentação continua logo abaixo, para quem chega
@@ -1360,6 +1368,213 @@ body.combat-on { overflow: hidden; }
 .cbt-ord-sep { color: var(--cbt-gold); }
 
 /* Campo de batalha */
+/* =========================================================
+   COMPONENTES — o que morava no style= do HTML
+   =========================================================
+   Havia 114 declarações de espaçamento escritas direto no atributo style=
+   dos três HTML. Elas ficavam FORA da escala de espaçamento (um style=
+   inline não vê --esp-*), e fora do alcance de qualquer ajuste: mudar o
+   respiro de um tipo de botão exigia caçar 9 lugares no markup.
+
+   Pior: estilo inline vence QUALQUER regra de folha. Um botão com
+   `width:auto` no HTML ignorava, em silêncio, o `width:100%` que o mobile
+   aplica — e o motivo disso não estava escrito em lugar nenhum.
+
+   Agora está. As regras abaixo ficam DEPOIS das media queries de propósito:
+   é o que permite a um componente recusar o padrão responsivo sem precisar
+   de !important, e a intenção fica visível em vez de escondida no markup.
+   ========================================================= */
+
+/* ── Botões que não esticam ──────────────────────────────────────────────
+   No mobile .btn-main e .bottom-actions .clean-button viram width:100%.
+   Estes recusam isso: são botões de barra, lado a lado, onde 100% quebraria
+   a linha. */
+.btn-inline       { width: auto; margin: 0; }
+.btn-inline-medio { width: auto; margin: 0; padding: var(--esp-2) var(--esp-4); }
+.btn-inline-mini  { width: auto; margin: 0; padding: var(--esp-1) var(--esp-3); }
+/* Botão que se parece com link: usado nos "+ Adicionar" das seções. */
+.btn-texto {
+  width: auto; margin: 0; padding: 2px var(--esp-2);
+  font-size: 12px; border: none; color: var(--ink-user);
+}
+.btn-texto-mini { font-size: 10px; }
+/* O único d20 da bandeja: destacado por ser a rolagem mais comum. */
+.btn-inline-medio.destaque {
+  border-color: var(--ink-user); color: var(--ink-user); font-weight: bold;
+}
+
+/* ── Linhas de cabeçalho: um rótulo à esquerda, uma ação à direita ────── */
+.linha-secao {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: var(--esp-3);
+}
+.linha-secao-larga { margin-bottom: var(--esp-5); }
+.linha-secao > label { margin: 0; }
+/* O subtítulo do editor fica alinhado com o título, não colado nele. */
+.linha-secao .modal-subtitle { margin-top: var(--esp-1); }
+
+/* ── Barras de ação ───────────────────────────────────────────────────── */
+.acoes-centro  { display: flex; gap: var(--esp-3); justify-content: center; }
+.acoes-direita { display: flex; gap: var(--esp-3); justify-content: flex-end; }
+.acoes-rodape  { display: flex; gap: var(--esp-3); margin-left: auto; align-items: center; }
+
+/* ── Formulário do wizard e do editor ─────────────────────────────────── */
+/* A grade padrão tem respiro de página (40px). Dentro de um modal isso é
+   demais: o modal já é uma caixa apertada. */
+.form-grid.compacta { gap: var(--esp-5); margin-bottom: var(--esp-5); }
+.field-group.rente  { margin: 0; }
+
+/* ── Textos de apoio abaixo de um campo ───────────────────────────────── */
+.campo-status { font-size: 12px; margin-top: var(--esp-1); }
+.campo-nota   { font-size: 12px; margin-top: var(--esp-1); font-style: italic; }
+
+/* ── Diálogo de confirmação (mesmo markup no menu e no jogo) ──────────── */
+.dialogo-cabeca {
+  justify-content: center; position: relative;
+  margin-top: var(--esp-3); margin-bottom: var(--esp-5);
+}
+.dialogo-titulo { margin: 0 auto; }
+.dialogo-mensagem {
+  font-family: 'Lora', serif; font-size: 16px; line-height: 1.5;
+  color: var(--text-muted); text-align: center;
+  margin-bottom: var(--esp-6);
+}
+
+/* ── Barra lateral do jogo ────────────────────────────────────────────── */
+/* Linha "rótulo à esquerda, valor à direita" (Local, Tempo). */
+.linha-info {
+  display: flex; justify-content: space-between;
+  font-family: 'Lora', serif; font-size: 13px; margin-bottom: var(--esp-1);
+}
+/* O "(editar)" ao lado de um título de seção. */
+.sb-editar {
+  font-family: 'Lora', serif; font-size: 12px; font-style: italic;
+  font-weight: normal; cursor: pointer; color: var(--ink-user);
+  text-transform: none; margin-left: var(--esp-1);
+}
+.sb-nota { font-size: 12px; color: var(--text-muted); margin-bottom: var(--esp-2); }
+.sb-titulo-rente { margin-bottom: var(--esp-1); }
+
+/* ── Legenda acima da lista de campanhas ("AS SUAS HISTÓRIAS") ────────── */
+.lista-legenda {
+  font-family: 'Playfair Display', serif; font-size: 16px;
+  color: var(--text-muted); text-transform: uppercase; text-align: center;
+  margin: 0 0 var(--esp-4) 0;
+}
+
+/* ── Prefácio da sessão (menu) ────────────────────────────────────────── */
+.preambulo-titulo {
+  font-family: 'Playfair Display', serif; font-weight: 500; font-size: 32px;
+  color: var(--text-main); text-align: center; margin: 0 0 var(--esp-3) 0;
+}
+.preambulo-sub {
+  text-align: center; font-style: italic; color: var(--text-muted);
+  font-size: 16px; margin-bottom: var(--esp-10);
+}
+.campo-ajuda { font-size: 14px; color: var(--text-muted); margin-top: 0; }
+.campo-abaixo { margin-top: var(--esp-4); }
+
+/* ── Bandeja de dados ─────────────────────────────────────────────────── */
+.bandeja-dados {
+  margin-top: var(--esp-4); padding: var(--esp-5);
+  background: rgba(0,0,0,0.02); border-radius: 6px;
+  border: 1px solid var(--page-edge);
+}
+.bandeja-linha { display: flex; align-items: center; gap: var(--esp-2); }
+.bandeja-botoes { display: flex; gap: var(--esp-2); flex-wrap: wrap; }
+.bandeja-nota {
+  font-family: 'Lora', serif; font-size: 11px; color: var(--text-dim);
+  margin-top: var(--esp-3); font-style: italic;
+}
+
+/* ── Elementos com id próprio ────────────────────────────────────────────
+   Estes não precisam de classe nova: já têm identidade. O estilo estava
+   inline só por hábito. Regra de id vence classe, então a cascata aqui é
+   trivial — o que importa é que o espaçamento agora usa a escala. */
+#model-full-label {
+  font-family: 'Lora', serif; font-size: 12px; color: var(--text-muted);
+  margin-top: var(--esp-2); font-style: italic;
+}
+#start-hint {
+  font-family: 'Lora', serif; font-size: 13px; font-style: italic;
+  text-align: center; margin-bottom: var(--esp-3);
+}
+#import-prompt-text {
+  background: rgba(0,0,0,0.03); padding: var(--esp-3); border-radius: 4px;
+  font-family: 'Lora', serif; font-size: 12px;
+  margin-bottom: var(--esp-3); max-height: 100px;
+}
+#combat-mode-hint {
+  font-family: 'Lora', serif; font-size: 11px; color: var(--text-dim);
+  margin-top: var(--esp-2); font-style: italic;
+}
+#dice-modifier {
+  width: 50px; font-family: 'Caveat', cursive; font-size: 22px;
+  padding: 0 var(--esp-1); text-align: center;
+}
+#edit-body { max-height: 60vh; padding: var(--esp-3) 0; }
+#edit-footer {
+  display: flex; justify-content: space-between;
+  margin-top: var(--esp-5); padding-top: var(--esp-5);
+  border-top: 1px solid var(--page-edge);
+}
+
+/* ── Painel de cota do modelo (barra lateral do jogo) ───────────────────
+   As duas colunas eram uma grade 1fr 1fr. "Requisições: 0 / 500" é bem mais
+   longo que "Tokens: 0", e a grade igual só cabia por 2px — quando o padding
+   da lateral cresceu 2px de cada lado, a linha estourou. Flex com
+   space-between: cada um ocupa o que precisa. */
+.quota-panel {
+  width: 100%; padding: var(--esp-3); background: rgba(0,0,0,0.03);
+  border-radius: 4px; border: 1px solid var(--page-edge);
+}
+.quota-titulo {
+  font-family: 'Lora', serif; font-size: 10px; color: var(--text-muted);
+  text-transform: uppercase; margin-bottom: var(--esp-1);
+  letter-spacing: 0.05em; font-weight: 600;
+}
+.quota-linha {
+  display: flex; justify-content: space-between; gap: var(--esp-2);
+  font-family: 'Lora', serif; font-size: 11px; white-space: nowrap;
+}
+.quota-barra {
+  height: 3px; background: var(--page-edge); margin-top: var(--esp-2);
+  border-radius: 2px; overflow: hidden;
+}
+
+/* ── Miudezas de formulário e modal ─────────────────────────────────────── */
+.modal-header.rente { margin-bottom: 0; }
+.rotulo-inline {
+  font-size: 13px; display: flex; align-items: center; gap: var(--esp-1);
+  cursor: pointer; white-space: nowrap;
+}
+.btn-salvar-item {
+  width: auto; padding: var(--esp-3) var(--esp-6); font-size: 16px;
+}
+.acoes-par { display: flex; gap: var(--esp-3); }
+
+/* ── Página de entrada ──────────────────────────────────────────────────── */
+.auth-ornamento {
+  text-align: center; color: var(--page-edge); font-size: 24px;
+  margin-bottom: var(--esp-3);
+}
+.auth-apresentacao {
+  font-size: 16px; line-height: 1.8; color: var(--text-muted);
+  text-align: justify; margin-top: var(--esp-5);
+}
+#auth-submit-btn {
+  width: 100%; max-width: 400px; margin: var(--esp-3) auto 0 auto;
+  display: block;
+}
+
+/* ── Últimos que moravam no markup ──────────────────────────────────────── */
+/* Bloco "Local / Tempo" no topo da barra lateral. */
+.world-state { width: 100%; margin-bottom: var(--esp-4); }
+/* A lista de campanhas vazia respira; as demais mensagens de vazio, não. */
+.empty-state.acolchoada { padding: var(--esp-4); }
+/* Exportar diário: botão largo, separado da lista acima dele. */
+.btn-exportar { width: 100%; margin-top: var(--esp-3); }
+
 /* ── Missões na barra lateral (onda 4) ─────────────────────────────────
    O que o jogador quer da lateral é "o que fazer agora": só missões ativas,
    com o próximo passo à vista. Histórico é papel do diário. */

@@ -35,7 +35,7 @@
        Sem isso, a narração da IA (ou texto injetado) poderia conter
        <script>/<img onerror> e executar — XSS. -->
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.7/dist/purify.min.js"></script>
-  <link rel="stylesheet" href="/static/css/style.css?v=46">
+  <link rel="stylesheet" href="/static/css/style.css?v=47">
 </head>
 
 <body class="game-page">
@@ -62,9 +62,8 @@
           <div class="sidebar-header-row">
             <h2 id="sb-campaign" class="book-title">—</h2>
 
-            <div class="world-state" style="margin-bottom: 15px; width: 100%;">
-              <div
-                style="display:flex;justify-content:space-between;font-family: 'Lora', serif; font-size:13px;margin-bottom:5px;">
+            <div class="world-state">
+              <div class="linha-info">
                 <span style="color:var(--text-main); font-weight: 600;">Local:</span>
                 <span id="sb-location" style="color:var(--text-muted); text-align:right;">—</span>
               </div>
@@ -77,18 +76,14 @@
               </div>
             </div>
 
-            <div class="quota-panel"
-              style="width: 100%; padding: 10px; background: rgba(0,0,0,0.03); border-radius: 4px; border: 1px solid var(--page-edge);">
-              <div
-                style="font-family: 'Lora', serif; font-size: 10px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 5px; letter-spacing: 0.05em; font-weight: 600;">
+            <div class="quota-panel">
+              <div class="quota-titulo">
                 Uso do modelo</div>
-              <div
-                style="display: flex; justify-content: space-between; gap: 8px; font-family: 'Lora', serif; font-size: 11px; white-space: nowrap;">
+              <div class="quota-linha">
                 <div title="Requisições feitas nesta sessão, do limite diário do seu modelo">Requisições: <span id="stat-req">0</span></div>
                 <div title="Tokens consumidos nesta sessão">Tokens: <span id="stat-tokens">0</span></div>
               </div>
-              <div
-                style="height: 3px; background: var(--page-edge); margin-top: 8px; border-radius: 2px; overflow: hidden;">
+              <div class="quota-barra">
                 <div id="rpm-bar" style="width: 0%; height: 100%; background: var(--ink-user); transition: width 0.4s;">
                 </div>
               </div>
@@ -96,7 +91,7 @@
           </div>
         </div>
 
-        <div class="sidebar-tabs" style="margin-top: 15px;">
+        <div class="sidebar-tabs">
           <button class="tab-btn active" data-tab="mundo" onclick="switchTab('mundo')">Mundo</button>
           <button class="tab-btn" data-tab="enciclopedia" onclick="switchTab('enciclopedia')">Enciclopédia</button>
           <button class="tab-btn" data-tab="diario" onclick="switchTab('diario')">Diário</button>
@@ -106,11 +101,9 @@
 
           <div id="tab-mundo" class="tab-panel active">
             <div class="sb-section">
-              <h3 class="sb-section-title">ESTADO <span onclick="openWorldEdit()"
-                  style="font-family: 'Lora', serif; font-size:12px; font-style: italic; font-weight: normal; cursor:pointer; color:var(--ink-user); text-transform:none; margin-left:5px;">(editar)</span>
+              <h3 class="sb-section-title">ESTADO <span onclick="openWorldEdit()" class="sb-editar">(editar)</span>
               </h3>
-              <div
-                style="display:flex;justify-content:space-between;font-family: 'Lora', serif; font-size:13px;margin-bottom:5px;">
+              <div class="linha-info">
                 <span style="color:var(--text-muted);">Capítulo</span>
                 <span id="ws-chapter" style="font-weight:600;">—</span>
               </div>
@@ -120,18 +113,16 @@
               </div>
             </div>
 
-            <div class="sb-section" style="margin-top: 20px;">
+            <div class="sb-section">
               <h3 class="sb-section-title" style="display:flex;justify-content:space-between;align-items:center;">
                 VALIDAÇÃO
-                <button onclick="clearAllViolations()" class="clean-button"
-                  style="width:auto; margin:0; padding:2px 8px; font-size:10px;">Limpar Todas</button>
+                <button onclick="clearAllViolations()" class="clean-button btn-texto btn-texto-mini">Limpar Todas</button>
               </h3>
               <div id="sb-violations"><span class="empty-state">Nenhuma violação detetada.</span></div>
             </div>
 
-            <div class="sb-section" style="margin-top: 20px;">
-              <h3 class="sb-section-title">RESUMO <span onclick="openSummaryEdit()"
-                  style="font-family: 'Lora', serif; font-size:12px; font-style: italic; font-weight: normal; cursor:pointer; color:var(--ink-user); text-transform:none; margin-left:5px;">(editar)</span>
+            <div class="sb-section">
+              <h3 class="sb-section-title">RESUMO <span onclick="openSummaryEdit()" class="sb-editar">(editar)</span>
               </h3>
               <div id="sb-summary"
                 style="font-family: 'Lora', serif; font-size: 14px; line-height: 1.6; text-align: justify; color: var(--text-muted);">
@@ -141,24 +132,23 @@
             <!-- Missões. O painel inteiro some sem missão registrada: a
                  onda 4 é aditiva e campanha antiga não pode ganhar uma seção
                  vazia do nada. -->
-            <div id="sb-missoes-secao" class="sb-section hidden" style="margin-top: 20px;">
+            <div id="sb-missoes-secao" class="sb-section hidden">
               <h3 class="sb-section-title">MISSÕES</h3>
               <div id="sb-missoes"></div>
             </div>
 
-            <div class="sb-section" style="margin-top: 20px;">
+            <div class="sb-section">
               <h3 class="sb-section-title" style="display:flex;align-items:center;justify-content:space-between;">
                 OBSERVAÇÕES
-                <button onclick="addNewFlag()" class="clean-button"
-                  style="width:auto; margin:0; padding:2px 8px; font-size:11px; border:none; color:var(--ink-user);">+
+                <button onclick="addNewFlag()" class="clean-button btn-texto">+
                   Adicionar</button>
               </h3>
               <div id="sb-flags"><span class="empty-state">Nenhuma observação.</span></div>
             </div>
 
-            <div class="sb-section" style="margin-top: 20px;">
-              <h3 class="sb-section-title" style="margin-bottom: 5px;">MODO DE COMBATE</h3>
-              <div style="font-family: 'Lora', serif; font-size: 12px; color: var(--text-muted); margin-bottom: 8px;">
+            <div class="sb-section">
+              <h3 class="sb-section-title sb-titulo-rente">MODO DE COMBATE</h3>
+              <div class="sb-nota">
                 Como as lutas são resolvidas nesta campanha.
               </div>
               <div id="combat-mode-toggle" class="combat-mode-toggle">
@@ -167,11 +157,11 @@
                 <button type="button" data-mode="tela" class="cm-opt"
                   onclick="setCombatMode('tela')">⚔️ Tela tática</button>
               </div>
-              <div id="combat-mode-hint" style="font-family:'Lora',serif;font-size:11px;color:var(--text-dim);margin-top:6px;font-style:italic;"></div>
+              <div id="combat-mode-hint"></div>
             </div>
 
-            <div class="sb-section" style="margin-top: 20px;">
-              <h3 class="sb-section-title" style="margin-bottom: 5px;">STATUS DO SISTEMA</h3>
+            <div class="sb-section">
+              <h3 class="sb-section-title sb-titulo-rente">STATUS DO SISTEMA</h3>
               <div style="font-family: 'Lora', serif; font-size: 12px; color: var(--text-muted);">
                 Modelo: <span id="sb-model">—</span><br>
                 Tokens em uso: <span id="sb-stat-tokens">0</span>
@@ -183,26 +173,23 @@
             <div class="sb-section">
               <h3 class="sb-section-title" style="display:flex;align-items:center;justify-content:space-between;">
                 <span id="sb-party-title">GRUPO DE AVENTUREIROS</span>
-                <button onclick="addNewPartyMember()" class="clean-button"
-                  style="width:auto; margin:0; padding:2px 8px; font-size:12px; border:none; color:var(--ink-user);">+
+                <button onclick="addNewPartyMember()" class="clean-button btn-texto">+
                   Membro</button>
               </h3>
               <div id="sb-party"><span class="empty-state">Carregando...</span></div>
             </div>
-            <div class="sb-section" style="margin-top: 20px;">
+            <div class="sb-section">
               <h3 class="sb-section-title" style="display:flex;align-items:center;justify-content:space-between;">
                 PERSONAGENS
-                <button onclick="addNewCharacter()" class="clean-button"
-                  style="width:auto; margin:0; padding:2px 8px; font-size:12px; border:none; color:var(--ink-user);">+
+                <button onclick="addNewCharacter()" class="clean-button btn-texto">+
                   Personagem</button>
               </h3>
               <div id="sb-chars"><span class="empty-state">Carregando...</span></div>
             </div>
-            <div class="sb-section" style="margin-top: 20px;">
+            <div class="sb-section">
               <h3 class="sb-section-title" style="display:flex;align-items:center;justify-content:space-between;">
                 LOCAIS
-                <button onclick="addNewLocation()" class="clean-button"
-                  style="width:auto; margin:0; padding:2px 8px; font-size:12px; border:none; color:var(--ink-user);">+
+                <button onclick="addNewLocation()" class="clean-button btn-texto">+
                   Local</button>
               </h3>
               <div id="sb-locs"><span class="empty-state">Carregando...</span></div>
@@ -213,13 +200,12 @@
             <div class="sb-section">
               <h3 class="sb-section-title" style="display:flex;align-items:center;justify-content:space-between;">
                 ENTRADAS DO DIÁRIO
-                <button onclick="addNewDiaryEntry()" class="clean-button"
-                  style="width:auto; margin:0; padding:2px 8px; font-size:12px; border:none; color:var(--ink-user);">+
+                <button onclick="addNewDiaryEntry()" class="clean-button btn-texto">+
                   Entrada</button>
               </h3>
               <div id="sb-diary"><span class="empty-state">Carregando...</span></div>
             </div>
-            <button class="clean-button" style="margin-top:10px; width: 100%;" onclick="exportDiary()">Exportar como
+            <button class="clean-button btn-exportar" onclick="exportDiary()">Exportar como
               Arquivo (.md)</button>
           </div>
 
@@ -278,38 +264,35 @@
               <button id="send-btn" onclick="sendMessage()">Enviar</button>
             </div>
 
-            <div id="dice-tray" class="hidden"
-              style="margin-top:15px; padding:20px; background:rgba(0,0,0,0.02); border-radius:6px; border:1px solid var(--page-edge);">
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+            <div id="dice-tray" class="hidden bandeja-dados">
+              <div class="linha-secao linha-secao-larga">
                 <span
                   style="font-family: 'Playfair Display', serif; font-size:16px; font-weight:600; color:var(--text-main);">Rolar um dado</span>
-                <div style="display:flex; align-items:center; gap:8px;">
+                <div class="bandeja-linha">
                   <label
                     style="font-family: 'Lora', serif; font-size:12px; font-weight: 600; color:var(--text-muted);">Modificador:</label>
-                  <input type="number" id="dice-modifier" value="0"
-                    style="width:50px; font-family: 'Caveat', cursive; font-size:22px; padding:0 5px; text-align:center;">
+                  <input type="number" id="dice-modifier" value="0">
                 </div>
               </div>
-              <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                <button class="clean-button" style="width:auto; padding:8px 15px; margin:0;"
+              <div class="bandeja-botoes">
+                <button class="clean-button btn-inline-medio"
                   onclick="rollPlayerDie(4)">d4</button>
-                <button class="clean-button" style="width:auto; padding:8px 15px; margin:0;"
+                <button class="clean-button btn-inline-medio"
                   onclick="rollPlayerDie(6)">d6</button>
-                <button class="clean-button" style="width:auto; padding:8px 15px; margin:0;"
+                <button class="clean-button btn-inline-medio"
                   onclick="rollPlayerDie(8)">d8</button>
-                <button class="clean-button" style="width:auto; padding:8px 15px; margin:0;"
+                <button class="clean-button btn-inline-medio"
                   onclick="rollPlayerDie(10)">d10</button>
-                <button class="clean-button" style="width:auto; padding:8px 15px; margin:0;"
+                <button class="clean-button btn-inline-medio"
                   onclick="rollPlayerDie(12)">d12</button>
-                <button class="clean-button"
-                  style="width:auto; padding:8px 15px; margin:0; border-color:var(--ink-user); color:var(--ink-user); font-weight:bold;"
+                <button class="clean-button btn-inline-medio destaque"
                   onclick="rollPlayerDie(20)">d20</button>
-                <button class="clean-button" style="width:auto; padding:8px 15px; margin:0;"
+                <button class="clean-button btn-inline-medio"
                   onclick="rollPlayerDie(100)">d%</button>
               </div>
               <!-- O dado rola no próprio clique; sem esta linha não havia
                    nada indicando isso, e o jogador procurava um botão "Rolar". -->
-              <div style="font-family:'Lora',serif; font-size:11px; color:var(--text-dim); margin-top:10px; font-style:italic;">
+              <div class="bandeja-nota">
                 Clique num dado para rolar — o resultado vai direto para o Mestre.
               </div>
             </div>
@@ -334,20 +317,18 @@
         style="height: 4px; border-radius: 8px 8px 0 0; position: absolute; top: 0; left: 0; right: 0;"></div>
 
       <div id="dialog-inner">
-        <div id="dialog-head" class="modal-header"
-          style="justify-content: center; margin-bottom: 20px; position: relative; margin-top: 10px;">
+        <div id="dialog-head" class="modal-header dialogo-cabeca">
           <div id="dialog-icon"
             style="position: absolute; left: 0; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: bold;">
           </div>
-          <div class="modal-title" id="dialog-title" style="margin: 0 auto;"></div>
+          <div class="modal-title dialogo-titulo" id="dialog-title"></div>
         </div>
 
-        <div id="dialog-message"
-          style="font-family: 'Lora', serif; font-size: 16px; margin-bottom: 25px; line-height: 1.5; color: var(--text-muted); text-align: center;">
+        <div id="dialog-message" class="dialogo-mensagem">
         </div>
       </div>
 
-      <div id="dialog-buttons" style="display: flex; gap: 10px; justify-content: center;"></div>
+      <div id="dialog-buttons" class="acoes-centro"></div>
     </div>
   </div>
 
@@ -360,17 +341,16 @@
         </div>
         <button onclick="closeEditModal()" class="close-btn">✕</button>
       </div>
-      <div id="edit-body" class="scroll-area" style="max-height: 60vh; padding: 10px 0;"></div>
-      <div
-        style="display:flex; justify-content:space-between; margin-top:20px; border-top: 1px solid var(--page-edge); padding-top: 20px;">
+      <div id="edit-body" class="scroll-area"></div>
+      <div id="edit-footer">
         <!-- Destrutivo com MENOS peso que "Salvar", não igual: sem borda e em
              texto, para não competir com a ação que o jogador quase sempre
              quer. A confirmação é que segura o erro, não o tamanho do botão. -->
         <button id="edit-del-btn" class="btn-delete-discreto"
           onclick="deleteCurrentItem()">Deletar registro</button>
-        <div style="display:flex; gap:10px;">
-          <button class="clean-button" style="width:auto; margin:0;" onclick="closeEditModal()">Cancelar</button>
-          <button class="btn-main" style="width:auto; padding: 10px 25px; font-size: 16px;"
+        <div class="acoes-par">
+          <button class="clean-button btn-inline" onclick="closeEditModal()">Cancelar</button>
+          <button class="btn-main btn-salvar-item"
             onclick="saveCurrentItem()">Salvar</button>
         </div>
       </div>
