@@ -365,10 +365,14 @@ async function loadGeminiModels() {
         const op = document.createElement('option');
         op.value = m.id;
         // A API de listagem não informa cota; mostramos RPM/RPD só nos
-        // modelos que o servidor conhece (MODEL_LIMITS).
+        // modelos que o servidor conhece (MODEL_LIMITS). Sem parênteses e sem
+        // a palavra "Recomendado": assim o rótulo cabe no <select> fechado,
+        // que tem ~382px úteis. A estrela marca o mesmo modelo que
+        // _aplicarModeloPadrao seleciona sozinho.
+        const estrela = MODELO_PADRAO.test(m.label) || MODELO_PADRAO.test(m.id) ? '★ ' : '';
         op.textContent = (m.rpm && m.rpd)
-          ? `${m.label} — (${m.rpm} RPM / ${m.rpd} RPD)`
-          : m.label;
+          ? `${estrela}${m.label} — ${m.rpm} RPM / ${m.rpd} RPD`
+          : `${estrela}${m.label}`;
         grupo.appendChild(op);
       });
       fragmento.appendChild(grupo);
@@ -4519,13 +4523,38 @@ async function saveEditedCampaign() {
 }
 
 // O <select> nativo corta a opção quando ela não cabe na coluna — e o que fica
-// de fora são justamente os limites de uso do modelo (RPM/RPD). Esta função
-// repete o rótulo inteiro logo abaixo, onde ele pode quebrar em várias linhas.
+// de fora são justamente os limites de uso do modelo (RPM/RPD).
+//
+// Os rótulos foram encurtados para caber, então na prática esta linha fica
+// vazia. Ela só aparece quando o texto REALMENTE não coube: os modelos vindos
+// da API do Google têm nomes que não controlamos. Antes ela era permanente e
+// repetia palavra por palavra o que já estava logo acima.
 function mostrarRotuloCompletoDoModelo() {
   const sel  = document.getElementById('model-select');
   const alvo = document.getElementById('model-full-label');
   if (!sel || !alvo) return;
   const opt = sel.options[sel.selectedIndex];
-  alvo.textContent = opt ? opt.textContent.trim() : '';
-  sel.title = alvo.textContent;
+  const texto = opt ? opt.textContent.trim() : '';
+  sel.title = texto;
+  alvo.textContent = _naoCabeNoSelect(sel, texto) ? texto : '';
+}
+
+// Mede o texto com a fonte real do <select> e compara com o espaço interno,
+// descontando a seta. Sem medir, a única alternativa seria adivinhar um
+// número de caracteres — que muda com a fonte e com a largura da coluna.
+const _LARGURA_DA_SETA = 28;
+let _lapis = null;
+function _naoCabeNoSelect(sel, texto) {
+  if (!texto) return false;
+  try {
+    _lapis = _lapis || document.createElement('canvas').getContext('2d');
+    const cs = getComputedStyle(sel);
+    _lapis.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+    const util = sel.clientWidth
+      - parseFloat(cs.paddingLeft || 0) - parseFloat(cs.paddingRight || 0)
+      - _LARGURA_DA_SETA;
+    return _lapis.measureText(texto).width > util;
+  } catch (_) {
+    return false;   // sem canvas, melhor não poluir a tela
+  }
 }

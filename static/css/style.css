@@ -143,6 +143,10 @@ input, textarea {
 select {
   width: 100%; background: transparent; border: none; border-bottom: 1px solid var(--page-edge); color: var(--ink-user);
   font-family: 'Lora', serif; font-size: 16px; padding: 6px 0; outline: none; transition: border-color 0.3s; cursor: pointer;
+  /* Corte com reticências: o <select> nativo cortava o rótulo no meio de uma
+     palavra, sem sinal nenhum de que havia texto adiante. A lista aberta não
+     é afetada — o popup do navegador cresce até o maior item. */
+  text-overflow: ellipsis;
 }
 /* Campo de senha com botão de revelar (chaves de API no menu).
    O input continua ocupando 100% e mantendo a borda inferior do tema; o
@@ -1697,13 +1701,44 @@ body.combat-on { overflow: hidden; }
   .cbt-action-panel {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
     max-height: 52vh; overflow-y: auto;
-    background: #fff;
     border-top: 2px solid var(--cbt-gold);
     border-bottom: none;
     box-shadow: 0 -8px 24px rgba(74,37,17,0.25);
     padding-bottom: calc(20px + env(safe-area-inset-bottom));
+    /* Sem padding em cima: ele é o bloco de contenção do título grudado,
+       que por causa dele não conseguia encostar no topo e deixava uma
+       fresta de 22px por onde o conteúdo rolado aparecia. O recuo passou
+       para dentro do próprio título. */
+    padding-top: 0;
+    /* Sombra de rolagem no rodapé, como no .cbt-battlefield: quando o
+       seletor abre, a barra rola por dentro e corta a fileira de selos
+       (AÇÃO / BÔNUS / REAÇÃO) ao meio. Sem pista nenhuma isso parece
+       defeito de renderização em vez de conteúdo rolado. */
+    background:
+      linear-gradient(rgba(255,255,255,0), #fff 70%) bottom / 100% 24px no-repeat local,
+      radial-gradient(farthest-side at 50% 100%, rgba(74,37,17,.18), transparent)
+        bottom / 100% 10px no-repeat scroll,
+      #fff;
   }
-  .cbt-picker { max-height: none; }
+  /* O título é a única coisa que diz de quem é o turno dentro da barra, e era
+     a primeira a sair de vista ao rolar. Grudado no topo ele vira cabeçalho:
+     os selos passam POR BAIXO dele, que é uma leitura óbvia de rolagem. */
+  .cbt-action-title {
+    position: sticky; top: 0; z-index: 2;
+    background: #fff;
+    margin: 0 -24px 6px;
+    padding: 18px 24px 8px;
+    border-bottom: 1px solid #e6ded2;
+    /* A sombra é o que faz a fileira cortada logo abaixo ser lida como
+       "passando por baixo" e não como recorte. Só a linha do border não
+       bastava: os botões têm contorno próprio e se confundiam com ela. */
+    box-shadow: 0 6px 6px -6px rgba(74,37,17,0.30);
+  }
+  .cbt-picker {
+    max-height: none;
+    /* scrollIntoView não pode enfiar o seletor debaixo do título grudado. */
+    scroll-margin-top: 60px;
+  }
   /* O painel de fim precisa cobrir a barra fixa. */
   .cbt-end-overlay { z-index: 40; }
   .cbt-title { font-size: 1.3rem; }

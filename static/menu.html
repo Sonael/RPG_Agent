@@ -24,7 +24,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;600&family=Lora:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Playfair+Display:ital,wght@0,500;0,700;1,500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/css/style.css?v=39">
+  <link rel="stylesheet" href="/static/css/style.css?v=42">
 </head>
 <body>
   <div class="scene">
@@ -58,7 +58,8 @@
         <div class="form-grid">
           <div class="form-section">
             <h3>Motor de História (IA)</h3>
-            <p style="font-size: 14px; color: var(--text-muted); margin-top: 0;">Selecione a inteligência artificial responsável por conduzir a narrativa:</p>
+            <p style="font-size: 14px; color: var(--text-muted); margin-top: 0;">Selecione a inteligência artificial responsável por conduzir a narrativa
+              (<strong>★</strong> = a sugerida). Os números são a cota gratuita: pedidos por minuto e por dia.</p>
             <div class="field-group" style="margin-top: 15px;">
               <!-- Lista de RESERVA. Havendo chave Google salva, loadGeminiModels()
                    substitui os grupos Google por aquilo que a API realmente
@@ -67,17 +68,17 @@
                    falhar. Os grupos com ":" no valor (DeepSeek) são preservados. -->
               <select id="model-select" onchange="onModelChange()">
                 <optgroup label="Google Gemini 3.x">
-                  <option value="gemini-3.1-flash-lite-preview">Gemini 3.1 Flash-Lite — Recomendado (15 RPM / 500 RPD)</option>
-                  <option value="gemini-3-flash">Gemini 3 Flash — (5 RPM / 20 RPD)</option>
-                  <option value="gemini-3.1-flash-tts">Gemini 3.1 Flash TTS — (3 RPM / 10 RPD)</option>
+                  <option value="gemini-3.1-flash-lite-preview">★ Gemini 3.1 Flash-Lite — 15 RPM / 500 RPD</option>
+                  <option value="gemini-3-flash">Gemini 3 Flash — 5 RPM / 20 RPD</option>
+                  <option value="gemini-3.1-flash-tts">Gemini 3.1 Flash TTS — 3 RPM / 10 RPD</option>
                 </optgroup>
                 <optgroup label="Google Gemini 2.5">
-                  <option value="gemini-2.5-flash">Gemini 2.5 Flash — (5 RPM / 20 RPD)</option>
-                  <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite — (10 RPM / 20 RPD)</option>
+                  <option value="gemini-2.5-flash">Gemini 2.5 Flash — 5 RPM / 20 RPD</option>
+                  <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite — 10 RPM / 20 RPD</option>
                 </optgroup>
                 <optgroup label="Google Gemma (Alta Performance)">
-                  <option value="gemma-4-26b-it">Gemma 4 26B — (30 RPM / 14.4K RPD)</option>
-                  <option value="gemma-4-31b-it">Gemma 4 31B — (30 RPM / 14.4K RPD)</option>
+                  <option value="gemma-4-26b-it">Gemma 4 26B — 30 RPM / 14.4K RPD</option>
+                  <option value="gemma-4-31b-it">Gemma 4 31B — 30 RPM / 14.4K RPD</option>
                 </optgroup>
                 <optgroup label="DeepSeek (API)">
                   <option value="deepseek:deepseek-chat">DeepSeek V3.1 671B</option>
@@ -85,10 +86,10 @@
                 </optgroup>
               </select>
             </div>
-            <!-- O <select> nativo trunca a opção quando ela é maior que a
-                 coluna, e é justamente no fim que estão os limites de uso
-                 (RPM/RPD). Esta linha mostra o rótulo inteiro do que está
-                 selecionado. -->
+            <!-- Rede de segurança: os rótulos foram encurtados para caber no
+                 <select> fechado, mas os modelos vindos da API do Google podem
+                 ter nomes maiores. Esta linha só aparece quando o texto de fato
+                 não coube — ver mostrarRotuloCompletoDoModelo(). -->
             <div id="model-full-label" style="font-family:'Lora',serif; font-size:12px; color:var(--text-muted); margin-top:6px; font-style:italic;"></div>
             <div id="ollama-status" style="font-size: 12px; margin-top: 5px;"></div>
           </div>
@@ -428,7 +429,7 @@
   </div>
 
   <script src="/static/js/utils.js?v=9"></script>
-  <script src="/static/js/menu.js?v=40"></script>
+  <script src="/static/js/menu.js?v=41"></script>
   <script>
     // Animação de volta para a capa quando carregado da cache
     window.addEventListener('pageshow', function(event) {
