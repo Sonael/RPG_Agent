@@ -309,6 +309,8 @@ def update_world_state(
         memory.campaign["current_location"] = current_location
     if chapter > 0:
         memory.campaign["chapter"] = chapter
+    if current_location or current_scene:
+        memory.marcar_upkeep("mundo")
     memory.save_campaign()
     return (
         f"Estado do mundo atualizado — "
@@ -328,6 +330,7 @@ def update_story_summary(summary: str) -> str:
         summary: Novo resumo da história.
     """
     memory.campaign["story_summary"] = summary
+    memory.marcar_upkeep("resumo")
     memory.save_campaign()
     return "Resumo da história atualizado."
 
@@ -407,6 +410,7 @@ def add_diary_entry(title: str, content: str) -> str:
         "content": content,
     }
     memory.campaign["diary"].append(entry)
+    memory.marcar_upkeep("diario")
     memory.save_campaign()
     return f"Entrada '{title}' adicionada ao diário (Capítulo {entry['chapter']})."
 
@@ -471,25 +475,51 @@ def get_scene_context(extra_characters: str = "", extra_locations: str = "") -> 
     current_loc_norm = (c.get("current_location") or "").lower()
     extra_names = {n.strip().lower() for n in extra_characters.split(",") if n.strip()}
 
+    # ATENÇÃO ao que esta lista é e ao que ela NÃO é. Não existe registro de
+    # quem está fisicamente na cena. O que dá para inferir é "é do grupo"
+    # (confiável) e "o local atual aparece na descrição/notas do personagem"
+    # (indício fraco: o texto de um NPC menciona o lugar para sempre, mesmo
+    # depois de ele ter saído dali).
+    #
+    # O bloco era rotulado só "Personagens:" e a instrução mandava confiar nele
+    # para saber QUEM ESTÁ PRESENTE. O agente então tratava a lista como elenco
+    # da cena — e chegou a rolar iniciativa para NPC que estava em outro ponto
+    # da história. O rótulo agora diz exatamente o que a lista significa.
+    no_grupo = set()
     relevant_chars = []
     for key, ch in c["characters"].items():
         in_location = current_loc_norm and current_loc_norm in (ch.get("notes", "") + ch.get("description", "")).lower()
         explicitly_requested = key in extra_names or ch["name"].lower() in extra_names
-        in_party = any(m["name"].lower() == key for m in c["party"])
+        in_party = any(m["name"].lower().strip() == key for m in c["party"])
         if in_location or explicitly_requested or in_party:
             relevant_chars.append(ch)
+            if in_party:
+                no_grupo.add(id(ch))
 
-    # Se nenhum foi selecionado, inclui todos (campanha pequena ainda)
+    # Sem ninguém selecionado, cai na campanha inteira — útil no começo, quando
+    # ainda não há grupo nem local. Mas aí a lista é ainda MENOS um elenco de
+    # cena, e o rótulo tem de avisar.
+    campanha_inteira = False
     if not relevant_chars:
         relevant_chars = list(c["characters"].values())
+        campanha_inteira = True
 
     if relevant_chars:
         lines = []
         for ch in relevant_chars:
-            lines.append(f"• {ch['name']} ({ch['status']}): {ch['description'][:80]}")
+            marca = " [grupo]" if id(ch) in no_grupo else ""
+            lines.append(f"• {ch['name']}{marca} ({ch['status']}): {ch['description'][:80]}")
             if ch.get("traits"):
                 lines.append(f"  Traços: {ch['traits'][:60]}")
-        parts.append("Personagens:\n" + "\n".join(lines))
+        titulo = (
+            "Personagens conhecidos (a campanha INTEIRA — ainda não há grupo "
+            "nem local para filtrar; quem está na cena quem decide é você)"
+            if campanha_inteira else
+            "Personagens conhecidos — os marcados [grupo] estão com o jogador; "
+            "os demais apenas têm LIGAÇÃO com este local e podem não estar "
+            "presentes agora"
+        )
+        parts.append(titulo + ":\n" + "\n".join(lines))
 
     # Local atual
     loc_data = c["locations"].get(current_loc_norm)

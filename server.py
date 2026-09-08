@@ -210,6 +210,66 @@ def _check_dead_characters_alive(text: str, dead_before: set) -> list[str]:
     return violations
 
 
+# Sufixo de mob numerado: spawn_monster cria "Goblin 1", "Goblin 2"… e a
+# narração fala "três goblins". Compara-se pela raiz do nome.
+_NUMERO_FINAL_RE = re.compile(r"\s+\d+$")
+
+
+def _mencionado(nome: str, texto: str) -> bool:
+    """
+    O nome (ou sua raiz, ou o plural dela) aparece no texto?
+    Sem acentos e sem caixa, com fronteira de palavra e plural opcional —
+    'Bandido' casa com 'bandidos', 'Acólito' com 'acolitos'.
+    """
+    def _sem_acento(t: str) -> str:
+        return t.lower().translate(str.maketrans(
+            "áàãâäéèêëíìîïóòõôöúùûüçñ", "aaaaaeeeeiiiiooooouuuucn"))
+
+    alvo = _sem_acento(texto)
+    raiz = _NUMERO_FINAL_RE.sub("", nome).strip()
+    for termo in {nome.strip(), raiz}:
+        if not termo:
+            continue
+        # Casa a expressão inteira e aceita plural na última palavra.
+        pat = r"\b" + r"\s+".join(re.escape(p) for p in _sem_acento(termo).split()) \
+              + r"(?:e?s)?\b"
+        if re.search(pat, alvo):
+            return True
+    return False
+
+
+def _check_combatants_offscene(text: str) -> list[str]:
+    """
+    Combatentes fora do grupo cujo nome não aparece na narração do encontro.
+
+    Só olha quem NÃO é do grupo: o grupo está presente por definição, e a
+    narração costuma tratá-lo por "vocês" em vez de nomear cada um.
+    """
+    cs = memory.campaign.get("combat_state", {}) or {}
+    if not cs.get("is_active"):
+        return []
+
+    chars = memory.campaign.get("characters", {})
+    fora  = []
+    for nome in cs.get("initiative_order", []) or []:
+        ch = chars.get(memory.char_key(nome))
+        if ch and memory.is_party_member(ch):
+            continue
+        if not _mencionado(nome, text):
+            fora.append(nome)
+
+    if not fora:
+        return []
+    return [
+        "Rolou iniciativa para " + ", ".join(f"'{n}'" for n in fora)
+        + ", mas a narração não põe " + ("esse NPC" if len(fora) == 1 else "esses NPCs")
+        + " na cena. Só entra em combate quem você narrou como presente — "
+        "a lista de personagens conhecidos NÃO é o elenco da cena. "
+        "Reescreva: ou descreva a chegada " + ("dele" if len(fora) == 1 else "deles")
+        + " no encontro, ou refaça roll_initiative() apenas com quem está ali."
+    ]
+
+
 def _verify_agent_response(
     text: str,
     tools_called: set,
@@ -239,6 +299,15 @@ def _verify_agent_response(
             "Narrou início de combate ('rodada 1', 'iniciativa rolada', etc.) "
             "sem chamar roll_initiative(). Chame a ferramenta com TODOS os participantes."
         )
+
+    # 1b. Combatente que a narração nunca mencionou.
+    #     Não existe registro de quem está fisicamente na cena, então o único
+    #     sinal disponível é a própria narração: se o mestre pôs alguém na
+    #     iniciativa sem tê-lo colocado na cena, ele veio da lista de
+    #     personagens conhecidos, não do encontro. Foi assim que NPCs de outros
+    #     pontos da história apareceram no meio da luta.
+    if _INIT_TOOLS.intersection(tools_called):
+        violations.extend(_check_combatants_offscene(text))
 
     # 2. HP modificado narrativamente
     if (not _HP_TOOLS.intersection(tools_called)
@@ -421,8 +490,12 @@ def _build_correction_prompt(violations: list[str], already_called: set | None =
 
     # Ferramentas que modificam estado e JÁ foram executadas neste turno.
     # Re-chamá-las causaria efeitos duplicados (dano duplo, mana dupla, etc.).
+    # roll_initiative NÃO entra aqui: ela SUBSTITUI o estado de combate inteiro
+    # (ordem, rodada, log, turno) em vez de somar efeito, então re-chamá-la no
+    # mesmo turno não duplica nada — e é justamente o conserto quando a
+    # iniciativa saiu com gente que não estava na cena.
     stateful = {"attack_roll", "modify_hp", "use_ability", "modify_mana",
-                "roll_initiative", "apply_condition", "learn_spell", "learn_ability",
+                "apply_condition", "learn_spell", "learn_ability",
                 "grant_xp", "set_flag", "clear_flag"}
     already_stateful = (already_called or set()) & stateful
 
@@ -1983,6 +2056,24 @@ def chat():
                         {"severity": v.severity, "rule": v.rule, "message": v.message, "detail": v.detail}
                         for v in result.violations
                     ]
+
+                    # Fecha o ciclo da manutenção de memória.
+                    #
+                    # Estes avisos ("Fulano parece novo mas não foi salvo",
+                    # "local X não registrado") só chegavam ao JOGADOR, que não
+                    # pode fazer nada com eles — quem esqueceu foi o mestre.
+                    # Guardados aqui, o provedor de instrução os devolve ao
+                    # agente no turno seguinte, junto com há quantos turnos o
+                    # resumo, o diário e o local não são atualizados. Custa
+                    # zero chamada de API: a instrução é recomputada de todo
+                    # jeito a cada turno.
+                    if registrar:
+                        memory.avancar_turno()
+                        memory.campaign["_pendencias"] = [
+                            v["message"] for v in violations
+                            if v["rule"] in ("unsaved_character", "unknown_location")
+                        ][:6]
+                        memory.save_campaign()
 
                     yield f"data: {json.dumps({'type': 'text', 'content': response_text})}\n\n"
 

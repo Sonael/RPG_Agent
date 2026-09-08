@@ -323,6 +323,46 @@ def char_key(name: str) -> str:
     return name.lower().strip().replace("_", " ")
 
 
+# ---------------------------------------------------------------------------
+# Manutenção da memória — há quantos turnos cada tarefa não é feita
+# ---------------------------------------------------------------------------
+#
+# O agente esquece de salvar personagem, trocar o local, escrever no diário e
+# atualizar o resumo. Instrução sozinha não resolveu: são oito bullets de
+# "faça sempre" competindo com um prompt de 800 linhas.
+#
+# Aqui o esquecimento vira NÚMERO. O contador é lido a cada turno pelo provedor
+# de instrução (rpg.agent._pendencias_block), que injeta a cobrança no próprio
+# prompt do turno seguinte — sem gastar uma chamada de API a mais, porque a
+# instrução já é recomputada mesmo.
+
+def turno_atual() -> int:
+    return int(campaign.get("_turno", 0) or 0)
+
+
+def avancar_turno() -> int:
+    """Chamado uma vez por resposta concluída do agente."""
+    n = turno_atual() + 1
+    campaign["_turno"] = n
+    return n
+
+
+def marcar_upkeep(chave: str) -> None:
+    """Anota que a tarefa `chave` acabou de ser feita."""
+    campaign.setdefault("_upkeep", {})[chave] = turno_atual()
+
+
+def turnos_sem(chave: str) -> int:
+    """
+    Turnos desde a última vez que `chave` foi feita.
+    -1 = nunca foi feita nesta campanha.
+    """
+    marcas = campaign.get("_upkeep") or {}
+    if chave not in marcas:
+        return -1
+    return turno_atual() - int(marcas.get(chave) or 0)
+
+
 def is_party_member(char: dict) -> bool:
     """
     Definição ÚNICA e canônica de "pertence ao grupo do jogador".

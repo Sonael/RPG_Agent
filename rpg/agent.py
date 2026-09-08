@@ -417,7 +417,20 @@ quem é a vez na própria mensagem e aja por esse combatente:
   • turno do jogador → narre "ainda não é a vez de X" e siga o turno correto.
 Insistir na chamada recusada só vai gerar a mesma recusa.
 
-INÍCIO: encontro hostil → roll_initiative() com todos.
+INÍCIO: encontro hostil → roll_initiative() com os participantes.
+
+QUEM ENTRA NA INICIATIVA — regra dura:
+  Só quem VOCÊ acabou de narrar como presente nesta cena. Nada além disso.
+  • O bloco "ESTADO ATUAL DA CENA" lista personagens CONHECIDOS, não o elenco
+    da cena. NPC que aparece lá pode estar em outro lugar da história.
+  • NUNCA passe a lista inteira de personagens da campanha.
+  • Na dúvida sobre um NPC, deixe-o FORA. Se ele deveria estar, você narra a
+    chegada dele e inicia o combate de novo — o contrário (alguém surgir do
+    nada no meio da luta) quebra a cena.
+  • O LADO de cada um não é escolha da iniciativa: quem está no grupo do
+    jogador luta pelo grupo, o resto luta contra. Se um NPC não for aliado,
+    NÃO chame recruit_character/add_party_member para ele — foi assim que um
+    acólito inimigo apareceu do lado do grupo.
 
 FIM — VITÓRIA (todos os inimigos derrotados): sequência OBRIGATÓRIA:
   1. end_combat()
@@ -687,6 +700,66 @@ os stats corretos de D&D 5e. Use os stats retornados em create_character_sheet()
 # Snapshot de cena — injetado na instrução A CADA TURNO (instruction provider)
 # ---------------------------------------------------------------------------
 
+def _pendencias_block() -> str:
+    """
+    Cobrança de manutenção de memória, recomputada a cada turno.
+
+    O agente esquece de salvar personagem, trocar o local, escrever no diário e
+    atualizar o resumo. As regras para isso já existem em _BASE_MEMORY_RULES,
+    mas são oito bullets de "faça sempre" disputando espaço com um prompt de
+    800 linhas — e perdem.
+
+    Aqui o esquecimento vira uma cobrança curta, específica e COM NÚMERO, no
+    topo do turno em que ele importa. Duas fontes:
+
+      • contadores (rpg.memory.turnos_sem): há quantos turnos cada tarefa não
+        é feita;
+      • os avisos que o validador já produziu sobre a resposta ANTERIOR, que
+        até agora só chegavam ao jogador — que não tem como agir sobre eles.
+
+    Não custa chamada de API: a instrução é recomputada a cada turno de todo
+    jeito. Falha em silêncio se algo der errado — cobrança é acessório, não
+    pode derrubar o turno.
+    """
+    try:
+        from rpg import memory as _m
+        linhas = []
+
+        # -1 = nunca feito. Numa campanha recém-criada isso é normal, então só
+        # cobra depois que a história já andou.
+        turno = _m.turno_atual()
+        for chave, limite, texto in (
+            ("resumo", 5, "update_story_summary() — o resumo vivo da história"),
+            ("diario", 8, "add_diary_entry() — o diário da campanha"),
+            ("mundo",  6, "update_world_state() — local e cena atuais"),
+        ):
+            n = _m.turnos_sem(chave)
+            if n < 0:
+                if turno > limite:
+                    linhas.append(f"• NUNCA foi chamado nesta campanha: {texto}")
+            elif n >= limite:
+                linhas.append(f"• {n} turnos sem {texto}")
+
+        for aviso in (_m.campaign.get("_pendencias") or [])[:6]:
+            linhas.append(f"• Da sua resposta anterior: {aviso}")
+
+        if not linhas:
+            return ""
+
+        return (
+            "\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            "PENDÊNCIAS DE MEMÓRIA (verificado pelo sistema, não é opinião)\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            + "\n".join(linhas)
+            + "\nResolva o que fizer sentido NESTE turno, junto com a narração "
+              "— são chamadas de ferramenta, não texto para o jogador ler. "
+              "Se algum item não se aplicar (ex.: o grupo não saiu do lugar), "
+              "ignore-o em silêncio."
+        )
+    except Exception:
+        return ""
+
+
 def _scene_snapshot_block() -> str:
     """
     Mini-snapshot do estado atual da cena (personagens presentes, local, flags,
@@ -718,8 +791,12 @@ def _scene_snapshot_block() -> str:
         "ESTADO ATUAL DA CENA (gerado automaticamente — sempre atualizado)\n"
         "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         "Este bloco reflete a memória do mundo NESTE instante. Confie nele "
-        "para saber quem está presente, o local, as flags e o estado de "
-        "combate — não precisa chamar get_scene_context() só para se situar. "
+        "para o local, as flags e o estado de combate — não precisa chamar "
+        "get_scene_context() só para se situar. "
+        "⚠️ A lista de personagens é de CONHECIDOS, não de presentes: só os "
+        "marcados [grupo] estão garantidamente com o jogador. Quem mais está "
+        "na cena é decisão SUA, pela narrativa — não trate a lista como "
+        "elenco nem ponha em combate quem você não narrou ali. "
         "Não invente nem contradiga estes dados; para detalhes de um "
         "personagem específico use get_character.\n"
         "⚠️ O campo de LOCAL/CENA acima é AUTORITATIVO. Se o grupo se mover "
@@ -776,8 +853,10 @@ def create_agent(model, campaign_type: str = "fantasia") -> Agent:
         "MODO DE COMBATE: TELA TÁTICA (não narrado)\n"
         "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         "• Quando um combate começar: descreva a CENA inicial (terreno, "
-        "inimigos, clima de tensão), chame roll_initiative() com TODOS os "
-        "participantes e PARE. A luta acontece na tela tática — você NÃO "
+        "inimigos, clima de tensão), chame roll_initiative() com os "
+        "participantes QUE VOCÊ ACABOU DE NARRAR NA CENA — e só eles; nunca a "
+        "lista inteira de personagens conhecidos — e PARE. A luta acontece na "
+        "tela tática — você NÃO "
         "narra turnos nem chama attack_roll/use_ability/execute_npc_turn/"
         "next_turn. NÃO descreva golpes nem resultados ainda.\n"
         "• Você será chamado de novo com '[COMBATE RESOLVIDO NA TELA "
@@ -797,6 +876,7 @@ def create_agent(model, campaign_type: str = "fantasia") -> Agent:
         if _memory.campaign.get("combat_mode") == "tela":
             instr += _TELA_BLOCK
         instr += _scene_snapshot_block()
+        instr += _pendencias_block()
         return instr
 
     # Conjunto de ferramentas resolvido a cada turno (ver rpg/toolsets.py).
