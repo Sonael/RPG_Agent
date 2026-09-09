@@ -611,6 +611,39 @@ WEAPON_PT_TO_EN: dict[str, str] = {
     "faca":                "dagger",
 }
 
+# Custo (po) e peso (lb) do SRD 5e por arma, em inglês — a chave é o que
+# WEAPON_PT_TO_EN devolve. Localmente e não pela API porque a loja não pode
+# depender de a Open5e estar de pé: um HTTP 0 lá fora fazia open_shop recusar
+# o estoque inteiro. Os valores conferem com a rota /weapons/.
+#
+# Abaixo de 1 po (clava, funda, dardo) o motor cobra 1 po: a bolsa da loja
+# trabalha em ouro inteiro, e arredondar para zero daria item de graça.
+_ARMAS_SRD: dict[str, tuple[float, float]] = {
+    # Corpo a corpo simples
+    "club": (0.1, 2), "dagger": (2, 1), "greatclub": (0.2, 10),
+    "handaxe": (5, 2), "javelin": (0.5, 2), "light hammer": (2, 2),
+    "mace": (5, 4), "quarterstaff": (0.2, 4), "sickle": (1, 2),
+    "spear": (1, 3),
+    # À distância simples
+    "light crossbow": (25, 5), "dart": (0.05, 0.25), "shortbow": (25, 2),
+    "sling": (0.1, 0),
+    # Corpo a corpo marcial
+    "battleaxe": (10, 4), "flail": (10, 2), "glaive": (20, 6),
+    "greataxe": (30, 7), "greatsword": (50, 6), "halberd": (20, 6),
+    "lance": (10, 6), "longsword": (15, 3), "maul": (10, 10),
+    "morningstar": (15, 4), "pike": (5, 18), "rapier": (25, 2),
+    "scimitar": (25, 3), "shortsword": (10, 2), "trident": (5, 4),
+    "war pick": (5, 2), "warhammer": (15, 2), "whip": (2, 3),
+    # À distância marcial
+    "blowgun": (10, 1), "hand crossbow": (75, 3), "heavy crossbow": (50, 18),
+    "longbow": (50, 2), "net": (1, 3),
+}
+
+
+def _arma_conhecida(nome: str) -> tuple[float, float] | None:
+    """(custo em po, peso em lb) quando o nome é uma arma do SRD."""
+    return _ARMAS_SRD.get(_traduzir_para_srd(nome).lower())
+
 # ── Tradução PT→EN para busca de raças no Open5e ─────────────────────────────
 RACE_PT_TO_EN: dict[str, str] = {
     "humano":    "human",
@@ -1984,28 +2017,81 @@ def _is_healing_ability(hab: dict) -> bool:
 
 ARMOR_TABLE: dict[str, dict] = {
     # Armadura leve
-    "roupa de couro":            {"ca_base": 11, "dex_bonus": "full",   "slot": "armadura"},
-    "armadura de couro":         {"ca_base": 11, "dex_bonus": "full",   "slot": "armadura"},
-    "armadura de couro batido":  {"ca_base": 12, "dex_bonus": "full",   "slot": "armadura"},
-    "gibão de peles":            {"ca_base": 11, "dex_bonus": "full",   "slot": "armadura"},
+    "roupa de couro":            {"ca_base": 11, "dex_bonus": "full",   "slot": "armadura", "srd": "leather"},
+    "armadura de couro":         {"ca_base": 11, "dex_bonus": "full",   "slot": "armadura", "srd": "leather"},
+    "armadura de couro batido":  {"ca_base": 12, "dex_bonus": "full",   "slot": "armadura", "srd": "studded leather"},
+    "gibão de peles":            {"ca_base": 11, "dex_bonus": "full",   "slot": "armadura", "srd": "hide"},
     # Armadura média
-    "corselete":                 {"ca_base": 13, "dex_bonus": "cap2",   "slot": "armadura"},
-    "armadura de osso":          {"ca_base": 13, "dex_bonus": "cap2",   "slot": "armadura"},
-    "armadura de escamas":       {"ca_base": 14, "dex_bonus": "cap2",   "slot": "armadura"},
-    "cota de malha":             {"ca_base": 14, "dex_bonus": "cap2",   "slot": "armadura"},
-    "meia armadura":             {"ca_base": 15, "dex_bonus": "cap2",   "slot": "armadura"},
+    "corselete":                 {"ca_base": 13, "dex_bonus": "cap2",   "slot": "armadura", "srd": "chain shirt"},
+    "armadura de osso":          {"ca_base": 13, "dex_bonus": "cap2",   "slot": "armadura", "srd": "chain shirt"},
+    "armadura de escamas":       {"ca_base": 14, "dex_bonus": "cap2",   "slot": "armadura", "srd": "scale mail"},
+    "cota de malha":             {"ca_base": 14, "dex_bonus": "cap2",   "slot": "armadura", "srd": "scale mail"},
+    "meia armadura":             {"ca_base": 15, "dex_bonus": "cap2",   "slot": "armadura", "srd": "half plate"},
     # Armadura pesada
-    "armadura de aros":          {"ca_base": 14, "dex_bonus": "none",   "slot": "armadura"},
-    "cota de placas":            {"ca_base": 16, "dex_bonus": "none",   "slot": "armadura"},
-    "armadura de cota de malha": {"ca_base": 16, "dex_bonus": "none",   "slot": "armadura"},
-    "armadura completa":         {"ca_base": 18, "dex_bonus": "none",   "slot": "armadura"},
-    "armadura de placas":        {"ca_base": 18, "dex_bonus": "none",   "slot": "armadura"},
+    "armadura de aros":          {"ca_base": 14, "dex_bonus": "none",   "slot": "armadura", "srd": "ring mail"},
+    "cota de placas":            {"ca_base": 16, "dex_bonus": "none",   "slot": "armadura", "srd": "chain mail"},
+    "armadura de cota de malha": {"ca_base": 16, "dex_bonus": "none",   "slot": "armadura", "srd": "chain mail"},
+    "armadura completa":         {"ca_base": 18, "dex_bonus": "none",   "slot": "armadura", "srd": "plate"},
+    "armadura de placas":        {"ca_base": 18, "dex_bonus": "none",   "slot": "armadura", "srd": "plate"},
     # Escudo (bônus +2 fixo — empilha com armadura)
-    "escudo":                    {"ca_base": 2,  "dex_bonus": "shield", "slot": "escudo"},
-    "escudo de madeira":         {"ca_base": 2,  "dex_bonus": "shield", "slot": "escudo"},
-    "escudo de metal":           {"ca_base": 2,  "dex_bonus": "shield", "slot": "escudo"},
-    "escudo reforçado":          {"ca_base": 2,  "dex_bonus": "shield", "slot": "escudo"},
+    "escudo":                    {"ca_base": 2,  "dex_bonus": "shield", "slot": "escudo",   "srd": "shield"},
+    "escudo de madeira":         {"ca_base": 2,  "dex_bonus": "shield", "slot": "escudo",   "srd": "shield"},
+    "escudo de metal":           {"ca_base": 2,  "dex_bonus": "shield", "slot": "escudo",   "srd": "shield"},
+    "escudo reforçado":          {"ca_base": 2,  "dex_bonus": "shield", "slot": "escudo",   "srd": "shield"},
 }
+
+# Custo (po) e peso (lb) do SRD 5e por armadura. A rota /armor/ do Open5e NÃO
+# traz o campo 'weight' — verificado nas 13 armaduras: peso vazio em todas —
+# então esta tabela é a única fonte de peso de armadura que existe.
+#
+# A chave 'srd' de ARMOR_TABLE acima aponta para cá pela CA que o motor
+# realmente concede, não pelo nome. Duas entradas têm nome fora do padrão
+# ("cota de malha" está com estatística de escamas, "cota de placas" com a de
+# cota de malha); casar pelo nome faria alguém pagar 75 po por CA 14. Casar
+# pela CA garante que preço e proteção andem juntos.
+_ARMADURAS_SRD: dict[str, tuple[int, float]] = {
+    "padded":          (5, 8),
+    "leather":         (10, 10),
+    "studded leather": (45, 13),
+    "hide":            (10, 12),
+    "chain shirt":     (50, 20),
+    "scale mail":      (50, 45),
+    "breastplate":     (400, 20),
+    "half plate":      (750, 40),
+    "ring mail":       (30, 40),
+    "chain mail":      (75, 55),
+    "splint":          (200, 60),
+    "plate":           (1500, 65),
+    "shield":          (10, 6),
+}
+
+
+def _armadura_conhecida(nome: str) -> tuple[int, float] | None:
+    """(custo em po, peso em lb) quando o nome é uma armadura de ARMOR_TABLE."""
+    alvo = _norm_txt(nome)
+    for chave, dados in ARMOR_TABLE.items():
+        if _norm_txt(chave) == alvo:
+            return _ARMADURAS_SRD.get(dados.get("srd", ""))
+    return None
+
+
+def _traduzir_para_srd(nome: str) -> str:
+    """
+    Nome em inglês para consultar o Open5e. O SRD é EM INGLÊS: buscar
+    'Espada Longa' devolve zero resultados, e era por isso que loja e carga
+    nunca achavam preço nenhum.
+
+    Devolve o próprio nome quando não há tradução — quem já escreveu em inglês
+    continua funcionando.
+    """
+    alvo = _norm_txt(nome)
+    for pt, en in WEAPON_PT_TO_EN.items():
+        if _norm_txt(pt) == alvo:
+            return en
+    for chave, dados in ARMOR_TABLE.items():
+        if _norm_txt(chave) == alvo:
+            return dados.get("srd", nome)
+    return (nome or "").strip()
 
 
 def _fetch_armor_data(armor_name: str) -> dict | None:
@@ -5965,12 +6051,17 @@ _PESO_PADRAO_KG = {
 
 
 def _peso_do_srd(nome: str) -> float | None:
-    """Peso em kg vindo do SRD (armas e armaduras trazem 'weight'). None se não achar."""
+    """
+    Peso em kg vindo do SRD. Só a rota /weapons/ preenche 'weight' — /armor/
+    devolve o campo vazio nas 13 armaduras, e é por isso que armadura sai de
+    _ARMADURAS_SRD e não daqui.
+    """
+    busca = _traduzir_para_srd(nome)
     from rpg.open5e import http as _req
     for rota in ("weapons", "armor"):
         try:
             r = _req.get(f"https://api.open5e.com/v1/{rota}/",
-                         params={"search": nome, "limit": 3}, timeout=4)
+                         params={"search": busca, "limit": 3}, timeout=4)
             if not r.ok:
                 continue
             for item in (r.json().get("results") or []):
@@ -5987,20 +6078,44 @@ def _peso_do_srd(nome: str) -> float | None:
 
 def _peso_do_item(item: dict) -> float:
     """
-    Peso de UMA unidade, em kg. A ordem importa: o que o mestre gravou no
-    item manda; depois o SRD; depois a tabela; e 0,5 kg como último recurso —
-    um número pequeno e honesto, que não faz a mochila estourar sozinha.
+    Peso de UMA unidade, em kg, nesta ordem:
+
+        1. o que o mestre gravou no item;
+        2. arma e armadura, das tabelas locais (para armadura é a única fonte
+           que existe: /armor/ do Open5e devolve 'weight' vazio nas 13);
+        3. a tabela de aproximação, que cobre o resto do que aparece numa mesa
+           e não custa rede;
+        4. o SRD traduzido, para equipamento exótico que nada acima pega;
+        5. 0,5 kg — pequeno e honesto, não faz a mochila estourar sozinha.
+
+    O SRD vem em 4º de propósito. check_encumbrance() roda no caminho da
+    requisição e passa por todo o inventário: consultar a rede antes das
+    tabelas poria dois GETs de 4s por item entre o jogador e a resposta.
+
+    A versão anterior nunca chamava o SRD — o docstring prometia e o código
+    pulava direto para a aproximação. Isso importava pouco para arma e muito
+    para armadura: uma Cota de Malha (20 kg) pesava os 0,5 kg do último
+    recurso, e o sistema de carga, feito justamente para que armadura pesada
+    seja uma escolha, era cego para armadura.
     """
     if item.get("peso") is not None:
         try:
             return max(0.0, float(item["peso"]))
         except (TypeError, ValueError):
             pass
-    nome = _norm_txt(item.get("nome", ""))
+
+    bruto = item.get("nome", "")
+    conhecido = _armadura_conhecida(bruto) or _arma_conhecida(bruto)
+    if conhecido:
+        return round(conhecido[1] * _LB_PARA_KG, 2)
+
+    nome = _norm_txt(bruto)
     for termo, kg in _PESO_PADRAO_KG.items():
         if _norm_txt(termo) in nome:
             return kg
-    return 0.5
+
+    do_srd = _peso_do_srd(bruto)
+    return do_srd if do_srd is not None else 0.5
 
 
 def _capacidade_kg(sheet: dict) -> float:
@@ -6071,12 +6186,27 @@ def _lojas() -> dict:
 
 
 def _preco_do_srd(nome: str) -> int | None:
-    """Preço em PEÇAS DE OURO vindo do SRD. None quando não há."""
+    """
+    Preço em PEÇAS DE OURO vindo do SRD. None quando não há.
+
+    Arma e armadura saem das tabelas locais, sem rede. O que sobra vai ao
+    Open5e com o nome TRADUZIDO — buscar 'Espada Longa' numa API em inglês
+    devolvia zero, e a loja recusava o estoque inteiro.
+    """
+    armadura = _armadura_conhecida(nome)
+    if armadura:
+        return armadura[0]
+
+    arma = _arma_conhecida(nome)
+    if arma:
+        return max(1, int(round(arma[0])))
+
+    busca = _traduzir_para_srd(nome)
     from rpg.open5e import http as _req
     for rota in ("weapons", "armor"):
         try:
             r = _req.get(f"https://api.open5e.com/v1/{rota}/",
-                         params={"search": nome, "limit": 3}, timeout=4)
+                         params={"search": busca, "limit": 3}, timeout=4)
             if not r.ok:
                 continue
             for item in (r.json().get("results") or []):
@@ -6099,9 +6229,15 @@ def _preco_do_srd(nome: str) -> int | None:
 
 def open_shop(shop_name: str, items: str, location: str = "") -> str:
     """
-    Monta uma loja com estoque e preços. O preço sai do SRD quando o item
-    existe lá (armas e armaduras têm custo oficial); informe você mesmo o que
-    o SRD não conhece.
+    Monta uma loja com estoque e preços. Arma e armadura com nome em português
+    já saem com o custo oficial do SRD ('Espada Longa' → 15 po); para o resto,
+    informe o preço.
+
+    Chamar de novo com o mesmo nome de loja ACRESCENTA ao estoque — item já
+    existente tem preço e quantidade atualizados, o resto continua lá.
+
+    Nada aqui confere se o estoque combina com a loja: uma forja vendendo
+    poção passa. Coerência é escolha sua na narrativa.
 
     Args:
         shop_name: Nome da loja ('Forja do Torbin').
@@ -6147,18 +6283,39 @@ def open_shop(shop_name: str, items: str, location: str = "") -> str:
                 "'nome:preço' (ex: 'Amuleto do Corvo:75').") if sem_preco else \
                "⚠️ Informe ao menos um item."
 
-    _lojas()[_norm_txt(nome_loja)] = {
-        "nome":   nome_loja,
-        "local":  location or memory.campaign.get("current_location", ""),
-        "estoque": estoque,
-    }
+    # Chamar open_shop de novo ACRESCENTA ao estoque; antes substituía, e uma
+    # segunda chamada para pôr um item a mais apagava a loja inteira.
+    chave = _norm_txt(nome_loja)
+    loja  = _lojas().get(chave)
+    ja_existia = loja is not None
+    if not ja_existia:
+        loja = {"nome": nome_loja, "local": "", "estoque": []}
+        _lojas()[chave] = loja
+    if location or not loja.get("local"):
+        loja["local"] = location or memory.campaign.get("current_location", "")
+
+    novos, repostos = [], []
+    for item in estoque:
+        antigo = next((i for i in loja["estoque"]
+                       if _norm_txt(i["nome"]) == _norm_txt(item["nome"])), None)
+        if antigo:
+            antigo["preco"] = item["preco"]
+            antigo["qtd"]   = item["qtd"]
+            repostos.append(item["nome"])
+        else:
+            loja["estoque"].append(item)
+            novos.append(item["nome"])
     memory.save_campaign()
 
-    linhas = [f"🏪 **{nome_loja}** aberta"
-              + (f" em {location}" if location else "") + ":"]
-    for i in estoque:
+    cabeca = (f"🏪 **{nome_loja}** atualizada" if ja_existia
+              else f"🏪 **{nome_loja}** aberta")
+    linhas = [cabeca + (f" em {loja['local']}" if loja.get("local") else "") + ":"]
+    for i in loja["estoque"]:
         q = "" if i["qtd"] >= 99 else f"  (x{i['qtd']})"
-        linhas.append(f"   • {i['nome']} — {i['preco']} po{q}")
+        marca = "  ← novo" if i["nome"] in novos and ja_existia else ""
+        linhas.append(f"   • {i['nome']} — {i['preco']} po{q}{marca}")
+    if repostos and ja_existia:
+        linhas.append("   ↻ Preço/estoque atualizados: " + ", ".join(repostos))
     if sem_preco:
         linhas.append("   ⚠️ Sem preço (fora do SRD, não entraram): "
                       + ", ".join(sem_preco))

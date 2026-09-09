@@ -492,11 +492,19 @@ SAQUE E COMPRA — o peso faz o saque virar escolha:
   check_encumbrance() diz quanto o personagem carrega. Acima de METADE da
   capacidade (FOR × 7,5 kg) ele fica sobrecarregado: desvantagem em ataques e
   em testes de FOR/DES/CON. Levar tudo passa a custar a próxima luta.
-  Lojas: open_shop("Forja do Torbin", "Espada Longa; Poção de Cura:50:3") —
-  o preço sai do SRD quando o item existe lá; informe você o que ele não
-  conhece. buy_item() cobra da bolsa trocando ouro/prata/cobre sozinho, e
+  Lojas: open_shop("Forja do Torbin", "Espada Longa; Cota de Malha; Escudo").
+  Arma e armadura em português já saem com o preço e o peso oficiais — não
+  invente valor para elas. Só informe preço no que o SRD não tem, com
+  "nome:preço" ("Poção de Cura:50:3").
+  Chamar open_shop de novo na MESMA loja acrescenta ao estoque em vez de
+  substituir: use isso para o ferreiro receber mercadoria nova sem apagar o
+  resto. buy_item() cobra da bolsa trocando ouro/prata/cobre sozinho, e
   sell_item() paga METADE da tabela (senão comprar e revender seria dinheiro
   de graça).
+  O motor não confere se o estoque combina com a loja — uma forja vendendo
+  poção passa sem aviso. A coerência é SUA: um ferreiro vende lâmina, escudo,
+  armadura e conserto; poção é com o boticário. Se o grupo pedir o que a loja
+  não faria, diga que ali não tem e aponte onde tem.
 
 TERRENO — dê um lugar à luta (opcional, mas quase sempre vale):
   Logo depois de roll_initiative(), chame set_battlefield() com 2 a 4 zonas

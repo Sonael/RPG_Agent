@@ -498,11 +498,34 @@ armaduras de placas e uma bigorna, e "comprar" era o mestre digitar um número
 de ouro de cabeça. Duas consequências chatas — saque nunca era **escolha**
 (leva tudo), e o preço do mesmo item variava conforme o humor da cena.
 
-Peso e preço vêm do **SRD** quando o item existe lá: `/v1/weapons/` e
-`/v1/armor/` trazem `weight` (`"8 lb."`) e `cost` (`"25 gp"`) de verdade, e a
-conversão para quilo e para peças de ouro é feita no motor. Fora do SRD, uma
-tabela curta só do que aparece numa mesa — inventar um catálogo completo
-seria peso morto.
+Peso e preço de **arma e armadura** saem de duas tabelas locais com os valores
+do SRD (`_ARMAS_SRD`, `_ARMADURAS_SRD`), e a conversão de libra para quilo é
+feita no motor. Fora delas, uma tabela curta de aproximação só do que aparece
+numa mesa (poção, corda, tocha); depois disso o Open5e; e 0,5 kg como último
+recurso.
+
+As tabelas são locais por dois motivos concretos, os dois medidos:
+
+- **O SRD é em inglês.** As consultas iam com o nome em português, então
+  `open_shop("Forja do Torbin", "Espada Longa; Cota de Malha; Escudo")`
+  respondia *"Nenhum item com preço. O SRD não conhece: Espada Longa, …"* e
+  recusava o estoque inteiro. `_traduzir_para_srd` resolve o caso geral
+  (reusa o `WEAPON_PT_TO_EN` que já existia e o novo campo `srd` de
+  `ARMOR_TABLE`), mas a tabela local torna a loja independente da API estar
+  no ar — um `HTTP 0` da Open5e não pode fechar o comércio da campanha.
+- **`/v1/armor/` não tem peso.** O campo `weight` volta vazio nas 13
+  armaduras; conferido uma a uma. Não existe fonte remota para isso.
+
+O campo `srd` de cada armadura aponta para a entrada de `_ARMADURAS_SRD` pela
+**CA que o motor concede**, não pelo nome. Duas entradas têm nome fora do
+padrão (`cota de malha` está com estatística de escamas, `cota de placas` com
+a de cota de malha); casar pelo nome faria alguém pagar 75 po por CA 14.
+
+Enquanto `_peso_do_srd` não era chamado por ninguém — código morto, com um
+docstring que prometia o contrário —, uma Cota de Malha pesava os 0,5 kg do
+último recurso em vez de 20,4 kg. O sistema de carga inteiro foi construído
+para que armadura pesada seja uma escolha, e armadura era exatamente o que
+ele não enxergava.
 
 Capacidade = **FOR × 7,5 kg**. Acima da metade o personagem fica
 **sobrecarregado**: desvantagem em ataques e em testes de FOR, DES e CON — não
@@ -515,6 +538,17 @@ bolsa **trocando ouro/prata/cobre sozinha** (50 pp pagam 5 po) e uma compra
 recusada por falta de dinheiro não tira nada do estoque. A venda paga
 **metade** da tabela: sem isso, comprar e revender pelo mesmo preço seria uma
 torneira de ouro.
+
+`open_shop` na mesma loja **acrescenta** ao estoque — item repetido tem preço
+e quantidade atualizados, o resto fica. Antes ela substituía, então a segunda
+chamada para pôr um item a mais apagava a loja, e o que o grupo já tinha
+esgotado voltava cheio.
+
+**O motor não tem categoria de loja.** Uma forja vendendo poção passa sem
+aviso: `open_shop` só cuida de preço, estoque e bolsa. Quem mantém a coerência
+é o mestre, e a instrução dele diz isso explicitamente. O SRD traz `category`
+(`Martial Melee Weapons`, `Medium Armor`), então dá para conferir um dia —
+`test_forja_pode_vender_pocao` existe para avisar quando esse limite mudar.
 
 ### Missões como objetos
 
