@@ -2015,30 +2015,71 @@ def _is_healing_ability(hab: dict) -> bool:
 # dex_bonus: "full" = add all DEX mod | "cap2" = max +2 | "none" = ignore DEX
 # ---------------------------------------------------------------------------
 
+# Nome em pt-BR → estatística. Cada armadura do SRD aparece uma vez com o nome
+# oficial e depois com os apelidos que o mestre digita; todos apontam para a
+# mesma entrada de _ARMADURAS_SRD pelo campo 'srd'.
+#
+# Três nomes estavam com a estatística de OUTRA armadura — em pt-BR "Cota de
+# Malha" é chain mail (CA 16, pesada), e a tabela dava a ela CA 14 média, que
+# é brunea. Quem tinha as estatísticas certas era "armadura de cota de malha",
+# um nome que ninguém digita. Os apelidos antigos continuam todos aqui: nenhum
+# personagem salvo perde a armadura, só passa a receber a estatística certa.
 ARMOR_TABLE: dict[str, dict] = {
-    # Armadura leve
-    "roupa de couro":            {"ca_base": 11, "dex_bonus": "full",   "slot": "armadura", "srd": "leather"},
+    # ── Armadura leve — soma o modificador de DES inteiro
+    "armadura acolchoada":       {"ca_base": 11, "dex_bonus": "full",   "slot": "armadura", "srd": "padded"},
+    "acolchoada":                {"ca_base": 11, "dex_bonus": "full",   "slot": "armadura", "srd": "padded"},
     "armadura de couro":         {"ca_base": 11, "dex_bonus": "full",   "slot": "armadura", "srd": "leather"},
+    "roupa de couro":            {"ca_base": 11, "dex_bonus": "full",   "slot": "armadura", "srd": "leather"},
     "armadura de couro batido":  {"ca_base": 12, "dex_bonus": "full",   "slot": "armadura", "srd": "studded leather"},
-    "gibão de peles":            {"ca_base": 11, "dex_bonus": "full",   "slot": "armadura", "srd": "hide"},
-    # Armadura média
+    "couro batido":              {"ca_base": 12, "dex_bonus": "full",   "slot": "armadura", "srd": "studded leather"},
+    "armadura de couro tachado": {"ca_base": 12, "dex_bonus": "full",   "slot": "armadura", "srd": "studded leather"},
+    # ── Armadura média — DES no máximo +2
+    "armadura de peles":         {"ca_base": 12, "dex_bonus": "cap2",   "slot": "armadura", "srd": "hide"},
+    "gibão de peles":            {"ca_base": 12, "dex_bonus": "cap2",   "slot": "armadura", "srd": "hide"},
+    "camisão de malha":          {"ca_base": 13, "dex_bonus": "cap2",   "slot": "armadura", "srd": "chain shirt"},
+    "camisa de malha":           {"ca_base": 13, "dex_bonus": "cap2",   "slot": "armadura", "srd": "chain shirt"},
     "corselete":                 {"ca_base": 13, "dex_bonus": "cap2",   "slot": "armadura", "srd": "chain shirt"},
     "armadura de osso":          {"ca_base": 13, "dex_bonus": "cap2",   "slot": "armadura", "srd": "chain shirt"},
+    "brunea":                    {"ca_base": 14, "dex_bonus": "cap2",   "slot": "armadura", "srd": "scale mail"},
     "armadura de escamas":       {"ca_base": 14, "dex_bonus": "cap2",   "slot": "armadura", "srd": "scale mail"},
-    "cota de malha":             {"ca_base": 14, "dex_bonus": "cap2",   "slot": "armadura", "srd": "scale mail"},
+    "peitoral":                  {"ca_base": 14, "dex_bonus": "cap2",   "slot": "armadura", "srd": "breastplate"},
     "meia armadura":             {"ca_base": 15, "dex_bonus": "cap2",   "slot": "armadura", "srd": "half plate"},
-    # Armadura pesada
+    "meia-armadura":             {"ca_base": 15, "dex_bonus": "cap2",   "slot": "armadura", "srd": "half plate"},
+    # ── Armadura pesada — ignora DES
+    "cota de anéis":             {"ca_base": 14, "dex_bonus": "none",   "slot": "armadura", "srd": "ring mail"},
     "armadura de aros":          {"ca_base": 14, "dex_bonus": "none",   "slot": "armadura", "srd": "ring mail"},
-    "cota de placas":            {"ca_base": 16, "dex_bonus": "none",   "slot": "armadura", "srd": "chain mail"},
+    "cota de malha":             {"ca_base": 16, "dex_bonus": "none",   "slot": "armadura", "srd": "chain mail"},
     "armadura de cota de malha": {"ca_base": 16, "dex_bonus": "none",   "slot": "armadura", "srd": "chain mail"},
-    "armadura completa":         {"ca_base": 18, "dex_bonus": "none",   "slot": "armadura", "srd": "plate"},
+    "armadura de talas":         {"ca_base": 17, "dex_bonus": "none",   "slot": "armadura", "srd": "splint"},
+    "talas":                     {"ca_base": 17, "dex_bonus": "none",   "slot": "armadura", "srd": "splint"},
     "armadura de placas":        {"ca_base": 18, "dex_bonus": "none",   "slot": "armadura", "srd": "plate"},
-    # Escudo (bônus +2 fixo — empilha com armadura)
+    "armadura completa":         {"ca_base": 18, "dex_bonus": "none",   "slot": "armadura", "srd": "plate"},
+    "cota de placas":            {"ca_base": 18, "dex_bonus": "none",   "slot": "armadura", "srd": "plate"},
+    # ── Escudo (bônus +2 fixo — empilha com armadura)
     "escudo":                    {"ca_base": 2,  "dex_bonus": "shield", "slot": "escudo",   "srd": "shield"},
     "escudo de madeira":         {"ca_base": 2,  "dex_bonus": "shield", "slot": "escudo",   "srd": "shield"},
     "escudo de metal":           {"ca_base": 2,  "dex_bonus": "shield", "slot": "escudo",   "srd": "shield"},
     "escudo reforçado":          {"ca_base": 2,  "dex_bonus": "shield", "slot": "escudo",   "srd": "shield"},
+    "escudo sagrado":            {"ca_base": 2,  "dex_bonus": "shield", "slot": "escudo",   "srd": "shield"},
 }
+
+
+def _armadura_na_tabela(nome: str) -> dict | None:
+    """
+    Entrada de ARMOR_TABLE para um nome, ignorando caixa e ACENTO.
+
+    Os três call sites faziam `ARMOR_TABLE.get(nome.lower())`, casamento
+    exato. Isso já era frágil e ficou pior com os nomes certos entrando na
+    tabela: quem escrevesse "Camisao de Malha" ou "Cota de Aneis" sem acento
+    não equipava armadura nenhuma e ficava com CA 10 + DES, em silêncio.
+    """
+    alvo = _norm_txt(nome)
+    if not alvo:
+        return None
+    for chave, dados in ARMOR_TABLE.items():
+        if _norm_txt(chave) == alvo:
+            return dados
+    return None
 
 # Custo (po) e peso (lb) do SRD 5e por armadura. A rota /armor/ do Open5e NÃO
 # traz o campo 'weight' — verificado nas 13 armaduras: peso vazio em todas —
@@ -2068,11 +2109,8 @@ _ARMADURAS_SRD: dict[str, tuple[int, float]] = {
 
 def _armadura_conhecida(nome: str) -> tuple[int, float] | None:
     """(custo em po, peso em lb) quando o nome é uma armadura de ARMOR_TABLE."""
-    alvo = _norm_txt(nome)
-    for chave, dados in ARMOR_TABLE.items():
-        if _norm_txt(chave) == alvo:
-            return _ARMADURAS_SRD.get(dados.get("srd", ""))
-    return None
+    dados = _armadura_na_tabela(nome)
+    return _ARMADURAS_SRD.get(dados.get("srd", "")) if dados else None
 
 
 def _traduzir_para_srd(nome: str) -> str:
@@ -2088,9 +2126,9 @@ def _traduzir_para_srd(nome: str) -> str:
     for pt, en in WEAPON_PT_TO_EN.items():
         if _norm_txt(pt) == alvo:
             return en
-    for chave, dados in ARMOR_TABLE.items():
-        if _norm_txt(chave) == alvo:
-            return dados.get("srd", nome)
+    armadura = _armadura_na_tabela(nome)
+    if armadura:
+        return armadura.get("srd", nome)
     return (nome or "").strip()
 
 
@@ -3349,8 +3387,8 @@ def _recalculate_ca(char: dict) -> None:
     armor_name  = (equip.get("armadura") or "").lower()
     shield_name = (equip.get("escudo")   or "").lower()
 
-    armor_data  = ARMOR_TABLE.get(armor_name) or _fetch_armor_data(armor_name)
-    shield_data = ARMOR_TABLE.get(shield_name)
+    armor_data  = _armadura_na_tabela(armor_name) or _fetch_armor_data(armor_name)
+    shield_data = _armadura_na_tabela(shield_name)
 
     if armor_data:
         dex_rule = armor_data["dex_bonus"]
@@ -5230,7 +5268,7 @@ def equip_item(char_name: str, item_name: str, slot: str = "") -> str:
 
     # Inferir slot se não fornecido
     item_lower  = item_name.lower()
-    armor_entry = ARMOR_TABLE.get(item_lower)
+    armor_entry = _armadura_na_tabela(item_name)
     if not slot:
         if armor_entry:
             slot = armor_entry["slot"]

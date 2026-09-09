@@ -516,16 +516,49 @@ As tabelas são locais por dois motivos concretos, os dois medidos:
 - **`/v1/armor/` não tem peso.** O campo `weight` volta vazio nas 13
   armaduras; conferido uma a uma. Não existe fonte remota para isso.
 
-O campo `srd` de cada armadura aponta para a entrada de `_ARMADURAS_SRD` pela
-**CA que o motor concede**, não pelo nome. Duas entradas têm nome fora do
-padrão (`cota de malha` está com estatística de escamas, `cota de placas` com
-a de cota de malha); casar pelo nome faria alguém pagar 75 po por CA 14.
-
 Enquanto `_peso_do_srd` não era chamado por ninguém — código morto, com um
 docstring que prometia o contrário —, uma Cota de Malha pesava os 0,5 kg do
-último recurso em vez de 20,4 kg. O sistema de carga inteiro foi construído
+último recurso em vez de 25 kg. O sistema de carga inteiro foi construído
 para que armadura pesada seja uma escolha, e armadura era exatamente o que
 ele não enxergava.
+
+#### Os nomes de armadura
+
+Ligar `ARMOR_TABLE` ao SRD expôs que três nomes estavam com a estatística de
+**outra** armadura. Em pt-BR "Cota de Malha" é *chain mail* — CA 16, pesada,
+75 po, 25 kg —, e a tabela dava a ela CA 14 média com bônus de DES, que é
+brunea. Quem tinha os números certos era `armadura de cota de malha`, um nome
+que ninguém digita. O `menu.js` já mostrava "Cota de Malha — CA 16. Armadura
+pesada" no wizard: o motor era o lado errado.
+
+| nome | antes | agora | por quê |
+|---|---|---|---|
+| `cota de malha` | CA 14, média | CA 16, pesada | é *chain mail* |
+| `cota de placas` | CA 16 | CA 18 | é o que o wizard já prometia |
+| `gibão de peles` | CA 11, leve | CA 12, média | é *hide* |
+
+Nenhuma chave antiga foi removida — todas continuam como apelido, então nenhum
+personagem salvo perde a armadura na atualização; ele passa a receber a
+estatística certa. A CA só é recalculada ao equipar, importar ou salvar pelo
+editor, nunca ao abrir a campanha, então a mudança não acontece no meio de uma
+cena. Faltavam ainda os nomes oficiais de metade da tabela (*camisão de malha*,
+*peitoral*, *brunea*, *armadura de talas*, *acolchoada*, *cota de anéis*): foram
+acrescentados, e agora as 13 armaduras do SRD têm nome em português.
+
+Dois efeitos colaterais que só apareceram na conferência cruzada:
+
+- `escudo sagrado` é o escudo que o preset de **paladino** do wizard equipa, e
+  não estava na `ARMOR_TABLE`. Todo paladino criado pelo wizard saía com 2 de
+  CA a menos, calado.
+- Os três call sites faziam `ARMOR_TABLE.get(nome.lower())` — casamento exato.
+  Quem escrevesse `cota de aneis` sem acento ficava sem armadura nenhuma.
+  Agora passam por `_armadura_na_tabela`, que ignora caixa e acento.
+
+`wzArmorCA` em `static/js/menu.js` é o **espelho** dessa tabela: é o número que
+o jogador vê no wizard, contra o número que ele recebe em jogo. Duas tabelas
+independentes é o que gerou o problema, então
+`test_o_wizard_promete_a_ca_que_o_motor_entrega` lê o `menu.js` de dentro do
+pytest e compara entrada por entrada.
 
 Capacidade = **FOR × 7,5 kg**. Acima da metade o personagem fica
 **sobrecarregado**: desvantagem em ataques e em testes de FOR, DES e CON — não

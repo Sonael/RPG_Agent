@@ -1077,12 +1077,39 @@ function wzSetEquipChoice(i, g, o) {
 /**
  * CA baseada no tipo de armadura (D&D 5e).
  * Leve: base + DEX. Média: base + DEX (máx +2). Pesada: fixo.
+ *
+ * Esta tabela é o ESPELHO de ARMOR_TABLE em rpg/tools_dnd.py, e as duas
+ * precisam concordar: aqui é o número que o jogador vê no wizard, lá é o
+ * número que ele recebe em jogo. Quando divergiam, o wizard prometia CA 12
+ * de couro tachado e o motor entregava 10, porque o nome não existia lá.
+ * tests/test_loja_e_peso.py compara os dois arquivos e falha se separarem.
+ *
+ * A busca ignora acento porque o motor também ignora — 'cota de aneis'
+ * digitado sem acento precisa dar a mesma CA nos dois lados.
  */
 function wzArmorCA(armorName, dexMod) {
-  const light  = {'robes de mago':10, 'armadura de couro':11, 'armadura de couro tachado':12};
-  const medium = {'armadura de peles':12, 'armadura de escamas':14};
-  const heavy  = {'cota de malha':16, 'cota de anéis':14, 'cota de placas':18};
-  const n = (armorName || '').toLowerCase();
+  const light = {
+    'robes de mago': 10,
+    'armadura acolchoada': 11, 'acolchoada': 11,
+    'armadura de couro': 11, 'roupa de couro': 11,
+    'armadura de couro batido': 12, 'couro batido': 12,
+    'armadura de couro tachado': 12,
+  };
+  const medium = {
+    'armadura de peles': 12, 'gibao de peles': 12,
+    'camisao de malha': 13, 'camisa de malha': 13,
+    'corselete': 13, 'armadura de osso': 13,
+    'brunea': 14, 'armadura de escamas': 14, 'peitoral': 14,
+    'meia armadura': 15, 'meia-armadura': 15,
+  };
+  const heavy = {
+    'cota de aneis': 14, 'armadura de aros': 14,
+    'cota de malha': 16, 'armadura de cota de malha': 16,
+    'armadura de talas': 17, 'talas': 17,
+    'armadura de placas': 18, 'armadura completa': 18, 'cota de placas': 18,
+  };
+  const n = (armorName || '').toLowerCase().trim()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '');
   if (n in light)  return light[n]  + dexMod;
   if (n in medium) return medium[n] + Math.min(dexMod, 2);
   if (n in heavy)  return heavy[n];

@@ -21,6 +21,9 @@ Três defeitos que só apareceram quando simulei um grupo entrando numa forja.
 3. `open_shop` SUBSTITUÍA o estoque. Chamar de novo para acrescentar um item
    apagava a loja: uma forja de 5 itens virava uma forja de 1.
 """
+import re
+from pathlib import Path
+
 import pytest
 
 from rpg import memory, tools_dnd as td
@@ -40,7 +43,8 @@ from conftest import criar_ficha
     ("Lança",              "spear"),          # com acento
     ("Lanca",              "spear"),          # sem acento: o mestre digita assim
     ("Maça",               "mace"),
-    ("Cota de Malha",      "scale mail"),     # armadura entra pela ARMOR_TABLE
+    ("Cota de Malha",      "chain mail"),     # armadura entra pela ARMOR_TABLE
+    ("Cota de Aneis",      "ring mail"),      # sem acento: o mestre digita assim
     ("Escudo",             "shield"),
     ("Armadura de Placas", "plate"),
 ])
@@ -69,7 +73,7 @@ def test_toda_armadura_da_tabela_aponta_para_um_srd_existente():
 
 @pytest.mark.parametrize("nome,po", [
     ("Escudo",                   10),
-    ("Cota de Malha",            50),
+    ("Cota de Malha",            75),
     ("Meia Armadura",           750),
     ("Armadura de Placas",     1500),
     ("Armadura de Couro Batido", 45),
@@ -104,7 +108,7 @@ def test_a_loja_abre_sem_o_mestre_informar_um_preco(campanha):
     assert _nomes("Forja do Torbin") == [
         "Espada Longa", "Machado de Batalha", "Cota de Malha", "Escudo", "Adaga"]
     assert "Espada Longa — 15 po" in saida
-    assert "Cota de Malha — 50 po" in saida
+    assert "Cota de Malha — 75 po" in saida
 
 
 # ---------------------------------------------------------------------------
@@ -112,7 +116,7 @@ def test_a_loja_abre_sem_o_mestre_informar_um_preco(campanha):
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize("nome,kg", [
-    ("Cota de Malha",       20.41),   # 45 lb  - antes pesava 0,5
+    ("Cota de Malha",       24.95),   # 55 lb  - antes pesava 0,5
     ("Armadura de Placas",  29.48),   # 65 lb
     ("Escudo",               2.72),   # 6 lb
     ("Meia Armadura",       18.14),   # 40 lb
@@ -233,3 +237,166 @@ def test_forja_pode_vender_pocao(campanha):
     saida = td.open_shop("Forja do Torbin", "Espada Longa:15; Poção de Cura:50:3")
     assert "Poção de Cura" in saida
     assert "⚠️" not in saida
+
+
+# ---------------------------------------------------------------------------
+# 7. Nomes de armadura: cada um com a estatística que o nome quer dizer
+# ---------------------------------------------------------------------------
+#
+# Três entradas estavam com a estatística de OUTRA armadura. Em pt-BR "Cota de
+# Malha" é chain mail — CA 16, pesada, 75 po — e a tabela dava a ela CA 14
+# média com bônus de DES, que é brunea. Quem tinha os números certos era
+# "armadura de cota de malha", nome que ninguém digita.
+
+# CA e regra de DES de cada armadura do SRD 5e.
+_SRD_CA = {
+    "padded":          (11, "full"),
+    "leather":         (11, "full"),
+    "studded leather": (12, "full"),
+    "hide":            (12, "cap2"),
+    "chain shirt":     (13, "cap2"),
+    "scale mail":      (14, "cap2"),
+    "breastplate":     (14, "cap2"),
+    "half plate":      (15, "cap2"),
+    "ring mail":       (14, "none"),
+    "chain mail":      (16, "none"),
+    "splint":          (17, "none"),
+    "plate":           (18, "none"),
+    "shield":          (2,  "shield"),
+}
+
+
+@pytest.mark.parametrize("nome,dados", sorted(td.ARMOR_TABLE.items()))
+def test_ca_bate_com_a_armadura_para_a_qual_o_nome_aponta(nome, dados):
+    """
+    A invariante que faltava. Enquanto ninguém amarrava a CA da tabela à
+    armadura do SRD, "cota de malha" podia ficar anos com CA de brunea sem
+    nada reclamar — foi exatamente o que aconteceu.
+    """
+    esperado = _SRD_CA[dados["srd"]]
+    assert (dados["ca_base"], dados["dex_bonus"]) == esperado, (
+        f"'{nome}' aponta para '{dados['srd']}' mas tem CA "
+        f"{dados['ca_base']}/{dados['dex_bonus']}, e deveria ser "
+        f"{esperado[0]}/{esperado[1]}")
+
+
+def test_toda_armadura_do_srd_tem_ao_menos_um_nome_em_portugues():
+    usados = {d["srd"] for d in td.ARMOR_TABLE.values()}
+    faltando = set(_SRD_CA) - usados
+    assert not faltando, f"sem nome em português: {sorted(faltando)}"
+
+
+def _ca_com(nome_armadura, destreza, campanha, povoar):
+    povoar(criar_ficha("Aria", grupo=True, destreza=destreza))
+    ch = memory.campaign["characters"]["aria"]
+    td.add_item("Aria", nome_armadura, 1)
+    td.equip_item("Aria", nome_armadura, "armadura")
+    return ch["sheet"]["ca"]
+
+
+def test_cota_de_malha_e_pesada_e_ignora_destreza(campanha, povoar):
+    """
+    DES 10 de propósito. Com DES 18 este teste seria VAZIO: 14 + min(2, 4) e
+    16 fixo dão os mesmos 16, então ele passaria com a tabela errada também —
+    foi o que a injeção de regressão mostrou. Em DES 10 o antes dava 14.
+    """
+    assert _ca_com("Cota de Malha", 10, campanha, povoar) == 16
+
+
+def test_brunea_continua_media(campanha, povoar):
+    """A estatística que a cota de malha usava indevidamente tem dono."""
+    assert _ca_com("Brunea", 10, campanha, povoar) == 14
+
+
+def test_brunea_limita_a_destreza_em_mais_dois(campanha, povoar):
+    """DES 18 (+4) numa média: entra só +2."""
+    assert _ca_com("Brunea", 18, campanha, povoar) == 16
+
+
+def test_apelido_antigo_nao_quebra_personagem_salvo(campanha, povoar):
+    """
+    'armadura de cota de malha' era o nome esquisito que tinha os números
+    certos. Continua na tabela: ninguém perde a armadura na atualização.
+    """
+    assert _ca_com("Armadura de Cota de Malha", 10, campanha, povoar) == 16
+
+
+def test_nome_sem_acento_equipa_do_mesmo_jeito(campanha, povoar):
+    """
+    Os call sites casavam por igualdade exata. Com os nomes certos entrando na
+    tabela, quem digitasse 'Camisao de Malha' ficaria com CA 10 + DES calado.
+    """
+    assert _ca_com("Camisao de Malha", 14, campanha, povoar) == 15   # 13 + 2
+
+
+def test_armadura_desconhecida_nao_vira_armadura(campanha, povoar):
+    """Sem invenção: nome que não é armadura deixa a CA base intacta."""
+    assert _ca_com("Bugiganga do Vhar", 14, campanha, povoar) == 12  # 10 + 2
+
+
+# ---------------------------------------------------------------------------
+# 8. O wizard e o motor têm que dizer o mesmo número
+# ---------------------------------------------------------------------------
+#
+# static/js/menu.js tem a PRÓPRIA tabela de CA, para o preview do wizard. Duas
+# tabelas independentes divergiram, e a divergência era invisível:
+#
+#   - 'armadura de couro tachado': o wizard prometia CA 12, o motor não
+#     conhecia o nome e entregava 10 + DES;
+#   - 'escudo sagrado': o preset de paladino equipa esse nome e ele não estava
+#     na ARMOR_TABLE, então o paladino saía do wizard sem os +2 do escudo;
+#   - 'cota de placas': 18 no wizard, 16 no motor.
+#
+# Este teste é a costura entre os dois arquivos.
+
+_REGRA_POR_GRUPO = {"light": "full", "medium": "cap2", "heavy": "none"}
+
+# O wizard trata 'robes de mago' como CA 10 + DES, que é exatamente o que o
+# motor faz para quem não tem armadura. Não é armadura e não entra na tabela.
+_SO_DO_WIZARD = {"robes de mago"}
+
+
+def _mapas_do_wizard():
+    js = (Path(__file__).parent.parent / "static" / "js" / "menu.js").read_text(
+        encoding="utf-8")
+    corpo = js.split("function wzArmorCA")[1].split("return 10 + dexMod")[0]
+    mapas = {}
+    for grupo in _REGRA_POR_GRUPO:
+        bloco = corpo.split(f"const {grupo} = {{")[1].split("};")[0]
+        mapas[grupo] = {m.group(1): int(m.group(2))
+                        for m in re.finditer(r"'([^']+)':\s*(\d+)", bloco)}
+    return mapas
+
+
+def test_o_wizard_promete_a_ca_que_o_motor_entrega():
+    for grupo, nomes in _mapas_do_wizard().items():
+        for nome, ca in nomes.items():
+            if nome in _SO_DO_WIZARD:
+                continue
+            dados = td._armadura_na_tabela(nome)
+            assert dados, f"o wizard oferece '{nome}' e o motor não conhece"
+            assert (dados["ca_base"], dados["dex_bonus"]) == (ca, _REGRA_POR_GRUPO[grupo]), (
+                f"'{nome}': wizard diz CA {ca} ({grupo}), motor diz "
+                f"{dados['ca_base']} ({dados['dex_bonus']})")
+
+
+def test_toda_armadura_do_motor_aparece_no_wizard():
+    do_wizard = {td._norm_txt(n) for m in _mapas_do_wizard().values() for n in m}
+    faltando = sorted(
+        nome for nome, d in td.ARMOR_TABLE.items()
+        if d["slot"] == "armadura" and td._norm_txt(nome) not in do_wizard)
+    assert not faltando, f"o preview do wizard não conhece: {faltando}"
+
+
+def test_paladino_do_wizard_ganha_os_dois_pontos_do_escudo(campanha, povoar):
+    """'escudo sagrado' é o nome que o preset de paladino equipa."""
+    povoar(criar_ficha("Aria", grupo=True, destreza=10))
+    ch = memory.campaign["characters"]["aria"]
+    td.add_item("Aria", "Cota de Malha", 1)
+    td.equip_item("Aria", "Cota de Malha", "armadura")
+    sem_escudo = ch["sheet"]["ca"]
+
+    td.add_item("Aria", "Escudo Sagrado", 1)
+    td.equip_item("Aria", "Escudo Sagrado", "escudo")
+
+    assert ch["sheet"]["ca"] == sem_escudo + 2
