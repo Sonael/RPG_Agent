@@ -270,7 +270,10 @@ def _check_combatants_offscene(text: str) -> list[str]:
     ]
 
 
-_ITEM_TOOLS = {"add_item"}
+# buy_item entra porque ele chama add_item por dentro: sem isso, comprar
+# numa loja era desvio da conferência — a marca ia para a ficha e
+# ninguém olhava naquele turno.
+_ITEM_TOOLS = {"add_item", "buy_item"}
 
 
 def _check_itens_inventados(tools_called: set) -> list[str]:
@@ -289,21 +292,43 @@ def _check_itens_inventados(tools_called: set) -> list[str]:
     if not _ITEM_TOOLS.intersection(tools_called):
         return []
 
-    achados = []
+    achados, sem_descricao = [], []
     for ch in memory.campaign.get("characters", {}).values():
         for it in (ch.get("inventario") or []):
-            if isinstance(it, dict) and it.get("custom") and it.get("efeito_mecanico"):
-                if not it.get("balanco_justificado"):
-                    achados.append((ch.get("name", "?"), it))
+            if not isinstance(it, dict) or not it.get("custom"):
+                continue
+            if it.get("balanco_justificado"):
+                continue
+            if it.get("efeito_mecanico"):
+                achados.append((ch.get("name", "?"), it))
+            elif it.get("efeito_desconhecido"):
+                sem_descricao.append((ch.get("name", "?"), it))
 
-    if not achados:
+    if not achados and not sem_descricao:
         return []
 
-    nomes = ", ".join(f"'{it.get('nome')}' ({dono})" for dono, it in achados[:4])
     nivel = max((int(((c.get("sheet") or {}).get("nivel", 1)) or 1)
                  for c in memory.campaign.get("characters", {}).values()
                  if memory.is_party_member(c)), default=1)
-    return [
+
+    violacoes = []
+    if sem_descricao:
+        soltos = ", ".join(f"'{it.get('nome')}' ({dono})"
+                           for dono, it in sem_descricao[:4])
+        violacoes.append(
+            f"Deu item de nome mágico que não existe no SRD e não disse o que "
+            f"ele FAZ: {soltos}. Sem descrição não dá para saber se é "
+            f"lembrança de família ou espada +3, e é assim que um item entra "
+            f"na campanha sem ninguém pesar. Narre de novo declarando o "
+            f"efeito — inclusive 'não faz nada, é sentimental', que é resposta "
+            f"válida e encerra o assunto."
+        )
+
+    if not achados:
+        return violacoes
+
+    nomes = ", ".join(f"'{it.get('nome')}' ({dono})" for dono, it in achados[:4])
+    return violacoes + [
         f"Criou item que NÃO existe no SRD de D&D 5e e promete efeito "
         f"mecânico: {nomes}. Item inventado com regra desequilibra a mesa em "
         f"silêncio. Faça UMA das duas coisas e narre de novo: (a) troque por "
@@ -543,9 +568,13 @@ def _build_correction_prompt(violations: list[str], already_called: set | None =
     # iniciativa saiu com gente que não estava na cena.
     # add_item fica de fora: quando a correção é sobre um item inventado, o
     # conserto passa por remove_item + add_item com o item certo.
+    # buy_item e sell_item ENTRAM: mexem na bolsa e no estoque, e agora
+    # disparam a conferência de item inventado — sem isso, a rodada de
+    # correção cobraria o ouro do jogador uma segunda vez pelo mesmo item.
     stateful = {"attack_roll", "modify_hp", "use_ability", "modify_mana",
                 "apply_condition", "learn_spell", "learn_ability",
-                "grant_xp", "set_flag", "clear_flag"}
+                "grant_xp", "set_flag", "clear_flag",
+                "buy_item", "sell_item"}
     already_stateful = (already_called or set()) & stateful
 
     lines += [

@@ -577,6 +577,21 @@ e quantidade atualizados, o resto fica. Antes ela substituía, então a segunda
 chamada para pôr um item a mais apagava a loja, e o que o grupo já tinha
 esgotado voltava cheio.
 
+Cada item aceita uma **descrição** depois de `|`
+(`"Amuleto do Corvo:75:1|dá vantagem em Furtividade"`), e ela viaja com o item
+até o inventário de quem comprar. Sem isso a loja era desvio da conferência de
+item inventado: `buy_item` chamava `add_item` sem descrição, `_tem_efeito_mecanico`
+não tinha o que ler, e uma "Lâmina Rúnica de Vhar" de 200 po era arquivada como
+"só sabor" — o verificador não dizia nada.
+
+Fechar só isso não bastava, porque o mestre pode simplesmente não descrever.
+Nome mágico fora do SRD **sem descrição nenhuma** agora é uma terceira
+categoria (`efeito_desconhecido`), e ela é cobrada: não dá para saber se é
+lembrança de família ou espada +3, e "não faz nada, é sentimental" é resposta
+válida que encerra o assunto. `buy_item` entrou em `_ITEM_TOOLS` para que a
+conferência rode no turno da compra, e em `stateful` para que a rodada de
+correção não cobre o ouro do jogador duas vezes pelo mesmo item.
+
 **O motor não tem categoria de loja.** Uma forja vendendo poção passa sem
 aviso: `open_shop` só cuida de preço, estoque e bolsa. Quem mantém a coerência
 é o mestre, e a instrução dele diz isso explicitamente. O SRD traz `category`
@@ -674,6 +689,25 @@ o próximo passo pendente, e aparecem na barra lateral do jogo.
   O nível 3 vale no teste de concentração porque ali o motor é quem rola —
   nos demais saves o d20 chega já rolado pelo jogador, então não há o que
   aplicar, e cobrar seria mentira. Descanso longo remove um nível.
+
+  Ser calculado só resolve metade do problema: alguém precisa **consultar** o
+  cálculo. Por um tempo `_hp_max_efetivo` era chamada num lugar só, dentro do
+  próprio `add_exhaustion`, como um corte de uma vez. Todo caminho de cura
+  fechava em `vida_max` cru, então o corte durava até a primeira poção:
+
+  ```
+  depois de exaustão 4   vida 20/40  | teto 20
+  depois da cura         vida 40/40  | teto 20   ← o teto virou enfeite
+  ```
+
+  Hoje os cinco caminhos de cura fecham no teto efetivo: `modify_hp`,
+  `short_rest`, `use_hit_die`, a cura automática de `use_ability` e o
+  `long_rest`. Quando o teto morde, o texto diz por quê — sem isso a ficha
+  mostra `20/40` e ninguém entende onde a cura foi parar.
+
+  No `long_rest` a **ordem** também estava errada: ele restaurava a vida e só
+  então baixava a exaustão. Quem dorme com exaustão 4 acorda com 3, e em 3 não
+  há corte — acordava com metade da vida por uma exaustão que já não tinha.
 
 ### NPCs
 
@@ -935,6 +969,18 @@ dragão não é usável todo turno nem uma vez por luta — no início de cada t
 dele rola-se 1d6 e o poder volta se der 5 ou 6. É o que faz o grupo jogar
 contra um relógio que ninguém controla. `execute_npc_turn` usa o poder assim
 que ele estiver carregado: é a jogada mais forte que a criatura tem.
+
+Por um tempo isso valia **só** para `execute_npc_turn`. `_recarga_pronta`
+existia e não era chamada por ninguém, e `_gastar_recarga` só aparecia no
+braço da IA de NPC — quando o mestre conduzia o chefe por `use_ability`, que é
+o caminho normal deste app, nada era gasto nem conferido e o dragão soprava
+toda rodada. Hoje `use_ability` recusa o poder gasto e o marca ao usar. A
+conferência vem **antes** do desconto de mana: recusar depois deixaria o custo
+pago por uma ação que não aconteceu.
+
+A busca aceita os dois nomes do poder — a habilidade fica na ficha em inglês
+(`Fire Breath`) e o mestre registra a recarga com o nome que narra (`Sopro de
+Fogo`). Procurar só por um deixava a recarga solta, sem erro nenhum.
 
 **Ações lendárias** (`set_legendary_actions`, `legendary_action`): um único
 inimigo contra quatro jogadores age 1 vez a cada 5 turnos, e a luta vira

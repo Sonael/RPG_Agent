@@ -3058,6 +3058,25 @@ def set_recharge_ability(name: str, ability: str, min_roll: int = 5) -> str:
             f"recarga {minimo}–6 (~{chance}% por turno).")
 
 
+def _nome_da_recarga(char: dict, *nomes: str) -> str:
+    """
+    Sob qual nome esse poder está registrado como recarga, se estiver.
+
+    Recebe VÁRIOS nomes porque a habilidade fica na ficha em inglês e o mestre
+    registra a recarga com o nome que ele narra: set_recharge_ability('Sopro
+    de Fogo') e a habilidade 'Fire Breath' são o mesmo poder. Procurar só por
+    um dos dois deixava a recarga sem efeito, calada.
+    """
+    recs = (char.get("sheet") or {}).get("recargas") or {}
+    for nome in nomes:
+        if not nome:
+            continue
+        for chave in recs:
+            if _norm_txt(chave) == _norm_txt(nome):
+                return chave
+    return ""
+
+
 def _recarga_pronta(char: dict, ability: str) -> bool:
     recs = (char.get("sheet") or {}).get("recargas") or {}
     for nome, cfg in recs.items():
@@ -4109,7 +4128,7 @@ def modify_hp(char_name: str, amount: int, reason: str = "",
         notas    = _res["notas"]
     else:
         hp_antes = s["vida_atual"]
-        s["vida_atual"] = max(0, min(s["vida_max"], s["vida_atual"] + amount))
+        s["vida_atual"] = max(0, min(_hp_max_efetivo(s), s["vida_atual"] + amount))
     delta    = s["vida_atual"] - hp_antes
 
     acao       = "curou" if delta > 0 else "sofreu"
@@ -5018,6 +5037,26 @@ def use_ability(
     s     = char["sheet"]
     custo = hab.get("custo_mana", 0)
 
+    # ── RECARGA 5–6 ────────────────────────────────────────────────────────
+    # O poder de recarga gasto não pode ser usado de novo até o d6 devolvê-lo
+    # no início do turno (_rolar_recargas). Antes, só o braço da IA de NPC
+    # cobrava isso: quando o MESTRE conduzia o chefe por use_ability — que é o
+    # caso normal — nada era gasto nem conferido, e o dragão soprava toda
+    # rodada. A cobrança vem antes da mana: recusar depois de descontar
+    # deixaria o custo pago por uma ação que não aconteceu.
+    _rec = _nome_da_recarga(char, hab.get("nome", ""), ability_name)
+    if _rec:
+        _cfg = s["recargas"][_rec]
+        if not _cfg.get("pronto", True):
+            _d6 = _cfg.get("ultimo_d6")
+            _rolagem = f" (último d6: {_d6})" if _d6 else ""
+            return (
+                f"❌ **{_rec}** de {char['name']} está GASTO{_rolagem}. "
+                f"Recarrega com {int(_cfg.get('min', 5) or 5)}+ no d6, rolado "
+                f"sozinho no início do turno dele.\n"
+                f"   Use outra ação nesta rodada."
+            )
+
     if custo > 0:
         if s["mana_atual"] < custo:
             return (
@@ -5025,6 +5064,9 @@ def use_ability(
                 f"✨ Mana: {s['mana_atual']}/{s['mana_max']} (necessário: {custo})"
             )
         s["mana_atual"] -= custo
+
+    if _rec:
+        _gastar_recarga(char, _rec)
 
     n_dice, sides, bonus = _parse_dice(hab.get("dado", "1d6"))
     rolls      = [random.randint(1, sides) for _ in range(n_dice)]
@@ -5166,7 +5208,7 @@ def use_ability(
             hp_antes = st["vida_atual"]
 
             if _is_healing_ability(hab):
-                st["vida_atual"] = min(st["vida_max"], st["vida_atual"] + total_dano)
+                st["vida_atual"] = min(_hp_max_efetivo(st), st["vida_atual"] + total_dano)
                 result += f"\n   {target['name']}: ❤️  {hp_antes} → {st['vida_atual']}/{st['vida_max']}"
                 if hp_antes == 0:
                     target["status"] = "vivo"
@@ -5831,6 +5873,19 @@ def add_item(char_name: str, item_name: str, quantity: int = 1, description: str
                     f"— e prefira efeitos pequenos (+1, 1d4, uma vez por "
                     f"descanso) a números redondos e grandes."
                 )
+            elif not (description or "").strip():
+                # Nome mágico e NENHUMA descrição: não dá para dizer se é
+                # sabor ou se quebra a mesa. Isso não é "sabor", é lacuna —
+                # e era o buraco por onde a loja passava, porque buy_item
+                # chamava add_item sem descrição nenhuma.
+                item_dict["efeito_desconhecido"] = True
+                warning = (
+                    f"\n⚠️  '{item_name}' NÃO EXISTE no SRD e entrou sem "
+                    f"descrição. Diga o que ele faz — mesmo que seja nada — "
+                    f"com add_item(..., description='...') ou "
+                    f"justify_custom_item(). Sem isso não há como saber se "
+                    f"é lembrança de família ou espada +3."
+                )
             else:
                 warning = (
                     f"\n📎 '{item_name}' não está no SRD — registrado como "
@@ -6280,8 +6335,13 @@ def open_shop(shop_name: str, items: str, location: str = "") -> str:
     Args:
         shop_name: Nome da loja ('Forja do Torbin').
         items:     Itens separados por ';'. Formato por item:
-                   "nome" ou "nome:preço_em_ouro" ou "nome:preço:quantidade".
+                   "nome" ou "nome:preço_em_ouro" ou "nome:preço:quantidade",
+                   com descrição opcional depois de '|'.
                    Ex: "Espada Longa; Poção de Cura:50:3; Corda de Seda:10"
+                   Ex: "Amuleto do Corvo:75:1|dá vantagem em Furtividade"
+                   Descreva SEMPRE o que não for item do SRD — a descrição
+                   vai junto para o inventário de quem comprar, e é por ela
+                   que o motor confere se o item desequilibra a mesa.
         location:  Onde fica (padrão: o local atual do grupo).
     """
     nome_loja = (shop_name or "").strip()
@@ -6294,6 +6354,10 @@ def open_shop(shop_name: str, items: str, location: str = "") -> str:
         bruto = bruto.strip()
         if not bruto:
             continue
+        # Descrição opcional depois de '|'. Fica fora do split de ':' porque
+        # texto livre tem dois-pontos ("efeito: +1") e comeria o preço.
+        bruto, _, descricao = bruto.partition("|")
+        descricao = descricao.strip()
         partes = [p.strip() for p in bruto.split(":")]
         nome   = partes[0]
         if not nome:
@@ -6313,7 +6377,8 @@ def open_shop(shop_name: str, items: str, location: str = "") -> str:
             qtd = max(1, int(partes[2])) if len(partes) > 2 and partes[2] else 99
         except ValueError:
             qtd = 99
-        estoque.append({"nome": nome, "preco": preco, "qtd": qtd})
+        estoque.append({"nome": nome, "preco": preco, "qtd": qtd,
+                        "descricao": descricao})
 
     if not estoque:
         return ("⚠️ Nenhum item com preço. O SRD não conhece: "
@@ -6339,6 +6404,8 @@ def open_shop(shop_name: str, items: str, location: str = "") -> str:
         if antigo:
             antigo["preco"] = item["preco"]
             antigo["qtd"]   = item["qtd"]
+            if item.get("descricao"):
+                antigo["descricao"] = item["descricao"]
             repostos.append(item["nome"])
         else:
             loja["estoque"].append(item)
@@ -6439,7 +6506,11 @@ def buy_item(char_name: str, shop_name: str, item_name: str, quantity: int = 1) 
     linha["qtd"] -= qtd
     if linha["qtd"] <= 0:
         loja["estoque"].remove(linha)
-    add_item(char["name"], linha["nome"], qtd)
+    # A descrição VAI JUNTO. Sem ela o add_item não tem o que auditar, e a
+    # loja virava desvio da conferência de item inventado: uma "Lâmina Rúnica
+    # de Vhar" comprada ficava marcada como custom mas sem efeito declarado,
+    # e o verificador não cobrava nada.
+    add_item(char["name"], linha["nome"], qtd, linha.get("descricao", ""))
 
     estado, carga, cap = _estado_de_carga(char)
     aviso = ""
@@ -6644,6 +6715,18 @@ def _hp_max_efetivo(sheet: dict) -> int:
     return max(1, bruto // 2) if _exaustao(sheet) >= 4 else bruto
 
 
+def _nota_teto(sheet: dict) -> str:
+    """
+    Lembrete de que o PV máximo está cortado. Sem isso a ficha mostra
+    '20/40' e ninguém entende por que a cura parou na metade.
+    """
+    teto  = _hp_max_efetivo(sheet)
+    bruto = int(sheet.get("vida_max", 0) or 0)
+    if teto >= bruto:
+        return ""
+    return f" — teto {teto} (exaustão {_exaustao(sheet)} corta o PV máximo pela metade)"
+
+
 def add_exhaustion(char_name: str, levels: int = 1, reason: str = "") -> str:
     """
     Adiciona níveis de exaustão. É o custo de marcha forçada, noite em claro,
@@ -6750,14 +6833,15 @@ def short_rest(char_name: str) -> str:
     rolls      = [random.randint(1, hit_die) for _ in range(n_dice)]
     total_heal = max(n_dice, sum(rolls) + con_mod * n_dice)
     hp_antes   = s["vida_atual"]
-    s["vida_atual"] = min(s["vida_max"], s["vida_atual"] + total_heal)
+    s["vida_atual"] = min(_hp_max_efetivo(s), s["vida_atual"] + total_heal)
     hp_ganho   = s["vida_atual"] - hp_antes
 
     memory.save_campaign()
     return (
         f"🛌 {char['name']} faz um descanso curto.\n"
         f"   Rola {n_dice}d{hit_die}: [{' + '.join(str(r) for r in rolls)}]\n"
-        f"   Cura: +{hp_ganho} pv | ❤️  Vida: {hp_antes} → {s['vida_atual']}/{s['vida_max']}"
+        f"   Cura: +{hp_ganho} pv | ❤️  Vida: {hp_antes} → "
+        f"{s['vida_atual']}/{s['vida_max']}{_nota_teto(s)}"
     )
 
 
@@ -6798,7 +6882,7 @@ def use_hit_die(char_name: str, count: int = 1) -> str:
     total_heal = max(count, sum(rolls) + con_mod * count)
 
     hp_antes        = s["vida_atual"]
-    s["vida_atual"] = min(s["vida_max"], s["vida_atual"] + total_heal)
+    s["vida_atual"] = min(_hp_max_efetivo(s), s["vida_atual"] + total_heal)
     s["hit_dice_remaining"] = hd_restantes - count
     hp_ganho        = s["vida_atual"] - hp_antes
 
@@ -6864,7 +6948,18 @@ def long_rest(char_name: str) -> str:
         if not _grupo_ja_avancou:
             advance_time(8, "descanso longo")
     s["ultimo_descanso_longo"] = _agora_em_horas()
-    s["vida_atual"] = s["vida_max"]
+
+    # Descanso longo remove UM nível de exaustão (PHB). É o único jeito de
+    # sair dela sem magia — e por isso o relógio importa: sem 24h, sem alívio.
+    #
+    # Tem que vir ANTES de restaurar a vida. Quem dorme com exaustão 4 acorda
+    # com 3, e em 3 não há corte de PV máximo: restaurar antes deixaria o
+    # personagem na metade da vida por uma exaustão que ele já não tem.
+    _exa_antes = _exaustao(s)
+    if _exa_antes > 0:
+        s["exaustao"] = _exa_antes - 1
+
+    s["vida_atual"] = _hp_max_efetivo(s)
     s["mana_atual"] = s["mana_max"]
     s["hit_dice_remaining"] = s.get("nivel", 1)  # Renova dados de vida no descanso longo
     s["death_saves_sucessos"] = 0
@@ -6873,12 +6968,6 @@ def long_rest(char_name: str) -> str:
     temp_perdidos   = _temp_hp(s)
     s["vida_temp"]  = 0
     conc_msg        = _break_concentration(char, "descanso longo")
-
-    # Descanso longo remove UM nível de exaustão (PHB). É o único jeito de
-    # sair dela sem magia — e por isso o relógio importa: sem 24h, sem alívio.
-    _exa_antes = _exaustao(s)
-    if _exa_antes > 0:
-        s["exaustao"] = _exa_antes - 1
 
     if char.get("status") in ("inconsciente", "ferido"):
         char["status"] = "vivo"
@@ -6898,7 +6987,7 @@ def long_rest(char_name: str) -> str:
     memory.save_campaign()
     return (
         f"🌙 {char['name']} faz um descanso longo.\n"
-        f"   ❤️  Vida restaurada: {s['vida_max']}/{s['vida_max']}\n"
+        f"   ❤️  Vida restaurada: {s['vida_atual']}/{s['vida_max']}{_nota_teto(s)}\n"
         f"   ✨ Mana restaurada: {s['mana_max']}/{s['mana_max']}"
         f"{cond_msg}"
         + (f"\n   🔵 {temp_perdidos} PV temporários expiraram." if temp_perdidos else "")

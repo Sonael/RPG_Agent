@@ -463,6 +463,9 @@ DESCANSO E EXAUSTÃO — o dia de aventura:
   A exaustão é o preço de forçar: nível 1 já dá desvantagem em perícia, 3 em
   ataques, 4 corta o PV máximo pela metade, 6 mata. Um descanso longo devolve
   um nível — só um.
+  Em exaustão 4+ NENHUMA cura passa da metade do PV máximo: poção, descanso
+  e magia param no teto, e o motor avisa quando isso acontece. Não prometa
+  ao jogador uma cura que o teto não deixa acontecer.
 
 ITENS — invente o SABOR, não a REGRA:
   Antes de dar um item mágico, prefira o que EXISTE no SRD: add_item() busca
@@ -530,6 +533,9 @@ TERRENO — dê um lugar à luta (opcional, mas quase sempre vale):
 CHEFES — o que separa um chefe de um saco de PV:
   • set_recharge_ability("Dragão", "Sopro de Fogo", 5) — o poder volta quando
     um d6 der 5+ no início do turno dele. Use para sopros e explosões.
+    Depois de usado, o motor RECUSA use_ability com esse poder até o d6
+    devolvê-lo. Não insista nem narre o sopro assim mesmo: escolha outra
+    ação para o chefe naquela rodada — é essa espera que faz o sopro doer.
   • set_legendary_actions("Dragão", "Ataque de Cauda, Investida Alada:2", 3)
     — o chefe passa a agir FORA do próprio turno. O motor gasta essas ações
     sozinho na virada de cada turno; você só narra o que apareceu no log.
