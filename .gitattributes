@@ -1,0 +1,20 @@
+# Fim de linha: LF em tudo que é texto, no repositório E na cópia de trabalho.
+#
+# Por que isto existe. O repositório era 54 arquivos em LF e DOIS em CRLF —
+# README.md e static/js/menu.js. Como nada declarava a convenção, qualquer
+# ferramenta que reescrevesse um arquivo inteiro decidia sozinha, e o
+# resultado aparecia como commit gigante de mudança nenhuma: uma edição de 46
+# linhas no README saiu uma vez com 3808 linhas no diff, porque o arquivo
+# virou de CRLF para LF junto. Duas vezes na mesma semana.
+#
+# `text=auto` deixa o git detectar binário sozinho; `eol=lf` fixa a convenção
+# nos dois lados. Os PNGs de ícone estão marcados explicitamente porque a
+# detecção automática é boa, mas aqui não há motivo para depender dela: um
+# ícone tratado como texto seria corrompido silenciosamente.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff  binary
+*.woff2 binary
