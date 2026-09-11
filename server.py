@@ -2691,6 +2691,31 @@ def combat_action_route():
     return jsonify(res)
 
 
+@app.route("/api/levelup/state", methods=["GET"])
+@require_auth
+def levelup_state_route():
+    from rpg import tools_dnd
+    return jsonify(tools_dnd.levelup_snapshot(
+        (request.args.get("personagem") or "").strip()))
+
+
+@app.route("/api/levelup/action", methods=["POST"])
+@require_auth
+def levelup_action_route():
+    from rpg import tools_dnd
+    d = request.json or {}
+    action = (d.get("action") or "").strip()
+    if not action:
+        return jsonify({"ok": False, "message": "Ação ausente."}), 400
+    return jsonify(tools_dnd.levelup_action(
+        action,
+        char=(d.get("char") or "").strip(),
+        feature=(d.get("feature") or "").strip(),
+        choice=(d.get("choice") or "").strip(),
+        points=d.get("points", 1),
+    ))
+
+
 @app.route("/api/shop/state", methods=["GET"])
 @require_auth
 def shop_state_route():

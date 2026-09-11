@@ -1046,6 +1046,87 @@ Eventos: `combat_start`, `attack_hit`, `attack_crit`, `attack_miss`,
 
 ---
 
+## Tela de nível ("A Ascensão")
+
+A terceira tela, e a primeira construída por um motivo que **não** é o das
+outras duas. Combate e loja são laços: muitas decisões pequenas em sequência,
+e a tela tira a LLM de dentro do laço. Subir de nível acontece umas dez vezes
+numa campanha inteira — não há laço nenhum, e não há round-trip a economizar.
+
+O que há é um punhado de escolhas que valem o resto da campanha e que o modelo
+inventaria de bom grado: estilo de combate, arquétipo, para onde vão os pontos
+de atributo. **Aqui a tela não economiza tempo, ela impede invenção.**
+
+### O custo estava no motor, não no front
+
+O motor sempre soube **subir** de nível (`grant_xp` dá PV, proficiência, mana e
+as features automáticas) e sempre soube **aplicar** uma escolha
+(`set_feature_choice`, `choose_feat`, `set_stat`). Faltava o meio: saber que o
+personagem **deve** uma escolha.
+
+Sem isso, "escolha um Estilo de Combate" era uma frase no fim do texto de
+level-up. Se ninguém escolhesse, nada acontecia e nada cobrava — e um
+guerreiro atravessava a campanha inteira sem o estilo a que tinha direito
+desde o nível 1.
+
+`_escolhas_pendentes(char)` é **calculada, não gravada**, a mesma disciplina do
+teto de PV da exaustão: o personagem tem a habilidade na ficha e não tem
+entrada em `feature_choices`, logo deve a escolha. Vale para fichas salvas
+antes desta mudança, sem migração nenhuma, e é a mesma pergunta que
+`set_feature_choice` já respondia para validar — só que feita de fora.
+
+### O Incremento de Atributo precisou de contador
+
+É a exceção, porque não deixa rastro: um +2 em Força é indistinguível de uma
+força alta na criação. `asi_pontos_gastos` conta os pontos, e a chave AUSENTE
+significa ficha anterior ao contador — nesse caso a resposta é **zero
+pendente**. Cobrar retroativamente os cinco incrementos de um personagem de
+nível 19 daria +10 de atributo de presente, e não há como saber se o mestre já
+os aplicou à mão.
+
+`grant_xp` carimba o contador no próximo level-up, ancorando-o no presente:
+o passado não é cobrado, o futuro é. `test_o_proximo_nivel_passa_a_ser_cobrado`
+é o que garante que a âncora não virou "desligar a conta para sempre".
+
+`apply_asi` é função nova em vez de reuso do `set_stat` porque ASI tem regra:
+sai de um pool que o nível concede e para no 20. `set_stat` é ajuste livre do
+mestre, sem teto e sem pool — usá-lo para ASI deixava o atributo subir sem
+limite e sem gastar nada. Guerreiro ganha incrementos extras no 6 e no 14,
+Ladino no 10; está em `_NIVEIS_ASI_EXTRA`.
+
+### A tela
+
+Abre sozinha quando a **assinatura** das pendências muda — ou seja, quando um
+nível novo criou escolha. Abrir sempre que houvesse pendência prenderia numa
+tela que reabre a cada turno quem decidiu deixar para depois.
+
+O botão do rodapé muda de **função**, não só de rótulo: desabilitado enquanto
+este personagem deve algo (sair devendo é o que a tela existe para impedir; o
+✕ continua fechando), atalho para o próximo do grupo quando outro deve, e
+"Concluir" só quando ninguém deve. Um botão escrito "Agora Helena →" que
+concluísse a cena seria mentira.
+
+No mobile a régua de atributos usa a sigla de três letras da mesa (FOR, DES,
+CON…). Com o nome inteiro ela quebrava em 4+2 e comia 280px dos 812 da tela —
+um terço do espaço, justamente na tela em que o conteúdo que importa são as
+escolhas.
+
+`levelup_action` é só despacho, igual à loja: chama `set_feature_choice`,
+`apply_asi` e `choose_feat`, as mesmas do mestre.
+`test_a_tela_passa_pelas_MESMAS_funcoes_do_mestre` guarda isso.
+
+### Um efeito colateral nos testes de navegador
+
+Com o segundo arquivo de teste de navegador, os dois passavam sozinhos e
+**erravam juntos**: `_subir_servidor` registrava `/__estado` via
+`@app.route`, e o Flask recusa registrar rota depois que o app atendeu a
+primeira requisição.
+
+A primeira tentativa de conserto foi contar referências do servidor — e não
+resolveu, porque o primeiro módulo solta o servidor antes de o segundo pedir.
+O que precisava de guarda era **a rota**, não o servidor: são coisas
+separadas, e reusar o servidor ficou como otimização.
+
 ## Tela de loja ("O Balcão")
 
 A segunda tela do jogo, e a primeira construída depois de perguntar **por que**

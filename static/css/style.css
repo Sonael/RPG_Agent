@@ -2340,6 +2340,7 @@ body.shop-on { overflow: hidden; }
 }
 .shp-bolsa-quem { font-weight: 700; }
 .shp-quem {
+  width: auto; max-width: 45%;          /* idem: `select` global é 100% */
   font-family: 'Lora', serif; font-size: 0.95rem; font-weight: 700;
   color: var(--shp-dark); background: var(--shp-paper);
   border: 1px solid var(--shp-gold); border-radius: 6px;
@@ -2524,4 +2525,313 @@ body.shop-on { overflow: hidden; }
      do botão ele vira estatística solta. */
   .shp-preco { min-width: 0; }
   .shp-item-linha { gap: var(--esp-2); }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   TELA DE NÍVEL ("A Ascensão") — static/js/levelup.js
+
+   Terceira tela, mesma paleta de pergaminho das outras duas. A estrutura
+   é a da loja (cabeçalho fixo, corpo que rola, rodapé fixo) porque o
+   conteúdo tem a mesma forma: uma lista de coisas para escolher.
+
+   O que muda é o peso visual. Loja é rotina; subir de nível acontece umas
+   dez vezes numa campanha, e cada escolha vale o resto dela. Por isso os
+   cartões de opção são grandes e trazem a descrição inteira: ninguém
+   escolhe arquétipo lendo três palavras.
+   ═══════════════════════════════════════════════════════════════════ */
+#levelup-overlay {
+  --lvl-paper: #fffbf0;
+  --lvl-bg:    #f4ebd8;
+  --lvl-dark:  #4a2511;
+  --lvl-gold:  #b89947;
+  --lvl-text:  #2c1a0e;
+  --lvl-muted: #6e5c4f;
+  --lvl-green: #2e7d32;
+  --lvl-red:   #8b2315;
+
+  position: fixed; inset: 0; z-index: 9000;
+  background: rgba(20,12,6,0.82); backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  padding: var(--esp-5); box-sizing: border-box;
+  font-family: 'Lora', serif;
+}
+#levelup-overlay.hidden { display: none; }
+body.levelup-on { overflow: hidden; }
+
+#lvl-frame {
+  width: 100%; max-width: 820px;
+  height: min(92vh, 860px);
+  background: var(--lvl-paper);
+  color: var(--lvl-text);
+  border: 2px solid var(--lvl-gold);
+  border-radius: 12px;
+  box-shadow: 0 15px 35px rgba(74,37,17,0.45), inset 0 0 40px rgba(184,153,71,0.1);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+.lvl-header {
+  padding: var(--esp-5) var(--esp-6) var(--esp-3);
+  border-bottom: 1px solid var(--lvl-gold);
+  text-align: center;
+  flex: 0 0 auto;
+}
+.lvl-close {
+  position: absolute; top: var(--esp-3); right: var(--esp-3);
+  background: none; border: none; cursor: pointer;
+  color: var(--lvl-muted); font-size: 1.4rem; line-height: 1;
+  padding: var(--esp-1) var(--esp-2); border-radius: 6px;
+}
+.lvl-close:hover { color: var(--lvl-red); background: var(--lvl-bg); }
+.lvl-title {
+  font-family: 'Playfair Display', serif;
+  color: var(--lvl-red);
+  font-size: 1.7rem; font-weight: 700;
+  margin: 0;
+}
+.lvl-title #lvl-quem {
+  color: var(--lvl-muted); font-size: 1.1rem;
+  font-style: italic; font-family: 'Lora', serif; font-weight: 400;
+}
+.lvl-sub {
+  display: flex; align-items: center; justify-content: center;
+  gap: var(--esp-3); flex-wrap: wrap;
+  margin-top: var(--esp-2);
+  color: var(--lvl-muted); font-size: 0.9rem;
+}
+.lvl-quem-sel {
+  /* `width: auto` porque a regra global de <select> é `width: 100%` — sem
+     isto o seletor de personagem ocupa a largura inteira do cabeçalho e
+     empurra a linha de classe/nível para baixo, ficando mais chamativo que
+     a informação que ele acompanha. */
+  width: auto; max-width: 60%;
+  font-family: 'Lora', serif; font-size: 0.9rem; font-weight: 700;
+  color: var(--lvl-dark); background: var(--lvl-paper);
+  border: 1px solid var(--lvl-gold); border-radius: 6px;
+  padding: var(--esp-1) var(--esp-2);
+}
+.lvl-classe { text-transform: capitalize; }
+
+.lvl-xp { margin-top: var(--esp-3); }
+.lvl-xp-barra {
+  height: 6px; border-radius: 3px;
+  background: #e6ded2; overflow: hidden;
+}
+.lvl-xp-fill {
+  height: 100%; background: var(--lvl-gold);
+  transition: width .3s;
+}
+.lvl-xp-num {
+  margin-top: var(--esp-1);
+  font-size: 0.78rem; color: var(--lvl-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Régua de atributos: fica no topo e FORA do corpo que rola, porque é a
+   referência que o jogador consulta enquanto decide para onde vão os
+   pontos. Rolar para conferir o próprio atributo seria absurdo. */
+.lvl-atributos {
+  display: flex; flex-wrap: wrap; justify-content: center;
+  gap: var(--esp-2);
+  padding: var(--esp-3) var(--esp-6);
+  background: var(--lvl-bg);
+  border-bottom: 1px solid var(--lvl-gold);
+  flex: 0 0 auto;
+  /* A sombra é o que faz o cartão cortado logo abaixo ser lido como
+     "passando por baixo" e não como recorte. Só a linha do border não
+     bastava: os cartões têm contorno próprio e se confundiam com ela —
+     o mesmo problema que a barra de ação do combate teve. */
+  position: relative; z-index: 2;
+  box-shadow: 0 6px 6px -6px rgba(74,37,17,0.35);
+}
+.lvl-attr {
+  display: flex; flex-direction: column; align-items: center;
+  min-width: 76px;
+  padding: var(--esp-1) var(--esp-2);
+  border: 1px solid #e0d5c2; border-radius: 6px;
+  background: var(--lvl-paper);
+}
+.lvl-attr-nome  { font-size: 0.7rem; color: var(--lvl-muted); text-transform: uppercase; letter-spacing: .03em; }
+.lvl-attr-sigla { display: none; }
+.lvl-attr-valor { font-size: 1.15rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.lvl-attr-mod   { font-size: 0.76rem; color: var(--lvl-muted); font-variant-numeric: tabular-nums; }
+
+.lvl-corpo {
+  flex: 1 1 auto; overflow-y: auto;
+  padding: var(--esp-4) var(--esp-6);
+  display: flex; flex-direction: column; gap: var(--esp-5);
+  /* Sombra de rolagem, como na loja e no campo de batalha: sem ela o
+     último cartão aparece cortado e isso se lê como defeito. */
+  background:
+    linear-gradient(var(--lvl-paper) 30%, rgba(255,251,240,0)) top / 100% 20px no-repeat local,
+    linear-gradient(rgba(255,251,240,0), var(--lvl-paper) 70%) bottom / 100% 20px no-repeat local,
+    radial-gradient(farthest-side at 50% 0, rgba(74,37,17,.16), transparent)
+      top / 100% 8px no-repeat scroll,
+    radial-gradient(farthest-side at 50% 100%, rgba(74,37,17,.16), transparent)
+      bottom / 100% 8px no-repeat scroll,
+    var(--lvl-paper);
+}
+
+.lvl-bloco { }
+.lvl-bloco-titulo {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.15rem; color: var(--lvl-dark);
+  margin: 0 0 var(--esp-1);
+  display: flex; align-items: baseline; gap: var(--esp-2);
+}
+.lvl-contagem {
+  font-family: 'Lora', serif; font-size: 0.75rem; font-weight: 700;
+  color: var(--lvl-red); background: var(--lvl-bg);
+  border: 1px solid var(--lvl-gold); border-radius: 10px;
+  padding: 1px var(--esp-2);
+}
+.lvl-bloco-desc {
+  margin: 0 0 var(--esp-3);
+  color: var(--lvl-muted); font-size: 0.88rem;
+}
+.lvl-ja {
+  font-size: 0.82rem; color: var(--lvl-green);
+  margin-bottom: var(--esp-2);
+}
+
+.lvl-opcoes {
+  display: grid; gap: var(--esp-2);
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+}
+.lvl-opcao {
+  display: flex; flex-direction: column; gap: var(--esp-1);
+  text-align: left;
+  background: var(--lvl-paper);
+  border: 1px solid var(--lvl-gold); border-radius: 8px;
+  padding: var(--esp-3) var(--esp-4);
+  font-family: 'Lora', serif; color: var(--lvl-text);
+  cursor: pointer; transition: all .15s;
+}
+.lvl-opcao:hover {
+  background: var(--lvl-bg);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(74,37,17,0.15);
+}
+.lvl-opcao-nome { font-weight: 700; font-size: 0.98rem; }
+.lvl-opcao-desc { font-size: 0.8rem; color: var(--lvl-muted); line-height: 1.35; }
+
+/* Incremento de atributo */
+.lvl-attr-grid {
+  display: grid; gap: var(--esp-2);
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+.lvl-attr-btn {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  background: var(--lvl-paper);
+  border: 1px solid var(--lvl-gold); border-radius: 8px;
+  padding: var(--esp-2) var(--esp-3);
+  font-family: 'Lora', serif; color: var(--lvl-text);
+  cursor: pointer; transition: all .15s;
+}
+.lvl-attr-btn:hover:not(:disabled) { background: var(--lvl-bg); }
+.lvl-attr-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.lvl-attr-btn-nome  { font-weight: 700; font-size: 0.9rem; }
+.lvl-attr-btn-valor { font-size: 1.02rem; font-variant-numeric: tabular-nums; color: var(--lvl-red); }
+.lvl-attr-btn-mod   { font-size: 0.74rem; color: var(--lvl-muted); }
+.lvl-attr-topo .lvl-attr-btn-valor { color: var(--lvl-muted); }
+
+.lvl-talento { margin-top: var(--esp-4); }
+.lvl-talento label { display: block; font-size: 0.84rem; color: var(--lvl-muted); margin-bottom: var(--esp-2); }
+.lvl-talento-linha { display: flex; gap: var(--esp-2); flex-wrap: wrap; }
+.lvl-talento-linha input {
+  flex: 1 1 240px; min-width: 0;
+  font-family: 'Lora', serif; font-size: 0.9rem;
+  color: var(--lvl-text); background: var(--lvl-paper);
+  border: 1px solid var(--lvl-gold); border-radius: 6px;
+  padding: var(--esp-2) var(--esp-3);
+}
+.lvl-talento-btn { flex: 0 0 auto; align-items: center; }
+
+.lvl-vazio {
+  color: var(--lvl-muted); font-style: italic; text-align: center;
+  padding: var(--esp-12) var(--esp-4);
+  display: flex; flex-direction: column; align-items: center; gap: var(--esp-2);
+}
+.lvl-vazio small { font-size: 0.82rem; }
+.lvl-ok {
+  font-size: 2rem; color: var(--lvl-green);
+  font-style: normal; line-height: 1;
+}
+
+.lvl-rodape {
+  display: flex; align-items: center; gap: var(--esp-4);
+  padding: var(--esp-3) var(--esp-6);
+  border-top: 1px solid var(--lvl-gold);
+  background: var(--lvl-bg);
+  flex: 0 0 auto;
+}
+.lvl-msg {
+  flex: 1 1 auto; font-size: 0.88rem; color: var(--lvl-dark);
+  min-height: 1.2em;
+}
+.lvl-msg-erro { color: var(--lvl-red); font-weight: 700; }
+.lvl-concluir {
+  background: var(--lvl-red); color: #fff;
+  border: 1px solid var(--lvl-gold); border-radius: 6px;
+  font-family: 'Lora', serif; font-weight: 700; font-size: 0.9rem;
+  padding: var(--esp-2) var(--esp-5); cursor: pointer;
+  flex: 0 0 auto;
+}
+.lvl-concluir:hover:not(:disabled) { background: #6b1a0f; }
+/* Desabilitado enquanto houver escolha pendente: sair da tela devendo é
+   exatamente o que ela existe para impedir. Fechar no ✕ continua possível. */
+.lvl-concluir:disabled {
+  opacity: 0.45; cursor: not-allowed;
+  background: var(--lvl-muted);
+}
+
+#lvl-reopen {
+  position: fixed; bottom: 20px; right: 20px; z-index: 8999;
+  background: #8a6d1f; color: #fff;
+  border: 2px solid #b89947; border-radius: 30px;
+  font-family: 'Lora', serif; font-weight: 700; font-size: 0.95rem;
+  padding: var(--esp-3) var(--esp-6); cursor: pointer;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+  transition: background .15s, transform .15s;
+}
+#lvl-reopen:hover { background: #6d5618; transform: translateY(-2px); }
+#lvl-reopen.hidden { display: none; }
+/* Três pílulas podem coexistir no mesmo canto. Empilham na ordem em que o
+   DOM as cria: combate, loja, nível. */
+#cbt-reopen:not(.hidden) ~ #lvl-reopen:not(.hidden) { bottom: 76px; }
+#shp-reopen:not(.hidden) ~ #lvl-reopen:not(.hidden) { bottom: 76px; }
+#cbt-reopen:not(.hidden) ~ #shp-reopen:not(.hidden) ~ #lvl-reopen:not(.hidden) { bottom: 132px; }
+
+@media (max-width: 760px) {
+  #levelup-overlay { padding: 0; align-items: stretch; }
+  #lvl-frame {
+    max-width: none; border-radius: 0; border: none;
+    height: 100vh; min-height: 0;
+  }
+  .lvl-header { padding: var(--esp-4) var(--esp-6) var(--esp-2); }
+  .lvl-title  { font-size: 1.3rem; }
+  /* Régua em UMA fileira. Com o nome inteiro ela quebrava em 4+2 e comia
+     280px dos 812 da tela — um terço do espaço, na tela em que o conteúdo
+     que importa são as escolhas. Com a sigla de três letras que a mesa já
+     usa, os seis cabem lado a lado. */
+  .lvl-atributos {
+    padding: var(--esp-2); gap: var(--esp-1);
+    flex-wrap: nowrap;
+  }
+  .lvl-attr { min-width: 0; flex: 1 1 0; padding: 2px 0; }
+  .lvl-attr-nome  { display: none; }
+  .lvl-attr-sigla { display: block; font-size: 0.62rem; color: var(--lvl-muted); letter-spacing: .02em; }
+  .lvl-attr-valor { font-size: 1rem; }
+  .lvl-attr-mod   { font-size: 0.7rem; }
+  .lvl-corpo { padding: var(--esp-3) var(--esp-4); gap: var(--esp-4); }
+  /* Uma coluna: dois cartões de arquétipo lado a lado em 375px deixam a
+     descrição com três palavras por linha, e é a descrição que faz o
+     jogador escolher. */
+  .lvl-opcoes { grid-template-columns: 1fr; }
+  .lvl-attr-grid { grid-template-columns: repeat(2, 1fr); }
+  .lvl-rodape {
+    padding: var(--esp-3) var(--esp-4);
+    padding-bottom: calc(var(--esp-3) + env(safe-area-inset-bottom));
+  }
 }

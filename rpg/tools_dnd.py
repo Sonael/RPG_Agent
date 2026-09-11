@@ -6060,6 +6060,11 @@ def grant_xp(char_name: str, amount: int, reason: str = "") -> str:
         return err
 
     s            = char["sheet"]
+    # Ancora o contador de ASI no que ele JÁ tinha, antes de qualquer
+    # nível novo. Sem isso, um personagem de nível 12 criado antes
+    # deste contador apareceria devendo 10 pontos de atributo que talvez
+    # já tenham sido aplicados à mão com set_stat.
+    _carimbar_asi(s)
     s["xp"]     += amount
     reason_str   = f" ({reason})" if reason else ""
     result       = f"⭐ {char['name']} ganhou {amount} XP{reason_str}. Total: {s['xp']}"
@@ -6102,12 +6107,317 @@ def grant_xp(char_name: str, amount: int, reason: str = "") -> str:
         else:
             result += "\n   📖 Escolha uma nova habilidade ou magia com learn_spell() ou learn_ability()."
 
+        pend = _escolhas_pendentes(char)
+        if pend:
+            quais = ", ".join(f"{q['rotulo']} ({q['faltam']})" for q in pend)
+            result += (f"\n   ⏳ Escolhas PENDENTES: {quais}."
+                       f" Quem escolhe é o JOGADOR, na tela de nível"
+                       f" — não escolha por ele.")
+
     if s["nivel"] < 20:
         result += f" / {s['xp_proximo']} para o próximo nível."
 
     memory.save_campaign()
     return result
 
+
+# ===========================================================================
+# SUBIDA DE NÍVEL — escolhas pendentes, ASI e tela
+# ===========================================================================
+# O motor sempre soube SUBIR de nível (grant_xp dá PV, proficiência, mana e as
+# features automáticas da classe) e sempre soube APLICAR uma escolha
+# (set_feature_choice, choose_feat, set_stat). O que faltava era o meio:
+# saber que o personagem DEVE uma escolha.
+#
+# Sem isso, "escolha um Estilo de Combate" era uma frase no fim do texto de
+# level-up. Se ninguém escolhesse, nada acontecia e nada cobrava — e o
+# guerreiro seguia a campanha inteira sem o +1 de CA a que tinha direito.
+#
+# Quase tudo aqui é CALCULADO, não gravado: um personagem tem a habilidade
+# "Estilo de Combate" na ficha e não tem entrada em feature_choices, logo
+# deve essa escolha. Isso vale para fichas salvas antes desta mudança, sem
+# migração nenhuma.
+#
+# A exceção é o ASI, que não deixa rastro: um +2 em FORÇA é indistinguível de
+# uma força alta na criação. Esse precisa de contador.
+
+# Níveis de Incremento de Atributo no SRD 5e. Guerreiro e Ladino ganham
+# extras — é parte do que compensa a falta de magia deles.
+_NIVEIS_ASI_BASE = {4, 8, 12, 16, 19}
+_NIVEIS_ASI_EXTRA = {"guerreiro": {6, 14}, "ladino": {10}}
+
+_PONTOS_POR_ASI = 2          # +2 num atributo ou +1 em dois
+_TETO_ATRIBUTO  = 20         # o limite do 5e; set_stat sozinho não impõe
+
+
+def _niveis_asi(classe: str) -> set[int]:
+    return _NIVEIS_ASI_BASE | _NIVEIS_ASI_EXTRA.get(_norm_txt(classe), set())
+
+
+def _asi_ganhos(sheet: dict) -> int:
+    """Quantos incrementos o nível atual já concedeu."""
+    nivel = int(sheet.get("nivel", 1) or 1)
+    return sum(1 for n in _niveis_asi(sheet.get("classe", "")) if n <= nivel)
+
+
+def _asi_pontos_pendentes(sheet: dict) -> int:
+    """
+    Pontos de atributo que o personagem tem a gastar.
+
+    `asi_pontos_gastos` ausente significa ficha ANTERIOR a este contador, e
+    aí a resposta é zero: reivindicar retroativamente todos os incrementos de
+    um personagem de nível 12 daria +10 de atributo de presente, e não há
+    como saber se o mestre já os aplicou à mão com set_stat. grant_xp carimba
+    o contador no próximo level-up, e dali em diante a conta é exata.
+    """
+    if "asi_pontos_gastos" not in sheet:
+        return 0
+    gastos = int(sheet.get("asi_pontos_gastos", 0) or 0)
+    return max(0, _asi_ganhos(sheet) * _PONTOS_POR_ASI - gastos)
+
+
+def _carimbar_asi(sheet: dict) -> None:
+    """
+    Ancora o contador no que o personagem JÁ tinha, sem cobrar o passado.
+    Chamado por grant_xp antes de subir o nível.
+    """
+    if "asi_pontos_gastos" not in sheet:
+        sheet["asi_pontos_gastos"] = _asi_ganhos(sheet) * _PONTOS_POR_ASI
+
+
+_ATRIBUTOS = ("forca", "destreza", "constituicao",
+              "inteligencia", "sabedoria", "carisma")
+_ATRIBUTO_PT = {
+    "forca": "Força", "destreza": "Destreza", "constituicao": "Constituição",
+    "inteligencia": "Inteligência", "sabedoria": "Sabedoria", "carisma": "Carisma",
+}
+# A sigla de três letras do 5e. Vai no payload em vez de ser recortada no JS
+# porque "Constituição"[:3] daria "Con", e a mesa escreve CON.
+_ATRIBUTO_SIGLA = {
+    "forca": "FOR", "destreza": "DES", "constituicao": "CON",
+    "inteligencia": "INT", "sabedoria": "SAB", "carisma": "CAR",
+}
+
+
+def _escolhas_pendentes(char: dict) -> list[dict]:
+    """
+    O que este personagem deve escolher. Derivado da ficha, não gravado.
+
+    Uma feature com variantes (Estilo de Combate, Metamagia, um arquétipo)
+    está pendente quando ele TEM a habilidade e escolheu menos que o `pick`
+    dela. É a mesma pergunta que set_feature_choice já responde para validar
+    — só que feita do lado de fora.
+    """
+    sheet = char.get("sheet") or {}
+    pendentes = []
+
+    for hab in (char.get("habilidades") or []):
+        nome = (hab.get("nome") or "").strip()
+        meta = _get_variants(nome)
+        if not meta:
+            continue
+        pick = int(meta.get("pick", 1) or 1)
+        atual = _get_feature_choice(char, nome)
+        escolhidos = ([atual] if isinstance(atual, str) and atual
+                      else list(atual or []))
+        faltam = pick - len(escolhidos)
+        if faltam <= 0:
+            continue
+        pendentes.append({
+            "tipo":       "arquetipo" if nome in ARCHETYPE_FEATURES else "variante",
+            "feature":    nome,
+            "rotulo":     nome,
+            "descricao":  meta.get("descricao", ""),
+            "pick":       pick,
+            "pick_label": meta.get("pick_label", "opção"),
+            "escolhidos": escolhidos,
+            "faltam":     faltam,
+            "opcoes": [
+                {"nome": k, "descricao": (v or {}).get("descricao", "")}
+                for k, v in sorted((meta.get("options") or {}).items())
+                if k not in escolhidos
+            ],
+        })
+
+    pontos = _asi_pontos_pendentes(sheet)
+    if pontos > 0:
+        pendentes.append({
+            "tipo":      "asi",
+            "feature":   "Incremento de Atributo",
+            "rotulo":    "Incremento de Atributo",
+            "descricao": (f"{pontos} ponto(s) a distribuir: +1 em dois "
+                          f"atributos ou +2 em um. Teto de {_TETO_ATRIBUTO}. "
+                          f"Um talento consome {_PONTOS_POR_ASI} pontos."),
+            "pick":      pontos,
+            "faltam":    pontos,
+            "escolhidos": [],
+            "opcoes": [
+                {"nome": _ATRIBUTO_PT[a], "chave": a,
+                 "valor": int(sheet.get(a, 10) or 10),
+                 "mod": _modifier(int(sheet.get(a, 10) or 10)),
+                 "no_teto": int(sheet.get(a, 10) or 10) >= _TETO_ATRIBUTO}
+                for a in _ATRIBUTOS
+            ],
+        })
+
+    return pendentes
+
+
+def apply_asi(char_name: str, stat_name: str, points: int = 1) -> str:
+    """
+    Gasta pontos de Incremento de Atributo (níveis 4, 8, 12, 16, 19 — e 6 e 14
+    do Guerreiro, 10 do Ladino).
+
+    Existe separada de set_stat porque ASI tem REGRA: sai de um pool que o
+    nível concede e para no 20. set_stat é um ajuste livre do mestre, sem
+    teto e sem pool — usar ela para ASI deixava o atributo subir sem limite e
+    sem gastar nada.
+
+    Args:
+        char_name: Nome do personagem.
+        stat_name: forca, destreza, constituicao, inteligencia, sabedoria ou carisma.
+        points:    Quantos pontos gastar (1 ou 2).
+    """
+    char, err = _get_char(char_name)
+    if not char:
+        return err
+    sheet = char["sheet"]
+
+    chave = _norm_txt(stat_name).replace(" ", "")
+    if chave not in _ATRIBUTOS:
+        return (f"❌ '{stat_name}' não é atributo. Use: "
+                f"{', '.join(_ATRIBUTOS)}.")
+    try:
+        pts = max(1, min(_PONTOS_POR_ASI, int(points)))
+    except (TypeError, ValueError):
+        pts = 1
+
+    disponiveis = _asi_pontos_pendentes(sheet)
+    if disponiveis <= 0:
+        return (f"❌ {char['name']} não tem incremento de atributo pendente. "
+                f"Eles vêm nos níveis {sorted(_niveis_asi(sheet.get('classe','')))}.")
+    if pts > disponiveis:
+        return (f"❌ Só restam {disponiveis} ponto(s) de incremento para "
+                f"{char['name']}.")
+
+    antes = int(sheet.get(chave, 10) or 10)
+    if antes >= _TETO_ATRIBUTO:
+        return (f"❌ {_ATRIBUTO_PT[chave]} de {char['name']} já está em "
+                f"{antes} — o teto do 5e é {_TETO_ATRIBUTO}. "
+                f"Escolha outro atributo ou um talento.")
+    depois = min(_TETO_ATRIBUTO, antes + pts)
+    usados = depois - antes
+
+    sheet[chave] = depois
+    sheet["asi_pontos_gastos"] = int(sheet.get("asi_pontos_gastos", 0) or 0) + usados
+
+    # Derivados: CON mexe em PV, DES na CA, o atributo de conjuração na mana.
+    extra = ""
+    if chave == "constituicao":
+        ganho = (_modifier(depois) - _modifier(antes)) * int(sheet.get("nivel", 1) or 1)
+        if ganho:
+            sheet["vida_max"] = max(1, int(sheet.get("vida_max", 1) or 1) + ganho)
+            sheet["vida_atual"] = min(_hp_max_efetivo(sheet),
+                                      int(sheet.get("vida_atual", 0) or 0) + ganho)
+            extra += f"\n   ❤️  Vida máxima: {ganho:+d} → {sheet['vida_max']}"
+    if chave == "destreza":
+        _recalculate_ca(char)
+        extra += f"\n   🛡️  CA agora: {sheet['ca']}"
+    novo_mana = _max_mana_for(sheet.get("classe", ""), int(sheet.get("nivel", 1) or 1))
+    if novo_mana != int(sheet.get("mana_max", 0) or 0):
+        ganho_mana = novo_mana - int(sheet.get("mana_max", 0) or 0)
+        sheet["mana_max"] = novo_mana
+        sheet["mana_atual"] = min(novo_mana,
+                                  int(sheet.get("mana_atual", 0) or 0) + max(0, ganho_mana))
+        extra += f"\n   ✨ Mana máxima: {ganho_mana:+d} → {novo_mana}"
+
+    memory.save_campaign()
+    restam = _asi_pontos_pendentes(sheet)
+    sobra = f" Restam {restam} ponto(s)." if restam else " Incremento concluído."
+    return (f"💪 {char['name']}: {_ATRIBUTO_PT[chave]} {antes} → **{depois}** "
+            f"(modificador {_modifier(depois):+d}).{extra}\n  {sobra}")
+
+
+def levelup_snapshot(char_name: str = "") -> dict:
+    """Estado da subida de nível para a tela (JSON-serializável)."""
+    grupo = [c for c in memory.campaign.get("characters", {}).values()
+             if memory.is_party_member(c) and (c.get("sheet") or {})]
+
+    alvo = None
+    if char_name:
+        alvo = next((c for c in grupo
+                     if _norm_txt(c.get("name", "")) == _norm_txt(char_name)), None)
+    if not alvo:
+        # Sem nome, abre em quem DEVE escolha — é para isso que a tela serve.
+        alvo = next((c for c in grupo if _escolhas_pendentes(c)), None)
+    if not alvo:
+        alvo = grupo[0] if grupo else None
+
+    if not alvo:
+        return {"tem_personagem": False, "grupo": [], "pendencias": [],
+                "devendo": [], "personagem": None}
+
+    s = alvo.get("sheet") or {}
+    nivel = int(s.get("nivel", 1) or 1)
+    xp = int(s.get("xp", 0) or 0)
+    prox = int(s.get("xp_proximo", 0) or 0)
+    base = XP_THRESHOLDS[nivel - 1] if 0 < nivel <= len(XP_THRESHOLDS) else 0
+    faixa = max(1, prox - base)
+
+    return {
+        "tem_personagem": True,
+        "grupo": [c.get("name", "") for c in grupo],
+        # Quem mais está devendo escolha: a tela avisa sem fazer o jogador
+        # abrir um por um.
+        "devendo": [c.get("name", "") for c in grupo if _escolhas_pendentes(c)],
+        "personagem": {
+            "nome":         alvo.get("name", ""),
+            "classe":       s.get("classe", ""),
+            "raca":         s.get("raca", ""),
+            "nivel":        nivel,
+            "xp":           xp,
+            "xp_proximo":   prox,
+            "xp_pct":       max(0, min(100, round((xp - base) / faixa * 100))),
+            "vida_max":     int(s.get("vida_max", 0) or 0),
+            "ca":           int(s.get("ca", 10) or 10),
+            "proficiencia": int(s.get("proficiencia", 2) or 2),
+            "atributos": [
+                {"chave": a, "nome": _ATRIBUTO_PT[a],
+                 "sigla": _ATRIBUTO_SIGLA[a],
+                 "valor": int(s.get(a, 10) or 10),
+                 "mod": _modifier(int(s.get(a, 10) or 10))}
+                for a in _ATRIBUTOS
+            ],
+            "habilidades": [h.get("nome", "") for h in (alvo.get("habilidades") or [])],
+            "escolhas_feitas": dict(s.get("feature_choices") or {}),
+        },
+        "pendencias": _escolhas_pendentes(alvo),
+    }
+
+
+def levelup_action(action: str, char: str = "", feature: str = "",
+                   choice: str = "", points: int = 1) -> dict:
+    """
+    Aplica UMA escolha de subida de nível vinda da tela.
+
+    actions: variante | asi | talento
+
+    Só despacho, igual à tela de loja: quem valida e aplica é
+    set_feature_choice / apply_asi / choose_feat — as mesmas do mestre.
+    """
+    a = (action or "").lower().strip()
+    if a == "variante":
+        msg = set_feature_choice(char, feature, choice)
+    elif a == "asi":
+        msg = apply_asi(char, choice, points)
+    elif a == "talento":
+        msg = choose_feat(char, choice)
+    else:
+        return {"ok": False, "message": f"Ação '{action}' desconhecida.",
+                "snapshot": levelup_snapshot(char)}
+
+    ok = not msg.lstrip().startswith(("⚠️", "❌", "ℹ️"))
+    return {"ok": ok, "message": msg, "snapshot": levelup_snapshot(char)}
 
 # ===========================================================================
 # CARGA E LOJA
@@ -9967,6 +10277,7 @@ DND_TOOLS = [
     list_inventory,
     identify_item,
     choose_feat,
+    apply_asi,
     set_feature_choice,
     grant_xp,
     short_rest,

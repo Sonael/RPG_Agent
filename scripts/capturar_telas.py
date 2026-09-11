@@ -150,6 +150,32 @@ def _mesclar(destino: dict, patch: dict) -> None:
             destino[chave] = valor
 
 
+# Servidor compartilhado entre chamadas. O Flask RECUSA registrar uma rota
+# depois que o app atendeu a primeira requisição, então uma segunda chamada a
+# _subir_servidor explodia com "The setup method 'route' can no longer be
+# called". Isso não aparecia no script de captura, que sobe o servidor uma vez
+# só — apareceu quando dois arquivos de teste de navegador passaram a subi-lo,
+# e cada um passava sozinho.
+_SERVIDOR: tuple | None = None      # (url, funcao que para de verdade)
+_REFS = 0                           # quantos chamadores ainda estão usando
+_BASE: dict = {}                    # campanha-base, trocável a cada chamada
+# O que o Flask proíbe é REGISTRAR A ROTA duas vezes, não subir o servidor
+# duas vezes. São coisas separadas: reusar o servidor é otimização, e esta
+# guarda é a correção. Contar referências sozinho não bastava — o primeiro
+# módulo de teste solta o servidor antes de o segundo pedir, e aí o segundo
+# tentava registrar de novo.
+_ROTA_REGISTRADA = False
+
+
+def _soltar_servidor() -> None:
+    """Só para de verdade quando o último chamador solta."""
+    global _SERVIDOR, _REFS
+    _REFS = max(0, _REFS - 1)
+    if _REFS == 0 and _SERVIDOR is not None:
+        _SERVIDOR[1]()
+        _SERVIDOR = None
+
+
 def _subir_servidor(campanha: dict, nome_campanha: str):
     """
     Sobe o app real numa thread e devolve (url_base, parar).
@@ -157,7 +183,12 @@ def _subir_servidor(campanha: dict, nome_campanha: str):
     Registra também a rota /__estado, que existe SÓ aqui: ela recarrega a
     campanha base e aplica um patch por cima, para que cada tela possa pedir
     o estado de mundo que quer retratar (combate ativo, vitória, etc.).
+
+    Reentrante: chamar de novo reusa o servidor que já está no ar e apenas
+    troca a campanha-base.
     """
+    global _SERVIDOR, _REFS, _BASE, _ROTA_REGISTRADA
+
     from rpg import memory
     from flask import jsonify, request
     from werkzeug.serving import make_server
@@ -166,22 +197,33 @@ def _subir_servidor(campanha: dict, nome_campanha: str):
 
     import server  # noqa: E402  (precisa vir depois dos dublês)
 
-    base = copy.deepcopy(campanha)
+    _BASE = copy.deepcopy(campanha)
 
-    @server.app.route("/__estado", methods=["POST"])
-    def __estado():  # noqa: ANN202
-        patch = request.get_json(silent=True) or {}
+    # A rota lê _BASE (global) e não uma variável de fechamento: é o que
+    # permite a segunda chamada trocar a campanha sem registrar nada de novo.
+    if _SERVIDOR is not None:
         memory.bind(USER_ID, nome_campanha)
-        camp = memory.campaign
-        camp.clear()
-        camp.update(copy.deepcopy(base))
-        _mesclar(camp, patch)
-        return jsonify({"ok": True})
+        memory.campaign.clear()
+        memory.campaign.update(copy.deepcopy(_BASE))
+        _REFS += 1
+        return _SERVIDOR[0], _soltar_servidor
+
+    if not _ROTA_REGISTRADA:
+        @server.app.route("/__estado", methods=["POST"])
+        def __estado():  # noqa: ANN202
+            patch = request.get_json(silent=True) or {}
+            memory.bind(USER_ID, nome_campanha)
+            camp = memory.campaign
+            camp.clear()
+            camp.update(copy.deepcopy(_BASE))
+            _mesclar(camp, patch)
+            return jsonify({"ok": True})
+        _ROTA_REGISTRADA = True
 
     # Estado inicial (a thread principal também precisa do vínculo).
     memory.bind(USER_ID, nome_campanha)
     memory.campaign.clear()
-    memory.campaign.update(copy.deepcopy(base))
+    memory.campaign.update(copy.deepcopy(_BASE))
 
     logging.getLogger("werkzeug").setLevel(logging.ERROR)
     server.app.logger.setLevel(logging.ERROR)
@@ -199,7 +241,9 @@ def _subir_servidor(campanha: dict, nome_campanha: str):
         except OSError:
             time.sleep(0.1)
 
-    return url, srv.shutdown
+    _SERVIDOR = (url, srv.shutdown)
+    _REFS += 1
+    return url, _soltar_servidor
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -313,6 +357,51 @@ LOJA = {
                  "descricao": ""},
                 {"nome": "Martelo do Velho Torbin", "preco": 40, "qtd": 1,
                  "descricao": "o martelo do pai dele; não faz nada, é lembrança"},
+            ],
+        },
+    },
+}
+
+
+# SUBIDA DE NÍVEL. A guerreira acabou de chegar ao 4 e deve TRÊS coisas: o
+# estilo de combate que nunca escolheu (nível 1), o arquétipo (nível 3) e os
+# dois pontos de atributo do nível 4.
+#
+# Três de uma vez não é exagero de cenário — é o caso comum. As duas
+# primeiras ficavam pendentes para sempre porque nada as cobrava: o motor
+# dizia "escolha um Estilo de Combate" no fim do texto de level-up e, se
+# ninguém escolhesse, a campanha seguia sem o bônus.
+NIVEL = {
+    "characters": {
+        "helena": {
+            "sheet": {
+                "classe": "guerreiro", "nivel": 4, "xp": 3100,
+                "xp_proximo": 6500, "proficiencia": 2,
+                "forca": 16, "destreza": 14, "constituicao": 15,
+                "inteligencia": 10, "sabedoria": 12, "carisma": 8,
+                "vida_max": 38, "vida_atual": 38, "ca": 16,
+                "asi_pontos_gastos": 0,
+                "feature_choices": {},
+            },
+            "habilidades": [
+                {"nome": "Estilo de Combate", "descricao": "", "custo_mana": 0, "dado": ""},
+                {"nome": "Segunda Fôlego", "descricao": "Recupera 1d10+nível PV.",
+                 "custo_mana": 0, "dado": "1d10"},
+                {"nome": "Surto de Ação", "descricao": "Uma ação extra, uma vez por descanso.",
+                 "custo_mana": 0, "dado": ""},
+                {"nome": "Arquétipo Marcial", "descricao": "", "custo_mana": 0, "dado": ""},
+            ],
+        },
+        # A Stelar já resolveu as dela: serve para a tela mostrar o estado
+        # "nada pendente", que é metade do que ela comunica.
+        "stelar": {
+            "sheet": {"classe": "guerreiro", "nivel": 3, "xp": 1200,
+                      "xp_proximo": 2700, "asi_pontos_gastos": 0,
+                      "feature_choices": {"Estilo de Combate": "Duelo",
+                                          "Arquétipo Marcial": "Campeão"}},
+            "habilidades": [
+                {"nome": "Estilo de Combate", "descricao": "", "custo_mana": 0, "dado": ""},
+                {"nome": "Arquétipo Marcial", "descricao": "", "custo_mana": 0, "dado": ""},
             ],
         },
     },
@@ -511,6 +600,25 @@ TELAS = [
      "estado": LOJA, "espera": 700,
      "js": "window.Shop._close()",
      "exigir": "#shp-reopen:not(.hidden)"},
+
+    # ── Subida de nível ──────────────────────────────────────────────
+    # Sem `js` para abrir: o gatilho automático (alguém está devendo escolha)
+    # É a feature, e uma captura que precisasse de empurrão não denunciaria
+    # se ele quebrasse.
+    {"nome": "nivel-ascensao", "pagina": "/game.html",
+     "estado": NIVEL, "espera": 700,
+     "exigir": "#levelup-overlay:not(.hidden)"},
+    {"nome": "nivel-incremento-atributo", "pagina": "/game.html",
+     "estado": NIVEL, "espera": 700,
+     # Rola até o bloco do incremento, que nasce abaixo da dobra por vir
+     # depois das duas escolhas de feature.
+     "js": "document.querySelector('.lvl-bloco-asi')"
+           ".scrollIntoView({block:'center'})",
+     "exigir": ".lvl-bloco-asi"},
+    {"nome": "nivel-sem-pendencia", "pagina": "/game.html",
+     "estado": NIVEL, "espera": 700,
+     "js": "window.LevelUp._trocar('Stelar')",
+     "exigir": ".lvl-ok"},
 
     # ── Combate ──────────────────────────────────────────────────────
     {"nome": "combate-regua-de-turnos", "pagina": "/game.html",

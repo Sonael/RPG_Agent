@@ -1158,6 +1158,10 @@ function renderMemory(mem) {
   // A tela de loja pendura no MESMO gancho: ela decide sozinha se aparece
   // (só quando existe loja no local atual e ainda não foi vista).
   try { if (window.Shop) window.Shop.sync(); } catch (_) {}
+  // E a tela de nível no mesmo lugar: ela também decide sozinha se aparece
+  // (só quando alguém do grupo está DEVENDO uma escolha que ainda não foi
+  // mostrada).
+  try { if (window.LevelUp) window.LevelUp.sync(); } catch (_) {}
 }
 
 // Editor do estado do mundo: capítulo, LOCAL atual, CENA atual e resumo.
