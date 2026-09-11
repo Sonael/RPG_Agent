@@ -1046,6 +1046,61 @@ Eventos: `combat_start`, `attack_hit`, `attack_crit`, `attack_miss`,
 
 ---
 
+## Tela de loja ("O Balcão")
+
+A segunda tela do jogo, e a primeira construída depois de perguntar **por que**
+o combate ganhou uma. A resposta não foi "combate é importante": foi que
+combate é um **laço** — dezenas de decisões pequenas por sessão, em sequência,
+cada uma com consequência mecânica — e pagar uma ida-e-volta de LLM por ataque
+era o custo real. A tela existe para tirar o modelo de dentro de um laço
+apertado.
+
+Comprar é o único outro laço do jogo: olhar preço → conferir bolsa → conferir
+peso → comprar → repetir. É também o único lugar onde ouro, peso e estoque
+precisam ser vistos ao mesmo tempo — e sem isso o peso de armadura, que o
+motor passou a calcular direito, não vira escolha nenhuma. Missões, atitudes e
+relógio **não** ganharam tela: são listas, e lista se resolve com um cartão no
+chat, como `/ficha` e `/inventario` já fazem.
+
+A tela abre **sozinha** quando o grupo entra num local que tem loja
+(`open_shop(..., location=...)`), e só na primeira vez que aquela loja
+aparece: loja é estado que persiste, e reabrir a tela em toda cena por causa
+de uma ferraria visitada no capítulo 2 seria intromissão. Fechada, fica uma
+pílula no canto para voltar. "Encerrar as compras" manda
+`[COMPRAS RESOLVIDAS NA TELA]` para a IA narrar a saída — o mesmo desenho do
+recap de combate: a tela resolve os números, a narração continua sendo dela.
+
+### Um cliente novo do motor, sem regra nova
+
+`shop_action` é **só despacho**: ela chama `buy_item`/`sell_item`, as mesmas
+funções que o mestre usa. O combate precisou de um dispatcher próprio
+(`combat_action`) porque a economia de turno não tem equivalente nas
+ferramentas do agente; comprar não tem nada disso.
+
+Isso é deliberado, e a razão está no histórico deste motor: todo caminho
+paralelo até uma regra é uma chance de os dois discordarem, e já aconteceu
+duas vezes — o braço da IA de NPC cobrava a recarga do chefe e o do mestre
+não; a loja marcava item inventado e o verificador não enxergava.
+`test_a_tela_passa_pela_MESMA_funcao_do_mestre` existe para ficar vermelho no
+dia em que alguém reimplementar a compra "para a tela ficar mais rápida".
+
+### O primeiro teste de navegador do projeto
+
+As capturas provam que a tela **desenha**; `test_tela_de_loja.py` prova que o
+motor por trás dela funciona. Nenhum dos dois prova que **clicar** funciona —
+e a tela existe inteira por causa do clique. Um `onclick` com nome errado
+passaria pelos dois: o print sairia idêntico e a suíte continuaria verde.
+
+`test_tela_de_loja_navegador.py` abre o Chromium, clica nos botões reais e
+confere bolsa e carga. Verificado por injeção de regressão: trocar
+`_comprar` por `_comprarr` derruba 3 testes que só ele pega. Depende do
+Playwright, que não está em `requirements-dev.txt` — sem ele o teste é pulado
+em vez de quebrar a suíte de quem instalou só o básico.
+
+Um detalhe que só o navegador pega: `opacity: 0.55` no item caro é
+**cosmética**. O que impede a compra é o atributo `disabled`, e o teste força
+um clique no botão apagado para confirmar que a bolsa não se mexe.
+
 ## Tela de combate tática (Pergaminho Épico)
 
 Quando `combat_mode == "tela"`:

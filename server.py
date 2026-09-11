@@ -2691,6 +2691,33 @@ def combat_action_route():
     return jsonify(res)
 
 
+@app.route("/api/shop/state", methods=["GET"])
+@require_auth
+def shop_state_route():
+    from rpg import tools_dnd
+    return jsonify(tools_dnd.shop_snapshot(
+        (request.args.get("loja") or "").strip(),
+        (request.args.get("comprador") or "").strip(),
+    ))
+
+
+@app.route("/api/shop/action", methods=["POST"])
+@require_auth
+def shop_action_route():
+    from rpg import tools_dnd
+    d = request.json or {}
+    action = (d.get("action") or "").strip()
+    if not action:
+        return jsonify({"ok": False, "message": "Ação ausente."}), 400
+    return jsonify(tools_dnd.shop_action(
+        action,
+        shop=(d.get("shop") or "").strip(),
+        char=(d.get("char") or "").strip(),
+        item=(d.get("item") or "").strip(),
+        quantity=d.get("quantity", 1),
+    ))
+
+
 @app.route("/api/combat/recap", methods=["GET"])
 @require_auth
 def combat_recap_route():

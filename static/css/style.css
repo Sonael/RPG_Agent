@@ -2255,3 +2255,273 @@ body.combat-on { overflow: hidden; }
   .guide-sec > summary { font-size: 15px; padding: var(--esp-3) var(--esp-4); }
   .guide-sec-body { padding: var(--esp-1) var(--esp-4) var(--esp-4); }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   TELA DE LOJA ("O Balcão") — static/js/shop.js
+
+   Mesma paleta de pergaminho do combate, de propósito: são a mesma
+   sessão de jogo, e trocar a linguagem visual entre uma tela e outra
+   faria a loja parecer outro aplicativo.
+
+   Diferença de estrutura: aqui NÃO existe barra de ação fixa. O combate
+   precisou dela porque os controles mudam a cada turno e ficavam fora
+   da tela; comprar é uma lista, e lista se resolve rolando. Por isso
+   esta tela é bem mais simples que #cbt-frame — e essa simplicidade é o
+   motivo de ela ter valido a pena.
+   ═══════════════════════════════════════════════════════════════════ */
+#shop-overlay {
+  --shp-paper: #fffbf0;
+  --shp-bg:    #f4ebd8;
+  --shp-dark:  #4a2511;
+  --shp-gold:  #b89947;
+  --shp-text:  #2c1a0e;
+  --shp-muted: #6e5c4f;
+  --shp-green: #2e7d32;
+  --shp-red:   #8b2315;
+
+  position: fixed; inset: 0; z-index: 9000;
+  background: rgba(20,12,6,0.82); backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  padding: var(--esp-5); box-sizing: border-box;
+  font-family: 'Lora', serif;
+}
+#shop-overlay.hidden { display: none; }
+body.shop-on { overflow: hidden; }
+
+#shp-frame {
+  width: 100%; max-width: 760px;
+  height: min(92vh, 820px);
+  background: var(--shp-paper);
+  color: var(--shp-text);
+  border: 2px solid var(--shp-gold);
+  border-radius: 12px;
+  box-shadow: 0 15px 35px rgba(74,37,17,0.45), inset 0 0 40px rgba(184,153,71,0.1);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+.shp-header {
+  padding: var(--esp-5) var(--esp-6) var(--esp-3);
+  border-bottom: 1px solid var(--shp-gold);
+  text-align: center;
+  flex: 0 0 auto;
+}
+.shp-close {
+  position: absolute; top: var(--esp-3); right: var(--esp-3);
+  background: none; border: none; cursor: pointer;
+  color: var(--shp-muted); font-size: 1.4rem; line-height: 1;
+  padding: var(--esp-1) var(--esp-2); border-radius: 6px;
+}
+.shp-close:hover { color: var(--shp-red); background: var(--shp-bg); }
+.shp-title {
+  font-family: 'Playfair Display', serif;
+  color: var(--shp-red);
+  font-size: 1.7rem; font-weight: 700;
+  margin: 0;
+}
+.shp-title #shp-nome {
+  color: var(--shp-muted); font-size: 1.1rem;
+  font-style: italic; font-family: 'Lora', serif; font-weight: 400;
+}
+.shp-local {
+  color: var(--shp-muted); font-size: 0.88rem; font-style: italic;
+  margin-top: var(--esp-1);
+}
+
+/* Bolsa e carga — a informação que torna a compra uma escolha */
+.shp-bolsa {
+  display: flex; flex-wrap: wrap; align-items: center;
+  gap: var(--esp-3) var(--esp-6);
+  padding: var(--esp-3) var(--esp-6);
+  background: var(--shp-bg);
+  border-bottom: 1px solid var(--shp-gold);
+  flex: 0 0 auto;
+}
+.shp-bolsa-quem { font-weight: 700; }
+.shp-quem {
+  font-family: 'Lora', serif; font-size: 0.95rem; font-weight: 700;
+  color: var(--shp-dark); background: var(--shp-paper);
+  border: 1px solid var(--shp-gold); border-radius: 6px;
+  padding: var(--esp-1) var(--esp-2);
+}
+.shp-bolsa-moedas { font-size: 0.95rem; }
+.shp-carga { flex: 1 1 220px; min-width: 200px; }
+.shp-carga-topo {
+  display: flex; justify-content: space-between;
+  font-size: 0.82rem; color: var(--shp-muted);
+  margin-bottom: var(--esp-1);
+}
+.shp-carga-num { font-variant-numeric: tabular-nums; }
+.shp-carga-barra {
+  position: relative; height: 8px; border-radius: 4px;
+  background: #e6ded2; overflow: hidden;
+}
+.shp-carga-fill {
+  height: 100%; background: var(--shp-green);
+  transition: width .25s;
+}
+.shp-carga-fill.shp-carga-cheia  { background: var(--shp-gold); }
+.shp-carga-fill.shp-carga-imovel { background: var(--shp-red); }
+/* A marca da METADE é onde começa a desvantagem. Sem ela a barra não diz
+   nada: "38 de 95 kg" não avisa que 48 já é o limite útil. */
+.shp-carga-meio {
+  position: absolute; top: -2px; bottom: -2px; width: 2px;
+  background: var(--shp-dark); opacity: 0.55;
+}
+
+.shp-abas {
+  display: flex; gap: var(--esp-2);
+  padding: var(--esp-3) var(--esp-6) 0;
+  flex: 0 0 auto;
+}
+.shp-aba {
+  font-family: 'Lora', serif; font-weight: 700; font-size: 0.95rem;
+  color: var(--shp-muted); background: none;
+  border: 1px solid transparent; border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  padding: var(--esp-2) var(--esp-4); cursor: pointer;
+}
+.shp-aba:hover { color: var(--shp-dark); }
+.shp-aba.shp-aba-on {
+  color: var(--shp-red); background: var(--shp-bg);
+  border-color: var(--shp-gold);
+}
+
+.shp-lista {
+  flex: 1 1 auto; overflow-y: auto;
+  padding: var(--esp-4) var(--esp-6);
+  display: flex; flex-direction: column; gap: var(--esp-3);
+  border-top: 1px solid var(--shp-gold);
+  /* Sombra de rolagem: sem ela o último item aparece cortado ao meio pelo
+     rodapé e isso se lê como defeito de renderização, não como "tem mais
+     coisa abaixo". Mesma técnica do campo de batalha no combate. */
+  background:
+    linear-gradient(var(--shp-paper) 30%, rgba(255,251,240,0)) top / 100% 20px no-repeat local,
+    linear-gradient(rgba(255,251,240,0), var(--shp-paper) 70%) bottom / 100% 20px no-repeat local,
+    radial-gradient(farthest-side at 50% 0, rgba(74,37,17,.16), transparent)
+      top / 100% 8px no-repeat scroll,
+    radial-gradient(farthest-side at 50% 100%, rgba(74,37,17,.16), transparent)
+      bottom / 100% 8px no-repeat scroll,
+    var(--shp-paper);
+}
+
+.shp-item {
+  border: 1px solid #e0d5c2; border-radius: 8px;
+  padding: var(--esp-3) var(--esp-4);
+  background: var(--shp-paper);
+}
+.shp-item-caro { opacity: 0.55; }
+.shp-item-cabeca {
+  display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--esp-2);
+  margin-bottom: var(--esp-1);
+}
+.shp-item-nome { font-weight: 700; font-size: 1.02rem; }
+.shp-resta { color: var(--shp-muted); font-size: 0.8rem; font-style: italic; }
+.shp-selo-custom {
+  font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--shp-dark); background: var(--shp-bg);
+  border: 1px solid var(--shp-gold); border-radius: 10px;
+  padding: 1px var(--esp-2);
+}
+.shp-desc {
+  color: var(--shp-muted); font-size: 0.86rem; font-style: italic;
+  margin-bottom: var(--esp-2);
+}
+.shp-item-linha {
+  display: flex; align-items: center; gap: var(--esp-3);
+}
+.shp-preco {
+  font-weight: 700; color: var(--shp-dark);
+  font-variant-numeric: tabular-nums; min-width: 84px;
+}
+.shp-preco small {
+  display: block; font-weight: 400; font-size: 0.74rem;
+  color: var(--shp-muted); font-style: italic;
+}
+.shp-peso {
+  color: var(--shp-muted); font-size: 0.86rem;
+  font-variant-numeric: tabular-nums; flex: 1 1 auto;
+}
+.shp-btn {
+  background: var(--shp-bg); border: 1px solid var(--shp-gold);
+  color: var(--shp-dark);
+  font-family: 'Lora', serif; font-weight: 700; font-size: 0.9rem;
+  padding: var(--esp-2) var(--esp-5);
+  border-radius: 6px; cursor: pointer; transition: all .15s;
+}
+.shp-btn:hover:not(:disabled) { background: var(--shp-gold); color: #fff; }
+.shp-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.shp-btn-vender:hover:not(:disabled) {
+  background: var(--shp-green); border-color: var(--shp-green); color: #fff;
+}
+
+.shp-vazio {
+  color: var(--shp-muted); font-style: italic; text-align: center;
+  padding: var(--esp-10) var(--esp-4);
+}
+.shp-vazio small { font-size: 0.82rem; }
+
+.shp-rodape {
+  display: flex; align-items: center; gap: var(--esp-4);
+  padding: var(--esp-3) var(--esp-6);
+  border-top: 1px solid var(--shp-gold);
+  background: var(--shp-bg);
+  flex: 0 0 auto;
+}
+.shp-msg {
+  flex: 1 1 auto; font-size: 0.88rem; color: var(--shp-dark);
+  min-height: 1.2em;
+}
+.shp-msg-erro { color: var(--shp-red); font-weight: 700; }
+.shp-sair {
+  background: var(--shp-red); color: #fff;
+  border: 1px solid var(--shp-gold); border-radius: 6px;
+  font-family: 'Lora', serif; font-weight: 700; font-size: 0.9rem;
+  padding: var(--esp-2) var(--esp-5); cursor: pointer;
+  flex: 0 0 auto;
+}
+.shp-sair:hover { background: #6b1a0f; }
+
+#shp-reopen {
+  position: fixed; bottom: 20px; right: 20px; z-index: 8999;
+  background: #6e5c1f; color: #fff;
+  border: 2px solid #b89947; border-radius: 30px;
+  font-family: 'Lora', serif; font-weight: 700; font-size: 0.95rem;
+  padding: var(--esp-3) var(--esp-6); cursor: pointer;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+  transition: background .15s, transform .15s;
+}
+#shp-reopen:hover { background: #55491a; transform: translateY(-2px); }
+#shp-reopen.hidden { display: none; }
+/* Quando a pílula de combate também está na tela, a da loja sobe: são o
+   mesmo canto, e sobrepostas uma esconderia a outra. */
+#cbt-reopen:not(.hidden) ~ #shp-reopen:not(.hidden) { bottom: 76px; }
+
+@media (max-width: 760px) {
+  #shop-overlay { padding: 0; align-items: stretch; }
+  #shp-frame {
+    max-width: none; border-radius: 0; border: none;
+    /* Quem rola é o FRAME, não o overlay: #shop-overlay tem backdrop-filter,
+       que cria bloco de contenção, e foi assim que a barra fixa do combate
+       saiu do lugar quando o overlay rolava. Aqui não há nada fixo dentro,
+       mas a regra vale igual — o frame é o scroller. */
+    height: 100vh; min-height: 0;
+  }
+  .shp-header { padding: var(--esp-4) var(--esp-6) var(--esp-2); }
+  .shp-title  { font-size: 1.3rem; }
+  .shp-bolsa  { padding: var(--esp-3) var(--esp-4); gap: var(--esp-2) var(--esp-4); }
+  .shp-carga  { flex-basis: 100%; }
+  .shp-abas   { padding: var(--esp-3) var(--esp-4) 0; }
+  .shp-lista  { padding: var(--esp-3) var(--esp-4); }
+  .shp-rodape {
+    padding: var(--esp-3) var(--esp-4);
+    padding-bottom: calc(var(--esp-3) + env(safe-area-inset-bottom));
+  }
+  /* Preço, peso e botão cabem na mesma linha em 375px depois que o preço
+     larga o min-width de alinhamento. Manter os três juntos importa: o peso
+     só serve para ser comparado com o preço na hora de decidir, e embaixo
+     do botão ele vira estatística solta. */
+  .shp-preco { min-width: 0; }
+  .shp-item-linha { gap: var(--esp-2); }
+}

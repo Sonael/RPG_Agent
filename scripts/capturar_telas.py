@@ -270,6 +270,55 @@ MUNDO_ONDA4 = {
 }
 
 
+# A LOJA. O local do grupo tem que bater com o `local` da loja: é esse
+# casamento que faz a tela abrir sozinha (loja é estado que persiste, e
+# reabrir em toda cena só porque existe uma ferraria em outra cidade seria
+# intromissão).
+#
+# A bolsa e o peso são escolhidos para a captura MOSTRAR a decisão: 96 po
+# compram a cota de malha (50) ou a meia armadura (nem isso), e a barra de
+# carga já está perto da metade, onde começa a desvantagem. Uma loja onde
+# tudo cabe e tudo é barato não retrata nada.
+LOJA = {
+    "current_location": "Oakhaven",
+    "characters": {
+        "helena": {
+            "sheet": {"ouro": 96, "prata": 8, "cobre": 0, "forca": 12},
+            "inventario": [
+                {"nome": "Espada Curta", "qtd": 2, "descricao": ""},
+                {"nome": "Adaga", "qtd": 1, "descricao": ""},
+                {"nome": "Armadura de Couro", "qtd": 1, "descricao": ""},
+                {"nome": "Corda de Cânhamo", "qtd": 1, "descricao": "15 metros"},
+            ],
+        },
+        "stelar": {
+            "sheet": {"ouro": 240, "prata": 0, "cobre": 0, "forca": 16},
+            "inventario": [{"nome": "Espada Longa", "qtd": 1, "descricao": ""}],
+        },
+    },
+    "lojas": {
+        "forja do torbin": {
+            "nome": "Forja do Torbin",
+            "local": "Oakhaven",
+            "estoque": [
+                {"nome": "Espada Longa",       "preco": 15,  "qtd": 99,
+                 "descricao": ""},
+                {"nome": "Machado de Batalha", "preco": 10,  "qtd": 3,
+                 "descricao": ""},
+                {"nome": "Escudo",             "preco": 10,  "qtd": 2,
+                 "descricao": ""},
+                {"nome": "Cota de Malha",      "preco": 75,  "qtd": 1,
+                 "descricao": ""},
+                {"nome": "Meia Armadura",      "preco": 750, "qtd": 1,
+                 "descricao": ""},
+                {"nome": "Martelo do Velho Torbin", "preco": 40, "qtd": 1,
+                 "descricao": "o martelo do pai dele; não faz nada, é lembrança"},
+            ],
+        },
+    },
+}
+
+
 # Combate COM ZONAS (onda 3): o campo dividido em trilha, cada um em sua zona.
 COMBATE_ZONAS = copy.deepcopy(COMBATE_ATIVO)
 COMBATE_ZONAS["characters"]["natasha"] = {"sheet": {"vida_atual": 21}}
@@ -446,6 +495,22 @@ TELAS = [
            "setTimeout(() => document.getElementById('sb-missoes-secao')"
            ".scrollIntoView({block:'center'}), 250)",
      "exigir": "#sb-missoes-secao:not(.hidden)"},
+
+    # ── Loja ─────────────────────────────────────────────────────────
+    # A tela abre SOZINHA quando o grupo entra num local que tem loja, então
+    # não há `js` para abri-la: se precisasse de um, o gatilho estaria
+    # quebrado e a captura não denunciaria.
+    {"nome": "loja-balcao", "pagina": "/game.html",
+     "estado": LOJA, "espera": 700,
+     "exigir": "#shop-overlay:not(.hidden)"},
+    {"nome": "loja-vender", "pagina": "/game.html",
+     "estado": LOJA, "espera": 700,
+     "js": "window.Shop._aba('vender')",
+     "exigir": "#shop-overlay:not(.hidden)"},
+    {"nome": "loja-fechada-pilula", "pagina": "/game.html",
+     "estado": LOJA, "espera": 700,
+     "js": "window.Shop._close()",
+     "exigir": "#shp-reopen:not(.hidden)"},
 
     # ── Combate ──────────────────────────────────────────────────────
     {"nome": "combate-regua-de-turnos", "pagina": "/game.html",

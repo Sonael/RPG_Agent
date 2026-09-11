@@ -6446,6 +6446,156 @@ def list_shop(shop_name: str) -> str:
     return "\n".join(linhas)
 
 
+# ===========================================================================
+# TELA DE LOJA — snapshot e despacho
+# ===========================================================================
+# Mesma disciplina da tela de combate: nenhuma REGRA mora aqui. A diferença é
+# que o combate precisou de um dispatcher próprio (combat_action) porque a
+# economia de turno não tem equivalente nas ferramentas do agente. Compra não
+# tem nada disso, então shop_action apenas CHAMA buy_item/sell_item — as
+# mesmas funções que o mestre usa.
+#
+# Isso é de propósito. Todo caminho paralelo até uma regra é uma chance de os
+# dois discordarem, e já aconteceu duas vezes neste motor: o braço da IA de
+# NPC cobrava a recarga e o do mestre não; a loja marcava item inventado e o
+# verificador não via. Uma função, um comportamento.
+
+
+def _linha_de_venda(char: dict, item: dict, loja: dict) -> dict | None:
+    """
+    O que o personagem consegue vender e por quanto. None quando não há preço
+    de referência — a loja não chuta valor de item sem tabela.
+    """
+    nome = item.get("nome", "")
+    if not nome:
+        return None
+    na_loja = next((i for i in loja.get("estoque", [])
+                    if _norm_txt(i["nome"]) == _norm_txt(nome)), None)
+    tabela = na_loja["preco"] if na_loja else _preco_do_srd(nome)
+    if not tabela or tabela <= 0:
+        return None
+    return {
+        "nome":    nome,
+        "qtd":     int(item.get("qtd", 1) or 1),
+        "tabela":  int(tabela),
+        "ganho":   max(1, int(tabela) // 2),      # a loja paga METADE
+        "peso":    round(_peso_do_item(item), 2),
+        "custom":  bool(item.get("custom")),
+    }
+
+
+def shop_snapshot(shop_name: str = "", buyer: str = "") -> dict:
+    """Estado completo da loja para a tela (JSON-serializável)."""
+    lojas = _lojas()
+    local = memory.campaign.get("current_location", "")
+
+    # A loja DAQUI é a que o grupo acabou de entrar. Sem ela a tela não se
+    # abre sozinha: loja é estado que persiste, e reabrir a tela em toda cena
+    # só porque existe uma ferraria em outra cidade seria intromissão.
+    aqui = [l for l in lojas.values()
+            if _norm_txt(l.get("local", "")) == _norm_txt(local) and local]
+
+    escolhida = None
+    if shop_name:
+        escolhida = lojas.get(_norm_txt(shop_name))
+    if not escolhida:
+        escolhida = aqui[0] if aqui else (next(iter(lojas.values()), None))
+
+    grupo = []
+    for c in memory.campaign.get("characters", {}).values():
+        if memory.is_party_member(c) and (c.get("sheet") or {}):
+            grupo.append(c)
+
+    comprador = None
+    if buyer:
+        comprador = next((c for c in grupo
+                          if _norm_txt(c.get("name", "")) == _norm_txt(buyer)), None)
+    if not comprador:
+        comprador = grupo[0] if grupo else None
+
+    dados_comprador, inventario = None, []
+    if comprador:
+        sh = comprador.get("sheet") or {}
+        estado, carga, cap = _estado_de_carga(comprador)
+        dados_comprador = {
+            "nome":   comprador.get("name", ""),
+            "ouro":   int(sh.get("ouro", 0) or 0),
+            "prata":  int(sh.get("prata", 0) or 0),
+            "cobre":  int(sh.get("cobre", 0) or 0),
+            "bolsa_em_cobre": _cobre_total(sh),
+            "carga":      round(carga, 1),
+            "capacidade": round(cap, 1),
+            "meia_capacidade": round(cap / 2, 1),
+            "estado_carga":   estado,
+        }
+        if escolhida:
+            for it in (comprador.get("inventario") or []):
+                if isinstance(it, dict):
+                    linha = _linha_de_venda(comprador, it, escolhida)
+                    if linha:
+                        inventario.append(linha)
+
+    estoque = []
+    if escolhida:
+        for i in escolhida.get("estoque", []):
+            estoque.append({
+                "nome":      i["nome"],
+                "preco":     int(i["preco"]),
+                "qtd":       int(i["qtd"]),
+                "ilimitado": int(i["qtd"]) >= 99,
+                "descricao": i.get("descricao", ""),
+                "peso":      round(_peso_do_item({"nome": i["nome"]}), 2),
+                "custom":    _preco_do_srd(i["nome"]) is None,
+            })
+
+    return {
+        "tem_loja":  bool(escolhida),
+        "loja_aqui": bool(aqui),
+        "loja": {
+            "nome":  escolhida.get("nome", "") if escolhida else "",
+            "local": escolhida.get("local", "") if escolhida else "",
+            "chave": _norm_txt(escolhida.get("nome", "")) if escolhida else "",
+        },
+        "lojas":     [{"nome": l.get("nome", ""), "local": l.get("local", "")}
+                      for l in lojas.values()],
+        "grupo":     [c.get("name", "") for c in grupo],
+        "comprador": dados_comprador,
+        "estoque":   estoque,
+        "inventario": inventario,
+        "local_atual": local,
+    }
+
+
+def shop_action(action: str, shop: str = "", char: str = "",
+                item: str = "", quantity: int = 1) -> dict:
+    """
+    Aplica UMA intenção da tela de loja. Devolve {ok, message, snapshot}.
+
+    actions: buy | sell
+
+    O corpo é só despacho: quem cobra a bolsa, confere o estoque, marca item
+    inventado e avisa da carga é buy_item/sell_item, iguais às do mestre.
+    """
+    a = (action or "").lower().strip()
+    try:
+        qtd = max(1, int(quantity))
+    except (TypeError, ValueError):
+        qtd = 1
+
+    if a == "buy":
+        msg = buy_item(char, shop, item, qtd)
+    elif a == "sell":
+        msg = sell_item(char, shop, item, qtd)
+    else:
+        return {"ok": False, "message": f"Ação '{action}' desconhecida.",
+                "snapshot": shop_snapshot(shop, char)}
+
+    # As ferramentas sinalizam recusa pelo prefixo, do mesmo jeito que na tela
+    # de combate — é o contrato que já existe e que os testes cobrem.
+    ok = not msg.lstrip().startswith(("⚠️", "❌", "💸"))
+    return {"ok": ok, "message": msg, "snapshot": shop_snapshot(shop, char)}
+
+
 def _cobre_total(sheet: dict) -> int:
     return (int(sheet.get("ouro", 0) or 0) * 100
             + int(sheet.get("prata", 0) or 0) * 10

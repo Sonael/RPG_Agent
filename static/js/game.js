@@ -1155,6 +1155,9 @@ function renderMemory(mem) {
 
   // Sincroniza a tela de combate tática (módulo isolado em combat.js).
   try { if (window.Combat) window.Combat.sync(); } catch (_) {}
+  // A tela de loja pendura no MESMO gancho: ela decide sozinha se aparece
+  // (só quando existe loja no local atual e ainda não foi vista).
+  try { if (window.Shop) window.Shop.sync(); } catch (_) {}
 }
 
 // Editor do estado do mundo: capítulo, LOCAL atual, CENA atual e resumo.
