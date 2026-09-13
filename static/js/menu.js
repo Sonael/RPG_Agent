@@ -1191,70 +1191,72 @@ function wzOnBackgroundChange(i, bg) {
 }
 
 
-// ── Magias iniciais por classe — objetos completos espelhando DEFAULT_SPELLS_BY_CLASS (Python) ──
-// Mantido em sincronismo com tools_dnd.py → DEFAULT_SPELLS_BY_CLASS
+// ── Magias iniciais por classe (kit sugerido do wizard) ──
+// Cada magia traz o círculo (nivel_magia) e o custo da tabela de mana do
+// motor (1º círculo = 2). Antes o círculo era deduzido por custo ÷ 4 e o
+// custo era o homebrew antigo (4); test_regras_e_editores confere os dois.
 // Nomes em inglês para coincidir com os nomes retornados pela API Open5e,
 // evitando duplicatas ao buscar magias.
 const INITIAL_SPELLS_WZ = {
   mago: [
     // 3 cantrips
-    {nome:'Prestidigitation', descricao:'[Truque] Efeitos mágicos menores: acender velas, limpar objetos, sons.',  custo_mana:0, dado:''},
-    {nome:'Light',            descricao:'[Truque] Objeto tocado emite luz como tocha por 1 hora.',                 custo_mana:0, dado:''},
-    {nome:'Ray of Frost',     descricao:'[Truque] Ataque mágico à distância: 1d8 dano de frio + velocidade -3m.', custo_mana:0, dado:'1d8'},
+    {nome:'Prestidigitation', descricao:'[Truque] Efeitos mágicos menores: acender velas, limpar objetos, sons.',  custo_mana:0, dado:'', nivel_magia:0},
+    {nome:'Light',            descricao:'[Truque] Objeto tocado emite luz como tocha por 1 hora.',                 custo_mana:0, dado:'', nivel_magia:0},
+    {nome:'Ray of Frost',     descricao:'[Truque] Ataque mágico à distância: 1d8 dano de frio + velocidade -3m.', custo_mana:0, dado:'1d8', nivel_magia:0},
     // 6 magias no Livro de Magias (nível 1)
-    {nome:'Magic Missile',    descricao:'[Evocação] 3 dardos de força, 1d4+1 dano cada. Automático.',             custo_mana:4, dado:'1d4'},
-    {nome:'Burning Hands',    descricao:'[Evocação] Cone de 4,5m, 3d6 dano de fogo. DEX salva metade.',           custo_mana:4, dado:'3d6'},
-    {nome:'Sleep',            descricao:'[Encantamento] Afeta 5d8 PV de criaturas, começando pelas mais fracas.',  custo_mana:4, dado:'5d8'},
-    {nome:'Shield',           descricao:'[Abjuração] Reação: +5 CA e imune a Magic Missile até o próximo turno.', custo_mana:4, dado:''},
-    {nome:'Mage Armor',       descricao:'[Abjuração] CA base = 13 + Mod. Destreza enquanto não usar armadura.',   custo_mana:4, dado:''},
-    {nome:'Identify',         descricao:'[Adivinhação] Ritual: revela propriedades mágicas de um item ou magia.', custo_mana:4, dado:''},
+    {nome:'Magic Missile',    descricao:'[Evocação] 3 dardos de força, 1d4+1 dano cada. Automático.',             custo_mana:2, dado:'1d4', nivel_magia:1},
+    {nome:'Burning Hands',    descricao:'[Evocação] Cone de 4,5m, 3d6 dano de fogo. DEX salva metade.',           custo_mana:2, dado:'3d6', nivel_magia:1},
+    {nome:'Sleep',            descricao:'[Encantamento] Afeta 5d8 PV de criaturas, começando pelas mais fracas.',  custo_mana:2, dado:'5d8', nivel_magia:1},
+    {nome:'Shield',           descricao:'[Abjuração] Reação: +5 CA e imune a Magic Missile até o próximo turno.', custo_mana:2, dado:'', nivel_magia:1},
+    {nome:'Mage Armor',       descricao:'[Abjuração] CA base = 13 + Mod. Destreza enquanto não usar armadura.',   custo_mana:2, dado:'', nivel_magia:1},
+    {nome:'Identify',         descricao:'[Adivinhação] Ritual: revela propriedades mágicas de um item ou magia.', custo_mana:2, dado:'', nivel_magia:1},
   ],
   feiticeiro: [
     // 4 cantrips
-    {nome:'Sacred Flame',     descricao:'[Truque] Ataque de magia: 1d8 dano radiante (DEX não conta para CA).',   custo_mana:0, dado:'1d8'},
-    {nome:'Light',            descricao:'[Truque] Objeto emite luz como tocha por 1 hora.',                        custo_mana:0, dado:''},
-    {nome:'Ray of Frost',     descricao:'[Truque] Ataque mágico à distância: 1d8 dano de frio.',                  custo_mana:0, dado:'1d8'},
-    {nome:'Prestidigitation', descricao:'[Truque] Efeitos mágicos menores: criar sons, luzes ou odores sutis.',   custo_mana:0, dado:''},
+    {nome:'Sacred Flame',     descricao:'[Truque] Ataque de magia: 1d8 dano radiante (DEX não conta para CA).',   custo_mana:0, dado:'1d8', nivel_magia:0},
+    {nome:'Light',            descricao:'[Truque] Objeto emite luz como tocha por 1 hora.',                        custo_mana:0, dado:'', nivel_magia:0},
+    {nome:'Ray of Frost',     descricao:'[Truque] Ataque mágico à distância: 1d8 dano de frio.',                  custo_mana:0, dado:'1d8', nivel_magia:0},
+    {nome:'Prestidigitation', descricao:'[Truque] Efeitos mágicos menores: criar sons, luzes ou odores sutis.',   custo_mana:0, dado:'', nivel_magia:0},
     // 2 magias conhecidas (nível 1)
-    {nome:'Magic Missile',    descricao:'[Evocação] 3 dardos de força, 1d4+1 dano cada. Automático.',             custo_mana:4, dado:'1d4'},
-    {nome:'Burning Hands',    descricao:'[Evocação] Cone de 4,5m, 3d6 dano de fogo. DEX salva metade.',           custo_mana:4, dado:'3d6'},
+    {nome:'Magic Missile',    descricao:'[Evocação] 3 dardos de força, 1d4+1 dano cada. Automático.',             custo_mana:2, dado:'1d4', nivel_magia:1},
+    {nome:'Burning Hands',    descricao:'[Evocação] Cone de 4,5m, 3d6 dano de fogo. DEX salva metade.',           custo_mana:2, dado:'3d6', nivel_magia:1},
   ],
   bruxo: [
     // 2 cantrips
-    {nome:'Eldritch Blast',   descricao:'[Truque] Ataque mágico à distância: 1d10 dano de força.',                custo_mana:0, dado:'1d10'},
-    {nome:'Minor Illusion',   descricao:'[Truque] Cria som ou imagem ilusória por 1 minuto.',                     custo_mana:0, dado:''},
+    {nome:'Eldritch Blast',   descricao:'[Truque] Ataque mágico à distância: 1d10 dano de força.',                custo_mana:0, dado:'1d10', nivel_magia:0},
+    {nome:'Minor Illusion',   descricao:'[Truque] Cria som ou imagem ilusória por 1 minuto.',                     custo_mana:0, dado:'', nivel_magia:0},
     // 2 magias conhecidas (nível 1)
-    {nome:'Hex',              descricao:'[Encantamento] Amaldiçoa alvo: +1d6 dano necrótico nos ataques. Concentração.', custo_mana:4, dado:'1d6'},
-    {nome:'Armor of Agathys', descricao:'[Abjuração] Ganha 5 PV temporários; atacante leva 5 dano de frio.',     custo_mana:4, dado:''},
+    {nome:'Hex',              descricao:'[Encantamento] Amaldiçoa alvo: +1d6 dano necrótico nos ataques. Concentração.', custo_mana:2, dado:'1d6', nivel_magia:1},
+    {nome:'Armor of Agathys', descricao:'[Abjuração] Ganha 5 PV temporários; atacante leva 5 dano de frio.',     custo_mana:2, dado:'', nivel_magia:1},
   ],
   clérigo: [
     // 3 cantrips
-    {nome:'Sacred Flame',  descricao:'[Truque] Ataque de magia: 1d8 dano radiante (DEX não conta para CA).',               custo_mana:0, dado:'1d8'},
-    {nome:'Guidance',      descricao:'[Truque] Toque: criatura ganha +1d4 em um teste de atributo.',                       custo_mana:0, dado:'1d4'},
-    {nome:'Thaumaturgy',   descricao:'[Truque] Manifesta um prodígio sobrenatural menor: vozes, luzes, tremores.',          custo_mana:0, dado:''},
+    {nome:'Sacred Flame',  descricao:'[Truque] Ataque de magia: 1d8 dano radiante (DEX não conta para CA).',               custo_mana:0, dado:'1d8', nivel_magia:0},
+    {nome:'Guidance',      descricao:'[Truque] Toque: criatura ganha +1d4 em um teste de atributo.',                       custo_mana:0, dado:'1d4', nivel_magia:0},
+    {nome:'Thaumaturgy',   descricao:'[Truque] Manifesta um prodígio sobrenatural menor: vozes, luzes, tremores.',          custo_mana:0, dado:'', nivel_magia:0},
     // Magias preparadas (SAB mod + nível do clérigo)
-    {nome:'Cure Wounds',   descricao:'[Evocação] Cura 1d8 + modificador de SAB de PV.',                                    custo_mana:4, dado:'1d8'},
-    {nome:'Bless',         descricao:'[Encantamento] Até 3 criaturas ganham +1d4 em ataques e salvaguardas. Concentração.', custo_mana:4, dado:'1d4'},
-    {nome:'Guiding Bolt',  descricao:'[Evocação] Ataque mágico à distância: 4d6 dano radiante. Vantagem contra alvos.',    custo_mana:4, dado:'4d6'},
+    {nome:'Cure Wounds',   descricao:'[Evocação] Cura 1d8 + modificador de SAB de PV.',                                    custo_mana:2, dado:'1d8', nivel_magia:1},
+    {nome:'Bless',         descricao:'[Encantamento] Até 3 criaturas ganham +1d4 em ataques e salvaguardas. Concentração.', custo_mana:2, dado:'1d4', nivel_magia:1},
+    {nome:'Guiding Bolt',  descricao:'[Evocação] Ataque mágico à distância: 4d6 dano radiante. Vantagem contra alvos.',    custo_mana:2, dado:'4d6', nivel_magia:1},
   ],
   druida: [
     // 2 cantrips
-    {nome:'Produce Flame', descricao:'[Truque] Chama na mão: ilumina 3m ou ataca à distância, 1d8 dano de fogo.', custo_mana:0, dado:'1d8'},
-    {nome:'Guidance',      descricao:'[Truque] Toque: criatura ganha +1d4 em um teste de atributo.',               custo_mana:0, dado:'1d4'},
+    {nome:'Produce Flame', descricao:'[Truque] Chama na mão: ilumina 3m ou ataca à distância, 1d8 dano de fogo.', custo_mana:0, dado:'1d8', nivel_magia:0},
+    {nome:'Guidance',      descricao:'[Truque] Toque: criatura ganha +1d4 em um teste de atributo.',               custo_mana:0, dado:'1d4', nivel_magia:0},
     // Magias preparadas (SAB mod + nível do druida)
-    {nome:'Entangle',      descricao:'[Conjuração] Área de 6m quadrada emaranha criaturas. Concentração 1 min.',   custo_mana:4, dado:''},
-    {nome:'Cure Wounds',   descricao:'[Evocação] Cura 1d8 + modificador de SAB de PV.',                            custo_mana:4, dado:'1d8'},
-    {nome:'Fog Cloud',     descricao:'[Conjuração] Nuvem de névoa 6m de raio, bloqueia visão. Concentração.',      custo_mana:4, dado:''},
+    {nome:'Entangle',      descricao:'[Conjuração] Área de 6m quadrada emaranha criaturas. Concentração 1 min.',   custo_mana:2, dado:'', nivel_magia:1},
+    {nome:'Cure Wounds',   descricao:'[Evocação] Cura 1d8 + modificador de SAB de PV.',                            custo_mana:2, dado:'1d8', nivel_magia:1},
+    {nome:'Fog Cloud',     descricao:'[Conjuração] Nuvem de névoa 6m de raio, bloqueia visão. Concentração.',      custo_mana:2, dado:'', nivel_magia:1},
   ],
   bardo: [
     // 2 cantrips
-    {nome:'Vicious Mockery', descricao:'[Truque] Ataque psíquico verbal: 1d4 dano psíquico + desvantagem no próximo ataque.', custo_mana:0, dado:'1d4'},
-    {nome:'Light',           descricao:'[Truque] Objeto emite luz como tocha por 1 hora.',                                    custo_mana:0, dado:''},
+    {nome:'Vicious Mockery', descricao:'[Truque] Ataque psíquico verbal: 1d4 dano psíquico + desvantagem no próximo ataque.', custo_mana:0, dado:'1d4', nivel_magia:0},
+    {nome:'Light',           descricao:'[Truque] Objeto emite luz como tocha por 1 hora.',                                    custo_mana:0, dado:'', nivel_magia:0},
     // 4 magias conhecidas (nível 1)
-    {nome:'Healing Word',    descricao:'[Evocação] Ação bônus: cura 1d4 + modificador de CAR de PV.',                         custo_mana:4, dado:'1d4'},
-    {nome:'Charm Person',    descricao:'[Encantamento] Enfeitiça uma criatura humanóide por 1 hora. Concentração.',            custo_mana:4, dado:''},
-    {nome:'Sleep',           descricao:'[Encantamento] Afeta 5d8 PV de criaturas, começando pelas mais fracas.',              custo_mana:4, dado:'5d8'},
-    {nome:'Thunderwave',     descricao:'[Evocação] Cubo de 4,5m: 2d8 dano trovejante + empurra 3m. CON salva metade.',       custo_mana:4, dado:'2d8'},
+    {nome:'Healing Word',    descricao:'[Evocação] Ação bônus: cura 1d4 + modificador de CAR de PV.',                         custo_mana:2, dado:'1d4', nivel_magia:1},
+    {nome:'Charm Person',    descricao:'[Encantamento] Enfeitiça uma criatura humanóide por 1 hora. Concentração.',            custo_mana:2, dado:'', nivel_magia:1},
+    {nome:'Sleep',           descricao:'[Encantamento] Afeta 5d8 PV de criaturas, começando pelas mais fracas.',              custo_mana:2, dado:'5d8', nivel_magia:1},
+    {nome:'Thunderwave',     descricao:'[Evocação] Cubo de 4,5m: 2d8 dano trovejante + empurra 3m. CON salva metade.',       custo_mana:2, dado:'2d8', nivel_magia:1},
   ],
   // Paladino e Patrulheiro: magias começam no nível 2. Sem magias iniciais no nível 1.
   // O painel de magias ainda aparece para que o jogador possa adicionar manualmente.
@@ -1273,7 +1275,7 @@ function wzSpellQueryParams(char) {
   const freeMode = !!char.freeMode;
   return {
     classe:   freeMode ? '' : (char.classe || 'mago'),
-    maxLevel: freeMode ? 9  : edMaxSpellLevel(char.nivel || 1),
+    maxLevel: freeMode ? 9  : edMaxSpellLevel(char.nivel || 1, char.classe),
   };
 }
 function wzTriggerSpellSearch(i) {
@@ -1337,7 +1339,7 @@ function wzBuildSpellPanel(i) {
   }
 
   // ── Contagens e limites de magias (modo livre = sem limite) ───────────────
-  const _wzLimit       = char.freeMode ? null : getSpellLimit(char.classe, char.nivel, char.stats);
+  const _wzLimit       = char.freeMode ? null : getSpellLimit(char.classe, char.nivel);
   const _wzCantripCnt  = selected.filter(s => s.nivel_magia === 0).length;
   const _wzLeveledCnt  = selected.filter(s => s.nivel_magia > 0).length;
 
@@ -1451,20 +1453,22 @@ function wzRemoveSpell(i, nome) {
     ? `Magias (${char._selectedSpells.length})` : 'Magias';
 }
 
+// Só os rótulos das classes. Dado de vida, mana e limites vêm de Regras
+// (/api/dnd/regras), que é o motor.
 const CLASS_DATA_WZ = {
-  bárbaro:     { hit_die: 12, mana_per_level: 0,  mana_stat: null,          label: 'Bárbaro' },
-  guerreiro:   { hit_die: 10, mana_per_level: 2,  mana_stat: 'forca',       label: 'Guerreiro' },
-  paladino:    { hit_die: 10, mana_per_level: 5,  mana_stat: 'carisma',     label: 'Paladino' },
-  patrulheiro: { hit_die: 8,  mana_per_level: 4,  mana_stat: 'sabedoria',   label: 'Patrulheiro' },
-  bardo:       { hit_die: 8,  mana_per_level: 6,  mana_stat: 'carisma',     label: 'Bardo' },
-  clérigo:     { hit_die: 8,  mana_per_level: 8,  mana_stat: 'sabedoria',   label: 'Clérigo' },
-  druida:      { hit_die: 8,  mana_per_level: 8,  mana_stat: 'sabedoria',   label: 'Druida' },
-  monge:       { hit_die: 8,  mana_per_level: 4,  mana_stat: 'sabedoria',   label: 'Monge' },
-  ladino:      { hit_die: 8,  mana_per_level: 2,  mana_stat: 'destreza',    label: 'Ladino' },
-  mago:        { hit_die: 6,  mana_per_level: 10, mana_stat: 'inteligencia', label: 'Mago' },
-  feiticeiro:  { hit_die: 6,  mana_per_level: 10, mana_stat: 'carisma',     label: 'Feiticeiro' },
-  bruxo:       { hit_die: 8,  mana_per_level: 8,  mana_stat: 'carisma',     label: 'Bruxo' },
-  npc:         { hit_die: 8,  mana_per_level: 0,  mana_stat: null,          label: 'NPC' },
+  bárbaro:     { label: 'Bárbaro' },
+  guerreiro:   { label: 'Guerreiro' },
+  paladino:    { label: 'Paladino' },
+  patrulheiro: { label: 'Patrulheiro' },
+  bardo:       { label: 'Bardo' },
+  clérigo:     { label: 'Clérigo' },
+  druida:      { label: 'Druida' },
+  monge:       { label: 'Monge' },
+  ladino:      { label: 'Ladino' },
+  mago:        { label: 'Mago' },
+  feiticeiro:  { label: 'Feiticeiro' },
+  bruxo:       { label: 'Bruxo' },
+  npc:         { label: 'NPC' },
 };
 
 // Atributos padrão por classe usando o array padrão D&D 5e [15,14,13,12,10,8]
@@ -1508,7 +1512,7 @@ function wzApplyClassDefaults(char) {
   if (!char._spellsInitialized) {
     char._selectedSpells = (INITIAL_SPELLS_WZ[char.classe] || []).map(s => ({
       ...s,
-      nivel_magia: s.nivel_magia ?? (s.custo_mana === 0 ? 0 : Math.max(1, Math.round((s.custo_mana || 4) / 4))),
+      nivel_magia: s.nivel_magia ?? Regras.nivelPorCusto(s.custo_mana),
     }));
     char._spellsInitialized = true;
   }
@@ -1532,6 +1536,9 @@ let wzSelectedModel = '';
 
 // ── Abrir / fechar ─────────────────────────────────────────
 function openWizard() {
+  // As tabelas de regra vêm do motor; a primeira ficha só é desenhada no
+  // passo 2, e wzRenderChars espera por elas se ainda não chegaram.
+  Regras.carregar();
   wzStep = 1;
   wzChars = [];
   wzLocs  = [];
@@ -1881,44 +1888,25 @@ function wzPointsUsed(stats) {
   }, 0);
 }
 
-// Pool de mana pela tabela oficial Spell Points do DMG (p.288) — IGUAL ao
-// backend (_max_mana_for em tools_dnd.py). Depende SÓ do nível de conjurador,
-// nunca do atributo. Mantém o preview do wizard idêntico ao que é criado.
-const SPELL_POINTS_BY_LEVEL_WZ = {
-  1:4, 2:6, 3:14, 4:17, 5:27, 6:32, 7:38, 8:44, 9:57, 10:64,
-  11:73, 12:73, 13:83, 14:83, 15:94, 16:94, 17:107, 18:114, 19:123, 20:133,
-};
-const FULL_CASTERS_WZ  = new Set(['mago','feiticeiro','clerigo','druida','bardo','bruxo','arcanista']);
-const HALF_CASTERS_WZ  = new Set(['paladino','patrulheiro']);
-const THIRD_CASTERS_WZ = new Set(['guerreiro','ladino']);
-
+// Pool de mana: o do motor (_max_mana_for), lido de Regras.
 function wzMaxMana(classe, nivel) {
-  // Normaliza igual ao backend (_norm_txt): minúsculas, sem acento.
-  const c   = (classe || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-  const lvl = Math.max(1, Math.min(20, parseInt(nivel) || 1));
-  let cl;
-  if      (FULL_CASTERS_WZ.has(c))  cl = lvl;
-  else if (HALF_CASTERS_WZ.has(c))  cl = lvl >= 2 ? Math.ceil(lvl / 2) : 0;  // meio-conjurador
-  else if (THIRD_CASTERS_WZ.has(c)) cl = lvl >= 3 ? Math.ceil(lvl / 3) : 0;  // terço-conjurador
-  else if (c === 'monge')           return lvl;   // pool de Ki = nível
-  else                              return 0;      // bárbaro / não-conjurador
-  return SPELL_POINTS_BY_LEVEL_WZ[cl] || 0;
+  return Regras.mana(classe, nivel);
 }
 
 function wzCalcSheet(char) {
   const isDnd = document.getElementById('wz-type').value === 'dnd';
   if (!isDnd) return null;
-  const cls    = CLASS_DATA_WZ[char.classe] || CLASS_DATA_WZ['guerreiro'];
+  const hitDie = Regras.dadoDeVida(char.classe) || Regras.dadoDeVida('guerreiro') || 8;
   const stats  = char.stats;
   const nivel  = Math.max(1, parseInt(char.nivel) || 1);
   const conMod = Math.floor((parseInt(stats.constituicao) - 10) / 2);
   const dexMod = Math.floor((parseInt(stats.destreza) - 10) / 2);
   // HP: nível 1 = hit_die + CON; cada nível seguinte = avg(die) + CON
-  const avgDie = Math.floor(cls.hit_die / 2) + 1;
-  const hp     = Math.max(nivel, (cls.hit_die + conMod) + (nivel - 1) * Math.max(1, avgDie + conMod));
+  const avgDie = Math.floor(hitDie / 2) + 1;
+  const hp     = Math.max(nivel, (hitDie + conMod) + (nivel - 1) * Math.max(1, avgDie + conMod));
   const ca     = 10 + dexMod;
   const mana   = wzMaxMana(char.classe, nivel);
-  return { hp, ca, mana, hit_die: cls.hit_die };
+  return { hp, ca, mana, hit_die: hitDie };
 }
 
 // ── Troca de raça no wizard ───────────────────────────────────────────────────
@@ -2226,7 +2214,7 @@ function wzStatBudgetFull(i) {
   if (!char) return { pbBudget:27, pbUsed:0, asiTotal:0, asiUsed:0, pbRemain:27, asiRemain:0 };
   wzInitAsiBonus(char);
   const nivel    = Math.max(1, parseInt(char.nivel) || 1);
-  const asiTotal = edAsiCount(nivel) * 2;
+  const asiTotal = edAsiCount(nivel, char.classe) * Regras.pontosPorIncremento();
   const bonus    = char._asiBonus;
   let pbUsed = 0;
   for (const stat of STATS_WZ) {
@@ -2414,7 +2402,7 @@ function wzBuildDndSectionHtml(i) {
   const nivel  = Math.max(1, parseInt(char.nivel) || 1);
   const calc   = wzCalcSheet(char);
   const bud    = char.freeMode ? null : wzStatBudgetFull(i);
-  const asiCnt = edAsiCount(nivel);
+  const asiCnt = edAsiCount(nivel, char.classe);
 
   const basicHtml = `
     <div class="cwc-row2">
@@ -2526,7 +2514,7 @@ function wzBuildDndSectionHtml(i) {
   if (isCaster && !char._spellsInitialized) {
     char._selectedSpells = (INITIAL_SPELLS_WZ[char.classe] || []).map(s => ({
       ...s,
-      nivel_magia: s.nivel_magia ?? (s.custo_mana === 0 ? 0 : Math.max(1, Math.round((s.custo_mana || 4) / 4))),
+      nivel_magia: s.nivel_magia ?? Regras.nivelPorCusto(s.custo_mana),
     }));
     char._spellsInitialized = true;
   }
@@ -2776,6 +2764,9 @@ function wzRenderThemeExtras(i, theme, char) {
 }
 
 function wzRenderChars() {
+  if (!Regras.pronto()) {
+    Regras.carregar().then(() => { if (Regras.pronto()) wzRenderChars(); });
+  }
   const theme   = document.getElementById('wz-type').value;
   const isDnd   = theme === 'dnd';
   const meta    = partyMeta(theme);
@@ -2848,34 +2839,9 @@ function escHtml(s) {
 }
 
 // ── Tabelas de limites de magias D&D 5e ──────────────────────────────────────
-const SPELL_CANTRIPS_TABLE = {
-  bardo:[2,2,2,3,3,3,3,3,3,4,4,4,4,4,4,4,4,4,4,4],
-  clérigo:[3,3,3,4,4,4,4,4,4,5,5,5,5,5,5,5,5,5,5,5],
-  druida:[2,2,2,3,3,3,3,3,3,4,4,4,4,4,4,4,4,4,4,4],
-  feiticeiro:[4,4,4,5,5,5,6,6,6,6,6,6,6,6,6,6,6,6,6,6],
-  bruxo:[2,2,2,3,3,3,4,4,4,4,4,4,4,4,4,4,4,4,4,4],
-  mago:[3,3,3,4,4,4,4,4,4,5,5,5,5,5,5,5,5,5,5,5],
-};
-const SPELL_KNOWN_TABLE = {
-  // Mago — Livro de Magias: 6 no nível 1, +2 por nível
-  mago:       [6,8,10,12,14,16,18,20,22,24,26,28,30,32,34,36,38,40,42,44],
-  // Clérigo / Druida — preparados: SAB 14 (+2) + nível (representativo de build típica)
-  clérigo:    [3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22],
-  druida:     [3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22],
-  // Paladino — half-caster: sem magias no nível 1, CAR 14 (+2) + metade do nível
-  paladino:   [0,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12],
-  // Magias conhecidas fixas
-  bardo:      [4,5,6,7,8,9,10,11,12,14,15,15,16,18,19,19,20,22,22,22],
-  feiticeiro: [2,3,4,5,6,7,8,9,10,11,12,12,13,13,14,14,15,15,15,15],
-  bruxo:      [2,3,4,5,6,7,8,9,10,10,11,11,12,12,13,13,14,14,14,15],
-  patrulheiro:[0,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11],
-};
-function getSpellLimit(classe, nivel, sheet) {
-  const nv=Math.min(Math.max(parseInt(nivel)||1,1),20), idx=nv-1;
-  const maxCantrips = SPELL_CANTRIPS_TABLE[classe]?.[idx] ?? 0;
-  if (SPELL_KNOWN_TABLE[classe]===undefined) return null;
-  const maxSpells = SPELL_KNOWN_TABLE[classe][idx] ?? 0;
-  return {maxCantrips, maxSpells};
+// Limite de truques e magias conhecidas: o do motor (_limite_de_magias).
+function getSpellLimit(classe, nivel) {
+  return Regras.limiteDeMagias(classe, nivel);
 }
 
 // ── Popup de detalhes de magia / habilidade ───────────────────────────────────
@@ -3039,17 +3005,17 @@ async function createCampaignFromWizard() {
     }
 
     if (isDnd) {
-      const cls     = CLASS_DATA_WZ[char.classe] || CLASS_DATA_WZ['guerreiro'];
+      const hitDie  = Regras.dadoDeVida(char.classe) || Regras.dadoDeVida('guerreiro') || 8;
       const stats   = char.stats;
       const isNpc   = char.classe === 'npc';
       const nivel   = isNpc ? 1 : Math.max(1, parseInt(char.nivel) || 1);
       const conMod  = Math.floor((parseInt(stats.constituicao) - 10) / 2);
       const dexMod  = Math.floor((parseInt(stats.destreza) - 10) / 2);
       // HP: monstros usam o HP real do bloco; PCs usam fórmula por nível
-      const avgDie  = Math.floor(cls.hit_die / 2) + 1;
+      const avgDie  = Math.floor(hitDie / 2) + 1;
       const hp_max  = isNpc && char._monsterHp
         ? char._monsterHp
-        : Math.max(nivel, (cls.hit_die + conMod) + (nivel - 1) * Math.max(1, avgDie + conMod));
+        : Math.max(nivel, (hitDie + conMod) + (nivel - 1) * Math.max(1, avgDie + conMod));
       const mana_max = isNpc ? 0 : wzMaxMana(char.classe, nivel);
 
       // Equipamentos: NPCs usam armas extraídas do bloco do monstro (Open5e)
@@ -3079,7 +3045,7 @@ async function createCampaignFromWizard() {
         mana_max:    mana_max,
         ca:          caFinal,
         proficiencia: edProfForLevel(nivel),
-        hit_die:     cls.hit_die,
+        hit_die:     hitDie,
         ouro:        10, prata: 5, cobre: 0,
         equipamentos:{
           armadura:        startEquip.arm,
@@ -3114,7 +3080,7 @@ async function createCampaignFromWizard() {
         descricao:   s.descricao || '',
         custo_mana:  s.custo_mana  || 0,
         dado:        s.dado        || '',
-        nivel_magia: s.nivel_magia ?? (s.custo_mana === 0 ? 0 : Math.max(1, Math.round((s.custo_mana || 4) / 4))),
+        nivel_magia: s.nivel_magia ?? Regras.nivelPorCusto(s.custo_mana),
       });
 
       if (hasSelections) {
@@ -3286,9 +3252,11 @@ const ED_PB_MAX   = 27;
 const ED_STATS    = ['forca','destreza','constituicao','inteligencia','sabedoria','carisma'];
 const ED_STAT_ABBR = { forca:'FOR', destreza:'DES', constituicao:'CON', inteligencia:'INT', sabedoria:'SAB', carisma:'CAR' };
 
-function edAsiCount(nivel) {
-  // Progressão padrão D&D 5e: ASI nos níveis 4, 8, 12, 16, 19
-  return [4,8,12,16,19].filter(t => nivel >= t).length;
+// Incrementos de atributo até o nível — por CLASSE: o guerreiro também
+// ganha no 6 e no 14, o ladino no 10. A tabela fixa 4/8/12/16/19 tirava
+// esses pontos de quem era criado nesses níveis.
+function edAsiCount(nivel, classe) {
+  return Regras.incrementos(classe, nivel);
 }
 
 // Garante que ch._asiBonus existe com valores iniciais razoáveis
@@ -3306,7 +3274,7 @@ function edStatBudget(i) {
   const ch       = edChars[i];
   const s        = ch?.sheet || {};
   const nivel    = parseInt(s.nivel) || 1;
-  const asiTotal = edAsiCount(nivel) * 2;
+  const asiTotal = edAsiCount(nivel, s.classe) * Regras.pontosPorIncremento();
   edInitAsiBonus(ch);
   const bonus = ch._asiBonus;
 
@@ -3358,25 +3326,18 @@ function edStatStep(i, stat, delta) {
   edRefreshDndSections(i);
 }
 
-// ── D&D: max spell level by character level ───────────────────────────────────
-function edMaxSpellLevel(nivel) {
-  return Math.min(9, Math.max(1, Math.ceil((parseInt(nivel)||1) / 2)));
+// Círculo máximo de magia: por tipo de conjurador, como no motor. "Metade
+// do nível" para toda classe dava 2º círculo a paladino de nível 3.
+function edMaxSpellLevel(nivel, classe) {
+  return Regras.circuloMaximo(classe, nivel);
 }
-
-// XP total necessário para atingir o próximo nível (tabela D&D 5e)
-const ED_XP_THRESHOLDS = [0, 300, 900, 2700, 6500, 14000, 23000, 34000,
-                           48000, 64000, 85000, 100000, 120000, 140000,
-                           165000, 195000, 225000, 265000, 305000, 355000];
 function edXpForNextLevel(nivel) {
-  const n = Math.min(Math.max(parseInt(nivel) || 1, 1), 19);
-  return ED_XP_THRESHOLDS[n];
+  return Regras.xpProximo(nivel);
 }
 
 // Bônus de proficiência padrão D&D 5e por nível
-const ED_PROF_BY_LEVEL = [2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,6,6,6,6];
 function edProfForLevel(nivel) {
-  const n = Math.min(Math.max(parseInt(nivel) || 1, 1), 20);
-  return ED_PROF_BY_LEVEL[n - 1];
+  return Regras.proficiencia(nivel);
 }
 
 // ── D&D: spell / item search state (per-character) ───────────────────────────
@@ -3398,7 +3359,7 @@ async function edDoSpellSearch(i) {
   const freeMode = ch.freeMode === true;
   const classe   = ch.sheet?.classe || 'mago';
   const nivel    = ch.sheet?.nivel  || 1;
-  const maxLevel = freeMode ? 9 : edMaxSpellLevel(nivel);
+  const maxLevel = freeMode ? 9 : edMaxSpellLevel(nivel, classe);
   const q        = (ch._spellQuery || '').trim();
   ch._spellLoading = true;
   edRefreshSpellPanel(i);
@@ -3649,6 +3610,7 @@ async function openEditCampaign(e, name) {
   edRenderStep();
 
   try {
+    await Regras.carregar();
     const res  = await authFetch(`${API}/api/campaigns/${encodeURIComponent(name)}`);
     const data = await res.json();
     if (!res.ok || !data.ok) throw new Error(data.error || 'Erro ao carregar campanha');
@@ -3674,6 +3636,8 @@ async function openEditCampaign(e, name) {
       sheet:       ch.sheet ? Object.assign(edBlankSheet(), ch.sheet) : edBlankSheet(),
       inventario:  Array.isArray(ch.inventario)  ? ch.inventario.map(it => ({...it}))  : [],
       habilidades: Array.isArray(ch.habilidades) ? ch.habilidades.map(h  => ({...h})) : [],
+      // Já existe na campanha: o que as telas controlam fica só para leitura.
+      _salvo:      true,
       _open:       false,
       _monsterQuery: '', _monsterResults: [], _monsterLoading: false,
     }));
@@ -3856,9 +3820,9 @@ function edBuildSpellPanel(i) {
   const query    = escHtml(ch._spellQuery || '');
   const rawQuery = (ch._spellQuery || '').trim();
   const nivel    = ch.sheet?.nivel || 1;
-  const maxSl    = freeMode ? 9 : edMaxSpellLevel(nivel);
-  const lvlF     = ch._spellLevelFilter;   // null | 0–9
   const classe   = ch.sheet?.classe || '';
+  const maxSl    = freeMode ? 9 : edMaxSpellLevel(nivel, classe);
+  const lvlF     = ch._spellLevelFilter;   // null | 0–9
   const scopeMsg = freeMode
     ? `Modo livre — qualquer magia até Nv.${maxSl}`
     : `Magias de <strong>${escHtml(classe)}</strong> até Nv.${maxSl}`;
@@ -3878,7 +3842,7 @@ function edBuildSpellPanel(i) {
   }
 
   // ── Contagens e limites de magias (modo livre = sem limite) ───────────────
-  const _edLimit      = freeMode ? null : getSpellLimit(classe, nivel, ch.sheet);
+  const _edLimit      = freeMode ? null : getSpellLimit(classe, nivel);
   const _edCantripCnt = ch.habilidades.filter(h => typeof h.nivel_magia === 'number' && h.nivel_magia === 0).length;
   const _edLeveledCnt = ch.habilidades.filter(h => typeof h.nivel_magia === 'number' && h.nivel_magia > 0).length;
 
@@ -4016,23 +3980,50 @@ function edBuildItemPanel(i) {
 }
 
 // ── Gera HTML das seções D&D de um personagem ─────────────────────
+// Ficha de personagem que já está em jogo, fora do Modo de correção: os campos
+// que definem o personagem (nível, atributos, CA, equipamento, magias,
+// escolhas de classe) ficam só para leitura. Na sessão quem os muda são as
+// telas — de nível, Grimório, Mochila — pelas ferramentas do motor; um editor
+// que os gravasse livremente contornaria todas elas. O servidor aplica a
+// mesma regra ao salvar (normalize_edited_character).
+function edTravado(ch) {
+  return !!(ch && ch._salvo && !ch.freeMode && ch.sheet && ch.sheet.classe !== 'npc');
+}
+
+// Envolve um trecho num <fieldset disabled>: desabilita todos os campos e
+// botões de dentro de uma vez, sem mexer em cada template.
+function edTrava(ch, html) {
+  return edTravado(ch) ? `<fieldset class="ed-trava" disabled>${html}</fieldset>` : html;
+}
+
 function edBuildDndSections(i) {
   const ch = edChars[i];
   if (!ch || !ch.sheet) return '';
   const s        = ch.sheet;
   const eq       = s.equipamentos || {};
   const freeMode = ch.freeMode === true;
+  const travado  = edTravado(ch);
 
   const statMod = v => { const m = Math.floor((parseInt(v)-10)/2); return (m>=0?'+':'')+m; };
 
   // ─── Toggle Modo Livre ───────────────────────────────────────────
   const modeToggle = `
-    <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:10px 0 6px 0;border-bottom:1px solid var(--page-edge);margin-bottom:14px;">
-      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text-muted);">
-        <input type="checkbox" ${freeMode?'checked':''} onchange="edChars[${i}].freeMode=this.checked;edRefreshDndSections(${i})">
-        Modo Livre (sem restrições de regras)
+    <div style="display:flex;align-items:center;justify-content:flex-end;padding:10px 0 6px 0;border-bottom:1px solid var(--page-edge);margin-bottom:14px;">
+      <label class="ed-correcao-toggle">
+        <input type="checkbox" class="ed-correcao" ${freeMode?'checked':''} onchange="edChars[${i}].freeMode=this.checked;edRefreshDndSections(${i})">
+        Modo de correção (passa por cima das regras)
       </label>
-    </div>`;
+    </div>
+    ${travado ? `<div class="ed-aviso-regras">
+      <b>Ficha em jogo.</b> Nível, atributos, CA, equipamento, magias e escolhas de
+      classe mudam pelas telas da sessão: a de nível, o Grimório e a Mochila.
+      Aqui ficam só para leitura; para corrigir um erro, ative o Modo de correção.
+    </div>` : ''}
+    ${ch._salvo && freeMode && s.classe !== 'npc' ? `<div class="ed-aviso-regras ed-aviso-correcao">
+      <b>Modo de correção.</b> O que você mudar aqui é gravado como está, sem passar
+      pelas regras. Vida e mana atuais continuam limitadas ao máximo, e a reserva
+      de dados de vida ao nível.
+    </div>` : ''}`;
 
   // ─── Ficha Principal (sempre livre) ─────────────────────────────
   const fichaHtml = `
@@ -4125,7 +4116,28 @@ function edBuildDndSections(i) {
 
   // ─── Atributos ───────────────────────────────────────────────────
   let statsHtml;
-  if (freeMode) {
+  if (travado) {
+    // Ficha em jogo: o Point Buy é da criação, e os incrementos são gastos na
+    // tela de nível. Contador e botões aqui só pareceriam um erro a corrigir.
+    const nivel  = parseInt(s.nivel) || 1;
+    const asiCnt = edAsiCount(nivel, s.classe);
+    statsHtml = `
+      <div class="ed-dnd-section">
+        <div class="ed-dnd-section-title">Atributos</div>
+        <p class="ed-aviso-inline">${asiCnt
+          ? `${asiCnt} incremento${asiCnt !== 1 ? 's' : ''} de atributo até o nível ${nivel}, escolhidos na tela de nível.`
+          : `Nenhum incremento de atributo até o nível ${nivel}; quando vier, é escolhido na tela de nível.`}</p>
+        <div class="stat-grid">
+          ${ED_STATS.map(stat => `
+            <div class="stat-cell">
+              <span class="stat-cell-name">${ED_STAT_ABBR[stat]}</span>
+              <input type="number" value="${s[stat]||10}" readonly
+                style="width:100%;text-align:center;font-size:18px;font-weight:700;padding:4px;border:1px solid var(--page-edge);border-radius:3px;background:transparent;">
+              <span class="stat-cell-mod">${statMod(s[stat]||10)}</span>
+            </div>`).join('')}
+        </div>
+      </div>`;
+  } else if (freeMode) {
     statsHtml = `
       <div class="ed-dnd-section">
         <div class="ed-dnd-section-title">Atributos — Modo Livre</div>
@@ -4145,7 +4157,7 @@ function edBuildDndSections(i) {
     // Modo estruturado: Point Buy (8-15) + ASI (qualquer atributo, até 20)
     const bud    = edStatBudget(i);
     const nivel  = parseInt(s.nivel) || 1;
-    const asiCnt = edAsiCount(nivel);
+    const asiCnt = edAsiCount(nivel, s.classe);
     statsHtml = `
       <div class="ed-dnd-section">
         <div class="ed-dnd-section-title">Atributos — Point Buy + ASI</div>
@@ -4171,12 +4183,15 @@ function edBuildDndSections(i) {
       <div class="ed-dnd-section-title">Combate & Recursos</div>
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">
         <div><span class="cwc-label">Vida Atual</span><input type="number" min="0" value="${s.vida_atual??10}" onchange="edSheetChange(${i},'vida_atual',this.value)"></div>
+        <div><span class="cwc-label">Mana Atual</span><input type="number" min="0" value="${s.mana_atual??0}" onchange="edSheetChange(${i},'mana_atual',this.value)"></div>
+        <div></div>
+      </div>
+      ${edTrava(ch, `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px;">
         <div><span class="cwc-label">Vida Máxima</span><input type="number" min="1" value="${s.vida_max??10}" onchange="edSheetChange(${i},'vida_max',this.value)"></div>
         <div><span class="cwc-label">CA</span><input type="number" min="1" value="${s.ca??10}" onchange="edSheetChange(${i},'ca',this.value)"></div>
-        <div><span class="cwc-label">Mana Atual</span><input type="number" min="0" value="${s.mana_atual??0}" onchange="edSheetChange(${i},'mana_atual',this.value)"></div>
         <div><span class="cwc-label">Mana Máxima</span><input type="number" min="0" value="${s.mana_max??0}" onchange="edSheetChange(${i},'mana_max',this.value)"></div>
         <div><span class="cwc-label">Hit Die</span><input type="number" min="4" max="12" value="${s.hit_die??8}" onchange="edSheetChange(${i},'hit_die',this.value)"></div>
-      </div>
+      </div>`)}
       <div class="cwc-row2" style="margin-top:10px;">
         <div><span class="cwc-label">Death Saves ✓</span><input type="number" min="0" max="3" value="${s.death_saves_sucessos??0}" onchange="edSheetChange(${i},'death_saves_sucessos',this.value)"></div>
         <div><span class="cwc-label">Death Saves ✗</span><input type="number" min="0" max="3" value="${s.death_saves_falhas??0}" onchange="edSheetChange(${i},'death_saves_falhas',this.value)"></div>
@@ -4192,7 +4207,8 @@ function edBuildDndSections(i) {
         <div><span class="cwc-label">Prata</span><input type="number" min="0" value="${s.prata??0}" onchange="edSheetChange(${i},'prata',this.value)"></div>
         <div><span class="cwc-label">Cobre</span><input type="number" min="0" value="${s.cobre??0}" onchange="edSheetChange(${i},'cobre',this.value)"></div>
       </div>
-      <div class="cwc-row2">
+      ${travado ? `<div class="ed-aviso-inline">Equipamento se veste e se tira na Mochila, durante a sessão.</div>` : ''}
+      ${edTrava(ch, `<div class="cwc-row2">
         <div><span class="cwc-label">Armadura</span><input value="${escHtml(eq.armadura||'')}" onchange="edEquipChange(${i},'armadura',this.value)" placeholder="Ex: Cota de malha"></div>
         <div><span class="cwc-label">Escudo</span><input value="${escHtml(eq.escudo||'')}" onchange="edEquipChange(${i},'escudo',this.value)" placeholder="Ex: Escudo de madeira"></div>
       </div>
@@ -4203,7 +4219,7 @@ function edBuildDndSections(i) {
       <div class="cwc-row2" style="margin-top:10px;">
         <div><span class="cwc-label">Amuleto</span><input value="${escHtml(eq.amuleto||'')}" onchange="edEquipChange(${i},'amuleto',this.value)" placeholder="Ex: Amuleto da proteção"></div>
         <div></div>
-      </div>
+      </div>`)}
     </div>`;
 
   // ─── Inventário ───────────────────────────────────────────────────
@@ -4277,8 +4293,10 @@ function edBuildDndSections(i) {
   const habHtml = `
     <div class="ed-dnd-section">
       <div class="ed-dnd-section-title">Habilidades & Magias</div>
-      ${edTabBar}
-      ${edTabContent}
+      ${travado
+        ? `<div class="ed-aviso-inline">Magias se aprendem no Grimório; estilo, arquétipo e incremento, na tela de nível.</div>`
+        : `${edTabBar}${edTabContent}`}
+      ${edTrava(ch, `
       ${ch.habilidades.length ? ch.habilidades.map((h, j) => `
         <div style="padding:10px;background:rgba(0,0,0,0.02);border-radius:4px;border:1px solid var(--page-edge);margin-bottom:8px;">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;">
@@ -4291,10 +4309,13 @@ function edBuildDndSections(i) {
           <div><span class="cwc-label">Descrição / Efeito</span>
             <textarea rows="2" onchange="edAbilityChange(${i},${j},'descricao',this.value)" placeholder="Efeito, alcance, duração...">${escHtml(h.descricao||'')}</textarea>
           </div>
-        </div>`).join('') : '<div style="font-size:12px;color:var(--text-muted);font-style:italic;padding:6px 0;">Nenhuma habilidade.</div>'}
+        </div>`).join('') : '<div style="font-size:12px;color:var(--text-muted);font-style:italic;padding:6px 0;">Nenhuma habilidade.</div>'}`)}
     </div>`;
 
-  return modeToggle + fichaHtml + statsHtml + combateHtml + equipHtml + invHtml + habHtml;
+  // Ficha e atributos travam inteiros; combate, equipamento e habilidades
+  // travam por dentro (vida e mana atuais, moedas e inventário seguem livres).
+  return modeToggle + edTrava(ch, fichaHtml) + edTrava(ch, statsHtml)
+       + combateHtml + equipHtml + invHtml + habHtml;
 }
 
 // ── Stat grid para modo estruturado do editor ──────────────────────
@@ -4488,6 +4509,9 @@ async function saveEditedCampaign() {
       sheet:       isDnd && ch.sheet ? ch.sheet : null,
       inventario:  isDnd ? (ch.inventario || []) : [],
       habilidades: isDnd ? (ch.habilidades || []) : [],
+      // Sem isto o servidor mantém nível, atributos, CA, equipamento e
+      // magias como estavam (ver edTravado).
+      correcao_manual: !!ch.freeMode,
     };
     characters[key] = charObj;
     if (ch.isParty) party.push({ name: ch.name, role: ch.role||'', notes: ch.notes||'' });
@@ -4542,7 +4566,14 @@ async function saveEditedCampaign() {
     if (selectedCampaign === edOriginalName && data.name !== edOriginalName) {
       selectedCampaign = data.name;
     }
-    await showAlert('Campanha atualizada', `"${data.name}" foi salva com sucesso.`, 'success');
+    // O servidor diz o que manteve como estava gravado: um cliente antigo em
+    // cache ainda poderia mandar esses campos, e o jogador precisa saber.
+    const mantidos = Object.entries(data.mantidos || {});
+    const nota = mantidos.length
+      ? `<br><br>Mantido como estava (use o Modo de correção para mudar): `
+        + mantidos.map(([nome, campos]) => `<b>${escHtml(nome)}</b>: ${campos.map(escHtml).join(', ')}`).join('; ')
+      : '';
+    await showAlert('Campanha atualizada', `"${escHtml(data.name)}" foi salva com sucesso.${nota}`, 'success');
   } catch (err) {
     document.getElementById('ed-err').textContent = err.message;
   } finally {

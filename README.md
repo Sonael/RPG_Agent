@@ -93,15 +93,16 @@ abre o loop **percepção → deliberação → ação → verificação** em de
 10. [Tela de equipamento ("A Mochila")](#tela-de-equipamento-a-mochila)
 11. [Tela de loja ("O Balcão")](#tela-de-loja-o-balcão)
 12. [Tela de descanso ("A Fogueira")](#tela-de-descanso-a-fogueira)
-13. [Tela de combate tática (Pergaminho Épico)](#tela-de-combate-tática-pergaminho-épico)
-14. [Tools, o catálogo do agente](#tools-o-catálogo-do-agente)
-15. [Endpoints HTTP](#endpoints-http)
-16. [Frontend](#frontend)
-17. [PWA e instalação](#pwa-e-instalação)
-18. [Testes e garantias](#testes-e-garantias)
-19. [Estrutura de arquivos](#estrutura-de-arquivos)
-20. [Configuração e execução](#configuração-e-execução)
-21. [Limitações conhecidas](#limitações-conhecidas)
+13. [Wizard e editores de ficha](#wizard-e-editores-de-ficha)
+14. [Tela de combate tática (Pergaminho Épico)](#tela-de-combate-tática-pergaminho-épico)
+15. [Tools, o catálogo do agente](#tools-o-catálogo-do-agente)
+16. [Endpoints HTTP](#endpoints-http)
+17. [Frontend](#frontend)
+18. [PWA e instalação](#pwa-e-instalação)
+19. [Testes e garantias](#testes-e-garantias)
+20. [Estrutura de arquivos](#estrutura-de-arquivos)
+21. [Configuração e execução](#configuração-e-execução)
+22. [Limitações conhecidas](#limitações-conhecidas)
 
 ---
 
@@ -1542,6 +1543,71 @@ refaz a conta, e o CSS só multiplica por 56px. As telas continuam sem saber
 umas das outras. `test_pilulas_de_loja_e_descanso_nao_se_sobrepoem` mede as
 duas caixas.
 
+## Wizard e editores de ficha
+
+O wizard de criação de campanha e os dois editores de ficha (o da campanha, no
+menu, e o "Editar Ficha Completa", no jogo) são mais antigos que as telas. Cada
+um tinha as suas tabelas de regra, copiadas do motor à mão, e gravava por cima
+do que as telas controlam. As cópias já discordavam do motor:
+
+| Regra | No navegador | No motor |
+|---|---|---|
+| Círculo máximo de magia | `ceil(nível / 2)` para toda classe: paladino de nível 3 recebia 2º círculo | meio conjurador só chega ao 1º círculo no nível 3 |
+| Incremento de atributo | só nos níveis 4, 8, 12, 16 e 19 | guerreiro também no 6 e no 14, ladino no 10 |
+| Nível da magia inicial | `Math.round(custo_mana / 4)`: 3º círculo (custo 5) virava 1º | `SPELL_MANA_COST` e `SPELL_LEVEL_OVERRIDE` |
+
+### As regras saem de um lugar só
+
+`rules_catalog()` (em `tools_dnd.py`, rota `GET /api/dnd/regras`) monta as
+tabelas chamando as mesmas funções que o jogo usa: `_limite_de_magias`,
+`_nivel_maximo_de_magia`, `_niveis_asi`, `_max_mana_for`, `_proficiency_bonus`,
+`XP_THRESHOLDS`, `SPELL_MANA_COST`. No navegador, o módulo `Regras` (em
+`utils.js`) carrega o catálogo uma vez e oferece leitores síncronos
+(`limiteDeMagias`, `circuloMaximo`, `incrementos`, `mana`, `dadoDeVida`,
+`xpProximo`, `proficiencia`, `nivelPorCusto`). O wizard e os editores esperam
+`Regras.carregar()` antes de abrir; `menu.js` e `game.js` ficaram só com os
+rótulos das classes.
+
+`test_js_nao_define_tabela_de_regra` falha se uma das tabelas antigas voltar a
+ser declarada em `menu.js` ou `game.js`, e
+`test_magias_iniciais_do_wizard_tem_nivel_e_custo_do_motor` confere o nível e o
+custo de cada magia inicial do wizard contra o motor.
+
+### O editor para de competir com as telas
+
+Numa ficha **já salva e jogável** (classe diferente de `npc`), os editores
+mostram nível, XP, atributos, CA, vida e mana máximas, dado de vida,
+equipamento e habilidades **só para leitura**, dentro de um
+`<fieldset class="ed-trava" disabled>`, com o aviso de qual tela cuida de cada
+coisa. O "Editar Ficha Completa" traz atalhos para a Mochila, o Grimório e a
+tela de nível. Continua livre o estado do momento: nome, descrição, notas,
+vida e mana atuais, moedas, inventário.
+
+Personagem novo e NPC não são travados. Para consertar uma ficha que o mestre
+estragou, há o **Modo de correção** ("passa por cima das regras"): destrava
+tudo e o salvamento vai com `correcao_manual: true`.
+
+A trava do navegador é conforto; a garantia está no servidor.
+`normalize_edited_character(novo, antigo, correcao_manual)` roda no
+`PUT /api/campaigns/<name>`, no `PUT /api/memory/characters/<name>` e na
+criação:
+
+- sem correção, cada campo de construção que mudou volta ao valor gravado, e
+  as habilidades também. Isso cobre um cliente antigo em cache ou um campo
+  forçado por script. Os campos mantidos voltam na resposta (`mantidos`) e o
+  editor avisa;
+- sempre, com ou sem correção, ajusta o que não pode ficar incoerente: reserva
+  de dados de vida entre 0 e o nível, vida e mana atuais abaixo do máximo,
+  `nivel_magia` gravado em cada magia, e item tirado da mochila sai do corpo. A
+  CA só é recalculada quando algo sai do corpo, para não apagar uma CA posta
+  pelo mestre (Armadura Arcana, anel);
+- a flag `correcao_manual` não é gravada na ficha.
+
+`test_regras_e_editores.py` cobre o catálogo e a normalização;
+`test_editores_navegador.py` (Playwright) abre os dois editores, confirma a
+trava, força o nível por JS e verifica que ele não é gravado enquanto a vida
+atual é, liga o Modo de correção e grava a CA.
+
 ## Tela de combate tática (Pergaminho Épico)
 
 Quando `combat_mode == "tela"`:
@@ -1885,6 +1951,9 @@ acessam memória):
 - `PUT/DELETE /api/memory/characters/<name>`,
   `/locations/<name>`, `/flags/<name>`, `/party/<name>`,
   `/events/<index>`, `/diary/<index>`, `/world`.
+- O `PUT` de personagem (e o `PUT /api/campaigns/<name>`) passa por
+  `normalize_edited_character`; aceita `correcao_manual` e devolve `mantidos`.
+  Veja [Wizard e editores de ficha](#wizard-e-editores-de-ficha).
 
 ### Diário
 
@@ -1892,6 +1961,9 @@ acessam memória):
 
 ### D&D auxiliares
 
+- `GET /api/dnd/regras`, tabelas de regra geradas pelo motor (limites de
+  magia, círculo máximo, incrementos, mana, XP, proficiência, dado de vida),
+  lidas pelo wizard e pelos editores.
 - `GET /api/dnd/class-spells?classe=mago&level=3`, magias do SRD.
 - `GET /api/dnd/items/search?q=...`, busca item.
 - `GET /api/dnd/monsters/search?q=...`, busca monstro.

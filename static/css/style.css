@@ -290,6 +290,29 @@ textarea { resize: vertical; min-height: 40px; }
 .ed-dnd-section { border-top: 1px solid var(--page-edge); margin-top: var(--esp-4); padding-top: var(--esp-4); }
 .ed-dnd-section-title { font-family: 'Playfair Display', serif; font-size: 13px; font-weight: 700; color: var(--text-muted); margin-bottom: var(--esp-3); text-transform: uppercase; letter-spacing: 0.06em; }
 
+/* Ficha em jogo nos editores: o que as telas controlam fica só para leitura.
+   O <fieldset disabled> desabilita tudo de dentro; aqui só se tira a moldura
+   padrão dele e se esmaece o conteúdo, para ler como "não se mexe aqui". */
+fieldset.ed-trava { border: 0; margin: 0; padding: 0; min-width: 0; }
+fieldset.ed-trava input, fieldset.ed-trava select, fieldset.ed-trava textarea,
+fieldset.ed-trava button { opacity: 0.62; cursor: not-allowed; }
+.ed-aviso-regras {
+  margin: 0 0 var(--esp-3); padding: var(--esp-2) var(--esp-3);
+  font-size: 12px; line-height: 1.45; color: var(--text-main);
+  background: rgba(38, 75, 130, 0.06);
+  border: 1px solid rgba(38, 75, 130, 0.25); border-radius: 4px;
+}
+.ed-aviso-correcao { background: rgba(180, 90, 20, 0.07); border-color: rgba(180, 90, 20, 0.35); }
+.ed-correcao-toggle {
+  display: flex; align-items: center; justify-content: flex-end; gap: var(--esp-2);
+  font-size: 12px; color: var(--text-muted); cursor: pointer; text-align: right;
+}
+/* O input global ocupa a largura toda; aqui é só a caixinha. */
+.ed-correcao-toggle input[type="checkbox"] {
+  width: auto; flex: 0 0 auto; margin: 0; padding: 0; border: 0; cursor: pointer;
+}
+.ed-aviso-inline { font-size: 11px; color: var(--ink-user); margin: 0 0 var(--esp-2); font-style: italic; }
+
 .ed-search-result {
   padding: var(--esp-2) var(--esp-3); border: 1px solid var(--page-edge); border-radius: 4px;
   margin-bottom: var(--esp-2); cursor: pointer; transition: background 0.15s;

@@ -1080,3 +1080,94 @@ document.addEventListener('DOMContentLoaded', () => {
   _injectSettingsPanel();
   _injectGuide();
 });
+
+// ═══════════════════════════════════════
+//  Regras do motor
+// ═══════════════════════════════════════
+// O wizard e os editores tinham tabelas de regra próprias (limite de magias,
+// círculo máximo, incrementos de atributo, mana, XP, proficiência, dado de
+// vida), copiadas do motor à mão — e as cópias já discordavam dele. Agora elas
+// vêm de /api/dnd/regras, geradas pelas mesmas funções que o jogo usa, e o
+// navegador só lê.
+//
+// As páginas chamam Regras.carregar() antes de abrir o wizard ou um editor;
+// os leitores são síncronos, para caber nos templates. Sem as regras
+// carregadas, devolvem valores neutros em vez de inventar uma tabela.
+const Regras = (() => {
+  let dados = null;
+  let carregando = null;
+  const semAcento = (s) => String(s || '').toLowerCase().trim()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const nv = (n) => Math.min(20, Math.max(1, parseInt(n) || 1));
+  let porNome = {};
+
+  function carregar() {
+    if (dados) return Promise.resolve(dados);
+    if (!carregando) {
+      carregando = authFetch(`${API}/api/dnd/regras`)
+        .then(r => (r.ok ? r.json() : null))
+        .then(d => {
+          if (d && d.classes) {
+            dados = d;
+            porNome = {};
+            Object.entries(d.classes).forEach(([k, v]) => { porNome[semAcento(k)] = v; });
+          } else {
+            carregando = null;
+          }
+          return dados;
+        })
+        .catch(() => { carregando = null; return null; });
+    }
+    return carregando;
+  }
+
+  const classe = (c) => porNome[semAcento(c)] || null;
+  const noNivel = (lista, n, padrao) => {
+    const v = lista ? lista[nv(n) - 1] : undefined;
+    return v === undefined || v === null ? padrao : v;
+  };
+  const tabelaDeCusto = () => (dados && dados.custo_mana_por_nivel) || {};
+
+  return {
+    carregar,
+    pronto: () => !!dados,
+    /** {maxCantrips, maxSpells} da classe no nível, ou null se não conjura. */
+    limiteDeMagias(c, n) {
+      const k = classe(c);
+      if (!k || !k.magias) return null;
+      return { maxCantrips: noNivel(k.truques, n, 0), maxSpells: noNivel(k.magias, n, 0) };
+    },
+    circuloMaximo(c, n) {
+      const k = classe(c);
+      return k ? noNivel(k.nivel_max_magia, n, 0) : 0;
+    },
+    /** Quantos incrementos de atributo a classe já ganhou até o nível. */
+    incrementos(c, n) {
+      const k = classe(c);
+      return ((k && k.niveis_asi) || []).filter(x => x <= nv(n)).length;
+    },
+    pontosPorIncremento: () => (dados ? dados.pontos_por_asi : 0),
+    mana(c, n) {
+      const k = classe(c);
+      return k ? noNivel(k.mana, n, 0) : 0;
+    },
+    dadoDeVida(c) {
+      const k = classe(c);
+      return k ? k.hit_die : null;
+    },
+    xpProximo: (n) => (dados ? dados.xp_por_nivel[Math.min(nv(n), 19)] : null),
+    proficiencia: (n) => (dados ? dados.proficiencia_por_nivel[nv(n) - 1] : null),
+    /** Nível de uma magia pelo custo em mana; custo desconhecido é 1º círculo. */
+    nivelPorCusto(custo) {
+      const c = parseInt(custo) || 0;
+      if (c === 0) return 0;
+      const achado = Object.entries(tabelaDeCusto()).find(([, v]) => v === c);
+      return achado ? parseInt(achado[0]) : 1;
+    },
+    custoPorNivel(nivel) {
+      const v = tabelaDeCusto()[String(nivel)];
+      return v === undefined ? 0 : v;
+    },
+  };
+})();
+window.Regras = Regras;

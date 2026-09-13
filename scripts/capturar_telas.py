@@ -667,6 +667,19 @@ COMBATE_NARRADO = {
 #           modal que silenciosamente não abriu viraria um print da tela de
 #           trás — parecendo certo e mentindo. Com isso, a tela falha e diz.
 
+_ABRIR_FICHA_NO_EDITOR_DA_CAMPANHA = """
+    (async () => {
+      await openEditCampaign(new Event('click'), window.__campanha);
+      editGoTo(2);
+      const i = edChars.findIndex(c => (c.name || '').toLowerCase() === 'helena');
+      edChars[i]._open = true;
+      edRenderChars();
+      if (%s) document.querySelector('#ed-dnd-sections-' + i + ' input.ed-correcao').click();
+      setTimeout(() => document.querySelector('#ed-dnd-sections-' + i)
+        .scrollIntoView({block: 'start'}), 150);
+    })()
+"""
+
 TELAS = [
     # ── Login ────────────────────────────────────────────────────────
     {"nome": "login-entrar", "pagina": "/login.html"},
@@ -719,6 +732,15 @@ TELAS = [
     {"nome": "menu-editar-campanha", "pagina": "/menu.html",
      "js": "openEditCampaign(new Event('click'), window.__campanha)",
      "espera": 900, "exigir": "#edit-overlay:not(.hidden)"},
+    # Ficha em jogo no editor da campanha: construção travada, com o aviso de
+    # qual tela cuida de cada coisa. E a mesma ficha no Modo de correção.
+    {"nome": "menu-editar-ficha-travada", "pagina": "/menu.html",
+     "js": _ABRIR_FICHA_NO_EDITOR_DA_CAMPANHA % "false",
+     # Os personagens fechados também têm o aviso, escondido: só o visível serve.
+     "espera": 900, "exigir": ".ed-aviso-regras >> visible=true"},
+    {"nome": "menu-editar-ficha-correcao", "pagina": "/menu.html",
+     "js": _ABRIR_FICHA_NO_EDITOR_DA_CAMPANHA % "true",
+     "espera": 900, "exigir": ".ed-aviso-correcao"},
     {"nome": "menu-confirmar", "pagina": "/menu.html",
      "exigir": "#dialog-overlay:not(.hidden)",
      "js": "deleteCampaign(new Event('click'), window.__campanha)"},
@@ -742,6 +764,19 @@ TELAS = [
     {"nome": "jogo-modal-personagem", "pagina": "/game.html",
      "exigir": "#edit-overlay:not(.hidden)",
      "js": "openEditModal('character', 'stelar', window._lastMem.party[1])"},
+    # A ficha D&D fica abaixo da dobra do modal: sem rolar, as duas capturas
+    # seriam o topo do modal, iguais à de cima.
+    {"nome": "jogo-modal-ficha-travada", "pagina": "/game.html",
+     "exigir": "#edit-body .ed-aviso-regras", "espera": 500,
+     "js": "openEditModal('character', 'stelar', window._lastMem.party[1])"
+           ".then(() => document.querySelector('#edit-body .ed-correcao-toggle')"
+           ".scrollIntoView({block: 'start'}))"},
+    {"nome": "jogo-modal-ficha-correcao", "pagina": "/game.html",
+     "exigir": "#edit-body .ed-aviso-correcao", "espera": 500,
+     "js": "openEditModal('character', 'stelar', window._lastMem.party[1])"
+           ".then(() => { document.querySelector('#edit-body input.ed-correcao').click();"
+           " setTimeout(() => document.querySelector('#edit-body .ed-correcao-toggle')"
+           ".scrollIntoView({block: 'start'}), 100); })"},
     {"nome": "jogo-modal-mundo", "pagina": "/game.html",
      "exigir": "#edit-overlay:not(.hidden)",
      "js": "openWorldEdit()"},

@@ -1883,6 +1883,128 @@ def _apply_archetype_features(char: dict, archetype_feature: str) -> list[str]:
     return added
 
 
+def rules_catalog() -> dict:
+    """
+    Todas as tabelas de regra que o wizard e os editores usam, geradas das
+    MESMAS funções do motor.
+
+    Elas existiam copiadas no menu.js e no game.js, e as cópias já discordavam:
+    círculo máximo de magia pela metade do nível para toda classe (paladino de
+    nível 3 com magia de 2º círculo), incremento de atributo só nos níveis 4,
+    8, 12, 16 e 19 (o guerreiro também ganha no 6 e no 14, o ladino no 10).
+    Uma rota que devolve o que o motor calcula acaba com a divergência na raiz:
+    não há mais segunda tabela para ficar para trás.
+    """
+    niveis = range(1, 21)
+    classes = {}
+    for classe, info in CLASS_DATA.items():
+        ficha = lambda n, c=classe: {"classe": c, "nivel": n}
+        limites = [_limite_de_magias(ficha(n)) for n in niveis]
+        classes[classe] = {
+            "hit_die":         info.get("hit_die", 8),
+            "conjurador":      classe in CASTER_CLASSES,
+            "niveis_asi":      sorted(_niveis_asi(classe)),
+            "mana":            [_max_mana_for(classe, n) for n in niveis],
+            "nivel_max_magia": [_nivel_maximo_de_magia(ficha(n)) for n in niveis],
+            "truques":         [(l or {}).get("truques", 0) for l in limites],
+            "magias":          [(l or {}).get("magias", 0) for l in limites] if limites[0] is not None
+                               else None,
+        }
+    return {
+        "xp_por_nivel":           list(XP_THRESHOLDS[:20]),
+        "proficiencia_por_nivel": [_proficiency_bonus(n) for n in niveis],
+        "custo_mana_por_nivel":   {str(k): v for k, v in SPELL_MANA_COST.items()},
+        "pontos_por_asi":         _PONTOS_POR_ASI,
+        "teto_atributo":          _TETO_ATRIBUTO,
+        "classes":                classes,
+    }
+
+
+# Campos que definem O QUE o personagem é. Durante o jogo quem os muda são as
+# telas (nível, Grimório, Mochila) pelas ferramentas do motor; um editor que
+# os gravasse livremente contornaria todas elas.
+_CAMPOS_DE_CONSTRUCAO = (
+    "classe", "raca", "nivel", "xp", "xp_proximo", "proficiencia",
+    "forca", "destreza", "constituicao", "inteligencia", "sabedoria", "carisma",
+    "ca", "vida_max", "mana_max", "hit_die", "equipamentos",
+    "feature_choices", "asi_pontos_gastos", "hit_dice_remaining",
+    "ultimo_descanso_longo", "ultimo_descanso_curto", "exaustao",
+)
+
+
+def normalize_edited_character(novo: dict, antigo: dict | None,
+                               correcao_manual: bool = False) -> list[str]:
+    """
+    Aplica as regras a um personagem que um editor (menu ou "Editar Ficha
+    Completa") vai gravar. Muta `novo`; devolve os campos que foram mantidos
+    como estavam (para o editor avisar).
+
+    Sem correção manual, num personagem JÁ salvo e jogável, os campos de
+    construção e as habilidades voltam ao valor gravado: os editores os
+    mostram só para leitura, e isto protege também de um cliente antigo em
+    cache. Com correção manual (o "Modo de correção" declarado), aceita.
+
+    Sempre — com ou sem correção — ajusta o que não pode ficar incoerente: a
+    reserva de dados de vida entre 0 e o nível, vida e mana atuais abaixo do
+    máximo, o nível de cada magia gravado na ficha, e item tirado da mochila
+    sai do corpo.
+    """
+    if not isinstance(novo, dict):
+        return []
+    novo.pop("correcao_manual", None)
+    s = novo.get("sheet")
+    if not isinstance(s, dict):
+        return []
+
+    mantidos = []
+    jogavel = (s.get("classe") or "").lower() not in ("", "npc")
+    antiga = (antigo or {}).get("sheet") if isinstance(antigo, dict) else None
+    if jogavel and isinstance(antiga, dict) and not correcao_manual:
+        for campo in _CAMPOS_DE_CONSTRUCAO:
+            if campo in antiga and s.get(campo) != antiga[campo]:
+                s[campo] = copy.deepcopy(antiga[campo])
+                mantidos.append(campo)
+        habs_antigas = antigo.get("habilidades")
+        if isinstance(habs_antigas, list) and novo.get("habilidades") != habs_antigas:
+            novo["habilidades"] = copy.deepcopy(habs_antigas)
+            mantidos.append("habilidades")
+    if jogavel and isinstance(antiga, dict):
+        # Item tirado da mochila pelo editor sai do corpo, como no remove_item.
+        # Vale também na correção: é coerência, não construção.
+        antes = {_norm_txt(i.get("nome", "")) for i in (antigo.get("inventario") or [])
+                 if isinstance(i, dict)}
+        depois = {_norm_txt(i.get("nome", "")) for i in (novo.get("inventario") or [])
+                  if isinstance(i, dict)}
+        equip = s.get("equipamentos") or {}
+        soltou = False
+        for slot, item in list(equip.items()):
+            if item and _norm_txt(item) in antes and _norm_txt(item) not in depois:
+                equip[slot] = None
+                soltou = True
+        if soltou:
+            mantidos.append("equipamentos (item removido da mochila)")
+            # Só recalcula quando algo saiu do corpo: recalcular sempre
+            # apagaria uma CA posta pelo mestre (Armadura Arcana, anel).
+            _recalculate_ca(novo)
+
+    # Coerência, sempre.
+    if "hit_dice_remaining" in s:
+        s["hit_dice_remaining"] = _reserva_de_dados(s)[0]
+    for atual, maximo in (("vida_atual", None), ("mana_atual", "mana_max")):
+        if atual not in s:
+            continue
+        try:
+            valor = int(s.get(atual) or 0)
+            teto = _hp_max_efetivo(s) if atual == "vida_atual" else int(s.get(maximo) or 0)
+        except (TypeError, ValueError):
+            continue
+        s[atual] = max(0, min(valor, teto))
+    for h in (novo.get("habilidades") or []):
+        if isinstance(h, dict) and _e_magia(h) and not isinstance(h.get("nivel_magia"), int):
+            h["nivel_magia"] = _nivel_da_magia(h)
+    return mantidos
+
+
 def reconcile_character_archetypes(char: dict) -> list[str]:
     """
     Garante que um personagem tenha TODAS as sub-features de arquétipo

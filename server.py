@@ -1037,7 +1037,7 @@ def create_campaign():
         return jsonify({"error": f"Já existe uma campanha com o nome '{name}'"}), 409
 
     # Normaliza chaves de personagens para lowercase + normaliza sheet.classe
-    from rpg.tools_dnd import reconcile_character_archetypes
+    from rpg.tools_dnd import reconcile_character_archetypes, normalize_edited_character
     raw_chars = campaign_data.get("characters", {})
     normalized_chars = {}
     for k, v in raw_chars.items():
@@ -1045,6 +1045,9 @@ def create_campaign():
         if char.get("sheet") and isinstance(char["sheet"].get("classe"), str):
             char["sheet"] = dict(char["sheet"])
             char["sheet"]["classe"] = char["sheet"]["classe"].lower()
+        # Personagem novo: nada a proteger, só a coerência (nível das magias,
+        # vida e mana atuais abaixo do máximo).
+        normalize_edited_character(char, None)
         # Materializa sub-features de arquétipos escolhidos no editor/wizard.
         reconcile_character_archetypes(char)
         normalized_chars[k.lower().strip().replace("_", " ")] = char
@@ -1088,11 +1091,20 @@ def update_campaign(name):
 
     # Materializa sub-features de arquétipos escolhidos no editor antes de
     # persistir (o picker do editor só grava a escolha em feature_choices).
-    from rpg.tools_dnd import reconcile_character_archetypes
+    # Antes disso, as regras: sem "Modo de correção", o que as telas controlam
+    # (nível, atributos, CA, equipamento, magias) fica como estava gravado.
+    from rpg.tools_dnd import reconcile_character_archetypes, normalize_edited_character
     edited_chars = campaign_data.get("characters", existing.get("characters", {}))
+    antigos = existing.get("characters", {}) or {}
+    mantidos_por_personagem = {}
     if isinstance(edited_chars, dict):
-        for _ch in edited_chars.values():
+        for _key, _ch in edited_chars.items():
             if isinstance(_ch, dict):
+                correcao = bool(_ch.get("correcao_manual"))
+                antigo = antigos.get(_key) or antigos.get(str(_ch.get("name", "")).lower().strip())
+                mantidos = normalize_edited_character(_ch, antigo, correcao)
+                if mantidos:
+                    mantidos_por_personagem[_ch.get("name", _key)] = mantidos
                 reconcile_character_archetypes(_ch)
 
     # Preserve fields that should not be overwritten by the editor
@@ -1117,7 +1129,7 @@ def update_campaign(name):
                 return jsonify({"error": f"Já existe uma campanha com o nome '{new_name}'"}), 409
             database.delete_campaign(g.user_id, name)
         database.save_campaign(g.user_id, new_name, payload)
-        return jsonify({"ok": True, "name": new_name})
+        return jsonify({"ok": True, "name": new_name, "mantidos": mantidos_por_personagem})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -2431,14 +2443,30 @@ def update_character(name):
     if key not in memory.campaign["characters"]:
         return jsonify({"error": "Não encontrado"}), 404
     ch = memory.campaign["characters"][key]
-    ch.update({k: v for k, v in data.items() if k in ch})
+    # "Editar Ficha Completa": as mesmas regras do editor da campanha. Aplicadas
+    # numa cópia com os valores novos, comparando com o personagem gravado.
+    import copy as _copy
+    from rpg.tools_dnd import normalize_edited_character
+    novo = _copy.deepcopy(ch)
+    novo.update({k: v for k, v in data.items() if k in ch})
+    mantidos = normalize_edited_character(novo, ch, bool(data.get("correcao_manual")))
+    ch.clear()
+    ch.update(novo)
     # Se o nome mudou, remigra a chave
     new_name = data.get("name", "").strip()
     if new_name and new_name.lower() != key:
         memory.campaign["characters"][new_name.lower()] = ch
         del memory.campaign["characters"][key]
     memory.save_campaign()
-    return jsonify({"ok": True})
+    return jsonify({"ok": True, "mantidos": mantidos})
+
+
+@app.route("/api/dnd/regras", methods=["GET"])
+@require_auth
+def dnd_rules_route():
+    """Tabelas de regra do motor para o wizard e os editores (ver rules_catalog)."""
+    from rpg.tools_dnd import rules_catalog
+    return jsonify(rules_catalog())
 
 
 @app.route("/api/memory/characters/<name>", methods=["DELETE"])
