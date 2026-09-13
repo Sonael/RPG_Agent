@@ -89,17 +89,18 @@ abre o loop **percepção → deliberação → ação → verificação** em de
 6. [Modo D&D, mecânicas](#modo-dd-mecânicas)
 7. [Sistema de combate](#sistema-de-combate)
 8. [Tela de nível ("A Ascensão")](#tela-de-nível-a-ascensão)
-9. [Tela de loja ("O Balcão")](#tela-de-loja-o-balcão)
-10. [Tela de descanso ("A Fogueira")](#tela-de-descanso-a-fogueira)
-11. [Tela de combate tática (Pergaminho Épico)](#tela-de-combate-tática-pergaminho-épico)
-12. [Tools, o catálogo do agente](#tools-o-catálogo-do-agente)
-13. [Endpoints HTTP](#endpoints-http)
-14. [Frontend](#frontend)
-15. [PWA e instalação](#pwa-e-instalação)
-16. [Testes e garantias](#testes-e-garantias)
-17. [Estrutura de arquivos](#estrutura-de-arquivos)
-18. [Configuração e execução](#configuração-e-execução)
-19. [Limitações conhecidas](#limitações-conhecidas)
+9. [Tela de magias ("O Grimório")](#tela-de-magias-o-grimório)
+10. [Tela de loja ("O Balcão")](#tela-de-loja-o-balcão)
+11. [Tela de descanso ("A Fogueira")](#tela-de-descanso-a-fogueira)
+12. [Tela de combate tática (Pergaminho Épico)](#tela-de-combate-tática-pergaminho-épico)
+13. [Tools, o catálogo do agente](#tools-o-catálogo-do-agente)
+14. [Endpoints HTTP](#endpoints-http)
+15. [Frontend](#frontend)
+16. [PWA e instalação](#pwa-e-instalação)
+17. [Testes e garantias](#testes-e-garantias)
+18. [Estrutura de arquivos](#estrutura-de-arquivos)
+19. [Configuração e execução](#configuração-e-execução)
+20. [Limitações conhecidas](#limitações-conhecidas)
 
 ---
 
@@ -1229,6 +1230,103 @@ resolveu, porque o primeiro módulo solta o servidor antes de o segundo pedir.
 O que precisava de guarda era **a rota**, não o servidor: são coisas
 separadas, e reusar o servidor ficou como otimização.
 
+## Tela de magias ("O Grimório")
+
+A quinta tela, e a irmã da de nível: existe porque **escolher magia é escolha do
+jogador**, e no chat quem acabava escolhendo era o modelo — "Lyra aprende Bola
+de Fogo" saía na narração do level up sem ninguém ter perguntado. O Grimório
+mostra a lista da classe, as vagas que sobram e o que cada magia faz, e o
+botão **Aprender** chama `learn_spell`, a mesma função do mestre.
+
+**Quando abre.** Sozinho, quando surge **vaga nova** — na prática, um
+conjurador que subiu de nível (na fila de telas ele vem logo depois da de
+nível, porque é o nível novo que abre a vaga). A assinatura do motor é a
+lista "Nome:nível" de quem tem vaga, e o navegador guarda o conjunto de
+entradas já vistas:
+
+- entrada que **aparece** ("Helena:4") abre a tela;
+- entrada que **some** ou vaga que só diminui (o mestre ensinou uma magia pelo
+  chat) não abre nada — com a quantidade de vagas na assinatura, cada magia
+  aprendida reabria a tela;
+- a **primeira visita** de um navegador a uma campanha não abre: marca o que
+  existe como visto e deixa só a pílula. Quase todo conjurador de campanha
+  antiga tem vaga sobrando, e o Grimório pularia no primeiro carregamento de
+  todo mundo por uma vaga que ninguém acabou de ganhar.
+
+Fechado, fica a pílula "Helena: magias a aprender"; e todo conjurador ganha um
+atalho **Grimório** no cartão do grupo, numa linha própria embaixo das barras
+(no cabeçalho ele espremia a CA em duas linhas). Com a tela fechada, a fila
+pede só o resumo (`?resumo=1`): vagas e assinatura, sem ir ao SRD buscar a
+lista a cada turno.
+
+**O que mostra.** No cabeçalho, as vagas ("Truques 2/3 · 1 a aprender",
+"Magias 3/5 · 2 a aprender") e até que círculo a classe chega — fora do corpo
+que rola, porque é o número conferido a cada magia olhada. À esquerda a lista
+da classe, com busca pelo nome e filtro por círculo; à direita as conhecidas,
+agrupadas por círculo. Cada cartão diz círculo, escola, concentração, ritual,
+custo em mana, dado e alcance, e o botão trava dizendo o motivo: *Já conhece*,
+*Sem vaga de truque*, *Sem vaga de magia*. Concluir depois de aprender manda
+`[GRIMÓRIO RESOLVIDO NA TELA]` com a lista para a IA narrar; sem nada
+aprendido, só fecha.
+
+### A regra que vivia no navegador
+
+A tabela de truques e magias conhecidas por nível existia **só no JavaScript
+do modal de edição**. O `learn_spell` não a conhecia: o mestre dava a décima
+magia a um clérigo de nível 3 e nada reclamava. Agora `_limite_de_magias` mora
+no motor, o `learn_spell` recusa acima dela, e o Grimório marca o botão pelo
+mesmo número. Junto vieram outras correções no `learn_spell`, todas do mesmo
+feitio (a regra existia num caminho e não no outro):
+
+- **Nível de magia por tipo de conjurador.** A exigência era nível 2L−1 para
+  toda classe — a tabela do conjurador pleno. Paladino e patrulheiro são
+  meio-conjuradores (1º círculo no nível 2, 2º no 5, 3º no 9): com a regra
+  antiga um paladino de nível 3 aprendia magia de 2º círculo.
+- **Sem conexão, qualquer nome entrava.** Com o SRD fora do ar a magia ia
+  para a ficha sem checagem de classe nem de nível, com custo 4 fixo — o único
+  caminho do motor em que uma magia inventada passava. Agora só entra o que o
+  motor conhece localmente (as magias padrão das classes e a tabela de
+  níveis), com as mesmas checagens.
+- **A busca aproximada escolhia qualquer uma.** Sem nenhuma palavra em comum
+  com o nome pedido, "a mais próxima" era a primeira da lista — a busca
+  textual casa também na descrição, e um nome inventado voltava com os dados
+  de outra magia.
+- **Sim e não do Open5e são texto.** Os campos `ritual` e `concentration` vêm
+  como `"yes"`/`"no"`, e `bool("no")` é verdadeiro: toda magia saía marcada
+  como ritual e concentração — no modal, no texto do `learn_spell` e na ficha.
+- **A lista da classe misturava livros de terceiros.** O Open5e junta o SRD
+  com outros livros; a lista do clérigo vinha com "Black Goat's Blessing" ao
+  lado de "Bless". O catálogo pede `document__slug=wotc-srd`.
+- **A ficha grava `nivel_magia` e `nome_srd`.** Sem o nível, a contagem
+  adivinhava pelo custo de mana; sem o nome do SRD, "Bola de Fogo" e
+  "Fireball" eram duas magias. Ficha antiga continua funcionando: o nível sai
+  da tabela do SRD pelo nome (inclusive o nome em português), senão do custo.
+
+O corpo da rota `/api/dnd/class-spells` virou `class_spell_catalog` no motor:
+agora ela tem dois clientes (o modal e o Grimório) e a tela precisa das marcas
+de limite, que são regra.
+
+### Dois defeitos que já existiam
+
+**O harness de capturas não devolvia os dublês.** `capturar_telas.py` troca o
+banco e o `memory.save_campaign` por versões que não gravam — e nunca os
+devolvia. Dentro do pytest, depois de qualquer teste de navegador o processo
+seguia com um `save_campaign` mudo, e `test_o_ciclo_completo_preserva_missao_e_relogio`
+via "a missão sumiu". Ficou escondido enquanto os testes de navegador rodavam
+por último na ordem alfabética; `test_grimorio_navegador.py` é o primeiro que
+vem antes de `test_persistencia_estado.py`. Agora os dublês são registrados e
+devolvidos quando o servidor de captura para.
+
+**A tela de nível reabria ao fechar.**
+
+Carregava isso desde o começo: só a assinatura que **abriu** a tela ficava
+marcada como vista.
+Escolher o estilo de combate muda a assinatura das pendências; fechar dispara
+a fila; a fila via uma assinatura "nova" e reabria a tela na cara do jogador.
+As duas telas agora marcam como vista a assinatura que está na tela enquanto
+ela está aberta. `test_escolher_e_fechar_nao_reabre_sozinha` falha com o
+`levelup.js` anterior e passa com o corrigido.
+
 ## Tela de loja ("O Balcão")
 
 A segunda tela do jogo, e a primeira construída depois de perguntar **por que**
@@ -1753,6 +1851,8 @@ ferramentas do mestre.
   `{action: buy|sell, shop, char, item, quantity}`.
 - `GET /api/rest/state` / `POST /api/rest/action`
   `{action: dado|concluir|cancelar, char}`.
+- `GET /api/grimoire/state?personagem=&q=&nivel=&resumo=1` /
+  `POST /api/grimoire/action` `{action: aprender, char, spell, q, spell_level}`.
 
 ### Outros
 
@@ -1809,10 +1909,11 @@ ferramentas do mestre.
   economia 5e, submenus de arma/habilidade/item, picker de variantes,
   modal de fim, botão de fechar + pílula de retomar, toggle de modo.
   **Zero regra de jogo no cliente**, só renderiza snapshot e envia intents.
-- **`levelup.js`**, **`shop.js`** e **`rest.js`**, as telas de nível, loja e
-  descanso. Mesma regra: renderizam o snapshot do motor e despacham intenções.
-  A fila que decide qual abre primeiro (combate, nível, descanso, loja) e o
-  empilhamento das pílulas ficam em `game.js`.
+- **`levelup.js`**, **`grimoire.js`**, **`shop.js`** e **`rest.js`**, as telas
+  de nível, magias, loja e descanso. Mesma regra: renderizam o snapshot do
+  motor e despacham intenções. A fila que decide qual abre primeiro (combate,
+  nível, grimório, descanso, loja) e o empilhamento das pílulas ficam em
+  `game.js`.
 
 ### Tema
 

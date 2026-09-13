@@ -36,6 +36,8 @@ const STATE_TOOLS = new Set([
   'resolve_saving_throw',
   // offer_rest abre a tela de descanso; use_hit_die mexe na vida e na reserva.
   'offer_rest', 'use_hit_die',
+  // learn_spell muda as vagas do grimório e a lista de habilidades.
+  'learn_spell',
 ]);
 
 function _condInfo(cd) {
@@ -976,6 +978,13 @@ function buildDndCharCard(c, idx, type) {
       });
       html += `</div>`;
     }
+    // Conjurador do grupo ganha o atalho para o Grimório, numa linha própria:
+    // no cabeçalho, ao lado do nome, do status e da CA, ele espremia a CA em
+    // duas linhas na lateral estreita. stopPropagation porque o cartão inteiro
+    // abre o modal de edição.
+    const conjura = type === 'party'
+      && GAME_CASTER_CLASSES.has(String(sheet.classe || '').toLowerCase());
+    if (conjura) html += `<div class="grimorio-linha"><span class="grimorio-link" role="button" tabindex="0" onclick="event.stopPropagation(); window.Grimoire && window.Grimoire._abrir('${nameEsc}')" title="Abrir o Grimório">Grimório</span></div>`;
   } else {
     const desc = c.notes || c.description || '';
     if (desc) html += `<div class="char-desc">${escapeHtml(desc.substring(0, 90))}${desc.length > 90 ? '…' : ''}</div>`;
@@ -1152,8 +1161,9 @@ function renderMemory(mem) {
 // ao carregar a página parado numa forja com uma escolha de nível pendente as
 // duas telas abriam juntas, uma empilhada na outra.
 //
-// Agora rodam em SÉRIE e nesta ordem de prioridade: combate, nível, descanso,
-// loja. A de nível vem antes da loja porque a escolha muda a compra — um ponto
+// Agora rodam em SÉRIE e nesta ordem de prioridade: combate, nível, grimório,
+// descanso, loja. O grimório vem logo depois do nível porque é o nível novo
+// que abre vaga de magia. A de nível vem antes da loja porque a escolha muda a compra — um ponto
 // em Força muda a carga que cabe na mochila. O descanso vem antes da loja
 // porque é o mestre que o abre, no meio da cena, e a loja é só um lugar onde o
 // grupo por acaso está parado. Cada tela também se recusa a abrir sozinha
@@ -1168,6 +1178,7 @@ function sincronizarTelas() {
   const rodada = async () => {
     try { if (window.Combat)  await window.Combat.sync();  } catch (_) {}
     try { if (window.LevelUp) await window.LevelUp.sync(); } catch (_) {}
+    try { if (window.Grimoire) await window.Grimoire.sync(); } catch (_) {}
     try { if (window.Rest)    await window.Rest.sync();    } catch (_) {}
     try { if (window.Shop)    await window.Shop.sync();    } catch (_) {}
   };
@@ -1216,7 +1227,7 @@ if (_MOBILE_PILULAS.addEventListener) _MOBILE_PILULAS.addEventListener('change',
 // uma regra por combinação: com três pílulas eram três regras, com a quarta
 // (descanso) seriam sete. Aqui cada pílula visível recebe a sua posição na
 // pilha e o CSS só multiplica — a ordem é esta lista, não a ordem do DOM.
-const _PILULAS = ['cbt-reopen', 'shp-reopen', 'lvl-reopen', 'rst-reopen'];
+const _PILULAS = ['cbt-reopen', 'shp-reopen', 'lvl-reopen', 'grm-reopen', 'rst-reopen'];
 function empilharPilulas() {
   let ordem = 0;
   for (const id of _PILULAS) {
@@ -1453,7 +1464,7 @@ function gameLevelUpClick(event, charKey, type, idx) {
       <div style="background:rgba(38,75,130,0.06);border:1px solid rgba(38,75,130,0.2);border-radius:8px;padding:14px;margin-bottom:18px;font-size:13px;">
         Estilo, arquétipo e incremento de atributo, se houver, abrem na
         <strong>tela de nível</strong> logo depois.
-        ${isCaster ? `<div style="margin-top:6px;">Magias novas continuam em <strong>Editar Ficha Completa</strong>.</div>` : ''}
+        ${isCaster ? `<div style="margin-top:6px;">Magias novas: no <strong>Grimório</strong>, que abre em seguida.</div>` : ''}
       </div>
 
       <div style="display:flex;flex-direction:column;gap:10px;">

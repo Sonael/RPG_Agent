@@ -390,6 +390,20 @@ def test_fechar_e_recarregar_nao_reabre(pagina):
     assert pg.is_visible("#lvl-reopen"), "a pílula tinha que continuar lá"
 
 
+def test_escolher_e_fechar_nao_reabre_sozinha(pagina):
+    """
+    Escolher o estilo muda a assinatura das pendências. Só a assinatura que
+    ABRIU a tela ficava marcada como vista: fechar disparava a fila, que via
+    uma assinatura "nova" e reabria a tela. Achado no Grimório, que copiava o
+    desenho.
+    """
+    pg, _ = pagina
+    _clicar(pg, _opcao("Defesa"), 700)
+    _clicar(pg, ".lvl-close", 1200)
+    assert not pg.is_visible("#levelup-overlay"), "reabriu ao fechar"
+    assert pg.is_visible("#lvl-reopen")
+
+
 def test_pendencia_igual_volta_a_abrir_depois_de_resolvida(pagina):
     """
     Defeito latente da versão anterior: resolvida a pendência, a memória

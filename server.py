@@ -1125,107 +1125,23 @@ def update_campaign(name):
 @app.route("/api/dnd/class-spells")
 @require_auth
 def get_class_spells():
-    """Retorna magias de uma classe até um nível máximo (usa Open5e + fallback local)."""
-    from rpg.tools_dnd import _CLASS_SLUG_MAP, SPELL_MANA_COST, DEFAULT_SPELLS_BY_CLASS
-    from rpg.open5e import http as _req   # SRD com cache, sessão e retry
+    """Magias de uma classe até um nível (Open5e + reserva local).
 
-    classe          = request.args.get("class", "").lower().strip()
-    max_level       = min(int(request.args.get("max_level", 9) or 9), 9)
-    query           = request.args.get("q", "").strip().lower()
-    spell_level_str = request.args.get("spell_level")   # filtro de nível exato (opcional)
+    O corpo foi para tools_dnd.class_spell_catalog: o Grimório usa a mesma
+    lista e precisa dela no motor, onde estão as marcas de limite."""
+    from rpg.tools_dnd import class_spell_catalog
 
-    en_class = _CLASS_SLUG_MAP.get(classe, "")
-    spells   = []
-
+    nivel_exato = request.args.get("spell_level")
     try:
-        # Sem classe (modo livre): busca em todas as magias. Com classe:
-        # filtra por `dnd_class__icontains` — o filtro exato `dnd_class` casa
-        # só o texto inteiro ("Sorcerer, Wizard" != "Wizard"), excluindo
-        # magias multiclasse, e retorna 0 quando combinado com `search`.
-        # `__icontains` é substring, case-insensitive e funciona com `search`.
-        # Sem query usamos limit maior para obter variedade entre níveis.
-        params = {
-            "spell_level__lte": max_level,
-            "limit":            100 if query else 250,
-            "ordering":         "spell_level",
-        }
-        if en_class:
-            params["dnd_class__icontains"] = en_class
-        if query:
-            params["search"] = query
-        # Filtro de nível exato (substituí lte quando presente)
-        if spell_level_str is not None:
-            try:
-                params["spell_level"] = int(spell_level_str)
-                del params["spell_level__lte"]
-            except (ValueError, TypeError):
-                pass
-        r = _req.get("https://api.open5e.com/v1/spells/", params=params, timeout=6)
-        if r.ok:
-            seen = set()
-            for s in r.json().get("results", []):
-                nome = s.get("name", "")
-                key  = nome.lower().strip()
-                if not nome or key in seen:
-                    continue
-                seen.add(key)
-                lvl  = int(s.get("spell_level", 0) or 0)
-                dado = ""
-                dmg  = s.get("damage", {})
-                if isinstance(dmg, dict):
-                    dado = dmg.get("damage_dice", "") or ""
-                    if not dado:
-                        # Cantrips: dado em damage_at_character_level (ex: Fire Bolt → 1d10)
-                        atcl = dmg.get("damage_at_character_level", {})
-                        if isinstance(atcl, dict) and atcl:
-                            dado = (atcl.get("1") or
-                                    next(iter(v for v in
-                                         (atcl[k] for k in sorted(atcl, key=lambda x: int(x) if x.isdigit() else 99))
-                                         if v), ""))
-                    if not dado:
-                        # Magias escaláveis: dado em damage_at_slot_level (ex: Fireball → 8d6)
-                        atsl = dmg.get("damage_at_slot_level", {})
-                        if isinstance(atsl, dict) and atsl:
-                            dado = (atsl.get("3") or
-                                    next(iter(v for v in
-                                         (atsl[k] for k in sorted(atsl, key=lambda x: int(x) if x.isdigit() else 99))
-                                         if v), ""))
-                if not dado:
-                    # Fallback: extrai primeira notação de dados da descrição
-                    # (ex: Magic Missile "1d4 + 1", Healing Word "1d4")
-                    _desc = s.get("desc", "") or ""
-                    _m = re.search(r'\d+d\d+(?:\s*[+\-]\s*\d+)?', _desc)
-                    if _m:
-                        dado = _m.group(0).replace(" ", "")
-                spells.append({
-                    "nome":          nome,
-                    "nivel_magia":   lvl,
-                    "escola":        s.get("school", ""),
-                    "descricao":     (" ".join((s.get("desc","") or "").split()))[:250],
-                    "custo_mana":    SPELL_MANA_COST.get(lvl, 4),
-                    "dado":          dado,
-                    "ritual":        bool(s.get("ritual")),
-                    "concentracao":  bool(s.get("concentration")),
-                    # Alcance vindo direto do Open5e — usado pelo engine para
-                    # decidir target_mode ("Self" → self-only; "Self (X cone)"
-                    # → área; resto → alvo único). Evita listas hardcoded.
-                    "alcance":       (s.get("range", "") or "").strip(),
-                })
-            # A busca full-text da Open5e também casa na descrição (ex.:
-            # "fireball" traz "Antimagic Field"). Prioriza nome; sort
-            # estável preserva a ordem por nível dentro de cada grupo.
-            if query:
-                spells.sort(key=lambda sp: 0 if query in sp["nome"].lower() else 1)
-    except Exception:
-        pass
-
-    # Fallback local só quando uma classe foi pedida e a Open5e falhou.
-    if not spells and classe:
-        fallback = DEFAULT_SPELLS_BY_CLASS.get(classe, [])
-        if query:
-            fallback = [s for s in fallback if query in s.get("nome","").lower() or query in s.get("descricao","").lower()]
-        spells = fallback[:50]
-
+        nivel_exato = int(nivel_exato) if nivel_exato is not None else None
+    except (TypeError, ValueError):
+        nivel_exato = None
+    spells = class_spell_catalog(
+        request.args.get("class", ""),
+        min(int(request.args.get("max_level", 9) or 9), 9),
+        request.args.get("q", ""),
+        nivel_exato,
+    )
     return jsonify({"ok": True, "spells": spells})
 
 
@@ -2717,6 +2633,45 @@ def levelup_action_route():
         choice=(d.get("choice") or "").strip(),
         points=d.get("points", 1),
         distribution=d.get("distribution") if isinstance(d.get("distribution"), dict) else None,
+    ))
+
+
+@app.route("/api/grimoire/state", methods=["GET"])
+@require_auth
+def grimoire_state_route():
+    from rpg import tools_dnd
+    nivel = request.args.get("nivel")
+    try:
+        nivel = int(nivel) if nivel not in (None, "") else None
+    except (TypeError, ValueError):
+        nivel = None
+    return jsonify(tools_dnd.grimoire_snapshot(
+        (request.args.get("personagem") or "").strip(),
+        (request.args.get("q") or "").strip(),
+        nivel,
+        com_catalogo=request.args.get("resumo") not in ("1", "true"),
+    ))
+
+
+@app.route("/api/grimoire/action", methods=["POST"])
+@require_auth
+def grimoire_action_route():
+    from rpg import tools_dnd
+    d = request.json or {}
+    action = (d.get("action") or "").strip()
+    if not action:
+        return jsonify({"ok": False, "message": "Ação ausente."}), 400
+    nivel = d.get("spell_level")
+    try:
+        nivel = int(nivel) if nivel not in (None, "") else None
+    except (TypeError, ValueError):
+        nivel = None
+    return jsonify(tools_dnd.grimoire_action(
+        action,
+        char=(d.get("char") or "").strip(),
+        spell=(d.get("spell") or "").strip(),
+        query=(d.get("q") or "").strip(),
+        spell_level=nivel,
     ))
 
 

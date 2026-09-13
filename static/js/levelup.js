@@ -43,7 +43,7 @@
   // Nenhuma tela abre sozinha por cima de outra. A de nível tem prioridade
   // sobre a loja na fila, mas se a loja JÁ estiver aberta (o jogador está
   // comprando) e um grant_xp chegar, esta espera a loja fechar.
-  const OUTRAS_TELAS = ['combat-on', 'shop-on', 'rest-on'];
+  const OUTRAS_TELAS = ['combat-on', 'shop-on', 'rest-on', 'grimoire-on'];
   const outraTelaAberta = () => OUTRAS_TELAS.some(c => document.body.classList.contains(c));
 
   // Rascunho do incremento de atributo, igual ao wizard de criação: o jogador
@@ -353,7 +353,16 @@
       }
 
       atualizarPilula(snap);
-      if (_open) render(snap); else _last = snap;
+      if (_open) {
+        // Aberta, o jogador está vendo as pendências: são vistas. Sem isto,
+        // escolher o estilo de combate mudava a assinatura e fechar a tela a
+        // reabria na hora (achado ao construir o Grimório, que tinha o mesmo
+        // desenho).
+        if (assinatura) marcarVista(assinatura);
+        render(snap);
+      } else {
+        _last = snap;
+      }
     } catch (_) { /* a tela de nível nunca derruba o turno */ }
   }
 
@@ -410,7 +419,10 @@
       _busy = false;
       if (res) {
         mensagem((res.message || '').split('\n')[0], res.ok !== false);
-        if (res.snapshot) render(res.snapshot);
+        if (res.snapshot) {
+          if (res.snapshot.assinatura) marcarVista(res.snapshot.assinatura);
+          render(res.snapshot);
+        }
       }
     } catch (_) {
       _busy = false;

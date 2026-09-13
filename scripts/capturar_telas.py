@@ -96,13 +96,33 @@ class _ClienteAuthFalso:
         return _RespostaFalsa()
 
 
+# Funções reais trocadas pelos dublês, para devolver quando o servidor para.
+# Sem isso os dublês ficavam para sempre no processo: dentro do pytest, um teste
+# de navegador deixava memory.save_campaign sem gravar nada, e o teste de
+# persistência que rodasse depois dele via "a missão sumiu". Passou despercebido
+# enquanto os testes de navegador rodavam por último na ordem alfabética.
+_ORIGINAIS: list = []
+
+
+def _trocar(modulo, nome, novo) -> None:
+    if not any(m is modulo and n == nome for m, n, _ in _ORIGINAIS):
+        _ORIGINAIS.append((modulo, nome, getattr(modulo, nome)))
+    setattr(modulo, nome, novo)
+
+
+def _remover_dubles() -> None:
+    while _ORIGINAIS:
+        modulo, nome, original = _ORIGINAIS.pop()
+        setattr(modulo, nome, original)
+
+
 def _instalar_dubles(campanha: dict, nome_campanha: str) -> None:
     """Substitui auth e database por versões locais, sem rede."""
     from rpg import auth
     from rpg import database
     from rpg import memory
 
-    auth._client = lambda: _ClienteAuthFalso()
+    _trocar(auth, "_client", lambda: _ClienteAuthFalso())
 
     resumo = {
         "name": nome_campanha,
@@ -120,15 +140,15 @@ def _instalar_dubles(campanha: dict, nome_campanha: str) -> None:
         "events": 1,
     }
 
-    database.list_campaigns = lambda user_id: [resumo, outra]
-    database.get_campaign = lambda user_id, name: copy.deepcopy(campanha)
-    database.save_campaign = lambda user_id, name, data: None
-    database.delete_campaign = lambda user_id, name: None
-    database.rename_campaign = lambda user_id, old_name, new_name: None
-    database.campaign_exists = lambda user_id, name: True
+    _trocar(database, "list_campaigns", lambda user_id: [resumo, outra])
+    _trocar(database, "get_campaign", lambda user_id, name: copy.deepcopy(campanha))
+    _trocar(database, "save_campaign", lambda user_id, name, data: None)
+    _trocar(database, "delete_campaign", lambda user_id, name: None)
+    _trocar(database, "rename_campaign", lambda user_id, old_name, new_name: None)
+    _trocar(database, "campaign_exists", lambda user_id, name: True)
 
     # Nenhuma tela de captura deve tentar persistir nada.
-    memory.save_campaign = lambda: None
+    _trocar(memory, "save_campaign", lambda: None)
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -174,6 +194,40 @@ def _soltar_servidor() -> None:
     if _REFS == 0 and _SERVIDOR is not None:
         _SERVIDOR[1]()
         _SERVIDOR = None
+        _remover_dubles()
+
+
+def _completar_campanha_base(campanha: dict) -> None:
+    """
+    Ajustes na campanha de exemplo que valem para TODAS as capturas e testes
+    de navegador, sem mexer no JSON local.
+
+    A Helena é clériga de nível 3 e no exemplo só tem dois poderes com nome
+    próprio. Sem magias do SRD na ficha sobram 3 truques e 5 magias, e a
+    pílula do Grimório aparece em toda captura do jogo — por uma vaga que é
+    artefato do arquivo de exemplo, não do que a captura quer mostrar.
+    """
+    helena = (campanha.get("characters") or {}).get("helena")
+    if not helena or "clérigo" not in str((helena.get("sheet") or {}).get("classe", "")).lower():
+        return
+
+    def magia(nome, nivel, escola, desc, dado=""):
+        return {"nome": nome, "descricao": f"[{escola}] {desc}",
+                "custo_mana": {0: 0, 1: 2, 2: 3}[nivel], "dado": dado, "nivel_magia": nivel}
+
+    completas = [
+        magia("Luz", 0, "Evocação", "Um objeto tocado brilha como uma tocha por uma hora."),
+        magia("Orientação", 0, "Adivinhação", "O alvo soma 1d4 a um teste de atributo.", "1d4"),
+        magia("Taumaturgia", 0, "Transmutação", "Uma manifestação menor de poder divino."),
+        magia("Cura Ferimentos", 1, "Evocação", "Toque que cura 1d8 + modificador de Sabedoria.", "1d8"),
+        magia("Bênção", 1, "Encantamento", "Até três aliados somam 1d4 em ataques e saves.", "1d4"),
+        magia("Escudo da Fé", 1, "Abjuração", "Um aliado ganha +2 de CA por dez minutos."),
+        magia("Palavra Curativa", 1, "Evocação", "Ação bônus: cura 1d4 + modificador à distância.", "1d4"),
+        magia("Arma Espiritual", 2, "Evocação", "Arma espectral que golpeia como ação bônus.", "1d8"),
+    ]
+    habs = helena.setdefault("habilidades", [])
+    ja = {str(h.get("nome", "")).lower() for h in habs}
+    habs.extend(m for m in completas if m["nome"].lower() not in ja)
 
 
 def _subir_servidor(campanha: dict, nome_campanha: str):
@@ -193,6 +247,7 @@ def _subir_servidor(campanha: dict, nome_campanha: str):
     from flask import jsonify, request
     from werkzeug.serving import make_server
 
+    _completar_campanha_base(campanha)
     _instalar_dubles(campanha, nome_campanha)
 
     import server  # noqa: E402  (precisa vir depois dos dublês)
@@ -428,6 +483,44 @@ NIVEL_SELO["characters"]["helena"]["sheet"].update({
     "nivel": 3, "xp": 2800, "xp_proximo": 2700, "asi_pontos_gastos": 0,
     "feature_choices": {"Estilo de Combate": "Defesa", "Arquétipo Marcial": "Campeão"},
 })
+
+
+# GRIMÓRIO. Helena, clériga de nível 3 (3 truques e 5 magias no máximo), conhece
+# 2 truques e 3 magias: sobra 1 truque e 2 magias para aprender, e é por isso
+# que a tela abre sozinha. As magias conhecidas cobrem três círculos para a
+# coluna da direita mostrar o agrupamento.
+def _magia_de_captura(nome, nivel, escola, desc, dado=""):
+    custo = {0: 0, 1: 2, 2: 3}[nivel]
+    return {"nome": nome, "descricao": f"[{escola}] {desc}", "custo_mana": custo,
+            "dado": dado, "nivel_magia": nivel}
+
+
+GRIMORIO = {
+    "characters": {
+        "helena": {
+            "sheet": {"classe": "clérigo", "nivel": 3, "mana_atual": 14, "mana_max": 14},
+            "habilidades": [
+                _magia_de_captura("Chamas Sagradas", 0, "Evocação",
+                                  "Chama radiante desce sobre o alvo.", "1d8"),
+                _magia_de_captura("Luz", 0, "Evocação", "Objeto brilha como uma tocha."),
+                _magia_de_captura("Cura Ferimentos", 1, "Evocação",
+                                  "Toque cura 1d8 + modificador.", "1d8"),
+                _magia_de_captura("Bênção", 1, "Encantamento",
+                                  "Até três aliados somam 1d4 em ataques e saves.", "1d4"),
+                _magia_de_captura("Arma Espiritual", 2, "Evocação",
+                                  "Uma arma espectral golpeia como ação bônus.", "1d8"),
+            ],
+        },
+    },
+}
+
+# Mesma Helena com as 5 magias ocupadas: só o truque ainda cabe, e a lista
+# precisa mostrar o botão travado dizendo "Sem vaga de magia".
+GRIMORIO_CHEIO = copy.deepcopy(GRIMORIO)
+GRIMORIO_CHEIO["characters"]["helena"]["habilidades"] += [
+    _magia_de_captura("Palavra Curativa", 1, "Evocação", "Cura à distância.", "1d4"),
+    _magia_de_captura("Silêncio", 2, "Ilusão", "Esfera onde nenhum som existe."),
+]
 
 
 # DESCANSO CURTO depois de uma emboscada. Cada um do grupo retrata um estado do
@@ -695,6 +788,35 @@ TELAS = [
      "js": "switchTab('enciclopedia');"
            "setTimeout(() => document.querySelector('.levelup-badge').click(), 300)",
      "exigir": "#levelup-popup"},
+
+    # ── Grimório ─────────────────────────────────────────────────────
+    # Aqui há `js` para abrir, ao contrário das outras telas: o Grimório só
+    # abre sozinho quando surge vaga NOVA desde a última visita, e cada
+    # captura começa com a memória das telas limpa — para ele, é a primeira
+    # visita, que mostra só a pílula. O gatilho automático é coberto por
+    # test_grimorio_navegador.py.
+    {"nome": "grimorio", "pagina": "/game.html",
+     "estado": GRIMORIO, "espera": 1200,
+     "js": "window.Grimoire._abrir()",
+     "exigir": ".grm-magia"},
+    {"nome": "grimorio-magia-aprendida", "pagina": "/game.html",
+     "estado": GRIMORIO, "espera": 1400,
+     # Aprende a primeira magia livre da lista: o print mostra a mensagem do
+     # motor no rodapé e a vaga descontada no cabeçalho.
+     "js": "window.Grimoire._abrir();"
+           "setTimeout(() => { const b = [...document.querySelectorAll('.grm-aprender-btn')]"
+           ".find(x => !x.disabled); if (b) b.click(); }, 900)",
+     "exigir": "#grm-msg:not(:empty)"},
+    {"nome": "grimorio-sem-vaga-de-magia", "pagina": "/game.html",
+     "estado": GRIMORIO_CHEIO, "espera": 1600,
+     # Filtra o 1º círculo: é onde o botão travado "Sem vaga de magia" aparece
+     # (a lista começa pelos truques, que ainda cabem).
+     "js": "window.Grimoire._abrir(); setTimeout(() => window.Grimoire._filtro(1), 900)",
+     "exigir": ".grm-magia"},
+    {"nome": "grimorio-fechado-pilula", "pagina": "/game.html",
+     "estado": GRIMORIO, "espera": 900,
+     "js": "window.Grimoire._abrir(); setTimeout(() => window.Grimoire._close(), 500)",
+     "exigir": "#grm-reopen:not(.hidden)"},
 
     # ── Descanso ─────────────────────────────────────────────────────
     # Abre sozinha pela proposta do mestre, como a loja e o nível.

@@ -2911,6 +2911,257 @@ body.levelup-on { overflow: hidden; }
 }
 
 /* ═══════════════════════════════════════════════════════════════════
+   GRIMÓRIO ("O Grimório") — static/js/grimoire.js
+
+   Quinta tela, mesma estrutura de pergaminho. O que muda é a divisão do
+   corpo: à esquerda a lista da classe, onde se decide; à direita o que o
+   personagem já conhece, que é a referência consultada enquanto se decide
+   ("já tenho uma de fogo?"). No mobile a lista vem primeiro e as conhecidas
+   descem para o fim.
+
+   As vagas ficam no cabeçalho, fora do corpo que rola, pelo mesmo motivo da
+   régua de atributos da tela de nível: é o número que se confere a cada
+   magia olhada.
+   ═══════════════════════════════════════════════════════════════════ */
+#grimoire-overlay {
+  --grm-paper: #fffbf0;
+  --grm-bg:    #f4ebd8;
+  --grm-dark:  #2f2447;
+  --grm-gold:  #b89947;
+  --grm-text:  #2c1a0e;
+  --grm-muted: #6e5c4f;
+  --grm-ink:   #4b3a78;
+  --grm-red:   #8b2315;
+  --grm-line:  #e0d5c2;
+
+  position: fixed; inset: 0; z-index: 9000;
+  background: rgba(20,12,6,0.82); backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  padding: var(--esp-5); box-sizing: border-box;
+  font-family: 'Lora', serif;
+}
+#grimoire-overlay.hidden { display: none; }
+body.grimoire-on { overflow: hidden; }
+
+#grm-frame {
+  width: 100%; max-width: 1040px;
+  height: min(92vh, 880px);
+  background: var(--grm-paper); color: var(--grm-text);
+  border: 2px solid var(--grm-gold); border-radius: 12px;
+  box-shadow: 0 15px 35px rgba(74,37,17,0.45), inset 0 0 40px rgba(184,153,71,0.1);
+  display: flex; flex-direction: column; overflow: hidden; position: relative;
+}
+
+.grm-header {
+  padding: var(--esp-5) var(--esp-6) var(--esp-3);
+  border-bottom: 1px solid var(--grm-gold);
+  text-align: center; flex: 0 0 auto;
+  position: relative; z-index: 2;
+  box-shadow: 0 6px 6px -6px rgba(74,37,17,0.35);
+}
+.grm-close {
+  position: absolute; top: var(--esp-3); right: var(--esp-3);
+  background: none; border: none; cursor: pointer;
+  color: var(--grm-muted); font-size: 1.4rem; line-height: 1;
+  padding: var(--esp-1) var(--esp-2); border-radius: 6px;
+}
+.grm-close:hover { color: var(--grm-red); background: var(--grm-bg); }
+.grm-title {
+  font-family: 'Playfair Display', serif; color: var(--grm-ink);
+  font-size: 1.7rem; font-weight: 700; margin: 0;
+}
+.grm-title #grm-quem {
+  color: var(--grm-muted); font-size: 1.1rem;
+  font-style: italic; font-family: 'Lora', serif; font-weight: 400;
+}
+.grm-sub {
+  display: flex; align-items: center; justify-content: center;
+  gap: var(--esp-3); flex-wrap: wrap;
+  margin-top: var(--esp-2); color: var(--grm-muted); font-size: 0.9rem;
+}
+.grm-quem-sel {
+  /* `width: auto`: a regra global de <select> é 100%. */
+  width: auto; max-width: 14rem;
+  font-family: 'Lora', serif; font-size: 0.9rem; font-weight: 700;
+  color: var(--grm-dark); background: var(--grm-paper);
+  border: 1px solid var(--grm-gold); border-radius: 6px;
+  padding: var(--esp-1) var(--esp-2);
+}
+.grm-classe { text-transform: capitalize; }
+
+.grm-vagas {
+  display: flex; justify-content: center; gap: var(--esp-2); flex-wrap: wrap;
+  margin-top: var(--esp-3);
+}
+.grm-vaga {
+  display: inline-flex; align-items: baseline; gap: var(--esp-2);
+  padding: var(--esp-1) var(--esp-3);
+  border: 1px solid var(--grm-line); border-radius: 20px;
+  background: var(--grm-paper); font-size: 0.84rem;
+}
+.grm-vaga-livre { border-color: var(--grm-ink); background: #f1edf8; }
+.grm-vaga-rotulo { color: var(--grm-muted); }
+.grm-vaga-num { font-weight: 700; font-variant-numeric: tabular-nums; }
+.grm-vaga-falta { color: var(--grm-ink); font-weight: 700; font-size: 0.78rem; }
+
+.grm-corpo {
+  flex: 1 1 auto; min-height: 0;
+  display: grid; grid-template-columns: minmax(0, 1fr) 300px;
+}
+.grm-aprender {
+  display: flex; flex-direction: column; min-height: 0;
+  border-right: 1px solid var(--grm-line);
+}
+.grm-busca-linha { padding: var(--esp-3) var(--esp-5) 0; }
+.grm-busca-linha input {
+  width: 100%; box-sizing: border-box;
+  font-family: 'Lora', serif; font-size: 0.92rem;
+  color: var(--grm-text); background: var(--grm-paper);
+  border: 1px solid var(--grm-gold); border-radius: 6px;
+  padding: var(--esp-2) var(--esp-3);
+}
+.grm-filtros {
+  display: flex; flex-wrap: wrap; gap: var(--esp-1);
+  padding: var(--esp-2) var(--esp-5) var(--esp-3);
+}
+.grm-filtro {
+  font-family: 'Lora', serif; font-size: 0.8rem;
+  background: var(--grm-paper); color: var(--grm-muted);
+  border: 1px solid var(--grm-line); border-radius: 14px;
+  padding: 2px var(--esp-3); cursor: pointer;
+}
+.grm-filtro:hover { border-color: var(--grm-gold); }
+.grm-filtro-on { background: var(--grm-ink); border-color: var(--grm-ink); color: #fff; font-weight: 700; }
+
+.grm-lista {
+  flex: 1 1 auto; overflow-y: auto;
+  padding: 0 var(--esp-5) var(--esp-4);
+  display: flex; flex-direction: column; gap: var(--esp-2);
+}
+.grm-magia {
+  background: var(--grm-paper);
+  border: 1px solid var(--grm-gold); border-radius: 8px;
+  padding: var(--esp-3) var(--esp-4);
+}
+.grm-magia-fora { border-color: var(--grm-line); }
+.grm-magia-fora .grm-magia-nome { color: var(--grm-muted); }
+.grm-magia-cabeca {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: var(--esp-2); flex-wrap: wrap;
+}
+.grm-magia-nome { font-weight: 700; font-size: 1rem; color: var(--grm-dark); }
+.grm-magia-marcas { display: flex; gap: var(--esp-1); flex-wrap: wrap; }
+.grm-circulo, .grm-escola, .grm-marca {
+  font-size: 0.7rem; border-radius: 10px; padding: 1px var(--esp-2);
+}
+.grm-circulo { background: var(--grm-ink); color: #fff; font-weight: 700; }
+.grm-escola  { background: var(--grm-bg); color: var(--grm-muted); }
+.grm-marca   { border: 1px solid var(--grm-line); color: var(--grm-muted); }
+.grm-magia-desc {
+  margin: var(--esp-2) 0; font-size: 0.82rem; color: var(--grm-muted);
+  line-height: 1.4;
+}
+.grm-magia-linha {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--esp-2);
+}
+.grm-magia-custo { font-size: 0.8rem; color: var(--grm-text); font-variant-numeric: tabular-nums; }
+.grm-aprender-btn {
+  flex: 0 0 auto;
+  font-family: 'Lora', serif; font-weight: 700; font-size: 0.86rem;
+  background: var(--grm-ink); color: #fff;
+  border: 1px solid var(--grm-ink); border-radius: 6px;
+  padding: var(--esp-1) var(--esp-4); cursor: pointer;
+}
+.grm-aprender-btn:hover:not(:disabled) { background: var(--grm-dark); }
+.grm-aprender-btn:disabled {
+  background: var(--grm-paper); color: var(--grm-muted);
+  border-color: var(--grm-line); cursor: not-allowed;
+}
+
+.grm-conhecidas {
+  overflow-y: auto; padding: var(--esp-3) var(--esp-4) var(--esp-4);
+  background: var(--grm-bg);
+}
+.grm-secao {
+  font-family: 'Playfair Display', serif; font-size: 1.05rem;
+  color: var(--grm-dark); margin: 0 0 var(--esp-2);
+}
+.grm-conhecidas-grupo { margin-bottom: var(--esp-3); }
+.grm-conhecidas-titulo {
+  font-size: 0.72rem; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--grm-muted); border-bottom: 1px solid var(--grm-line);
+  padding-bottom: 2px; margin-bottom: var(--esp-1);
+}
+.grm-conhecida {
+  display: flex; justify-content: space-between; gap: var(--esp-2);
+  font-size: 0.86rem; padding: 3px 0;
+}
+.grm-conhecida-nome { font-weight: 600; }
+.grm-conhecida-custo { color: var(--grm-muted); font-size: 0.76rem; white-space: nowrap; }
+.grm-vazio, .grm-vazio-lado {
+  color: var(--grm-muted); font-style: italic; text-align: center;
+  padding: var(--esp-8) var(--esp-4);
+}
+.grm-vazio-lado { padding: var(--esp-4) 0; text-align: left; }
+
+.grm-rodape {
+  display: flex; align-items: center; gap: var(--esp-4);
+  padding: var(--esp-3) var(--esp-6);
+  border-top: 1px solid var(--grm-gold); background: var(--grm-bg);
+  flex: 0 0 auto;
+}
+.grm-msg { flex: 1 1 auto; font-size: 0.88rem; color: var(--grm-dark); min-height: 1.2em; }
+.grm-msg-erro { color: var(--grm-red); font-weight: 700; }
+.grm-concluir {
+  background: var(--grm-red); color: #fff;
+  border: 1px solid var(--grm-gold); border-radius: 6px;
+  font-family: 'Lora', serif; font-weight: 700; font-size: 0.9rem;
+  padding: var(--esp-2) var(--esp-5); cursor: pointer; flex: 0 0 auto;
+}
+.grm-concluir:hover { background: #6b1a0f; }
+
+#grm-reopen {
+  position: fixed; right: 20px; z-index: 8999;
+  bottom: calc(var(--pilula-base, 20px) + var(--pilula-ordem, 0) * 56px);
+  background: #4b3a78; color: #fff;
+  border: 2px solid #b89947; border-radius: 30px;
+  font-family: 'Lora', serif; font-weight: 700; font-size: 0.95rem;
+  padding: var(--esp-3) var(--esp-6); cursor: pointer;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+  transition: background .15s, transform .15s;
+}
+#grm-reopen:hover { background: #2f2447; transform: translateY(-2px); }
+#grm-reopen.hidden { display: none; }
+
+/* Atalho no cartão do grupo, numa linha própria embaixo das barras. */
+.grimorio-linha { margin-top: var(--esp-2); }
+.grimorio-link {
+  display: inline-flex; align-items: center;
+  font-family: 'Lora', serif; font-size: 10px; font-weight: 700;
+  color: #4b3a78; background: #f1edf8;
+  border: 1px solid #b9acd8; border-radius: 20px;
+  padding: 2px var(--esp-2); cursor: pointer; white-space: nowrap;
+}
+.grimorio-link:hover { background: #e2daf2; }
+
+@media (max-width: 760px) {
+  #grimoire-overlay { padding: 0; align-items: stretch; }
+  #grm-frame { max-width: none; border-radius: 0; border: none; height: 100vh; }
+  .grm-header { padding: var(--esp-4) var(--esp-6) var(--esp-2); }
+  .grm-title { font-size: 1.3rem; }
+  /* Uma coluna que rola inteira: lista da classe em cima, conhecidas no fim. */
+  .grm-corpo { display: block; overflow-y: auto; }
+  .grm-aprender { border-right: none; }
+  .grm-lista { overflow: visible; padding: 0 var(--esp-4) var(--esp-4); }
+  .grm-busca-linha, .grm-filtros { padding-left: var(--esp-4); padding-right: var(--esp-4); }
+  .grm-conhecidas { overflow: visible; }
+  .grm-rodape {
+    padding: var(--esp-3) var(--esp-4);
+    padding-bottom: calc(var(--esp-3) + env(safe-area-inset-bottom));
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
    TELA DE DESCANSO ("A Fogueira") — static/js/rest.js
 
    Quarta tela, mesma estrutura de pergaminho (cabeçalho fixo, corpo que

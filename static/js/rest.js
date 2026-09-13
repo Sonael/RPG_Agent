@@ -41,8 +41,8 @@
   }
 
   // Nenhuma tela abre sozinha por cima de outra. A fila do game.js roda
-  // combate → nível → descanso → loja.
-  const OUTRAS_TELAS = ['combat-on', 'levelup-on', 'shop-on'];
+  // combate → nível → grimório → descanso → loja.
+  const OUTRAS_TELAS = ['combat-on', 'levelup-on', 'shop-on', 'grimoire-on'];
   const outraTelaAberta = () => OUTRAS_TELAS.some(c => document.body.classList.contains(c));
 
   // ---- DOM ---------------------------------------------------------

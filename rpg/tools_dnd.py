@@ -3697,6 +3697,17 @@ CASTER_CLASSES = {
     "bardo", "paladino", "patrulheiro",
 }
 
+def _sim_do_srd(valor) -> bool:
+    """
+    Os campos sim/não do Open5e v1 vêm como TEXTO: "yes" ou "no". bool("no")
+    é True, e por isso toda magia saía marcada como ritual e concentração —
+    no modal de edição, no texto do learn_spell e na ficha.
+    """
+    if isinstance(valor, str):
+        return valor.strip().lower() in ("yes", "true", "sim", "1")
+    return bool(valor)
+
+
 # Mapa classe PT → slug Open5e para /v1/spelllist/
 _CLASS_SLUG_MAP = {
     "mago":        "wizard",
@@ -3743,8 +3754,8 @@ def _fetch_class_spells(classe: str, max_spell_level: int = 1) -> list[dict]:
         for s in results:
             lvl      = int(s.get("spell_level", 0) or 0)
             escola   = s.get("school", "")
-            ritual   = " (ritual)" if s.get("ritual") else ""
-            concentr = " (concentração)" if s.get("concentration") else ""
+            ritual   = " (ritual)" if _sim_do_srd(s.get("ritual")) else ""
+            concentr = " (concentração)" if _sim_do_srd(s.get("concentration")) else ""
             desc_raw = s.get("desc", "")
             desc     = " ".join(desc_raw.split())[:200]
 
@@ -6116,6 +6127,13 @@ def grant_xp(char_name: str, amount: int, reason: str = "") -> str:
             result += (f"\n   Escolhas PENDENTES: {quais}."
                        f" Quem escolhe é o JOGADOR, na tela de nível"
                        f" — não escolha por ele.")
+
+    # Fora do laço: o que conta é a vaga depois do último nível subido.
+    _vagas = _vagas_de_magia(char) if "LEVEL UP" in result else None
+    if _vagas and (_vagas["truques"] or _vagas["magias"]):
+        result += (f"\n   Magias a aprender: {_vagas['truques']} truque(s), "
+                   f"{_vagas['magias']} magia(s). Quem escolhe é o JOGADOR, no Grimório"
+                   f" — não chame learn_spell por ele.")
 
     if s["nivel"] < 20:
         result += f" / {s['xp_proximo']} para o próximo nível."
@@ -8645,6 +8663,381 @@ def _apply_class_features(char: dict, sheet: dict, new_level: int) -> list[str]:
     return added
 
 
+# ===========================================================================
+# GRIMÓRIO — magias conhecidas, limites e o catálogo da classe
+# ---------------------------------------------------------------------------
+# Até aqui o motor sabia APRENDER uma magia e não sabia quantas o personagem
+# podia ter. A tabela de limites vivia só no JavaScript do modal de edição;
+# o learn_spell, que é o caminho do mestre, não a conhecia. Uma regra em dois
+# lugares, um deles no navegador — o mesmo desenho que já fez a recarga do
+# chefe valer num caminho e não no outro.
+#
+# As tabelas são as que o jogo já usava no modal (truques e magias conhecidas
+# por nível, D&D 5e). Para as classes que no livro PREPARAM magias (clérigo,
+# druida, mago) o número vale como o tamanho do repertório.
+# ===========================================================================
+
+_TRUQUES_CONHECIDOS = {
+    "bardo":      [2,2,2,3,3,3,3,3,3,4,4,4,4,4,4,4,4,4,4,4],
+    "clerigo":    [3,3,3,4,4,4,4,4,4,5,5,5,5,5,5,5,5,5,5,5],
+    "druida":     [2,2,2,3,3,3,3,3,3,4,4,4,4,4,4,4,4,4,4,4],
+    "feiticeiro": [4,4,4,5,5,5,6,6,6,6,6,6,6,6,6,6,6,6,6,6],
+    "bruxo":      [2,2,2,3,3,3,4,4,4,4,4,4,4,4,4,4,4,4,4,4],
+    "mago":       [3,3,3,4,4,4,4,4,4,5,5,5,5,5,5,5,5,5,5,5],
+}
+_MAGIAS_CONHECIDAS = {
+    "mago":        [6,8,10,12,14,16,18,20,22,24,26,28,30,32,34,36,38,40,42,44],
+    "clerigo":     [3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22],
+    "druida":      [3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22],
+    "paladino":    [0,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12],
+    "bardo":       [4,5,6,7,8,9,10,11,12,14,15,15,16,18,19,19,20,22,22,22],
+    "feiticeiro":  [2,3,4,5,6,7,8,9,10,11,12,12,13,13,14,14,15,15,15,15],
+    "bruxo":       [2,3,4,5,6,7,8,9,10,10,11,11,12,12,13,13,14,14,14,15],
+    "patrulheiro": [0,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11],
+}
+_CUSTO_PARA_NIVEL = {v: k for k, v in SPELL_MANA_COST.items()}
+
+
+def _limite_de_magias(sheet: dict) -> dict | None:
+    """{"truques": n, "magias": n} da classe no nível; None se não conjura."""
+    c = _norm_txt(sheet.get("classe", ""))
+    if c not in _MAGIAS_CONHECIDAS:
+        return None
+    i = max(1, min(20, int(sheet.get("nivel", 1) or 1))) - 1
+    return {"truques": (_TRUQUES_CONHECIDOS.get(c) or [0] * 20)[i],
+            "magias":  _MAGIAS_CONHECIDAS[c][i]}
+
+
+def _nivel_maximo_de_magia(sheet: dict) -> int:
+    """
+    Maior nível de magia que a classe alcança no nível do personagem.
+
+    O learn_spell exigia nível 2L−1 para toda classe, o que é a tabela do
+    conjurador PLENO. Paladino e patrulheiro são meio-conjuradores: magia de
+    1º no nível 2, de 2º no 5, de 3º no 9 — com a regra antiga um paladino de
+    nível 3 aprendia magia de 2º círculo.
+    """
+    c = _norm_txt(sheet.get("classe", ""))
+    nivel = max(1, min(20, int(sheet.get("nivel", 1) or 1)))
+    if c in _HALF_CASTERS:
+        return 0 if nivel < 2 else min(5, (nivel - 1) // 4 + 1)
+    if c in _FULL_CASTERS:
+        return min(9, (nivel + 1) // 2)
+    return 0
+
+
+def _nomes_srd(nome: str) -> set[str]:
+    base = (nome or "").strip().lower()
+    return {base, SPELL_PT_TO_EN.get(base, base)} - {""}
+
+
+def _e_magia(hab: dict) -> bool:
+    """
+    Habilidade que é magia. Toda magia do jogo — learn_spell, wizard, magias
+    padrão da classe — tem a descrição começando por "[escola]"; as de agora
+    em diante também têm nivel_magia.
+    """
+    if (isinstance(hab.get("nivel_magia"), int)
+            or str(hab.get("descricao", "")).lstrip().startswith("[")):
+        return True
+    # Fichas importadas ou escritas à mão trazem a magia sem a marca, só com
+    # o nome ("Chama Sagrada"). Se o nome é de uma magia do SRD que o motor
+    # conhece, é magia — senão é um poder próprio da campanha, que não ocupa
+    # vaga de magia.
+    nome = str(hab.get("nome", "")).strip().lower()
+    return nome in SPELL_PT_TO_EN or nome in SPELL_LEVEL_OVERRIDE
+
+
+def _nivel_da_magia(hab: dict) -> int:
+    """
+    Nível de uma magia da ficha. Ficha antiga não gravava o nível: vem da
+    tabela de níveis do SRD pelo nome; senão, truque se não custa mana; senão,
+    do custo pela tabela de pontos de magia; senão, 1.
+    """
+    if isinstance(hab.get("nivel_magia"), int):
+        return hab["nivel_magia"]
+    for n in _nomes_srd(hab.get("nome_srd", "")) | _nomes_srd(hab.get("nome", "")):
+        if n in SPELL_LEVEL_OVERRIDE:
+            return SPELL_LEVEL_OVERRIDE[n]
+    custo = int(hab.get("custo_mana", 0) or 0)
+    if custo == 0:
+        return 0
+    return _CUSTO_PARA_NIVEL.get(custo, 1)
+
+
+def _magias_da_ficha(char: dict) -> list[dict]:
+    return [h for h in (char.get("habilidades") or []) if isinstance(h, dict) and _e_magia(h)]
+
+
+def _contagem_de_magias(char: dict) -> tuple[int, int]:
+    """(truques, magias de nível 1+) que o personagem conhece."""
+    niveis = [_nivel_da_magia(h) for h in _magias_da_ficha(char)]
+    return sum(1 for n in niveis if n == 0), sum(1 for n in niveis if n > 0)
+
+
+def _ja_conhece_magia(char: dict, *nomes: str) -> bool:
+    procurados = set().union(*(_nomes_srd(n) for n in nomes))
+    for h in _magias_da_ficha(char):
+        if procurados & (_nomes_srd(h.get("nome", "")) | _nomes_srd(h.get("nome_srd", ""))):
+            return True
+    return False
+
+
+def _magia_conhecida_localmente(spell_name: str, en_query: str) -> dict | None:
+    """
+    A magia no formato de resposta do Open5e, montada só com o que o motor
+    tem sem rede: as magias padrão das classes (com descrição) e a tabela de
+    níveis do SRD (só o nível). None se o motor não a conhece.
+    """
+    alvo = _nomes_srd(spell_name) | _nomes_srd(en_query)
+    classes, entrada = [], None
+    for classe, pool in DEFAULT_SPELLS_BY_CLASS.items():
+        for sp in pool:
+            if _nomes_srd(sp.get("nome", "")) & alvo:
+                entrada = entrada or sp
+                slug = _CLASS_SLUG_MAP.get(classe, "")
+                if slug and slug not in classes:
+                    classes.append(slug)
+    nivel = next((SPELL_LEVEL_OVERRIDE[n] for n in alvo if n in SPELL_LEVEL_OVERRIDE), None)
+    if entrada is None and nivel is None:
+        return None
+
+    escola, desc = "", "Magia do SRD (descrição indisponível sem conexão)."
+    if entrada:
+        texto = entrada.get("descricao", "")
+        if texto.startswith("[") and "]" in texto:
+            escola, desc = texto[1:texto.index("]")], texto[texto.index("]") + 1:].strip()
+        else:
+            desc = texto
+        if nivel is None:
+            nivel = _nivel_da_magia(entrada)
+    return {
+        "name": spell_name, "spell_level": nivel, "school": escola, "desc": desc,
+        "dnd_class": ", ".join(c.capitalize() for c in classes),
+        "damage": {"damage_dice": (entrada or {}).get("dado", "")},
+        "concentration": "concentra" in desc.lower(), "ritual": False, "range": "",
+    }
+
+
+def _resumir(texto: str, limite: int) -> str:
+    if len(texto) <= limite:
+        return texto
+    corte = texto[:limite].rsplit(" ", 1)[0].rstrip(".,;:")
+    return corte + "…"
+
+
+def class_spell_catalog(classe: str, max_level: int = 9, query: str = "",
+                        spell_level: int | None = None) -> list[dict]:
+    """
+    Magias da lista de uma classe até um nível — do Open5e, com as magias
+    padrão da classe como reserva quando o SRD não responde.
+
+    Era o corpo da rota /api/dnd/class-spells. Veio para o motor porque agora
+    tem dois clientes (o modal de edição e o Grimório) e a tela precisa das
+    marcas "já conhece" e "limite", que são regra.
+    """
+    import re
+    from rpg.open5e import http as _req
+
+    classe   = (classe or "").lower().strip()
+    max_level = max(0, min(int(max_level if max_level is not None else 9), 9))
+    query    = (query or "").strip().lower()
+    en_class = _CLASS_SLUG_MAP.get(classe, "")
+    spells: list[dict] = []
+
+    # document__slug: o Open5e junta o SRD com livros de terceiros (Deep Magic
+    # e outros), e a lista da classe vinha com "Black Goat's Blessing" ao lado
+    # de "Bless". O jogo diz "SRD" — então é só o SRD.
+    params = {"spell_level__lte": max_level, "limit": 100 if query else 250,
+              "ordering": "spell_level", "document__slug": "wotc-srd"}
+    # `dnd_class__icontains`: o filtro exato casa só o texto inteiro
+    # ("Sorcerer, Wizard" != "Wizard") e zera quando combinado com `search`.
+    if en_class:
+        params["dnd_class__icontains"] = en_class
+    if query:
+        params["search"] = query
+    if spell_level is not None:
+        try:
+            params["spell_level"] = int(spell_level)
+            del params["spell_level__lte"]
+        except (TypeError, ValueError):
+            pass
+
+    r = _req.get("https://api.open5e.com/v1/spells/", params=params, timeout=6)
+    if r.ok:
+        vistos = set()
+        for s in r.json().get("results", []):
+            nome = s.get("name", "")
+            chave = nome.lower().strip()
+            if not nome or chave in vistos:
+                continue
+            vistos.add(chave)
+            lvl = int(s.get("spell_level", 0) or 0)
+            dado = ""
+            dmg = s.get("damage", {})
+            if isinstance(dmg, dict):
+                dado = dmg.get("damage_dice", "") or ""
+                for campo, preferido in (("damage_at_character_level", "1"),
+                                         ("damage_at_slot_level", "3")):
+                    tabela = dmg.get(campo, {})
+                    if not dado and isinstance(tabela, dict) and tabela:
+                        dado = tabela.get(preferido) or next(
+                            (tabela[k] for k in sorted(tabela, key=lambda x: int(x) if str(x).isdigit() else 99)
+                             if tabela[k]), "")
+            if not dado:
+                m = re.search(r'\d+d\d+(?:\s*[+\-]\s*\d+)?', s.get("desc", "") or "")
+                if m:
+                    dado = m.group(0).replace(" ", "")
+            spells.append({
+                "nome":         nome,
+                "nivel_magia":  lvl,
+                "escola":       s.get("school", ""),
+                # Corta na palavra e marca o corte: "[:250]" deixava "Completely
+                # covering the objec" no cartão, e parecia defeito.
+                "descricao":    _resumir(" ".join((s.get("desc", "") or "").split()), 250),
+                "custo_mana":   SPELL_MANA_COST.get(lvl, 4),
+                "dado":         dado,
+                "ritual":       _sim_do_srd(s.get("ritual")),
+                "concentracao": _sim_do_srd(s.get("concentration")),
+                "alcance":      (s.get("range", "") or "").strip(),
+            })
+        # A busca textual também casa na descrição ("fireball" traz "Antimagic
+        # Field"). Prioriza nome; o sort é estável e preserva a ordem por nível.
+        if query:
+            spells.sort(key=lambda sp: 0 if query in sp["nome"].lower() else 1)
+
+    if not spells and classe:
+        for sp in DEFAULT_SPELLS_BY_CLASS.get(classe, []):
+            lvl = _nivel_da_magia(sp)
+            texto = sp.get("descricao", "")
+            if lvl > max_level and spell_level is None:
+                continue
+            if spell_level is not None and lvl != int(spell_level):
+                continue
+            if query and query not in sp.get("nome", "").lower() and query not in texto.lower():
+                continue
+            escola = texto[1:texto.index("]")] if texto.startswith("[") and "]" in texto else ""
+            spells.append({
+                "nome": sp["nome"], "nivel_magia": lvl, "escola": escola,
+                "descricao": texto[texto.index("]") + 1:].strip() if escola else texto,
+                "custo_mana": SPELL_MANA_COST.get(lvl, 4), "dado": sp.get("dado", ""),
+                "ritual": False, "concentracao": "concentra" in texto.lower(), "alcance": "",
+            })
+        spells.sort(key=lambda sp: sp["nivel_magia"])
+        spells = spells[:50]
+    return spells
+
+
+def _vagas_de_magia(char: dict) -> dict | None:
+    limite = _limite_de_magias(char.get("sheet") or {})
+    if not limite:
+        return None
+    truques, magias = _contagem_de_magias(char)
+    return {"truques": max(0, limite["truques"] - truques),
+            "magias":  max(0, limite["magias"] - magias),
+            "truques_usados": truques, "magias_usadas": magias,
+            "truques_max": limite["truques"], "magias_max": limite["magias"]}
+
+
+def _grupo_que_conjura() -> list[dict]:
+    return [c for c in memory.campaign.get("characters", {}).values()
+            if memory.is_party_member(c) and (c.get("sheet") or {})
+            and _limite_de_magias(c["sheet"])]
+
+
+def grimoire_snapshot(char_name: str = "", query: str = "",
+                      spell_level: int | None = None,
+                      com_catalogo: bool = True) -> dict:
+    """
+    Estado do Grimório para a tela (JSON-serializável).
+
+    com_catalogo=False é o que a fila de telas pede a cada turno com a tela
+    fechada: só vagas e assinatura, sem ir ao SRD buscar a lista da classe.
+    """
+    grupo = _grupo_que_conjura()
+
+    def _deve(c):
+        v = _vagas_de_magia(c)
+        return bool(v and (v["truques"] or v["magias"]))
+
+    alvo = None
+    if char_name:
+        alvo = next((c for c in grupo if _norm_txt(c.get("name", "")) == _norm_txt(char_name)), None)
+    if not alvo:
+        # Sem nome, abre em quem tem magia a aprender — é para isso que a tela abre.
+        alvo = next((c for c in grupo if _deve(c)), None) or (grupo[0] if grupo else None)
+
+    # A assinatura diz à tela se há vaga NOVA. Cada entrada é "Nome:nível" de
+    # quem tem vaga — sem a quantidade de vagas. Com a quantidade, aprender
+    # uma magia pelo chat mudava a assinatura e a tela pulava de novo; sem o
+    # nível, a vaga aberta por um nível novo parecia a mesma de antes.
+    partes = []
+    for c in grupo:
+        v = _vagas_de_magia(c)
+        if v and (v["truques"] or v["magias"]):
+            partes.append(f"{c.get('name', '')}:{(c['sheet'].get('nivel') or 1)}")
+    base = {"tem_personagem": bool(alvo), "grupo": [c.get("name", "") for c in grupo],
+            "devendo": [c.get("name", "") for c in grupo if _deve(c)],
+            "assinatura": "|".join(sorted(partes)), "personagem": None, "catalogo": []}
+    if not alvo:
+        return base
+
+    s = alvo["sheet"]
+    vagas = _vagas_de_magia(alvo)
+    nivel_max = _nivel_maximo_de_magia(s)
+    conhecidas = sorted(
+        ({"nome": h.get("nome", ""), "nivel": _nivel_da_magia(h),
+          "custo_mana": int(h.get("custo_mana", 0) or 0), "dado": h.get("dado", ""),
+          "descricao": h.get("descricao", "")}
+         for h in _magias_da_ficha(alvo)),
+        key=lambda m: (m["nivel"], m["nome"].lower()))
+
+    catalogo = []
+    fonte = (class_spell_catalog(s.get("classe", ""), nivel_max, query, spell_level)
+             if com_catalogo else [])
+    for sp in fonte:
+        if _ja_conhece_magia(alvo, sp["nome"]):
+            bloqueio = "já conhece"
+        elif sp["nivel_magia"] == 0 and not vagas["truques"]:
+            bloqueio = "limite de truques"
+        elif sp["nivel_magia"] > 0 and not vagas["magias"]:
+            bloqueio = "limite de magias"
+        else:
+            bloqueio = ""
+        catalogo.append({**sp, "bloqueio": bloqueio})
+
+    base.update({
+        "personagem": {
+            "nome": alvo.get("name", ""), "classe": s.get("classe", ""),
+            "nivel": int(s.get("nivel", 1) or 1),
+            "mana_atual": int(s.get("mana_atual", 0) or 0),
+            "mana_max": int(s.get("mana_max", 0) or 0),
+            "nivel_max_magia": nivel_max,
+            "vagas": vagas,
+            "conhecidas": conhecidas,
+        },
+        "catalogo": catalogo,
+    })
+    return base
+
+
+def grimoire_action(action: str, char: str = "", spell: str = "", query: str = "",
+                    spell_level: int | None = None) -> dict:
+    """
+    Aplica UMA intenção do Grimório. actions: aprender.
+
+    Só despacho, como nas outras telas: quem valida classe, nível de magia,
+    limite e duplicata é o learn_spell — a mesma função do mestre.
+    """
+    a = (action or "").lower().strip()
+    if a != "aprender":
+        return {"ok": False, "message": f"Erro: Ação '{action}' desconhecida.",
+                "snapshot": grimoire_snapshot(char, query, spell_level)}
+    msg = learn_spell(char, spell)
+    ok = not msg.lstrip().startswith(("Aviso:", "Erro:", "Nota:"))
+    return {"ok": ok, "message": msg, "snapshot": grimoire_snapshot(char, query, spell_level)}
+
+
 def learn_spell(char_name: str, spell_name: str) -> str:
     """
     Busca a magia no Open5e e adiciona à ficha do personagem.
@@ -8703,39 +9096,45 @@ def learn_spell(char_name: str, spell_name: str) -> str:
                 if not r_search.ok:
                     raise Exception("API error")
                 all_results = r_search.json().get("results", [])
-                # Filtra pelo nome mais próximo para evitar resultados errados
+                # Filtra pelo nome mais próximo para evitar resultados errados.
+                # Sem NENHUMA palavra em comum não há "mais próximo": a busca
+                # textual também casa na descrição, e um nome inventado voltava
+                # com os dados da primeira magia da lista.
                 en_words = set(en_query.lower().split())
-                results = sorted(
+                results = [s for s in sorted(
                     all_results,
                     key=lambda s: len(en_words & set(s.get("name","").lower().split())),
                     reverse=True,
-                )[:1]
+                )[:1] if en_words & set(s.get("name", "").lower().split())]
             except Exception:
-                # Fallback offline
-                existing = [h["nome"].lower() for h in char.get("habilidades", [])]
-                if spell_name.lower() in existing:
-                    return f"Nota: {char['name']} já conhece {spell_name}."
-                char.setdefault("habilidades", []).append({
-                    "nome": spell_name, "descricao": "Magia aprendida (API offline).",
-                    "custo_mana": 4, "dado": "",
-                })
-                memory.save_campaign()
-                return f"{char['name']} aprendeu {spell_name}. (dados simplificados — API indisponível)"
+                # SRD fora do ar. Antes, aqui a magia entrava na ficha SEM
+                # validação nenhuma — qualquer nome, qualquer classe, qualquer
+                # nível, custo 4 fixo. Era o único caminho do motor em que uma
+                # magia inventada passava. Agora só entra o que o motor conhece
+                # localmente (as magias padrão das classes e a tabela de
+                # níveis), e com as mesmas checagens do caminho online.
+                local = _magia_conhecida_localmente(spell_name, en_query)
+                if not local:
+                    return (f"Erro: Não consegui confirmar '{spell_name}' no SRD (sem conexão). "
+                            f"Tente de novo mais tarde — magia não confirmada não entra na ficha.")
+                results = [local]
 
     if not results:
         return f"Erro: Magia '{spell_name}' não encontrada. Verifique o nome ou use learn_ability()."
 
     spell       = results[0]
-    # Corrige nível com banco local quando a API retorna valor incorreto
-    spell_level = SPELL_LEVEL_OVERRIDE.get(en_query.lower()) \
-               or SPELL_LEVEL_OVERRIDE.get(spell.get("name","").lower()) \
-               or int(spell.get("spell_level", 0) or 0)
-    min_char_lv = 1 if spell_level == 0 else max(1, spell_level * 2 - 1)
+    # Corrige nível com banco local quando a API retorna valor incorreto.
+    # `is not None`: um truque tem nível 0, e `or` o trocava pelo da API.
+    spell_level = next((v for v in (SPELL_LEVEL_OVERRIDE.get(en_query.lower()),
+                                    SPELL_LEVEL_OVERRIDE.get(spell.get("name", "").lower()))
+                        if v is not None),
+                       int(spell.get("spell_level", 0) or 0))
+    nivel_max = _nivel_maximo_de_magia(sheet)
 
-    if nivel < min_char_lv:
+    if spell_level > nivel_max:
         return (
-            f"Erro: {char['name']} (nv {nivel}) não pode aprender {spell_name} ainda. "
-            f"Requer personagem nível {min_char_lv} (magia nível {spell_level})."
+            f"Erro: {char['name']} ({sheet.get('classe', '')} nível {nivel}) só aprende magias "
+            f"até o nível {nivel_max}; {spell_name} é de nível {spell_level}."
         )
 
     # Valida se a magia pertence à lista da classe do personagem
@@ -8750,9 +9149,23 @@ def learn_spell(char_name: str, spell_name: str) -> str:
                 f"   Use learn_spell() com uma magia adequada para {char_class}."
             )
 
-    existing = [h["nome"].lower() for h in char.get("habilidades", [])]
-    if spell_name.lower() in existing:
+    nome_srd = spell.get("name", "") or spell_name
+    if _ja_conhece_magia(char, spell_name, nome_srd):
         return f"Nota: {char['name']} já conhece {spell_name}."
+
+    # Limite de magias conhecidas. Ele existia só no JavaScript do modal de
+    # edição: o mestre, pelo learn_spell, dava a décima magia a um clérigo de
+    # nível 3 sem que nada reclamasse. A regra agora mora aqui, e a tela do
+    # Grimório e o modal leem o mesmo número.
+    limite = _limite_de_magias(sheet)
+    if limite:
+        truques, magias = _contagem_de_magias(char)
+        if spell_level == 0 and truques >= limite["truques"]:
+            return (f"Erro: {char['name']} já conhece {truques}/{limite['truques']} truques "
+                    f"— o máximo de {sheet.get('classe', '')} no nível {nivel}.")
+        if spell_level > 0 and magias >= limite["magias"]:
+            return (f"Erro: {char['name']} já conhece {magias}/{limite['magias']} magias "
+                    f"— o máximo de {sheet.get('classe', '')} no nível {nivel}.")
 
     dado  = ""
     dmg   = spell.get("damage", {})
@@ -8762,8 +9175,8 @@ def learn_spell(char_name: str, spell_name: str) -> str:
     desc_raw   = spell.get("desc", "Sem descrição disponível.")
     desc_clean = " ".join(desc_raw.split())[:300]
     escola     = spell.get("school", "")
-    ritual     = " (ritual)"       if spell.get("ritual")        else ""
-    concentr   = " (concentração)" if spell.get("concentration") else ""
+    ritual     = " (ritual)"       if _sim_do_srd(spell.get("ritual"))        else ""
+    concentr   = " (concentração)" if _sim_do_srd(spell.get("concentration")) else ""
     mana       = SPELL_MANA_COST.get(spell_level, 4)
 
     char.setdefault("habilidades", []).append({
@@ -8775,6 +9188,11 @@ def learn_spell(char_name: str, spell_name: str) -> str:
         # Ex.: "Self" (Mage Armor), "Self (15-foot cone)" (Burning Hands),
         # "60 feet" (Magic Missile), "Touch" (Cure Wounds).
         "alcance":    (spell.get("range", "") or "").strip(),
+        # O nível e o nome no SRD ficam gravados. Sem o nível, a contagem de
+        # truques e magias tinha de adivinhar pelo custo de mana; sem o nome
+        # do SRD, "Bola de Fogo" e "Fireball" eram duas magias diferentes.
+        "nivel_magia": spell_level,
+        "nome_srd":   nome_srd,
     })
     memory.save_campaign()
 
