@@ -43,7 +43,7 @@
   // Nenhuma tela abre sozinha por cima de outra. A de nível tem prioridade
   // sobre a loja na fila, mas se a loja JÁ estiver aberta (o jogador está
   // comprando) e um grant_xp chegar, esta espera a loja fechar.
-  const OUTRAS_TELAS = ['combat-on', 'shop-on'];
+  const OUTRAS_TELAS = ['combat-on', 'shop-on', 'rest-on'];
   const outraTelaAberta = () => OUTRAS_TELAS.some(c => document.body.classList.contains(c));
 
   // Rascunho do incremento de atributo, igual ao wizard de criação: o jogador

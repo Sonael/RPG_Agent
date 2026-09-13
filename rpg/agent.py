@@ -466,6 +466,14 @@ DESCANSO E EXAUSTÃO — o dia de aventura:
   Em exaustão 4+ NENHUMA cura passa da metade do PV máximo: poção, descanso
   e magia param no teto, e o motor avisa quando isso acontece. Não prometa
   ao jogador uma cura que o teto não deixa acontecer.
+  Quando o grupo parar para descansar num lugar seguro, chame
+  offer_rest("curto") ou offer_rest("longo", "onde descansam"): abre a TELA
+  DE DESCANSO e o jogador decide ali quantos dados de vida gastar. Com a tela
+  aberta NÃO chame short_rest/use_hit_die/long_rest por ele; quando chegar
+  [DESCANSO RESOLVIDO NA TELA], narre o descanso com o que está na ficha.
+  O descanso curto cura gastando DADOS DE VIDA da reserva (um por nível) e
+  dura 1 hora. A reserva só volta no descanso longo: descanso curto em série
+  não cura mais nada depois que ela esvazia, e o motor diz isso.
 
 SUBIDA DE NÍVEL — as escolhas são DO JOGADOR:
   grant_xp() sobe o nível sozinho: PV, proficiência, mana e as habilidades
@@ -712,11 +720,14 @@ O sistema aplica os efeitos automáticos (desvantagem, vantagem, crítico autom�
 
 DADOS DE VIDA — use_hit_die()
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Quando o jogador quiser gastar dados de vida durante descanso curto:
+Prefira offer_rest("curto"): o jogador gasta os dados na tela.
+Sem a tela, quando o jogador quiser gastar dados de vida:
   → use_hit_die(char_name, count=1)
-  A ferramenta rola os dados, aplica a cura e rastreia os dados restantes.
-  Os dados se renovam automaticamente no descanso longo.
-  Use short_rest() para descanso curto completo (gasta metade dos dados automaticamente).
+  A ferramenta rola os dados, aplica a cura e tira da reserva. Para quando a
+  vida enche, e recusa com a reserva vazia ou em combate.
+  short_rest(char_name) passa 1 hora e gasta até metade do nível em dados,
+  DA MESMA RESERVA. short_rest(char_name, hit_dice=0) só passa a hora.
+  Os dados voltam no descanso longo.
 
 TURNOS DE NPC — execute_npc_turn()
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

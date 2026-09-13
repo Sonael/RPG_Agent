@@ -88,15 +88,18 @@ abre o loop **percepção → deliberação → ação → verificação** em de
 5. [Persistência (Supabase) e autenticação](#persistência-supabase-e-autenticação)
 6. [Modo D&D, mecânicas](#modo-dd-mecânicas)
 7. [Sistema de combate](#sistema-de-combate)
-8. [Tela de combate tática (Pergaminho Épico)](#tela-de-combate-tática-pergaminho-épico)
-9. [Tools, o catálogo do agente](#tools-o-catálogo-do-agente)
-10. [Endpoints HTTP](#endpoints-http)
-11. [Frontend](#frontend)
-12. [PWA e instalação](#pwa-e-instalação)
-13. [Testes e garantias](#testes-e-garantias)
-14. [Estrutura de arquivos](#estrutura-de-arquivos)
-15. [Configuração e execução](#configuração-e-execução)
-16. [Limitações conhecidas](#limitações-conhecidas)
+8. [Tela de nível ("A Ascensão")](#tela-de-nível-a-ascensão)
+9. [Tela de loja ("O Balcão")](#tela-de-loja-o-balcão)
+10. [Tela de descanso ("A Fogueira")](#tela-de-descanso-a-fogueira)
+11. [Tela de combate tática (Pergaminho Épico)](#tela-de-combate-tática-pergaminho-épico)
+12. [Tools, o catálogo do agente](#tools-o-catálogo-do-agente)
+13. [Endpoints HTTP](#endpoints-http)
+14. [Frontend](#frontend)
+15. [PWA e instalação](#pwa-e-instalação)
+16. [Testes e garantias](#testes-e-garantias)
+17. [Estrutura de arquivos](#estrutura-de-arquivos)
+18. [Configuração e execução](#configuração-e-execução)
+19. [Limitações conhecidas](#limitações-conhecidas)
 
 ---
 
@@ -661,8 +664,27 @@ o próximo passo pendente, e aparecem na barra lateral do jogo.
 
 ### Descanso, relógio e exaustão
 
-- `short_rest` (gasta metade dos hit dice; recupera HP), `use_hit_die`,
-  `long_rest` (full HP/MP + hit dice + condições; bloqueado em combate).
+- `short_rest` (1 hora; gasta dados de vida **da reserva**), `use_hit_die`,
+  `long_rest` (full HP/MP + reserva de dados + condições; bloqueado em
+  combate), `offer_rest` (abre a [tela de descanso](#tela-de-descanso-a-fogueira)
+  para o jogador decidir).
+- **Uma reserva de dados de vida, um caminho de gasto.** `short_rest` rolava
+  nível/2 dados e curava sem tirar nada da reserva que `use_hit_die`
+  controlava — e sem passar hora nenhuma. Era a cura infinita. Medido no commit
+  anterior à correção, guerreira de nível 5 com 5 dados, dados rolando o
+  máximo:
+
+  ```
+  descanso curto 1   vida  5 → 29   reserva 5/5   0 horas
+  descanso curto 2   vida 29 → 53   reserva 5/5   0 horas
+  descanso curto 3   vida 53 → 60   reserva 5/5   0 horas
+  ```
+
+  Hoje as duas ferramentas passam por `_gastar_dados_de_vida`: um dado de cada
+  vez, parando quando a vida enche (dado rolado com vida cheia é dado jogado
+  fora). Esvaziou a reserva, o descanso curto ainda passa a hora, mas não cura
+  — e só o descanso longo, que é um por dia, devolve os dados. Subir de nível
+  soma um dado à reserva; morto não descansa; em combate nenhum dos dois roda.
 - **Um descanso longo por 24 horas do relógio**, e ele consome 8 delas. Antes
   disso `long_rest` era um botão de vida cheia: bastava chamá-lo depois de
   cada luta, infinitas vezes por "dia", porque não havia dia. O *dia de
@@ -1277,6 +1299,79 @@ Um detalhe que só o navegador pega: `opacity: 0.55` no item caro é
 **cosmética**. O que impede a compra é o atributo `disabled`, e o teste força
 um clique no botão apagado para confirmar que a bolsa não se mexe.
 
+## Tela de descanso ("A Fogueira")
+
+A quarta tela. Ela não existe por ser um laço (como combate e loja) nem para
+impedir invenção de regra (como a de nível): existe porque, no 5e, **quem gasta
+os dados de vida é o jogador**, um de cada vez, olhando quanto curou. Guardar
+dado para amanhã é a decisão que dá peso à reserva — e no chat ninguém tomava
+essa decisão: o motor rolava tudo de uma vez.
+
+**Quem abre é o mestre.** A tela não tem botão de "descansar agora": é a ficção
+que diz se o acampamento é seguro. A IA chama `offer_rest("curto")` ou
+`offer_rest("longo", "na estalagem do Passo de Vhar")`, a proposta fica gravada
+na campanha (é estado do mundo, vale em qualquer aba) e a tela abre sozinha,
+uma vez por proposta. Cada proposta tem um id tirado de um contador que
+sobrevive a ela — se o id viesse da própria proposta, apagada ao concluir, o
+próximo descanso nasceria com o mesmo número e a tela acharia que já tinha
+aberto.
+
+### Descanso curto
+
+Um cartão por personagem do grupo, lado a lado: descansar é uma decisão
+coletiva, e só dá para decidir quem gasta e quem guarda vendo todos. Cada
+cartão mostra a vida, **um marcador por dado da reserva** (cheio = disponível,
+vazio = gasto), a regra do dado (`1d10 +3 por dado`) e o botão **Gastar 1
+dado**. Quando o botão trava, ele diz por quê — *Vida cheia*, *Reserva vazia*,
+*Morto* — em vez de só apagar.
+
+**Não descansar** trava depois do primeiro dado. A cura já aconteceu, e
+cancelar apagaria a hora de descanso que pagou por ela: seria a cura infinita
+de volta, pela tela. O motor recusa também; o botão travado só evita oferecer
+o clique. **Concluir descanso** passa a hora (uma vez para o grupo) sem gastar
+mais nenhum dado.
+
+### Descanso longo
+
+Não há decisão por personagem, então o cartão mostra o que a noite vai fazer
+(vida e mana cheias, reserva de volta, exaustão menos um) e, principalmente,
+**quem não pode dormir ainda e quanto falta** para as 24 horas. Quem pode dormir
+é decidido *antes* de alguém dormir: o primeiro `long_rest` avança o relógio 8
+horas, e decidir dentro do laço fazia o resultado depender da ordem do grupo —
+quem descansou há 20 horas era recusado se viesse primeiro e aceito se viesse
+depois de outro ter passado a noite. Se ninguém pode, **Dormir 8 horas** trava.
+
+### O que fecha a tela
+
+- **Concluir** manda `[DESCANSO RESOLVIDO NA TELA]` com o resumo (dados
+  gastos, hora nova) para a IA narrar; **Não descansar** manda
+  `[DESCANSO CANCELADO NA TELA]`.
+- **Emboscada:** `roll_initiative` apaga a proposta. A tela aberta se fecha no
+  próximo sincronismo, em vez de oferecer depois da luta uma hora de sossego
+  que não houve.
+- O **✕** só fecha: a proposta continua, e fica a pílula "Descanso curto
+  aberto". Recarregar a página não reabre.
+
+Na fila de telas o descanso vem depois do nível e antes da loja: é o mestre
+que abre o descanso no meio da cena, e a loja é só um lugar onde o grupo por
+acaso está parado.
+
+### Mesmo contrato das outras telas
+
+`rest_action` é **só despacho**: `dado` chama `use_hit_die`, `concluir` chama
+`short_rest(nome, hit_dice=0)` ou `long_rest` para cada um, `cancelar` apaga a
+proposta. `test_a_tela_passa_pelas_MESMAS_funcoes_do_mestre` espia as três.
+
+### Quatro pílulas no mesmo canto
+
+O empilhamento das pílulas de voltar era CSS de irmão — uma regra por
+combinação de pílulas visíveis. Com três eram três regras; com a quarta seriam
+sete. Agora `empilharPilulas()` (em `game.js`) dá a cada pílula visível a sua
+posição na pilha (`--pilula-ordem`), um `MutationObserver` na classe `hidden`
+refaz a conta, e o CSS só multiplica por 56px. As telas continuam sem saber
+umas das outras. `test_pilulas_de_loja_e_descanso_nao_se_sobrepoem` mede as
+duas caixas.
+
 ## Tela de combate tática (Pergaminho Épico)
 
 Quando `combat_mode == "tela"`:
@@ -1561,7 +1656,8 @@ atitude são matéria de romance e de mistério tanto quanto de masmorra.
 | `identify_item(char, nome)` | Valida item mágico contra o SRD |
 | `modify_currency(char, "ouro"\|"prata"\|"cobre", amount)` | Moedas |
 | `roll_death_save(char, player_roll)` | Teste de morte (PC informa o d20; NPC o sistema rola) |
-| `short_rest` / `use_hit_die` / `long_rest` | Descansos |
+| `short_rest` / `use_hit_die` / `long_rest` | Descansos (a reserva de dados de vida é uma só) |
+| `offer_rest` | Abre a tela de descanso para o jogador |
 | `grant_xp(char, amount, reason)` | XP + level up automático |
 | `set_stat(char, stat, value)` | ASI manual; recalcula derivados |
 | `choose_feat(char, feat_name)` | Talento via SRD, valida pré-requisitos |
@@ -1642,6 +1738,18 @@ acessam memória):
   `result`.
 - `GET/POST /api/combat/mode` → lê/grava `combat_mode`.
 
+### Telas de nível, loja e descanso
+
+Todas devolvem `{ok, message, snapshot}` na ação, e a ação só despacha para as
+ferramentas do mestre.
+
+- `GET /api/levelup/state?personagem=` / `POST /api/levelup/action`
+  `{action: variante|asi|asi_lote|talento|subir, char, feature, choice, points, distribution}`.
+- `GET /api/shop/state?loja=&comprador=` / `POST /api/shop/action`
+  `{action: buy|sell, shop, char, item, quantity}`.
+- `GET /api/rest/state` / `POST /api/rest/action`
+  `{action: dado|concluir|cancelar, char}`.
+
 ### Outros
 
 - `GET /api/ollama/models`, descobre modelos locais.
@@ -1697,6 +1805,10 @@ acessam memória):
   economia 5e, submenus de arma/habilidade/item, picker de variantes,
   modal de fim, botão de fechar + pílula de retomar, toggle de modo.
   **Zero regra de jogo no cliente**, só renderiza snapshot e envia intents.
+- **`levelup.js`**, **`shop.js`** e **`rest.js`**, as telas de nível, loja e
+  descanso. Mesma regra: renderizam o snapshot do motor e despacham intenções.
+  A fila que decide qual abre primeiro (combate, nível, descanso, loja) e o
+  empilhamento das pílulas ficam em `game.js`.
 
 ### Tema
 

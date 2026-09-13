@@ -430,6 +430,47 @@ NIVEL_SELO["characters"]["helena"]["sheet"].update({
 })
 
 
+# DESCANSO CURTO depois de uma emboscada. Cada um do grupo retrata um estado do
+# botão de dado, porque é isso que a tela comunica:
+#   • Helena, muito ferida e com a reserva cheia — o caso de gastar;
+#   • Stelar, já gastou um dado AGORA e tem só mais um — o caso de guardar;
+#   • Natasha, com a vida cheia — o botão travado dizendo por quê.
+# O mestre abriu o descanso (offer_rest), então não há `js` para abrir a tela.
+_HORA_DESCANSO = 4 * 24 + 16
+DESCANSO_CURTO = {
+    "relogio": {"dia": 4, "hora": 16},
+    "descansos_oferecidos": 7,
+    "descanso_proposto": {
+        "id": 7, "tipo": "curto", "hora": _HORA_DESCANSO,
+        "motivo": "à sombra das ruínas, depois da emboscada",
+        "gastos": {"Stelar": 1},
+    },
+    "characters": {
+        "helena":  {"sheet": {"vida_atual": 6,  "hit_dice_remaining": 3}},
+        "stelar":  {"sheet": {"vida_atual": 18, "hit_dice_remaining": 1}},
+        "natasha": {"sheet": {"vida_atual": 21, "hit_dice_remaining": 2}},
+    },
+}
+
+# DESCANSO LONGO com as duas coisas que a tela precisa deixar claras: quem NÃO
+# pode dormir ainda (Stelar descansou há 15 horas) e o que a noite devolve a
+# quem pode — inclusive um nível de exaustão.
+DESCANSO_LONGO = {
+    "relogio": {"dia": 4, "hora": 22},
+    "descansos_oferecidos": 8,
+    "descanso_proposto": {
+        "id": 8, "tipo": "longo", "hora": 4 * 24 + 22,
+        "motivo": "na estalagem do Passo de Vhar", "gastos": {},
+    },
+    "characters": {
+        "helena":  {"sheet": {"vida_atual": 9, "mana_atual": 6,
+                              "hit_dice_remaining": 0, "exaustao": 2}},
+        "stelar":  {"sheet": {"vida_atual": 25, "ultimo_descanso_longo": 4 * 24 + 7}},
+        "natasha": {"sheet": {"vida_atual": 12, "hit_dice_remaining": 1}},
+    },
+}
+
+
 # Combate COM ZONAS (onda 3): o campo dividido em trilha, cada um em sua zona.
 COMBATE_ZONAS = copy.deepcopy(COMBATE_ATIVO)
 COMBATE_ZONAS["characters"]["natasha"] = {"sheet": {"vida_atual": 21}}
@@ -654,6 +695,25 @@ TELAS = [
      "js": "switchTab('enciclopedia');"
            "setTimeout(() => document.querySelector('.levelup-badge').click(), 300)",
      "exigir": "#levelup-popup"},
+
+    # ── Descanso ─────────────────────────────────────────────────────
+    # Abre sozinha pela proposta do mestre, como a loja e o nível.
+    {"nome": "descanso-curto", "pagina": "/game.html",
+     "estado": DESCANSO_CURTO, "espera": 700,
+     "exigir": "#rest-overlay:not(.hidden)"},
+    {"nome": "descanso-curto-dado-gasto", "pagina": "/game.html",
+     "estado": DESCANSO_CURTO, "espera": 900,
+     # A Helena gasta um dado: o print mostra a rolagem no rodapé, um marcador
+     # esvaziado e o "Não descansar" travado (já há dado gasto).
+     "js": "setTimeout(() => window.Rest._dado('Helena'), 200)",
+     "exigir": ".rst-card[data-nome='Helena'] .rst-gastos:not(:empty)"},
+    {"nome": "descanso-longo", "pagina": "/game.html",
+     "estado": DESCANSO_LONGO, "espera": 700,
+     "exigir": "#rest-overlay:not(.hidden)"},
+    {"nome": "descanso-fechado-pilula", "pagina": "/game.html",
+     "estado": DESCANSO_CURTO, "espera": 700,
+     "js": "window.Rest._close()",
+     "exigir": "#rst-reopen:not(.hidden)"},
 
     # ── Combate ──────────────────────────────────────────────────────
     {"nome": "combate-regua-de-turnos", "pagina": "/game.html",

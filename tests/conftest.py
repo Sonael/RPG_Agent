@@ -127,6 +127,8 @@ def campanha():
     memory.campaign["quests"] = {}
     memory.campaign["lojas"]  = {}
     memory.campaign.pop("relogio", None)
+    memory.campaign.pop("descanso_proposto", None)
+    memory.campaign.pop("descansos_oferecidos", None)
     return memory.campaign
 
 

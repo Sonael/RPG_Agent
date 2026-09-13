@@ -18,13 +18,18 @@ import pytest
 
 RAIZ = pathlib.Path(__file__).resolve().parent.parent
 
+# As faixas vão em escape \u de propósito: escritas como caractere, este
+# arquivo — que também é versionado — reprovaria a si mesmo. Foi o que
+# aconteceu na primeira versão, que passou só porque ainda não estava no git
+# quando a suíte rodou.
 _BASE = ("\U0001F000-\U0001FAFF"   # pictogramas, rostos, objetos
-         "☀-➿"           # símbolos diversos e dingbats
-         "⬀-⯿"           # setas e estrelas coloridas
-         "⌚⌛⏩-⏺"
-         "ℹ⌨▶◀↩")
-EMOJI = re.compile(f"[{_BASE}]️?")
-PERMITIDOS = set("✕✎✓✗★☰❦▶◀↩")
+         "\u2600-\u27bf"           # símbolos diversos e dingbats
+         "\u2b00-\u2bff"           # setas e estrelas coloridas
+         "\u231a\u231b\u23e9-\u23fa"   # relógio, ampulheta, botões de mídia
+         "\u2139\u2328\u25b6\u25c0\u21a9")   # informação, teclado, triângulos, volta
+EMOJI = re.compile(f"[{_BASE}]\ufe0f?")
+# fechar, lápis, check, x, estrela, menu, ornamento, triângulos e seta de volta
+PERMITIDOS = set("\u2715\u270e\u2713\u2717\u2605\u2630\u2766\u25b6\u25c0\u21a9")
 BINARIOS = (".png", ".jpg", ".jpeg", ".ico", ".gif", ".webp", ".woff", ".woff2", ".pdf")
 
 

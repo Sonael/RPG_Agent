@@ -46,9 +46,9 @@
   }
 
   // Nenhuma tela abre sozinha por cima de outra. A fila em game.js já roda
-  // combate → nível → loja nessa ordem; esta checagem é o que faz a loja
-  // ESPERAR em vez de se empilhar sobre a de nível.
-  const OUTRAS_TELAS = ['combat-on', 'levelup-on'];
+  // combate → nível → descanso → loja nessa ordem; esta checagem é o que faz
+  // a loja ESPERAR em vez de se empilhar sobre as outras.
+  const OUTRAS_TELAS = ['combat-on', 'levelup-on', 'rest-on'];
   const outraTelaAberta = () => OUTRAS_TELAS.some(c => document.body.classList.contains(c));
 
   // ---- DOM ---------------------------------------------------------

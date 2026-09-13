@@ -571,10 +571,13 @@ def _build_correction_prompt(violations: list[str], already_called: set | None =
     # buy_item e sell_item ENTRAM: mexem na bolsa e no estoque, e agora
     # disparam a conferência de item inventado — sem isso, a rodada de
     # correção cobraria o ouro do jogador uma segunda vez pelo mesmo item.
+    # Os descansos ENTRAM pelo mesmo motivo: repetir short_rest/use_hit_die
+    # gastaria dados de vida duas vezes, e repetir offer_rest reabriria a tela.
     stateful = {"attack_roll", "modify_hp", "use_ability", "modify_mana",
                 "apply_condition", "learn_spell", "learn_ability",
                 "grant_xp", "set_flag", "clear_flag",
-                "buy_item", "sell_item"}
+                "buy_item", "sell_item",
+                "short_rest", "use_hit_die", "long_rest", "offer_rest"}
     already_stateful = (already_called or set()) & stateful
 
     lines += [
@@ -2715,6 +2718,24 @@ def levelup_action_route():
         points=d.get("points", 1),
         distribution=d.get("distribution") if isinstance(d.get("distribution"), dict) else None,
     ))
+
+
+@app.route("/api/rest/state", methods=["GET"])
+@require_auth
+def rest_state_route():
+    from rpg import tools_dnd
+    return jsonify(tools_dnd.rest_snapshot())
+
+
+@app.route("/api/rest/action", methods=["POST"])
+@require_auth
+def rest_action_route():
+    from rpg import tools_dnd
+    d = request.json or {}
+    action = (d.get("action") or "").strip()
+    if not action:
+        return jsonify({"ok": False, "message": "Ação ausente."}), 400
+    return jsonify(tools_dnd.rest_action(action, char=(d.get("char") or "").strip()))
 
 
 @app.route("/api/shop/state", methods=["GET"])

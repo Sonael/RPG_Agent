@@ -6077,6 +6077,11 @@ def grant_xp(char_name: str, amount: int, reason: str = "") -> str:
         hp_gain = max(1, random.randint(1, hit_die) + con_mod)
         s["vida_max"]   += hp_gain
         s["vida_atual"] += hp_gain
+        # Um nível é um dado de vida a mais na reserva. Sem isto, quem subia
+        # do 4 para o 5 continuava com 4 dados até o próximo descanso longo.
+        if "hit_dice_remaining" in s:
+            _rest, _max = _reserva_de_dados(s)
+            s["hit_dice_remaining"] = min(_max, _rest + 1)
 
         # Mana recalculada pela tabela oficial (DMG p.288). É um lookup por
         # nível, não um acumulador — isso corrige a inconsistência antiga em
@@ -7407,48 +7412,156 @@ def remove_exhaustion(char_name: str, levels: int = 1) -> str:
 # 13. Descanso
 # ---------------------------------------------------------------------------
 
-def short_rest(char_name: str) -> str:
+# A CURA INFINITA. short_rest() rolava nível/2 dados de vida e curava, mas não
+# tirava nada da reserva — a mesma que use_hit_die() controlava direitinho.
+# As duas não conversavam: bastava pedir "descanso curto" três vezes seguidas
+# para o grupo voltar inteiro, sem gastar dado nenhum e sem passar hora
+# nenhuma. O descanso longo tinha ganhado o limite de 24h justamente para
+# acabar com isso, e o curto continuava sendo a porta dos fundos.
+#
+# Agora há UMA reserva e UM caminho de gasto (_gastar_dados_de_vida), que as
+# duas ferramentas e a tela de descanso usam. A reserva é o que limita a cura:
+# esvaziou, o descanso curto ainda passa a hora, mas não cura — só o descanso
+# longo, que é um por dia, devolve os dados.
+
+def _dado_de_vida(sheet: dict) -> int:
+    """Faces do dado de vida: da classe; da ficha para NPC/monstro; senão d8."""
+    classe = CLASS_DATA.get((sheet.get("classe") or "").lower(), {})
+    return int(classe.get("hit_die") or sheet.get("hit_die") or 8)
+
+
+def _reserva_de_dados(sheet: dict) -> tuple[int, int]:
     """
-    Descanso curto (~1 hora): recupera metade dos hit dice em vida.
-    Não restaura mana. Use após um combate que não foi devastador.
+    (restantes, máximo). O máximo é o nível.
+
+    Ficha sem contador ainda não gastou nada: começa cheia. Um valor gravado
+    acima do máximo (ficha editada à mão, nível que desceu) é lido como o
+    máximo — ler é só ler, quem grava é o gasto.
+    """
+    maximo = max(1, int(sheet.get("nivel", 1) or 1))
+    try:
+        restantes = int(sheet.get("hit_dice_remaining", maximo))
+    except (TypeError, ValueError):
+        restantes = maximo
+    return max(0, min(restantes, maximo)), maximo
+
+
+def _gastar_dados_de_vida(char: dict, quantos: int) -> dict:
+    """
+    Gasta até `quantos` dados da reserva, UM de cada vez, e para quando a vida
+    chega ao teto — dado rolado com a vida cheia é dado jogado fora, e é o
+    jogador que perderia.
+
+    Cada dado cura 1d[dado] + CON, no mínimo 1 (a mesma conta de antes). O teto
+    é o efetivo: exaustão 4 corta a cura na metade do PV máximo.
+    """
+    s = char["sheet"]
+    restantes, maximo = _reserva_de_dados(s)
+    faces   = _dado_de_vida(s)
+    con_mod = _modifier(int(s.get("constituicao", 10) or 10))
+    teto    = _hp_max_efetivo(s)
+    antes   = int(s.get("vida_atual", 0) or 0)
+
+    rolagens = []
+    vida = antes
+    while len(rolagens) < quantos and restantes > 0 and vida < teto:
+        r = random.randint(1, faces)
+        rolagens.append(r)
+        restantes -= 1
+        vida = min(teto, vida + max(1, r + con_mod))
+
+    if rolagens:
+        s["vida_atual"] = vida
+        s["hit_dice_remaining"] = restantes
+    return {"rolagens": rolagens, "faces": faces, "con_mod": con_mod,
+            "antes": antes, "depois": vida, "restantes": restantes,
+            "maximo": maximo}
+
+
+def _linha_de_rolagem(g: dict) -> str:
+    n = len(g["rolagens"])
+    con = f" {g['con_mod']:+d} CON por dado" if g["con_mod"] else ""
+    return (f"{n}d{g['faces']}: [{' + '.join(str(r) for r in g['rolagens'])}]{con}"
+            f" = +{g['depois'] - g['antes']} PV")
+
+
+def _em_combate() -> bool:
+    return bool((memory.campaign.get("combat_state") or {}).get("is_active"))
+
+
+def _passar_hora_do_descanso_curto(sheet: dict) -> None:
+    """
+    O descanso curto dura uma hora. Avança o relógio UMA vez para o grupo —
+    no primeiro que descansa; os outros descansam na mesma hora, igual ao
+    descanso longo faz com as 8 horas.
+    """
+    agora = _agora_em_horas()
+    ja_passou = any(
+        (c.get("sheet") or {}).get("ultimo_descanso_curto") == agora
+        for c in memory.campaign.get("characters", {}).values()
+        if c.get("sheet") is not sheet
+    )
+    if not ja_passou:
+        advance_time(1, "descanso curto")
+    sheet["ultimo_descanso_curto"] = _agora_em_horas()
+
+
+def short_rest(char_name: str, hit_dice: int = -1) -> str:
+    """
+    Descanso curto (1 hora): o personagem gasta dados de vida da RESERVA para
+    curar. Não restaura mana. A reserva só volta no descanso longo — é ela
+    que impede descanso curto em série de curar o grupo inteiro de graça.
+
+    Se a tela de descanso estiver disponível, prefira offer_rest("curto"):
+    quantos dados gastar é escolha do jogador.
 
     Args:
         char_name: Nome do personagem.
+        hit_dice:  Quantos dados de vida gastar. -1 (padrão) gasta até metade
+                   do nível, parando quando a vida enche. 0 descansa sem
+                   gastar dado.
     """
     char, err = _get_char(char_name, allow_dead=True)
     if not char:
         return err
+    if char.get("status") == "morto":
+        return f"Erro: {char['name']} está morto — descanso não cura quem morreu."
+    if _em_combate():
+        return (f"Erro: Impossível descansar — há um combate em andamento.\n"
+                f"   Encerre o combate com end_combat() antes de descansar.")
 
-    s        = char["sheet"]
-    info     = CLASS_DATA.get(s.get("classe", "").lower(), {"hit_die": 8})
-    hit_die  = info.get("hit_die", 8)
-    n_dice   = max(1, s["nivel"] // 2)
-    con_mod  = _modifier(s["constituicao"])
+    s = char["sheet"]
+    restantes, maximo = _reserva_de_dados(s)
+    try:
+        pedido = int(hit_dice)
+    except (TypeError, ValueError):
+        pedido = -1
+    quantos = max(1, int(s.get("nivel", 1) or 1) // 2) if pedido < 0 else pedido
 
-    rolls      = [random.randint(1, hit_die) for _ in range(n_dice)]
-    total_heal = max(n_dice, sum(rolls) + con_mod * n_dice)
-    hp_antes   = s["vida_atual"]
-    s["vida_atual"] = min(_hp_max_efetivo(s), s["vida_atual"] + total_heal)
-    hp_ganho   = s["vida_atual"] - hp_antes
-
+    _passar_hora_do_descanso_curto(s)
+    g = _gastar_dados_de_vida(char, quantos)
     memory.save_campaign()
-    return (
-        f"{char['name']} faz um descanso curto.\n"
-        f"   Rola {n_dice}d{hit_die}: [{' + '.join(str(r) for r in rolls)}]\n"
-        f"   Cura: +{hp_ganho} pv | Vida: {hp_antes} → "
-        f"{s['vida_atual']}/{s['vida_max']}{_nota_teto(s)}"
-    )
+
+    linhas = [f"{char['name']} faz um descanso curto (1 hora — agora {_hora_legivel()})."]
+    if g["rolagens"]:
+        linhas.append(f"   Rola {_linha_de_rolagem(g)}")
+    elif quantos > 0 and restantes == 0:
+        linhas.append("   Sem dados de vida na reserva: a hora passa, mas não cura. "
+                      "O descanso longo devolve os dados.")
+    elif quantos > 0:
+        linhas.append("   Vida já estava no máximo: nenhum dado gasto.")
+    linhas.append(f"   Vida: {g['antes']} → {g['depois']}/{s['vida_max']}{_nota_teto(s)}")
+    linhas.append(f"   Dados de vida: {g['restantes']}/{g['maximo']}")
+    return "\n".join(linhas)
 
 
 def use_hit_die(char_name: str, count: int = 1) -> str:
     """
-    Usa dados de vida para recuperar HP durante um descanso curto.
-    Cada dado de vida: 1d[hit_die] + modificador de CON por dado.
-    Os dados gastos se renovam no descanso longo.
-    Rastreia dados disponíveis na ficha (máximo = nível do personagem).
+    Gasta dados de vida da reserva para curar (1d[dado] + CON por dado).
+    A reserva tem tantos dados quanto o nível e só volta no descanso longo.
+    Para de rolar quando a vida enche — não desperdiça dado.
 
     Use quando o jogador escolhe gastar dados de vida específicos.
-    Prefira short_rest() para descanso curto completo.
 
     Args:
         char_name: Nome do personagem.
@@ -7457,38 +7570,33 @@ def use_hit_die(char_name: str, count: int = 1) -> str:
     char, err = _get_char(char_name, allow_dead=True)
     if not char:
         return err
+    if char.get("status") == "morto":
+        return f"Erro: {char['name']} está morto — dado de vida não cura quem morreu."
+    if _em_combate():
+        return ("Erro: Dados de vida se gastam em descanso, não no meio do combate.")
 
-    s       = char["sheet"]
-    hit_die = CLASS_DATA.get(s.get("classe", "").lower(), {}).get("hit_die", 8)
-    nivel   = s.get("nivel", 1)
-
-    hd_max       = nivel
-    hd_restantes = s.setdefault("hit_dice_remaining", hd_max)
-
-    if hd_restantes <= 0:
+    s = char["sheet"]
+    restantes, maximo = _reserva_de_dados(s)
+    if restantes <= 0:
         return (
-            f"Erro: {char['name']} não tem dados de vida disponíveis.\n"
-            f"   Faça um descanso longo para recuperar todos os {hd_max} dados."
+            f"Erro: {char['name']} não tem dados de vida disponíveis (0/{maximo}).\n"
+            f"   O descanso longo devolve os dados."
         )
+    if int(s.get("vida_atual", 0) or 0) >= _hp_max_efetivo(s):
+        return (f"Nota: {char['name']} já está com a vida no máximo"
+                f"{_nota_teto(s)} — nenhum dado gasto.")
 
-    count = max(1, min(int(count), hd_restantes))
-    con_mod   = _modifier(s["constituicao"])
-    rolls     = [random.randint(1, hit_die) for _ in range(count)]
-    total_heal = max(count, sum(rolls) + con_mod * count)
-
-    hp_antes        = s["vida_atual"]
-    s["vida_atual"] = min(_hp_max_efetivo(s), s["vida_atual"] + total_heal)
-    s["hit_dice_remaining"] = hd_restantes - count
-    hp_ganho        = s["vida_atual"] - hp_antes
-
+    try:
+        pedido = max(1, int(count))
+    except (TypeError, ValueError):
+        pedido = 1
+    g = _gastar_dados_de_vida(char, pedido)
     memory.save_campaign()
 
-    con_str    = f" {'+' if con_mod >= 0 else ''}{con_mod * count}(CON×{count})" if con_mod != 0 else ""
-    detail_str = " + ".join(str(r) for r in rolls) if count > 1 else str(rolls[0])
     return (
-        f"{char['name']} usa {count}d{hit_die}: [{detail_str}]{con_str} = +{hp_ganho} PV\n"
-        f"   {hp_antes} → {s['vida_atual']}/{s['vida_max']}\n"
-        f"   Dados de vida restantes: {s['hit_dice_remaining']}/{hd_max}"
+        f"{char['name']} usa {_linha_de_rolagem(g)}\n"
+        f"   {g['antes']} → {g['depois']}/{s['vida_max']}{_nota_teto(s)}\n"
+        f"   Dados de vida restantes: {g['restantes']}/{g['maximo']}"
     )
 
 
@@ -7588,6 +7696,253 @@ def long_rest(char_name: str) -> str:
         + (f"\n   {temp_perdidos} PV temporários expiraram." if temp_perdidos else "")
         + (f"\n   {conc_msg}" if conc_msg else "")
     )
+
+
+# ── Tela de descanso ("A Fogueira") ────────────────────────────────────────
+# Descansar era uma frase no chat e o motor decidia tudo: quantos dados de vida
+# rolar, quem descansava. No 5e quem escolhe é o JOGADOR, um dado de cada vez,
+# vendo quanto curou — guardar dado para depois é a decisão que dá peso à
+# reserva.
+#
+# Quem decide SE dá para descansar continua sendo o mestre: é a ficção que diz
+# se o acampamento é seguro. Ele chama offer_rest(); a tela abre para o jogador;
+# ao concluir, a tela manda [DESCANSO RESOLVIDO NA TELA] e o mestre narra.
+#
+# A proposta mora na campanha (não no navegador) porque é estado do mundo: o
+# grupo está parado descansando, e isso vale em qualquer aba ou aparelho.
+
+_TIPOS_DE_DESCANSO = {"curto": "curto", "short": "curto",
+                      "longo": "longo", "long": "longo"}
+
+
+def _grupo_com_ficha() -> list[dict]:
+    return [c for c in memory.campaign.get("characters", {}).values()
+            if memory.is_party_member(c) and (c.get("sheet") or {})]
+
+
+def _descanso_proposto() -> dict | None:
+    d = memory.campaign.get("descanso_proposto")
+    return d if isinstance(d, dict) and d.get("tipo") in ("curto", "longo") else None
+
+
+def _situacao_descanso_longo(sheet: dict) -> tuple[bool, int]:
+    """(pode descansar agora, horas que faltam). A regra é a do long_rest."""
+    ultimo = sheet.get("ultimo_descanso_longo")
+    if ultimo is None:
+        return True, 0
+    passou = _agora_em_horas() - int(ultimo)
+    return passou >= 24, max(0, 24 - passou)
+
+
+def offer_rest(kind: str, reason: str = "") -> str:
+    """
+    Abre a TELA DE DESCANSO para o jogador. Chame quando a ficção permitir
+    descansar (lugar seguro, sem combate) e o grupo quiser parar.
+
+    Na tela o jogador gasta os dados de vida um a um (descanso curto) ou
+    confirma a noite de sono (descanso longo). NÃO chame short_rest,
+    use_hit_die ou long_rest por ele enquanto a tela estiver aberta: quando
+    ele concluir chega [DESCANSO RESOLVIDO NA TELA], e aí você narra.
+
+    Args:
+        kind:   "curto" (1 hora) ou "longo" (8 horas, um por dia).
+        reason: Onde e como descansam (ex: "acampamento na clareira").
+    """
+    tipo = _TIPOS_DE_DESCANSO.get((kind or "").strip().lower())
+    if not tipo:
+        return "Erro: Tipo de descanso inválido. Use \"curto\" ou \"longo\"."
+    if _em_combate():
+        return "Erro: Impossível descansar — há um combate em andamento."
+    grupo = _grupo_com_ficha()
+    if not grupo:
+        return "Erro: Nenhum personagem com ficha no grupo para descansar."
+
+    atual = _descanso_proposto()
+    if atual:
+        if atual["tipo"] == tipo:
+            return f"Nota: O descanso {tipo} já está aberto na tela do jogador."
+        if atual.get("gastos"):
+            return ("Erro: Há um descanso curto em andamento com dados já gastos. "
+                    "O jogador precisa concluí-lo na tela antes de outro descanso.")
+
+    # O id identifica ESTA proposta para a tela saber se já abriu por ela. Vem
+    # de um contador que sobrevive à proposta: se viesse da própria proposta,
+    # que é apagada ao concluir, o próximo descanso nasceria com o mesmo id e a
+    # tela acharia que já tinha aberto.
+    contador = int(memory.campaign.get("descansos_oferecidos", 0) or 0) + 1
+    memory.campaign["descansos_oferecidos"] = contador
+    memory.campaign["descanso_proposto"] = {
+        "id": contador, "tipo": tipo, "motivo": (reason or "").strip(),
+        "hora": _agora_em_horas(), "gastos": {},
+    }
+    memory.save_campaign()
+
+    linhas = [f"Descanso {tipo} aberto na TELA DE DESCANSO para o jogador"
+              + (f" ({reason.strip()})." if (reason or "").strip() else ".")]
+    if tipo == "curto":
+        linhas.append("   Quem decide quantos dados de vida gastar é o JOGADOR. "
+                      "Não chame short_rest/use_hit_die por ele.")
+    else:
+        sem = []
+        for c in grupo:
+            pode, faltam = _situacao_descanso_longo(c["sheet"])
+            if not pode:
+                sem.append(f"{c.get('name')} (faltam {faltam}h)")
+        if sem:
+            linhas.append("   Ainda não podem fazer descanso longo: " + ", ".join(sem) + ".")
+        linhas.append("   Não chame long_rest por ele.")
+    linhas.append("   Aguarde [DESCANSO RESOLVIDO NA TELA] para narrar.")
+    return "\n".join(linhas)
+
+
+def rest_snapshot() -> dict:
+    """Estado do descanso para a tela (JSON-serializável)."""
+    proposta = _descanso_proposto()
+    grupo = []
+    for c in _grupo_com_ficha():
+        s = c["sheet"]
+        restantes, maximo = _reserva_de_dados(s)
+        teto   = _hp_max_efetivo(s)
+        vida   = int(s.get("vida_atual", 0) or 0)
+        morto  = c.get("status") == "morto"
+        pode_longo, faltam = _situacao_descanso_longo(s)
+        exa = _exaustao(s)
+
+        # Por que o botão de dado está travado — a tela mostra o motivo em vez
+        # de só apagar o botão.
+        if morto:
+            bloqueio = "morto"
+        elif restantes <= 0:
+            bloqueio = "sem dados na reserva"
+        elif vida >= teto:
+            bloqueio = "vida no máximo"
+        else:
+            bloqueio = ""
+
+        grupo.append({
+            "nome":            c.get("name", ""),
+            "classe":          s.get("classe", ""),
+            "nivel":           int(s.get("nivel", 1) or 1),
+            "morto":           morto,
+            "vida_atual":      vida,
+            "vida_max":        int(s.get("vida_max", 0) or 0),
+            "teto":            teto,
+            "vida_temp":       _temp_hp(s),
+            "mana_atual":      int(s.get("mana_atual", 0) or 0),
+            "mana_max":        int(s.get("mana_max", 0) or 0),
+            "dado":            _dado_de_vida(s),
+            "con_mod":         _modifier(int(s.get("constituicao", 10) or 10)),
+            "dados_restantes": restantes,
+            "dados_max":       maximo,
+            "gastos_agora":    int(((proposta or {}).get("gastos") or {}).get(c.get("name", ""), 0)),
+            "bloqueio_dado":   bloqueio,
+            "exaustao":        exa,
+            "exaustao_efeito": EXAUSTAO_EFEITOS.get(exa, "") if exa else "",
+            "condicoes":       [cd.get("nome", "") for cd in (s.get("condicoes") or [])
+                                if isinstance(cd, dict)],
+            "pode_longo":      pode_longo,
+            "faltam_horas":    faltam,
+        })
+
+    return {
+        "tem_descanso": bool(proposta),
+        "descanso": ({"id": proposta.get("id", 0), "tipo": proposta["tipo"],
+                      "motivo": proposta.get("motivo", ""),
+                      "com_gastos": bool(proposta.get("gastos"))}
+                     if proposta else None),
+        "em_combate": _em_combate(),
+        "hora": _hora_legivel(),
+        "grupo": grupo,
+    }
+
+
+def rest_action(action: str, char: str = "") -> dict:
+    """
+    Aplica UMA intenção da tela de descanso.
+
+    actions: dado | concluir | cancelar
+
+    Só despacho, como nas telas de loja e nível: quem cura, gasta a reserva,
+    passa o relógio e aplica o limite de 24h é use_hit_die / short_rest /
+    long_rest — as mesmas funções do mestre.
+    """
+    a = (action or "").lower().strip()
+    proposta = _descanso_proposto()
+
+    def _resposta(ok, msg):
+        return {"ok": ok, "message": msg, "snapshot": rest_snapshot()}
+
+    if a not in ("dado", "concluir", "cancelar"):
+        return _resposta(False, f"Erro: Ação '{action}' desconhecida.")
+    if not proposta:
+        return _resposta(False, "Erro: Nenhum descanso aberto. Peça ao mestre para acampar.")
+
+    if a == "dado":
+        if proposta["tipo"] != "curto":
+            return _resposta(False, "Erro: Dados de vida se gastam no descanso curto.")
+        msg = use_hit_die(char, 1)
+        ok = not msg.lstrip().startswith(("Aviso:", "Erro:", "Nota:"))
+        if ok:
+            alvo, _ = _get_char(char, allow_dead=True)
+            nome = alvo.get("name", char) if alvo else char
+            gastos = proposta.setdefault("gastos", {})
+            gastos[nome] = int(gastos.get(nome, 0)) + 1
+            memory.save_campaign()
+        return _resposta(ok, msg)
+
+    if a == "cancelar":
+        # Dado gasto já curou. Cancelar agora apagaria a hora de descanso que
+        # pagou por essa cura — o mesmo buraco da cura infinita, pela tela.
+        if proposta.get("gastos"):
+            return _resposta(False, "Erro: Já há dados de vida gastos neste descanso. "
+                                    "Conclua o descanso para a hora passar.")
+        memory.campaign.pop("descanso_proposto", None)
+        memory.save_campaign()
+        return _resposta(True, "Descanso cancelado. O grupo segue sem parar.")
+
+    # concluir
+    if _em_combate():
+        return _resposta(False, "Erro: Um combate começou — não dá para concluir o descanso agora.")
+    vivos = [c for c in _grupo_com_ficha() if c.get("status") != "morto"]
+    if proposta["tipo"] == "curto":
+        for c in vivos:
+            short_rest(c["name"], hit_dice=0)       # só a hora; os dados já foram
+        gastos = proposta.get("gastos") or {}
+        partes = [f"{n}: {q} dado(s)" for n, q in gastos.items() if q]
+        msg = (f"Descanso curto concluído — {_hora_legivel()}."
+               + (f" Dados gastos: {', '.join(partes)}." if partes
+                  else " Ninguém gastou dado de vida."))
+        memory.campaign.pop("descanso_proposto", None)
+        memory.save_campaign()
+        return _resposta(True, msg)
+
+    # Quem pode dormir é decidido ANTES de alguém dormir. O primeiro long_rest
+    # avança o relógio 8 horas, e decidir no meio do laço deixava o resultado
+    # depender da ordem do grupo: quem descansou há 20h era recusado se viesse
+    # primeiro e aceito se viesse depois de alguém ter passado a noite.
+    aptos, recusados = [], []
+    for c in vivos:
+        pode, faltam = _situacao_descanso_longo(c["sheet"])
+        if pode:
+            aptos.append(c)
+        else:
+            recusados.append(f"{c['name']} (faltam {faltam}h)")
+    descansaram = []
+    for c in aptos:
+        saida = long_rest(c["name"])
+        if saida.lstrip().startswith(("Erro:", "Aviso:")):
+            recusados.append(c["name"])
+        else:
+            descansaram.append(c["name"])
+    if not descansaram:
+        return _resposta(False, "Erro: Ninguém do grupo pode fazer descanso longo agora: "
+                                + ", ".join(recusados) + ".")
+    memory.campaign.pop("descanso_proposto", None)
+    memory.save_campaign()
+    msg = (f"Descanso longo concluído — {_hora_legivel()}. "
+           f"Descansaram: {', '.join(descansaram)}."
+           + (f" Não puderam: {', '.join(recusados)}." if recusados else ""))
+    return _resposta(True, msg)
 
 
 # ---------------------------------------------------------------------------
@@ -7759,6 +8114,10 @@ def roll_initiative(characters_names: str) -> str:
     results.sort(key=lambda x: x["initiative"], reverse=True)
 
     cs = memory.campaign.setdefault("combat_state", {})
+    # Emboscada no acampamento: o descanso aberto na tela foi interrompido.
+    # Sem isto a tela de descanso reabriria depois da luta como se nada tivesse
+    # acontecido — e o jogador concluiria uma hora de sossego que não houve.
+    memory.campaign.pop("descanso_proposto", None)
     cs["is_active"]          = True
     cs["initiative_order"]   = [r["name"] for r in results]
     cs["current_turn_index"] = 0
@@ -10462,6 +10821,7 @@ DND_TOOLS = [
     add_exhaustion,
     remove_exhaustion,
     check_encumbrance,
+    offer_rest,
     open_shop,
     list_shop,
     buy_item,

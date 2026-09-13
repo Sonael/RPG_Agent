@@ -1971,7 +1971,9 @@ body.combat-on { overflow: hidden; }
 
 /* Pílula flutuante para retomar o combate (fica fora de #combat-overlay,
    então usa cores literais — as variáveis --cbt-* são escopadas). */
-/* Pílulas de "voltar à tela" (combate, loja, nível) — todas no mesmo canto.
+/* Pílulas de "voltar à tela" (combate, loja, nível, descanso) — todas no
+   mesmo canto, empilhadas: o game.js dá a cada pílula visível a sua posição
+   na pilha (--pilula-ordem) e aqui ela vira 56px por degrau.
    A altura vem de --pilula-base. No desktop é 20px da borda. No mobile o
    game.js mede o topo do #input-area e põe a pílula logo ACIMA dele: o
    espaço abaixo do campo de mensagem é reservado de propósito para a barra
@@ -1979,7 +1981,8 @@ body.combat-on { overflow: hidden; }
    por cima da dica "Digite / para ver os comandos". Medir em vez de fixar
    no CSS porque o bloco de entrada cresce quando a bandeja de dados abre. */
 #cbt-reopen {
-  position: fixed; bottom: var(--pilula-base, 20px); right: 20px; z-index: 8999;
+  position: fixed; right: 20px; z-index: 8999;
+  bottom: calc(var(--pilula-base, 20px) + var(--pilula-ordem, 0) * 56px);
   background: #8b2315; color: #fff;
   border: 2px solid #b89947; border-radius: 30px;
   font-family: 'Lora', serif; font-weight: 700; font-size: 0.95rem;
@@ -2508,7 +2511,8 @@ body.shop-on { overflow: hidden; }
 .shp-sair:hover { background: #6b1a0f; }
 
 #shp-reopen {
-  position: fixed; bottom: var(--pilula-base, 20px); right: 20px; z-index: 8999;
+  position: fixed; right: 20px; z-index: 8999;
+  bottom: calc(var(--pilula-base, 20px) + var(--pilula-ordem, 0) * 56px);
   background: #6e5c1f; color: #fff;
   border: 2px solid #b89947; border-radius: 30px;
   font-family: 'Lora', serif; font-weight: 700; font-size: 0.95rem;
@@ -2518,9 +2522,6 @@ body.shop-on { overflow: hidden; }
 }
 #shp-reopen:hover { background: #55491a; transform: translateY(-2px); }
 #shp-reopen.hidden { display: none; }
-/* Quando a pílula de combate também está na tela, a da loja sobe: são o
-   mesmo canto, e sobrepostas uma esconderia a outra. */
-#cbt-reopen:not(.hidden) ~ #shp-reopen:not(.hidden) { bottom: calc(var(--pilula-base, 20px) + 56px); }
 
 @media (max-width: 760px) {
   #shop-overlay { padding: 0; align-items: stretch; }
@@ -2855,7 +2856,8 @@ body.levelup-on { overflow: hidden; }
 }
 
 #lvl-reopen {
-  position: fixed; bottom: var(--pilula-base, 20px); right: 20px; z-index: 8999;
+  position: fixed; right: 20px; z-index: 8999;
+  bottom: calc(var(--pilula-base, 20px) + var(--pilula-ordem, 0) * 56px);
   background: #8a6d1f; color: #fff;
   border: 2px solid #b89947; border-radius: 30px;
   font-family: 'Lora', serif; font-weight: 700; font-size: 0.95rem;
@@ -2865,11 +2867,6 @@ body.levelup-on { overflow: hidden; }
 }
 #lvl-reopen:hover { background: #6d5618; transform: translateY(-2px); }
 #lvl-reopen.hidden { display: none; }
-/* Três pílulas podem coexistir no mesmo canto. Empilham na ordem em que o
-   DOM as cria: combate, loja, nível. */
-#cbt-reopen:not(.hidden) ~ #lvl-reopen:not(.hidden) { bottom: calc(var(--pilula-base, 20px) + 56px); }
-#shp-reopen:not(.hidden) ~ #lvl-reopen:not(.hidden) { bottom: calc(var(--pilula-base, 20px) + 56px); }
-#cbt-reopen:not(.hidden) ~ #shp-reopen:not(.hidden) ~ #lvl-reopen:not(.hidden) { bottom: calc(var(--pilula-base, 20px) + 112px); }
 
 @media (max-width: 760px) {
   #levelup-overlay { padding: 0; align-items: stretch; }
@@ -2911,6 +2908,232 @@ body.levelup-on { overflow: hidden; }
     padding: var(--esp-3) var(--esp-4);
     padding-bottom: calc(var(--esp-3) + env(safe-area-inset-bottom));
   }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   TELA DE DESCANSO ("A Fogueira") — static/js/rest.js
+
+   Quarta tela, mesma estrutura de pergaminho (cabeçalho fixo, corpo que
+   rola, rodapé fixo). O conteúdo é o GRUPO, lado a lado: descansar é uma
+   decisão coletiva — quem gasta dado agora e quem guarda para amanhã —, e
+   só dá para decidir isso vendo todos ao mesmo tempo.
+
+   O desenho central são os marcadores de dado de vida: cheio é dado na
+   reserva, vazio é dado gasto. É ele que faz a reserva ser um recurso que
+   se vê, e não um número no fim de uma frase.
+   ═══════════════════════════════════════════════════════════════════ */
+#rest-overlay {
+  --rst-paper: #fffbf0;
+  --rst-bg:    #f4ebd8;
+  --rst-dark:  #4a2511;
+  --rst-gold:  #b89947;
+  --rst-text:  #2c1a0e;
+  --rst-muted: #6e5c4f;
+  --rst-green: #2e7d32;
+  --rst-red:   #8b2315;
+  --rst-ember: #b5541c;
+
+  position: fixed; inset: 0; z-index: 9000;
+  background: rgba(20,12,6,0.82); backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  padding: var(--esp-5); box-sizing: border-box;
+  font-family: 'Lora', serif;
+}
+#rest-overlay.hidden { display: none; }
+body.rest-on { overflow: hidden; }
+
+#rst-frame {
+  width: 100%; max-width: 900px;
+  max-height: min(92vh, 860px);
+  background: var(--rst-paper);
+  color: var(--rst-text);
+  border: 2px solid var(--rst-gold);
+  border-radius: 12px;
+  box-shadow: 0 15px 35px rgba(74,37,17,0.45), inset 0 0 40px rgba(184,153,71,0.1);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+.rst-header {
+  padding: var(--esp-5) var(--esp-6) var(--esp-3);
+  border-bottom: 1px solid var(--rst-gold);
+  text-align: center;
+  flex: 0 0 auto;
+}
+.rst-close {
+  position: absolute; top: var(--esp-3); right: var(--esp-3);
+  background: none; border: none; cursor: pointer;
+  color: var(--rst-muted); font-size: 1.4rem; line-height: 1;
+  padding: var(--esp-1) var(--esp-2); border-radius: 6px;
+}
+.rst-close:hover { color: var(--rst-red); background: var(--rst-bg); }
+.rst-title {
+  font-family: 'Playfair Display', serif;
+  color: var(--rst-red);
+  font-size: 1.7rem; font-weight: 700;
+  margin: 0;
+}
+.rst-title #rst-tipo {
+  color: var(--rst-muted); font-size: 1.1rem;
+  font-style: italic; font-family: 'Lora', serif; font-weight: 400;
+}
+.rst-sub {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  margin-top: var(--esp-2);
+  color: var(--rst-muted); font-size: 0.9rem;
+}
+.rst-motivo { font-style: italic; }
+
+.rst-corpo {
+  flex: 1 1 auto; overflow-y: auto;
+  padding: var(--esp-4) var(--esp-6);
+  background:
+    linear-gradient(var(--rst-paper) 30%, rgba(255,251,240,0)) top / 100% 20px no-repeat local,
+    linear-gradient(rgba(255,251,240,0), var(--rst-paper) 70%) bottom / 100% 20px no-repeat local,
+    radial-gradient(farthest-side at 50% 0, rgba(74,37,17,.16), transparent)
+      top / 100% 8px no-repeat scroll,
+    radial-gradient(farthest-side at 50% 100%, rgba(74,37,17,.16), transparent)
+      bottom / 100% 8px no-repeat scroll,
+    var(--rst-paper);
+}
+.rst-grade {
+  display: grid; gap: var(--esp-3);
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+}
+.rst-card {
+  display: flex; flex-direction: column; gap: var(--esp-3);
+  background: var(--rst-paper);
+  border: 1px solid var(--rst-gold); border-radius: 8px;
+  padding: var(--esp-3) var(--esp-4);
+}
+.rst-card-fora { opacity: 0.62; border-color: #e0d5c2; }
+.rst-card-cabeca { display: flex; flex-direction: column; }
+.rst-nome { font-family: 'Playfair Display', serif; font-weight: 700; font-size: 1.08rem; color: var(--rst-dark); }
+.rst-classe { font-size: 0.8rem; color: var(--rst-muted); text-transform: capitalize; }
+.rst-num { font-variant-numeric: tabular-nums; }
+.rst-num small { color: var(--rst-red); font-size: 0.74rem; }
+
+.rst-vida-topo, .rst-dados-topo {
+  display: flex; justify-content: space-between;
+  font-size: 0.8rem; color: var(--rst-muted); margin-bottom: 3px;
+}
+.rst-vida-barra {
+  position: relative; height: 8px; border-radius: 4px;
+  background: #e6ded2; overflow: hidden;
+}
+.rst-vida-fill { height: 100%; background: var(--rst-red); transition: width .35s; }
+.rst-vida-teto {
+  position: absolute; top: -2px; bottom: -2px; width: 2px;
+  background: var(--rst-dark);
+}
+
+.rst-pips { display: flex; flex-wrap: wrap; gap: 4px; margin: 2px 0 4px; }
+.rst-pip {
+  width: 14px; height: 14px; border-radius: 3px;
+  border: 1.5px solid var(--rst-ember);
+  background: transparent;
+  transform: rotate(45deg);
+  margin: 2px;
+}
+.rst-pip-cheio { background: var(--rst-ember); }
+.rst-dados-regra { font-size: 0.76rem; color: var(--rst-muted); font-variant-numeric: tabular-nums; }
+
+.rst-card-acao {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--esp-2);
+  margin-top: auto;
+}
+.rst-gastos { font-size: 0.78rem; color: var(--rst-ember); font-weight: 700; }
+.rst-dado {
+  font-family: 'Lora', serif; font-weight: 700; font-size: 0.88rem;
+  background: var(--rst-ember); color: #fff;
+  border: 1px solid var(--rst-ember); border-radius: 6px;
+  padding: var(--esp-2) var(--esp-4); cursor: pointer;
+  transition: background .15s;
+}
+.rst-dado:hover:not(:disabled) { background: #8f4115; }
+.rst-dado:disabled {
+  background: var(--rst-paper); color: var(--rst-muted);
+  border-color: #e0d5c2; cursor: not-allowed;
+}
+
+.rst-longo-lista {
+  margin: 0; padding-left: 1.1em;
+  font-size: 0.84rem; color: var(--rst-green);
+}
+.rst-longo-lista li { margin: 2px 0; }
+.rst-longo-nao { font-size: 0.84rem; color: var(--rst-red); }
+
+.rst-vazio {
+  color: var(--rst-muted); font-style: italic; text-align: center;
+  padding: var(--esp-12) var(--esp-4);
+  display: flex; flex-direction: column; align-items: center; gap: var(--esp-2);
+}
+.rst-vazio small { font-size: 0.82rem; }
+
+.rst-rodape {
+  display: flex; align-items: center; gap: var(--esp-3);
+  padding: var(--esp-3) var(--esp-6);
+  border-top: 1px solid var(--rst-gold);
+  background: var(--rst-bg);
+  flex: 0 0 auto;
+}
+.rst-msg {
+  flex: 1 1 auto; font-size: 0.88rem; color: var(--rst-dark);
+  min-height: 1.2em; font-variant-numeric: tabular-nums;
+}
+.rst-msg-erro { color: var(--rst-red); font-weight: 700; }
+.rst-cancelar, .rst-concluir {
+  font-family: 'Lora', serif; font-weight: 700; font-size: 0.9rem;
+  border-radius: 6px; padding: var(--esp-2) var(--esp-5); cursor: pointer;
+  flex: 0 0 auto;
+}
+.rst-cancelar {
+  background: var(--rst-paper); color: var(--rst-dark);
+  border: 1px solid var(--rst-gold);
+}
+.rst-cancelar:hover:not(:disabled) { background: var(--rst-paper); border-color: var(--rst-dark); }
+.rst-concluir {
+  background: var(--rst-red); color: #fff;
+  border: 1px solid var(--rst-gold);
+}
+.rst-concluir:hover:not(:disabled) { background: #6b1a0f; }
+.rst-cancelar:disabled, .rst-concluir:disabled { opacity: 0.45; cursor: not-allowed; }
+.rst-concluir:disabled { background: var(--rst-muted); }
+
+#rst-reopen {
+  position: fixed; right: 20px; z-index: 8999;
+  bottom: calc(var(--pilula-base, 20px) + var(--pilula-ordem, 0) * 56px);
+  background: #8f4115; color: #fff;
+  border: 2px solid #b89947; border-radius: 30px;
+  font-family: 'Lora', serif; font-weight: 700; font-size: 0.95rem;
+  padding: var(--esp-3) var(--esp-6); cursor: pointer;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+  transition: background .15s, transform .15s;
+}
+#rst-reopen:hover { background: #6f320f; transform: translateY(-2px); }
+#rst-reopen.hidden { display: none; }
+
+@media (max-width: 760px) {
+  #rest-overlay { padding: 0; align-items: stretch; }
+  #rst-frame {
+    max-width: none; max-height: none; border-radius: 0; border: none;
+    height: 100vh; min-height: 0;
+  }
+  .rst-header { padding: var(--esp-4) var(--esp-6) var(--esp-2); }
+  .rst-title  { font-size: 1.3rem; }
+  .rst-corpo  { padding: var(--esp-3) var(--esp-4); }
+  .rst-grade  { grid-template-columns: 1fr; gap: var(--esp-2); }
+  .rst-card   { gap: var(--esp-2); padding: var(--esp-3); }
+  /* No rodapé estreito os dois botões dividem a linha e a mensagem vai para
+     cima deles: espremida ao lado, a rolagem do dado não cabia. */
+  .rst-rodape {
+    flex-wrap: wrap;
+    padding: var(--esp-3) var(--esp-4);
+    padding-bottom: calc(var(--esp-3) + env(safe-area-inset-bottom));
+  }
+  .rst-msg { flex: 1 1 100%; }
+  .rst-cancelar, .rst-concluir { flex: 1 1 0; padding: var(--esp-2); }
 }
 
 /* Ponto de vida do /status (antes um emoji colorido) e marca de objetivo de

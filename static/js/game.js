@@ -34,6 +34,8 @@ const STATE_TOOLS = new Set([
   // Faltavam: mudam turno/HP/status mas não atualizavam a barra/sidebar
   'execute_npc_turn', 'spawn_monster', 'recruit_character',
   'resolve_saving_throw',
+  // offer_rest abre a tela de descanso; use_hit_die mexe na vida e na reserva.
+  'offer_rest', 'use_hit_die',
 ]);
 
 function _condInfo(cd) {
@@ -643,6 +645,7 @@ const TOOL_LABEL = {
   use_ability: 'usando habilidade', roll_death_save: 'teste de morte',
   modify_hp: 'atualizando vida', modify_mana: 'atualizando mana', grant_xp: 'concedendo XP',
   short_rest: 'descanso curto', long_rest: 'descanso longo',
+  offer_rest: 'preparando o descanso', use_hit_die: 'gastando dado de vida',
   create_character_sheet: 'criando ficha', get_character_sheet: 'lendo ficha',
   get_combat_status: 'status de combate', add_item: 'adicionando item',
   remove_item: 'removendo item', list_inventory: 'listando inventário',
@@ -1149,9 +1152,11 @@ function renderMemory(mem) {
 // ao carregar a página parado numa forja com uma escolha de nível pendente as
 // duas telas abriam juntas, uma empilhada na outra.
 //
-// Agora rodam em SÉRIE e nesta ordem de prioridade: combate, nível, loja. A de
-// nível vem antes da loja porque a escolha muda a compra — um ponto em Força
-// muda a carga que cabe na mochila. Cada tela também se recusa a abrir sozinha
+// Agora rodam em SÉRIE e nesta ordem de prioridade: combate, nível, descanso,
+// loja. A de nível vem antes da loja porque a escolha muda a compra — um ponto
+// em Força muda a carga que cabe na mochila. O descanso vem antes da loja
+// porque é o mestre que o abre, no meio da cena, e a loja é só um lugar onde o
+// grupo por acaso está parado. Cada tela também se recusa a abrir sozinha
 // por cima de outra já aberta; quando uma fecha, ela dispara 'rpg:tela-fechou'
 // e a fila roda de novo, dando a vez para quem esperava.
 //
@@ -1163,6 +1168,7 @@ function sincronizarTelas() {
   const rodada = async () => {
     try { if (window.Combat)  await window.Combat.sync();  } catch (_) {}
     try { if (window.LevelUp) await window.LevelUp.sync(); } catch (_) {}
+    try { if (window.Rest)    await window.Rest.sync();    } catch (_) {}
     try { if (window.Shop)    await window.Shop.sync();    } catch (_) {}
   };
   _filaTelas = _filaTelas.then(rodada, rodada);
@@ -1203,6 +1209,34 @@ function posicionarPilulas() {
 window.posicionarPilulas = posicionarPilulas;
 window.addEventListener('resize', posicionarPilulas);
 if (_MOBILE_PILULAS.addEventListener) _MOBILE_PILULAS.addEventListener('change', posicionarPilulas);
+
+// ── Empilhamento das pílulas ────────────────────────────────────────────────
+// Várias pílulas podem estar visíveis ao mesmo tempo no mesmo canto. O
+// empilhamento era CSS de irmão (#cbt-reopen:not(.hidden) ~ #shp-reopen...),
+// uma regra por combinação: com três pílulas eram três regras, com a quarta
+// (descanso) seriam sete. Aqui cada pílula visível recebe a sua posição na
+// pilha e o CSS só multiplica — a ordem é esta lista, não a ordem do DOM.
+const _PILULAS = ['cbt-reopen', 'shp-reopen', 'lvl-reopen', 'rst-reopen'];
+function empilharPilulas() {
+  let ordem = 0;
+  for (const id of _PILULAS) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    if (el.classList.contains('hidden')) el.style.removeProperty('--pilula-ordem');
+    else el.style.setProperty('--pilula-ordem', String(ordem++));
+  }
+}
+window.empilharPilulas = empilharPilulas;
+
+document.addEventListener('DOMContentLoaded', () => {
+  empilharPilulas();
+  // Cada tela mostra e esconde a própria pílula trocando a classe `hidden`.
+  // Observar a classe é o que deixa as telas sem saber umas das outras.
+  new MutationObserver(empilharPilulas).observe(document.body, {
+    childList: true, subtree: true, attributes: true, attributeFilter: ['class'],
+  });
+});
+
 document.addEventListener('DOMContentLoaded', () => {
   posicionarPilulas();
   if (!('ResizeObserver' in window)) return;
