@@ -1094,6 +1094,15 @@ mestre, sem teto e sem pool — usá-lo para ASI deixava o atributo subir sem
 limite e sem gastar nada. Guerreiro ganha incrementos extras no 6 e no 14,
 Ladino no 10; está em `_NIVEIS_ASI_EXTRA`.
 
+**Talento sai do mesmo pool.** Um talento é trocado por um incremento inteiro,
+então `choose_feat` desconta os 2 pontos. A primeira versão desta tela não
+descontava: quem escolhia talento ficava com o talento **e** com os 2 pontos
+pendentes. A checagem antiga, por nível exato (4, 8, 12, 16, 19), também
+barrava quem subiu ao 5 ainda devendo o incremento do 4; em ficha com contador
+agora vale o pool, e em ficha sem contador continua valendo o nível — com os
+extras do Guerreiro e do Ladino. O bônus de atributo que alguns talentos dão
+parava em 30; agora para no mesmo teto de 20 do `apply_asi`.
+
 ### A tela
 
 Abre sozinha quando a **assinatura** das pendências muda — ou seja, quando um
@@ -1105,6 +1114,34 @@ este personagem deve algo (sair devendo é o que a tela existe para impedir; o
 ✕ continua fechando), atalho para o próximo do grupo quando outro deve, e
 "Concluir" só quando ninguém deve. Um botão escrito "Agora Helena →" que
 concluísse a cena seria mentira.
+
+O incremento de atributo usa o **mesmo stepper `− valor +` do wizard de
+criação**, e pelo mesmo modelo: um rascunho local. `+` e `−` não vão ao
+servidor; só "Confirmar incremento" grava. A diferença para o wizard é o piso:
+lá o `−` desce até o mínimo da criação, aqui ele só retira os pontos postos
+**agora** — o valor que a ficha já tinha não é negociável, incremento não é
+redistribuição. O `+` trava quando o pool acaba ou o atributo chega a 20.
+Confirmar exige todos os pontos distribuídos, porque um ponto esquecido
+viraria pendência que o jogador não entenderia; a exceção é não haver mais
+onde pôr. Talento fica bloqueado enquanto há ponto no rascunho.
+
+Rascunho local foi a escolha em vez de "gravar a cada clique e desfazer no
+`−`" porque desfazer um ponto de CON exigiria desfazer os PV que ele deu, um
+de DES a CA, e o atributo de conjuração a mana. Com o rascunho, o servidor
+nunca precisa desfazer nada.
+
+A confirmação chama `apply_asi_distribution`, que é **atômica**: valida o lote
+inteiro antes de aplicar o primeiro ponto. Aplicar ponto a ponto e parar no
+erro deixaria meio incremento gravado — +1 em Força aceito, +1 em Carisma
+recusado — e uma ficha que não é nem a de antes nem a escolhida. Depois de
+validar, cada ponto passa por `apply_asi`, então pool, teto e derivados
+continuam num lugar só.
+
+O rascunho é descartado sempre que não há incremento pendente. Sem isso,
+depois de confirmar o bloco sumia com o rascunho ainda guardado, e no PRÓXIMO
+incremento do mesmo personagem — também de 2 pontos — os pontos antigos
+voltavam já postos. `test_o_rascunho_nao_reaparece_no_proximo_incremento`
+guarda esse caso.
 
 No mobile a régua de atributos usa a sigla de três letras da mesa (FOR, DES,
 CON…). Com o nome inteiro ela quebrava em 4+2 e comia 280px dos 812 da tela —

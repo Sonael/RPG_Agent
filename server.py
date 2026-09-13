@@ -2713,6 +2713,7 @@ def levelup_action_route():
         feature=(d.get("feature") or "").strip(),
         choice=(d.get("choice") or "").strip(),
         points=d.get("points", 1),
+        distribution=d.get("distribution") if isinstance(d.get("distribution"), dict) else None,
     ))
 
 

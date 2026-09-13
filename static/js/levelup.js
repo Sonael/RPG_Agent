@@ -22,6 +22,14 @@
   let _quem  = '';
   let _visto = '';     // assinatura das pendências que já abriram a tela
 
+  // Rascunho do incremento de atributo, igual ao wizard de criação: o jogador
+  // sobe e desce com + e − e NADA vai ao servidor até "Confirmar". Vive aqui e
+  // não no DOM porque sync() redesenha a tela a cada turno.
+  //   dono/faltam: de quem é e para qual pool foi feito. Se qualquer um mudar
+  //   (confirmou, subiu outro nível, trocou de personagem), o rascunho é
+  //   descartado em vez de ser reaproveitado sobre uma ficha diferente.
+  let _rascunho = { dono: '', faltam: 0, pontos: {} };
+
   const esc = (s) => (window.escapeHtml ? window.escapeHtml(s) : String(s == null ? '' : s));
   const q   = (id) => document.getElementById(id);
 
@@ -115,35 +123,103 @@
       </section>`;
   }
 
-  function cartaoAsi(pd) {
-    // Cada botão gasta UM ponto. Dois cliques no mesmo atributo dão o +2, e
-    // em dois atributos diferentes dão o +1/+1 — sem precisar de um seletor
-    // de modo que o jogador teria que entender antes de escolher.
-    const botoes = (pd.opcoes || []).map(o => `
-      <button class="lvl-attr-btn${o.no_teto ? ' lvl-attr-topo' : ''}"
-              ${o.no_teto ? 'disabled' : ''}
-              title="${o.no_teto ? 'Já está no teto de 20' : '+1 ponto'}"
-              onclick="window.LevelUp._asi('${esc(o.chave)}')">
-        <span class="lvl-attr-btn-nome">${esc(o.nome)}</span>
-        <span class="lvl-attr-btn-valor">${o.valor} → ${Math.min(20, o.valor + 1)}</span>
-        <span class="lvl-attr-btn-mod">mod ${o.mod >= 0 ? '+' : ''}${o.mod}</span>
-      </button>`).join('');
+  // Teto do 5e. O motor é quem manda (recusa acima disso), mas o botão + tem
+  // que saber onde parar para não oferecer um clique que vai ser recusado.
+  const TETO = 20;
+  const modDe = (v) => Math.floor((v - 10) / 2);
+  const sinal = (n) => (n >= 0 ? '+' : '') + n;
+
+  function rascunhoPara(p, pd) {
+    if (_rascunho.dono !== p.nome || _rascunho.faltam !== pd.faltam) {
+      _rascunho = { dono: p.nome, faltam: pd.faltam, pontos: {} };
+    }
+    // Se a ficha mudou por fora (o mestre ajustou um atributo), um ponto do
+    // rascunho pode ter passado do teto: esse ponto sai em vez de travar.
+    for (const o of (pd.opcoes || [])) {
+      const n = _rascunho.pontos[o.chave] || 0;
+      if (n && o.valor + n > TETO) _rascunho.pontos[o.chave] = Math.max(0, TETO - o.valor);
+    }
+    return _rascunho;
+  }
+
+  const totalDistribuido = () =>
+    Object.values(_rascunho.pontos).reduce((a, b) => a + b, 0);
+
+  function cartaoAsi(pd, p) {
+    const r      = rascunhoPara(p, pd);
+    const usados = totalDistribuido();
+    const sobram = pd.faltam - usados;
+
+    // Cada atributo é um stepper − valor +, como no wizard de criação. A
+    // diferença está no piso: no wizard o − desce até o mínimo da criação;
+    // aqui ele só retira os pontos que o jogador pôs AGORA. O valor que a
+    // ficha já tinha não é negociável — incremento não é redistribuição.
+    const celulas = (pd.opcoes || []).map(o => {
+      const extra  = r.pontos[o.chave] || 0;
+      const valor  = o.valor + extra;
+      const podeMenos = extra > 0;
+      const podeMais  = sobram > 0 && valor < TETO;
+      const dicaMais  = valor >= TETO ? 'Teto de 20'
+                      : sobram <= 0   ? 'Todos os pontos já foram distribuídos'
+                      : '+1 ponto';
+      return `
+        <div class="lvl-step${extra ? ' lvl-step-alterado' : ''}" data-attr="${esc(o.chave)}">
+          <span class="lvl-step-nome">${esc(o.nome)}</span>
+          <div class="lvl-step-controle">
+            <button class="lvl-step-btn lvl-step-menos" ${podeMenos ? '' : 'disabled'}
+                    aria-label="Retirar 1 ponto de ${esc(o.nome)}"
+                    title="${podeMenos ? 'Retirar 1 ponto' : 'Não desce abaixo do que a ficha já tinha'}"
+                    onclick="window.LevelUp._passo('${esc(o.chave)}', -1)">−</button>
+            <span class="lvl-step-valor">${valor}</span>
+            <button class="lvl-step-btn lvl-step-mais" ${podeMais ? '' : 'disabled'}
+                    aria-label="Somar 1 ponto em ${esc(o.nome)}"
+                    title="${dicaMais}"
+                    onclick="window.LevelUp._passo('${esc(o.chave)}', 1)">+</button>
+          </div>
+          <span class="lvl-step-mod">mod ${sinal(modDe(valor))}</span>
+          <span class="lvl-step-extra">${extra ? `${o.valor} +${extra}` : '&nbsp;'}</span>
+        </div>`;
+    }).join('');
+
+    // Confirmar exige TODOS os pontos distribuídos — deixar um sobrando por
+    // descuido criaria uma pendência que o jogador não entenderia. A única
+    // exceção é não haver mais onde pôr (tudo no teto), que libera o que já
+    // foi distribuído.
+    const semEspaco  = (pd.opcoes || []).every(o => o.valor + (r.pontos[o.chave] || 0) >= TETO);
+    const confirmavel = usados > 0 && (sobram === 0 || semEspaco);
+    const rotuloConfirmar = sobram > 0 && !semEspaco
+      ? `Distribua mais ${sobram} ponto${sobram > 1 ? 's' : ''}`
+      : `Confirmar incremento (+${usados})`;
+
+    // O talento substitui um incremento INTEIRO e não se mistura com pontos
+    // em rascunho: com +1 já distribuído, "trocar por talento" seria ambíguo
+    // sobre o que acontece com esse ponto.
+    const talentoLivre = usados === 0 && pd.faltam >= 2;
 
     return `
       <section class="lvl-bloco lvl-bloco-asi">
         <h2 class="lvl-bloco-titulo">
           Incremento de Atributo
-          <span class="lvl-contagem">${pd.faltam} ponto${pd.faltam > 1 ? 's' : ''}</span>
+          <span class="lvl-contagem" id="lvl-asi-contagem">${usados} / ${pd.faltam} pontos</span>
         </h2>
         <p class="lvl-bloco-desc">${esc(pd.descricao)}</p>
-        <div class="lvl-attr-grid">${botoes}</div>
+        <div class="lvl-step-grid">${celulas}</div>
+        <div class="lvl-asi-acoes">
+          <button class="lvl-asi-desfazer" ${usados ? '' : 'disabled'}
+                  onclick="window.LevelUp._desfazer()">Desfazer</button>
+          <button class="lvl-asi-confirmar" ${confirmavel ? '' : 'disabled'}
+                  onclick="window.LevelUp._confirmarAsi()">${rotuloConfirmar}</button>
+        </div>
         <div class="lvl-talento">
           <label for="lvl-talento-nome">…ou troque o incremento por um
             <b>talento</b> (consome os 2 pontos):</label>
           <div class="lvl-talento-linha">
             <input id="lvl-talento-nome" type="text" autocomplete="off"
-                   placeholder="nome do talento em inglês, como no SRD (ex: Alert)">
-            <button class="lvl-opcao lvl-talento-btn"
+                   ${talentoLivre ? '' : 'disabled'}
+                   placeholder="${talentoLivre
+                     ? 'nome do talento em inglês, como no SRD (ex: Alert)'
+                     : 'desfaça os pontos para escolher talento'}">
+            <button class="lvl-opcao lvl-talento-btn" ${talentoLivre ? '' : 'disabled'}
                     onclick="window.LevelUp._talento()">Escolher talento</button>
           </div>
         </div>
@@ -183,6 +259,15 @@
     atributos(p);
 
     const pend = _last.pendencias || [];
+
+    // Sem incremento pendente, o rascunho não pode sobreviver. Depois de
+    // confirmar, o bloco some e rascunhoPara() não roda mais — sem esta linha
+    // os pontos antigos ficariam guardados e reapareceriam no PRÓXIMO
+    // incremento do mesmo personagem, que também tem 2 pontos.
+    if (!pend.some(x => x.tipo === 'asi')) {
+      _rascunho = { dono: '', faltam: 0, pontos: {} };
+    }
+
     if (!pend.length) {
       q('lvl-corpo').innerHTML = `
         <div class="lvl-vazio">
@@ -192,7 +277,7 @@
         </div>`;
     } else {
       q('lvl-corpo').innerHTML = pend
-        .map(pd => pd.tipo === 'asi' ? cartaoAsi(pd) : cartaoVariante(pd))
+        .map(pd => pd.tipo === 'asi' ? cartaoAsi(pd, p) : cartaoVariante(pd))
         .join('');
     }
 
@@ -323,6 +408,38 @@
     _concluir: concluir,
     _trocar: (n) => { _quem = n; getState().then(render).catch(() => {}); },
     _variante: (feature, choice) => agir({ action: 'variante', feature, choice }),
+    // + e − só mexem no rascunho e redesenham com o snapshot que já está em
+    // mãos: nenhuma ida ao servidor por clique, como no wizard.
+    _passo: (chave, delta) => {
+      const pd = (_last.pendencias || []).find(x => x.tipo === 'asi');
+      const o  = pd && (pd.opcoes || []).find(x => x.chave === chave);
+      if (!o) return;
+      const atual = _rascunho.pontos[chave] || 0;
+      if (delta < 0) {
+        if (atual <= 0) return;                       // piso: o que a ficha já tinha
+        _rascunho.pontos[chave] = atual - 1;
+      } else {
+        if (pd.faltam - totalDistribuido() <= 0) return;
+        if (o.valor + atual >= TETO) return;
+        _rascunho.pontos[chave] = atual + 1;
+      }
+      mensagem('', true);
+      render(_last);
+    },
+    _desfazer: () => {
+      _rascunho.pontos = {};
+      mensagem('', true);
+      render(_last);
+    },
+    _confirmarAsi: () => {
+      const distribution = {};
+      for (const [k, n] of Object.entries(_rascunho.pontos)) if (n > 0) distribution[k] = n;
+      if (!Object.keys(distribution).length) return;
+      // O rascunho só é descartado quando o servidor devolve o pool novo
+      // (faltam muda em rascunhoPara). Se a confirmação for recusada, os
+      // pontos continuam onde o jogador pôs.
+      agir({ action: 'asi_lote', distribution });
+    },
     _asi: (chave) => agir({ action: 'asi', choice: chave, points: 1 }),
     _talento: () => {
       const el = q('lvl-talento-nome');

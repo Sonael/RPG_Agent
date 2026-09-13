@@ -481,7 +481,9 @@ SUBIDA DE NÍVEL — as escolhas são DO JOGADOR:
   virada usando o que está NA FICHA.
   Use apply_asi() (não set_stat) se algum dia precisar aplicar um incremento
   você mesmo: ela sai do pool que o nível concede e respeita o teto de 20,
-  coisas que set_stat não faz.
+  coisas que set_stat não faz. choose_feat() TROCA um incremento inteiro por
+  um talento e desconta os 2 pontos — não dê talento e incremento no mesmo
+  nível.
 
 ITENS — invente o SABOR, não a REGRA:
   Antes de dar um item mágico, prefira o que EXISTE no SRD: add_item() busca

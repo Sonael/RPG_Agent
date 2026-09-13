@@ -2716,25 +2716,70 @@ body.levelup-on { overflow: hidden; }
 .lvl-opcao-nome { font-weight: 700; font-size: 0.98rem; }
 .lvl-opcao-desc { font-size: 0.8rem; color: var(--lvl-muted); line-height: 1.35; }
 
-/* Incremento de atributo */
-.lvl-attr-grid {
+/* Incremento de atributo — stepper − valor +, como no wizard de criação.
+   A leitura tem que ser a mesma do wizard para o jogador não reaprender:
+   nome em cima, controles no meio, modificador embaixo. O que só existe
+   aqui é a linha "16 +1": sem ela, depois de dois cliques, não dá para ver
+   qual parte do número já era da ficha e qual é o rascunho. */
+.lvl-step-grid {
   display: grid; gap: var(--esp-2);
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
 }
-.lvl-attr-btn {
-  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+.lvl-step {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
   background: var(--lvl-paper);
-  border: 1px solid var(--lvl-gold); border-radius: 8px;
-  padding: var(--esp-2) var(--esp-3);
-  font-family: 'Lora', serif; color: var(--lvl-text);
-  cursor: pointer; transition: all .15s;
+  border: 1px solid #e0d5c2; border-radius: 8px;
+  padding: var(--esp-2) var(--esp-2) var(--esp-1);
+  transition: border-color .15s, background .15s;
 }
-.lvl-attr-btn:hover:not(:disabled) { background: var(--lvl-bg); }
-.lvl-attr-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.lvl-attr-btn-nome  { font-weight: 700; font-size: 0.9rem; }
-.lvl-attr-btn-valor { font-size: 1.02rem; font-variant-numeric: tabular-nums; color: var(--lvl-red); }
-.lvl-attr-btn-mod   { font-size: 0.74rem; color: var(--lvl-muted); }
-.lvl-attr-topo .lvl-attr-btn-valor { color: var(--lvl-muted); }
+.lvl-step-alterado { border-color: var(--lvl-gold); background: var(--lvl-bg); }
+.lvl-step-nome { font-weight: 700; font-size: 0.86rem; }
+.lvl-step-controle {
+  display: flex; align-items: center; gap: var(--esp-3);
+  margin: var(--esp-1) 0;
+}
+.lvl-step-btn {
+  width: 34px; height: 34px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--lvl-paper); color: var(--lvl-dark);
+  border: 1px solid var(--lvl-gold); border-radius: 6px;
+  font-family: 'Lora', serif; font-size: 1.2rem; font-weight: 700; line-height: 1;
+  cursor: pointer; transition: background .15s;
+}
+.lvl-step-btn:hover:not(:disabled) { background: var(--lvl-gold); color: #fff; }
+.lvl-step-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.lvl-step-valor {
+  min-width: 2ch; text-align: center;
+  font-size: 1.35rem; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.lvl-step-alterado .lvl-step-valor { color: var(--lvl-red); }
+.lvl-step-mod   { font-size: 0.76rem; color: var(--lvl-muted); font-variant-numeric: tabular-nums; }
+.lvl-step-extra { font-size: 0.72rem; color: var(--lvl-red); font-variant-numeric: tabular-nums; min-height: 1.1em; }
+
+.lvl-asi-acoes {
+  display: flex; justify-content: flex-end; flex-wrap: wrap;
+  gap: var(--esp-2); margin-top: var(--esp-3);
+}
+.lvl-asi-desfazer, .lvl-asi-confirmar {
+  font-family: 'Lora', serif; font-weight: 700; font-size: 0.9rem;
+  border-radius: 6px; padding: var(--esp-2) var(--esp-5); cursor: pointer;
+}
+.lvl-asi-desfazer {
+  background: var(--lvl-paper); color: var(--lvl-dark);
+  border: 1px solid var(--lvl-gold);
+}
+.lvl-asi-desfazer:hover:not(:disabled) { background: var(--lvl-bg); }
+.lvl-asi-confirmar {
+  background: var(--lvl-green); color: #fff;
+  border: 1px solid var(--lvl-green);
+}
+.lvl-asi-confirmar:hover:not(:disabled) { background: #1f5c23; }
+.lvl-asi-desfazer:disabled, .lvl-asi-confirmar:disabled {
+  opacity: 0.45; cursor: not-allowed;
+}
+.lvl-asi-confirmar:disabled { background: var(--lvl-muted); border-color: var(--lvl-muted); }
+.lvl-talento-linha input:disabled { opacity: 0.55; cursor: not-allowed; }
+.lvl-talento-btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; box-shadow: none; }
 
 .lvl-talento { margin-top: var(--esp-4); }
 .lvl-talento label { display: block; font-size: 0.84rem; color: var(--lvl-muted); margin-bottom: var(--esp-2); }
@@ -2829,7 +2874,16 @@ body.levelup-on { overflow: hidden; }
      descrição com três palavras por linha, e é a descrição que faz o
      jogador escolher. */
   .lvl-opcoes { grid-template-columns: 1fr; }
-  .lvl-attr-grid { grid-template-columns: repeat(2, 1fr); }
+  /* Três por linha em 375px: cada célula tem ~105px, e − 16 + cabe com
+     botões de 30px. Em duas colunas a grade ficava com três fileiras altas
+     e empurrava o Confirmar para fora da tela. */
+  .lvl-step-grid { grid-template-columns: repeat(3, 1fr); gap: var(--esp-1); }
+  .lvl-step { padding: var(--esp-1) 2px; }
+  .lvl-step-controle { gap: var(--esp-1); }
+  .lvl-step-btn { width: 30px; height: 30px; }
+  .lvl-step-valor { font-size: 1.15rem; }
+  .lvl-step-nome { font-size: 0.74rem; }
+  .lvl-asi-acoes > button { flex: 1 1 auto; }
   .lvl-rodape {
     padding: var(--esp-3) var(--esp-4);
     padding-bottom: calc(var(--esp-3) + env(safe-area-inset-bottom));

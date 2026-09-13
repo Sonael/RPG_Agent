@@ -6338,6 +6338,96 @@ def apply_asi(char_name: str, stat_name: str, points: int = 1) -> str:
             f"(modificador {_modifier(depois):+d}).{extra}\n  {sobra}")
 
 
+def apply_asi_distribution(char_name: str, distribution) -> str:
+    """
+    Aplica de UMA VEZ os pontos que o jogador distribuiu na tela de nível.
+
+    A tela funciona como o wizard de criação: o jogador sobe e desce os
+    atributos com + e − num rascunho local, e só no "Confirmar" os pontos são
+    gravados. Por isso o lote é ATÔMICO: tudo é validado antes de o primeiro
+    ponto ser aplicado. Aplicar ponto a ponto e parar no erro deixaria meio
+    incremento gravado (+1 em Força aceito, +1 em Carisma recusado) e um
+    jogador olhando uma ficha que não é nem o que ele tinha nem o que ele
+    escolheu.
+
+    Cada ponto passa por apply_asi — a função do mestre —, então pool, teto de
+    20 e os derivados (PV por CON, CA por DES, mana) continuam num lugar só.
+
+    Args:
+        char_name:    Nome do personagem.
+        distribution: {"forca": 1, "constituicao": 1} ou "forca:1, constituicao:1".
+    """
+    char, err = _get_char(char_name)
+    if not char:
+        return err
+    sheet = char["sheet"]
+
+    # Aceita o dict da tela e o texto que um agente escreveria.
+    if isinstance(distribution, str):
+        bruto = {}
+        for parte in distribution.split(","):
+            if not parte.strip():
+                continue
+            nome, _, qtd = parte.partition(":")
+            bruto[nome.strip()] = qtd.strip() or "1"
+    elif isinstance(distribution, dict):
+        bruto = dict(distribution)
+    else:
+        return "❌ Distribuição inválida. Use {'forca': 1, 'constituicao': 1}."
+
+    plano: dict[str, int] = {}
+    for nome, qtd in bruto.items():
+        chave = _norm_txt(str(nome)).replace(" ", "")
+        if chave not in _ATRIBUTOS:
+            return (f"❌ '{nome}' não é atributo. Use: {', '.join(_ATRIBUTOS)}. "
+                    f"Nenhum ponto foi aplicado.")
+        try:
+            n = int(qtd)
+        except (TypeError, ValueError):
+            return f"❌ Quantidade inválida para {nome}: {qtd!r}. Nenhum ponto foi aplicado."
+        if n < 0:
+            return (f"❌ Incremento não retira ponto de atributo ({nome}: {n}). "
+                    f"Nenhum ponto foi aplicado.")
+        if n:
+            plano[chave] = plano.get(chave, 0) + n
+
+    total = sum(plano.values())
+    if total <= 0:
+        return "❌ Nenhum ponto distribuído."
+
+    disponiveis = _asi_pontos_pendentes(sheet)
+    if total > disponiveis:
+        return (f"❌ {total} ponto(s) distribuídos, mas {char['name']} só tem "
+                f"{disponiveis} de incremento. Nenhum ponto foi aplicado.")
+
+    for chave, n in plano.items():
+        antes = int(sheet.get(chave, 10) or 10)
+        if antes + n > _TETO_ATRIBUTO:
+            return (f"❌ {_ATRIBUTO_PT[chave]} iria a {antes + n}, acima do teto de "
+                    f"{_TETO_ATRIBUTO}. Nenhum ponto foi aplicado.")
+
+    # Tudo validado: agora aplica. apply_asi recebe no máximo 2 por chamada
+    # (um incremento é +2 num atributo ou +1 em dois); quem deve dois
+    # incrementos pode legitimamente pôr +3 num atributo, então o ponto sobe
+    # em fatias.
+    linhas = []
+    for chave, n in plano.items():
+        restam = n
+        while restam > 0:
+            fatia = min(_PONTOS_POR_ASI, restam)
+            msg = apply_asi(char_name, chave, fatia)
+            if msg.lstrip().startswith("❌"):          # não deveria: validado acima
+                linhas.append(msg)
+                break
+            linhas.append(msg.split("\n")[0])
+            restam -= fatia
+
+    sobra = _asi_pontos_pendentes(sheet)
+    fim = (f"   Restam {sobra} ponto(s) de incremento." if sobra
+           else "   Incremento concluído.")
+    return "\n".join(linhas + [fim])
+
+
 def levelup_snapshot(char_name: str = "") -> dict:
     """Estado da subida de nível para a tela (JSON-serializável)."""
     grupo = [c for c in memory.campaign.get("characters", {}).values()
@@ -6396,11 +6486,12 @@ def levelup_snapshot(char_name: str = "") -> dict:
 
 
 def levelup_action(action: str, char: str = "", feature: str = "",
-                   choice: str = "", points: int = 1) -> dict:
+                   choice: str = "", points: int = 1,
+                   distribution: dict | None = None) -> dict:
     """
     Aplica UMA escolha de subida de nível vinda da tela.
 
-    actions: variante | asi | talento
+    actions: variante | asi | asi_lote | talento
 
     Só despacho, igual à tela de loja: quem valida e aplica é
     set_feature_choice / apply_asi / choose_feat — as mesmas do mestre.
@@ -6410,6 +6501,8 @@ def levelup_action(action: str, char: str = "", feature: str = "",
         msg = set_feature_choice(char, feature, choice)
     elif a == "asi":
         msg = apply_asi(char, choice, points)
+    elif a == "asi_lote":
+        msg = apply_asi_distribution(char, distribution or {})
     elif a == "talento":
         msg = choose_feat(char, choice)
     else:
@@ -8634,12 +8727,26 @@ def choose_feat(char_name: str, feat_name: str) -> str:
     sheet = char["sheet"]
     nivel = sheet.get("nivel", 1)
 
-    # Verifica se está num nível de melhoria de atributo
-    FEAT_LEVELS = {4, 8, 12, 16, 19}
-    if nivel not in FEAT_LEVELS:
+    # Um talento é TROCADO por um incremento de atributo, então ele sai do
+    # mesmo pool. Antes esta função não descontava nada: na tela de nível,
+    # quem escolhia talento ficava com o talento E com os 2 pontos pendentes.
+    #
+    # Ficha COM contador: vale o pool — inclusive para quem subiu ao 5 ainda
+    # devendo o incremento do 4, que a checagem por nível exato barrava.
+    # Ficha SEM contador (anterior a ele): mantém a regra antiga por nível,
+    # agora com os extras do Guerreiro e do Ladino.
+    rastreado = "asi_pontos_gastos" in sheet
+    if rastreado:
+        if _asi_pontos_pendentes(sheet) < _PONTOS_POR_ASI:
+            return (
+                f"❌ {char['name']} não tem um incremento inteiro pendente "
+                f"({_asi_pontos_pendentes(sheet)} ponto(s)). Um talento substitui "
+                f"um incremento completo, de {_PONTOS_POR_ASI} pontos."
+            )
+    elif nivel not in _niveis_asi(sheet.get("classe", "")):
         return (
-            f"❌ {char['name']} está no nível {nivel}. "
-            f"Talentos só podem ser escolhidos nos níveis {sorted(FEAT_LEVELS)}."
+            f"❌ {char['name']} está no nível {nivel}. Talentos só podem ser "
+            f"escolhidos nos níveis {sorted(_niveis_asi(sheet.get('classe', '')))}."
         )
 
     # Verifica se já tem esse talento
@@ -8689,7 +8796,8 @@ def choose_feat(char_name: str, feat_name: str) -> str:
     for en_attr, pt_attr in attr_map_en.items():
         if _re.search(rf"increase your {en_attr}.*by 1|{en_attr}.*increases? by 1", desc_raw, _re.IGNORECASE):
             if pt_attr in sheet:
-                sheet[pt_attr] = min(30, sheet[pt_attr] + 1)
+                # Teto do 5e é 20 (era 30 aqui, divergindo de apply_asi).
+                sheet[pt_attr] = min(_TETO_ATRIBUTO, sheet[pt_attr] + 1)
                 bonus_applied.append(f"{pt_attr.upper()[:3]} +1")
 
     char.setdefault("habilidades", []).append({
@@ -8698,6 +8806,9 @@ def choose_feat(char_name: str, feat_name: str) -> str:
         "custo_mana": 0,
         "dado":       "",
     })
+    if rastreado:
+        sheet["asi_pontos_gastos"] = (int(sheet.get("asi_pontos_gastos", 0) or 0)
+                                      + _PONTOS_POR_ASI)
     memory.save_campaign()
 
     prereq_info = f"\n   Pré-requisito: {prereq_str}" if prereq_str else ""

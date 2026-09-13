@@ -610,11 +610,15 @@ TELAS = [
      "exigir": "#levelup-overlay:not(.hidden)"},
     {"nome": "nivel-incremento-atributo", "pagina": "/game.html",
      "estado": NIVEL, "espera": 700,
-     # Rola até o bloco do incremento, que nasce abaixo da dobra por vir
-     # depois das duas escolhas de feature.
-     "js": "document.querySelector('.lvl-bloco-asi')"
-           ".scrollIntoView({block:'center'})",
-     "exigir": ".lvl-bloco-asi"},
+     # Um ponto já posto em Força: o print precisa mostrar o stepper NO MEIO
+     # do uso — o − habilitado só onde há ponto do rascunho, a linha "16 +1"
+     # e o Confirmar ainda bloqueado pedindo o segundo ponto. Uma captura com
+     # tudo zerado não mostraria nenhuma dessas três coisas.
+     # Rola até o bloco, que nasce abaixo da dobra.
+     "js": "window.LevelUp._passo('forca', 1);"
+           "setTimeout(() => document.querySelector('.lvl-bloco-asi')"
+           ".scrollIntoView({block:'center'}), 150)",
+     "exigir": ".lvl-step-alterado"},
     {"nome": "nivel-sem-pendencia", "pagina": "/game.html",
      "estado": NIVEL, "espera": 700,
      "js": "window.LevelUp._trocar('Stelar')",

@@ -298,3 +298,155 @@ def test_as_rotas_do_nivel_estao_registradas():
 def test_apply_asi_esta_no_catalogo_do_agente():
     """O mestre também precisa poder aplicar ASI — a tela não é o único jeito."""
     assert "apply_asi" in {f.__name__ for f in td.DND_TOOLS}
+
+
+# ---------------------------------------------------------------------------
+# 6. Incremento em lote — o que o "Confirmar" da tela chama
+# ---------------------------------------------------------------------------
+#
+# A tela agora funciona como o wizard de criação: + e − num rascunho local e
+# nada gravado até confirmar. Por isso o lote é ATÔMICO: tudo é validado antes
+# de o primeiro ponto ser aplicado. Aplicar ponto a ponto e parar no erro
+# deixaria meio incremento na ficha.
+
+def test_lote_aplica_os_dois_pontos(helena):
+    td.apply_asi_distribution("Helena", {"forca": 1, "constituicao": 1})
+    s = helena["sheet"]
+    assert (s["forca"], s["constituicao"]) == (17, 16)
+    assert td._asi_pontos_pendentes(s) == 0
+
+
+def test_lote_aceita_o_texto_que_um_agente_escreveria(helena):
+    td.apply_asi_distribution("Helena", "forca:2")
+    assert helena["sheet"]["forca"] == 18
+
+
+def test_lote_com_atributo_invalido_nao_aplica_NADA(helena):
+    """O caso que justifica a atomicidade: o primeiro item era válido."""
+    saida = td.apply_asi_distribution("Helena", {"forca": 1, "sorte": 1})
+    assert "Nenhum ponto foi aplicado" in saida
+    assert helena["sheet"]["forca"] == 16
+    assert td._asi_pontos_pendentes(helena["sheet"]) == 2
+
+
+def test_lote_acima_do_pool_nao_aplica_nada(helena):
+    saida = td.apply_asi_distribution("Helena", {"forca": 2, "destreza": 1})
+    assert "Nenhum ponto foi aplicado" in saida
+    assert (helena["sheet"]["forca"], helena["sheet"]["destreza"]) == (16, 14)
+
+
+def test_lote_acima_do_teto_nao_aplica_nada(helena):
+    # 2 pontos no total, dentro do pool: a ÚNICA violação é o teto. (A primeira
+    # versão somava 3 e quem recusava era a checagem de pool, não a de teto.)
+    helena["sheet"]["forca"] = 20
+    saida = td.apply_asi_distribution("Helena", {"constituicao": 1, "forca": 1})
+    assert "teto" in saida and "Nenhum ponto foi aplicado" in saida
+    assert helena["sheet"]["constituicao"] == 15, "aplicou a CON antes de recusar"
+
+
+def test_lote_nao_retira_ponto(helena):
+    """
+    O − da tela só desfaz o RASCUNHO. Se um valor negativo chegasse ao motor,
+    ele não pode virar redistribuição de atributo.
+    """
+    saida = td.apply_asi_distribution("Helena", {"forca": 2, "carisma": -1})
+    assert "não retira" in saida
+    assert helena["sheet"]["carisma"] == 8
+
+
+def test_lote_sobe_mais_de_dois_quando_deve_dois_incrementos(helena):
+    """
+    Quem deve dois incrementos pode pôr +3 num atributo (+2 de um, +1 do
+    outro). apply_asi aceita no máximo 2 por chamada, então o lote fatia.
+    """
+    helena["sheet"]["asi_pontos_gastos"] = -2           # 4 pontos pendentes
+    td.apply_asi_distribution("Helena", {"forca": 3, "destreza": 1})
+    assert helena["sheet"]["forca"] == 19
+    assert helena["sheet"]["destreza"] == 15
+
+
+def test_lote_vazio_e_recusado(helena):
+    assert "Nenhum ponto" in td.apply_asi_distribution("Helena", {"forca": 0})
+
+
+def test_lote_passa_por_apply_asi(helena, monkeypatch):
+    """Pool, teto e derivados continuam num lugar só: apply_asi."""
+    chamadas = []
+    real = td.apply_asi
+
+    def espiao(*a, _r=real, **k):
+        chamadas.append(a)
+        return _r(*a, **k)
+
+    monkeypatch.setattr(td, "apply_asi", espiao)
+    td.apply_asi_distribution("Helena", {"forca": 1, "constituicao": 1})
+    assert ("Helena", "forca", 1) in chamadas
+    assert ("Helena", "constituicao", 1) in chamadas
+
+
+def test_levelup_action_despacha_o_lote(helena):
+    r = td.levelup_action("asi_lote", char="Helena",
+                          distribution={"forca": 1, "carisma": 1})
+    assert r["ok"] is True
+    assert helena["sheet"]["carisma"] == 9
+    assert not [x for x in r["snapshot"]["pendencias"] if x["tipo"] == "asi"]
+
+
+# ---------------------------------------------------------------------------
+# 7. Talento sai do mesmo pool
+# ---------------------------------------------------------------------------
+#
+# Antes, choose_feat não descontava nada: na tela de nível, quem escolhia
+# talento ficava com o talento E com os dois pontos pendentes. E a checagem por
+# nível exato (4, 8, 12, 16, 19) barrava quem subiu ao 5 ainda devendo o 4.
+
+@pytest.fixture
+def srd_com_talento(monkeypatch):
+    """O Open5e fica offline na suíte; aqui ele responde um talento."""
+    from rpg import open5e
+
+    def falso(url, params=None, timeout=5.0):
+        if "/feats/" in url:
+            nome = "Brawny" if "brawny" in url.lower() or (params or {}).get("search", "").lower() == "brawny" else "Alert"
+            desc = ("Increase your Strength score by 1, to a maximum of 20."
+                    if nome == "Brawny" else "You gain +5 to initiative.")
+            return open5e.Response(ok=True, data={"name": nome, "desc": desc,
+                                                  "prerequisite": ""}, status_code=200)
+        return open5e.Response(ok=False, data=None, status_code=404)
+
+    monkeypatch.setattr(open5e, "get", falso)
+
+
+def test_talento_consome_os_dois_pontos(helena, srd_com_talento):
+    saida = td.choose_feat("Helena", "Alert")
+    assert "Alert" in saida
+    assert td._asi_pontos_pendentes(helena["sheet"]) == 0, "talento de graça"
+
+
+def test_talento_recusado_com_so_um_ponto(helena, srd_com_talento):
+    td.apply_asi("Helena", "forca", 1)
+    saida = td.choose_feat("Helena", "Alert")
+    assert "incremento inteiro" in saida
+    assert "Alert" not in [h["nome"] for h in helena["habilidades"]]
+
+
+def test_talento_vale_para_quem_subiu_devendo(helena, srd_com_talento):
+    """Nível 5 devendo o incremento do 4: a regra por nível exato barrava."""
+    helena["sheet"]["nivel"] = 5
+    assert "Alert" in td.choose_feat("Helena", "Alert")
+
+
+def test_talento_em_ficha_antiga_mantem_a_regra_por_nivel(helena, srd_com_talento):
+    """Sem contador não há pool; vale o nível, agora com os extras do guerreiro."""
+    helena["sheet"].pop("asi_pontos_gastos")
+    helena["sheet"]["nivel"] = 5
+    assert "Talentos só podem" in td.choose_feat("Helena", "Alert")
+    helena["sheet"]["nivel"] = 6                         # extra do guerreiro
+    assert "Alert" in td.choose_feat("Helena", "Alert")
+
+
+def test_bonus_de_atributo_do_talento_para_no_20(helena, srd_com_talento):
+    """Era min(30, …) — divergia do teto que apply_asi impõe."""
+    helena["sheet"]["forca"] = 20
+    td.choose_feat("Helena", "Brawny")
+    assert helena["sheet"]["forca"] == 20
