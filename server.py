@@ -111,21 +111,21 @@ _COMBAT_START_RE = re.compile(
 )
 _HP_CHANGE_RE = re.compile(
     # Seta com contexto HP explícito: "vida: 15 → 9", "HP 12 → 7"
-    r'(?:(?:vida|hp|pv)\b.{0,20}\d+\s*[→➜▶]\s*-?\d+)'
+    r'(?:(?:vida|hp|pv)\b.{0,20}\d+\s*[→▶]\s*-?\d+)'
     # Seta com max HP: "15 → 9/12" — formato das ferramentas copiado na narrativa
-    r'|(?:\d+\s*[→➜▶]\s*-?\d+\s*/\s*\d+)'
+    r'|(?:\d+\s*[→▶]\s*-?\d+\s*/\s*\d+)'
     # Forma narrativa explícita: "perdeu 6 PV", "tomou 4 pontos de vida"
     r'|(?:(?:perdeu|sofreu|tomou|curou)\s+\d+\s*(?:pontos?\s+de\s+vida|pv\b))',
     re.IGNORECASE,
 )
 _ATTACK_RESULT_RE = re.compile(
-    r'(?:✅\s*acerto|❌\s*errou?'
+    r'(?:\bacerto!|\berrou!'
     r'|o\s+(?:ataque|golpe|disparo|virote|flecha)\s+(?:acerta|erra|conecta|atinge|perfura)'
     r'|\bacertou?\b|\berrou?\b\s+o\s+ataque)',
     re.IGNORECASE,
 )
 _MANA_CHANGE_RE = re.compile(
-    r'mana[:\s]+\d+\s*[→➜]\s*\d+',
+    r'mana[:\s]+\d+\s*[→]\s*\d+',
     re.IGNORECASE,
 )
 # Detecta quando o agente narra que um personagem aprendeu uma magia/habilidade
@@ -586,7 +586,7 @@ def _build_correction_prompt(violations: list[str], already_called: set | None =
     if already_stateful:
         tools_str = ", ".join(sorted(already_stateful))
         lines += [
-            f"\n⚠️  ATENÇÃO: as seguintes ferramentas JÁ foram chamadas neste turno e NÃO devem ser chamadas novamente: {tools_str}",
+            f"\nATENÇÃO: as seguintes ferramentas JÁ foram chamadas neste turno e NÃO devem ser chamadas novamente: {tools_str}",
             "   Re-chamá-las causaria efeitos duplicados (dano duplo, mana dupla, etc.).",
             "   Apenas narre o resultado já obtido, corrigindo o formato.",
         ]
@@ -1450,7 +1450,7 @@ def set_feature_choice_route():
         _mem.load_campaign()
 
     msg = set_feature_choice(char, feature, choice)
-    ok = msg.startswith("✅") or msg.startswith("🗑️")
+    ok = not msg.lstrip().startswith(("Erro:", "Aviso:", "Nota:"))
     return jsonify({"ok": ok, "message": msg})
 
 
@@ -1671,7 +1671,7 @@ def start_session():
         is_ollama   = False
 
     _dbg("\n" + "▓" * 70)
-    _dbg("🚀 [MENU] Iniciando sessão de jogo — montando o agente")
+    _dbg("[MENU] Iniciando sessão de jogo — montando o agente")
     _dbg(f"   • Usuário ............ {user_id}")
     _dbg(f"   • Campanha ........... {campaign_name}")
     _dbg(f"   • Estilo (instrução) . {campaign_type}  (define a 'política' do agente)")
@@ -1681,7 +1681,7 @@ def start_session():
     agent = create_agent(model, campaign_type)
     runner, session_service = create_runner(agent)
     _n_tools = len(getattr(agent, "tools", []) or [])
-    _dbg(f"   ✅ Agente '{getattr(agent, 'name', 'rpg_master_agent')}' criado "
+    _dbg(f"   Agente '{getattr(agent, 'name', 'rpg_master_agent')}' criado "
          f"com {_n_tools} ferramentas (ações disponíveis).")
     _dbg("▓" * 70 + "\n")
 
@@ -1748,7 +1748,7 @@ def start_session():
     # Debug: este é o PRIMEIRO contexto que o agente recebe sobre o mundo.
     # Para recap/campanha nova, embute o get_full_context() (personagens,
     # local, eventos, flags, resumo) — é "como o agente sabe o que existe".
-    _dbg(f"\n📜 [CONTEXTO INICIAL] Mensagem de abertura injetada no agente "
+    _dbg(f"\n[CONTEXTO INICIAL] Mensagem de abertura injetada no agente "
          f"(tipo: {opening_type}):")
     _dbg_block(opening, title="CONTEXTO INJETADO NO AGENTE")
     _dbg("")
@@ -1793,7 +1793,7 @@ def _build_fresh_start_opening() -> str:
     ficha_line = ""
     if chars_com_ficha:
         ficha_line = (
-            "• ⚠️ Os personagens a seguir JÁ possuem ficha D&D pronta (criada "
+            "• Os personagens a seguir JÁ possuem ficha D&D pronta (criada "
             f"pelo wizard): {', '.join(chars_com_ficha)}. NÃO chame "
             "create_character_sheet para eles — as fichas já existem com "
             "atributos, vida, CA e equipamento corretos. Recriar destruiria "
@@ -1845,7 +1845,7 @@ def _build_recap() -> str:
             else f"Anuncie que é a vez de {current} e aguarde o jogador digitar 'continuar'. NÃO execute o ataque ainda."
         )
         combat_block = (
-            f"\n\n⚔️  COMBATE ATIVO — ESTADO ATUAL (NÃO RE-EXECUTE TURNOS ANTERIORES):\n"
+            f"\n\nCOMBATE ATIVO — ESTADO ATUAL (NÃO RE-EXECUTE TURNOS ANTERIORES):\n"
             f"   Rodada: {round_n}\n"
             f"   Ordem: {' → '.join(f'[{n}]' if i == idx else n for i, n in enumerate(order))}\n"
             f"   Turno atual: {current}\n"
@@ -1956,7 +1956,7 @@ def chat():
         MAX_RETRIES  = 5
 
         _dbg("\n" + "═" * 70)
-        _dbg(f"🎲 [AGENTE] Novo turno  |  usuário={adk_user}  campanha={memory.campaign.get('name', '?')}")
+        _dbg(f"[AGENTE] Novo turno  |  usuário={adk_user}  campanha={memory.campaign.get('name', '?')}")
         _dbg(f"   ▶ Entrada: {_short(texto, 300)}")
         _dbg("─" * 70)
 
@@ -1964,7 +1964,7 @@ def chat():
             full         = ""
             tools_called = set()
             if attempt > 0:
-                _dbg(f"🔁 [AGENTE] Tentativa {attempt + 1}/{MAX_RETRIES} (retry após erro recuperável)")
+                _dbg(f"[AGENTE] Tentativa {attempt + 1}/{MAX_RETRIES} (retry após erro recuperável)")
             try:
                 async for event in runner.run_async(
                     user_id=adk_user, session_id=adk_session, new_message=msg
@@ -1978,9 +1978,9 @@ def chat():
                                 kind = "write" if name in WRITE_TOOLS else "read"
                                 tools_called.add(name)
                                 # Debug: o agente DECIDIU agir sobre o ambiente.
-                                icon     = "✏️  WRITE" if kind == "write" else "👁️  READ "
+                                icon     = "WRITE" if kind == "write" else "READ "
                                 args_str = ", ".join(f"{k}={_short(v, 60)}" for k, v in args.items())
-                                _dbg(f"  🔧 [AÇÃO ] {icon} → {name}({args_str})")
+                                _dbg(f"  [AÇÃO ] {icon} → {name}({args_str})")
                                 result_q.put(("tool_call", {"name": name, "args": args, "kind": kind}))
 
                             fr = getattr(part, "function_response", None)
@@ -1992,13 +1992,13 @@ def chat():
                                     # Percepção: é exatamente o que informa o agente
                                     # sobre personagens, local, eventos e flags.
                                     # Mostra o bloco COMPLETO (não truncado).
-                                    _dbg(f"  📥 [OBSERV] {fr.name} → PERCEPÇÃO DA CENA (contexto que o agente lê):")
+                                    _dbg(f"  [OBSERV] {fr.name} → PERCEPÇÃO DA CENA (contexto que o agente lê):")
                                     _dbg_block(conteudo)
                                 else:
                                     # Limite maior aqui para não esconder marcações
                                     # importantes que vêm no fim do texto (ex.: morte,
                                     # "INCONSCIENTE", XP concedido, level up).
-                                    _dbg(f"  📥 [OBSERV] {fr.name} → {_short(conteudo, 600)}")
+                                    _dbg(f"  [OBSERV] {fr.name} → {_short(conteudo, 600)}")
                                 if conteudo:
                                     # Remove trechos marcados como instrução interna
                                     # ao modelo ([[llm]]…[[/llm]]) antes de exibir
@@ -2034,10 +2034,10 @@ def chat():
                         }
                         _cache_str = (
                             f" | cache={cached} ({usage['cache_hit_ratio']:.0%} do prompt)"
-                            if cached else " | cache=0 ⚠️ nada aproveitado"
+                            if cached else " | cache=0 nada aproveitado"
                         )
                         _dbg(
-                            f"  🧮 [TOKENS] prompt={usage['prompt_tokens']} "
+                            f"  [TOKENS] prompt={usage['prompt_tokens']} "
                             f"resposta={usage['candidates_tokens']} "
                             f"total={usage['total_tokens']}{_cache_str}"
                         )
@@ -2052,7 +2052,7 @@ def chat():
                     full = "*(O Mestre observa os registros em silêncio por um momento, parecendo organizar as memórias da aventura...)*"
 
                 _dbg("─" * 70)
-                _dbg(f"💬 [AGENTE] Resposta final ({len(tools_called)} ferramenta(s) usada(s): "
+                _dbg(f"[AGENTE] Resposta final ({len(tools_called)} ferramenta(s) usada(s): "
                      f"{', '.join(sorted(tools_called)) or 'nenhuma'})")
                 _dbg(f"   {_short(full, 400)}")
                 _dbg("═" * 70 + "\n")
@@ -2128,17 +2128,17 @@ def chat():
                             correction_attempted = True
                             correction_prompt    = _build_correction_prompt(mech_violations, tools_called)
 
-                            _dbg("\n" + "🛑" * 35)
-                            _dbg(f"🔎 [VERIFICADOR] {len(mech_violations)} violação(ões) detectada(s) "
+                            _dbg("\n" + "=" * 70)
+                            _dbg(f"[VERIFICADOR] {len(mech_violations)} violação(ões) detectada(s) "
                                  f"— a resposta do agente quebrou regras mecânicas:")
                             for v in mech_violations:
                                 _dbg(f"     • {_short(v, 160)}")
-                            _dbg("↩️  [VERIFICADOR] Re-injetando o seguinte prompt de correção no agente:")
+                            _dbg("[VERIFICADOR] Re-injetando o seguinte prompt de correção no agente:")
                             _dbg("┌" + "─" * 68)
                             for line in correction_prompt.splitlines():
                                 _dbg("│ " + line)
                             _dbg("└" + "─" * 68)
-                            _dbg("🛑" * 35 + "\n")
+                            _dbg("=" * 70 + "\n")
 
                             # Notifica o frontend que está corrigindo
                             yield f"data: {json.dumps({'type': 'correction', 'violations': mech_violations})}\n\n"
@@ -2406,10 +2406,10 @@ def generate_lore():
     full_prompt = f"{system}\n\nIdeia: {user_prompt}\n\nTipo de campanha: {campaign_type}"
 
     _route = "DeepSeek" if is_deepseek else ("Ollama" if is_ollama else "Gemini")
-    _dbg("\n" + "✨" * 35)
-    _dbg(f"🧙 [MENU/LORE] Gerando mundo da campanha via {_route} ({model})")
+    _dbg("\n" + "=" * 70)
+    _dbg(f"[MENU/LORE] Gerando mundo da campanha via {_route} ({model})")
     _dbg(f"   • Tipo: {campaign_type}  |  Ideia do jogador: {_short(user_prompt, 200)}")
-    _dbg("✨" * 35 + "\n")
+    _dbg("=" * 70 + "\n")
 
     try:
         raw = ""

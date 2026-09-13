@@ -255,7 +255,7 @@ def run(n_combates=10000, seed=1234):
         for f in total_fails[:15]:
             print("  " + f)
         return False
-    print("\n✅ 0 VIOLAÇÕES — invariantes de turno mantidos em todos os combates.")
+    print("\n0 VIOLAÇÕES — invariantes de turno mantidos em todos os combates.")
     return True
 
 
@@ -364,7 +364,7 @@ def run_screen(n_combates=5000, seed=4321):
         for f in fails[:15]:
             print("  " + f)
         return False
-    print("[TELA] ✅ 0 violações — combat_action/snapshot íntegros e sempre terminam.")
+    print("[TELA] 0 violações — combat_action/snapshot íntegros e sempre terminam.")
     return True
 
 

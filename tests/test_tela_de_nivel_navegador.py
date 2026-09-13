@@ -431,7 +431,7 @@ def test_loja_espera_a_tela_de_nivel_fechar(navegador):
 
 def test_selo_de_nivel_sobe_pelo_motor_e_abre_a_tela(navegador):
     """
-    O selo "⬆️ NÍVEL!" da ficha gravava o nível direto, com PV calculados no
+    O selo "NÍVEL!" da ficha gravava o nível direto, com PV calculados no
     navegador, sem as habilidades da classe nem o contador de incremento — e
     abria o modal de edição. Agora sobe pelo grant_xp e abre a tela de nível.
     """

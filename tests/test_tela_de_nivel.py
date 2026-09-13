@@ -485,7 +485,7 @@ def test_assinatura_vazia_quando_ninguem_deve(helena):
 
 def test_selo_sobe_de_nivel_pelo_grant_xp(campanha, povoar, monkeypatch):
     """
-    O selo "⬆️ NÍVEL!" gravava o nível pela rota de edição, com PV calculados no
+    O selo "NÍVEL!" gravava o nível pela rota de edição, com PV calculados no
     navegador, e pulava as habilidades da classe, a mana e o contador de
     incremento. Agora é grant_xp com 0 de XP.
     """

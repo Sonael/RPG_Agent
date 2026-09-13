@@ -211,7 +211,7 @@ select {
 .btn-olho:focus-visible { outline: 1px dotted var(--ink-user); outline-offset: 2px; }
 
 /* Ícone em SVG, não emoji: herda a cor do tema e desenha igual em todo
-   sistema — 👁 e 🙈 mudam de forma (e de cor) entre Windows, Android e iOS.
+   sistema — e mudam de forma (e de cor) entre Windows, Android e iOS.
    A troca é feita só por CSS a partir do aria-pressed, então o JS mexe
    apenas no estado e não há como o ícone divergir dele. */
 .btn-olho svg { width: 17px; height: 17px; display: block; }
@@ -516,7 +516,6 @@ textarea { resize: vertical; min-height: 40px; }
 
 .tool-log { display: flex; flex-wrap: wrap; gap: var(--esp-2); margin: var(--esp-3) 0; }
 .tool-item { background: rgba(0,0,0,0.03); border: 1px solid var(--page-edge); border-radius: 12px; padding: var(--esp-1) var(--esp-3); font-size: 11px; color: var(--text-muted); display: flex; align-items: center; gap: var(--esp-2); }
-.tool-item-icon { font-size: 14px; }
 .tool-item-args { font-family: 'JetBrains Mono', monospace; font-size: 9px; background: rgba(0,0,0,0.05); padding: 2px var(--esp-1); border-radius: 3px; }
 
 /* ── ZONA DE VIOLAÇÃO ── */
@@ -2913,3 +2912,18 @@ body.levelup-on { overflow: hidden; }
     padding-bottom: calc(var(--esp-3) + env(safe-area-inset-bottom));
   }
 }
+
+/* Ponto de vida do /status (antes um emoji colorido) e marca de objetivo de
+   missão (antes os caracteres de caixa marcada/vazia). */
+.hp-ponto {
+  display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+  margin-right: 6px; vertical-align: middle;
+}
+.hp-ponto-ok      { background: var(--green); }
+.hp-ponto-atencao { background: var(--gold, #c8a84b); }
+.hp-ponto-baixo   { background: var(--red); }
+.missao-marca {
+  display: inline-block; width: 10px; height: 10px; margin-right: 6px;
+  border: 1px solid currentColor; border-radius: 2px; vertical-align: -1px;
+}
+.missao-passo.feito .missao-marca { background: currentColor; }

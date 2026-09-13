@@ -3,7 +3,7 @@
 > Um RPG narrado por uma IA que age como Mestre, com memória persistente, regras
 > de D&D 5e mecanicamente fiéis e uma tela de combate tática opcional.
 
-**🎲 Jogue agora: [rpg-agent.onrender.com](https://rpg-agent.onrender.com)**
+**Jogue agora: [rpg-agent.onrender.com](https://rpg-agent.onrender.com)**
 
 > A aplicação está hospedada no plano gratuito do Render; a primeira
 > requisição após um período ocioso pode levar alguns segundos enquanto o
@@ -1020,8 +1020,8 @@ A escolha persiste por campanha (`combat_mode` em `memory.campaign`):
   meio). No fim, o servidor monta um log estruturado e a IA é chamada **uma
   vez** para narrar a luta inteira + gerar saque.
 
-Toggle do modo: sidebar do jogo → aba Mundo → "📖 Narrado pela IA" / "⚔️
-Tela tática".
+Toggle do modo: sidebar do jogo → aba Mundo → "Narrado pela IA" / "Tela
+tática".
 
 ### Log estruturado
 
@@ -1030,8 +1030,8 @@ Cada evento mecânico do combate vira uma entrada em `combat_state["log"]`
 
 ```
 [R1] Combate iniciado
-[R1] Valerius → Goblin 4 (Espada Longa): 🎲 d20=20 +3+2 = 25 vs CA 5
-     • 🌟 CRÍTICO ACERTO • 💥 dano [6 + 6] +3(mod) = 15 → HP 7→0/7
+[R1] Valerius → Goblin 4 (Espada Longa): d20=20 +3+2 = 25 vs CA 5
+     • CRÍTICO ACERTO • dano [6 + 6] +3(mod) = 15 → HP 7→0/7
 [R1] Goblin 4 caiu inconsciente
 [R1] Combate decidido, inimigos fora de ação
 [R1] Combate encerrado
@@ -1131,7 +1131,7 @@ novo, dando a vez para quem esperava. A série também resolve outra corrida:
 `refreshMemory()` costuma ser chamado duas vezes seguidas (resultado de
 ferramenta e fim do turno).
 
-### O selo "⬆️ NÍVEL!"
+### O selo "Subir de nível"
 
 O selo no cartão do personagem (aba Enciclopédia) aparece quando o XP já passa
 do limite e o nível não subiu — XP ajustado à mão, por exemplo. Ele gravava o
@@ -1230,7 +1230,7 @@ mundo. Antes ela vivia numa variável, e um F5 bastava para a loja pular na
 cara de novo.
 
 Com mais de uma loja no mesmo local, o cabeçalho ganha um seletor e a pílula
-diz "🏪 2 lojas em Oakhaven". Antes a tela só conhecia a primeira loja do
+diz "2 lojas em Oakhaven". Antes a tela só conhecia a primeira loja do
 local — o boticário ao lado da forja era inalcançável. Fechada, fica a pílula
 no canto para voltar.
 
@@ -1299,7 +1299,6 @@ Quando `combat_mode == "tela"`:
 │           Goblin 2          Goblin 3                       │
 │           HP 4/7            HP 7/7                         │
 │                                                            │
-│                   ⚔️                                        │
 │                                                            │
 │   Valerius           Elara ▶                               │
 │   HP 18/24 MP 7/7    HP 8/11 MP 10/10                      │
@@ -1311,8 +1310,8 @@ Quando `combat_mode == "tela"`:
 │ └──────────────────────────────────────────────────────┘  │
 │                                                            │
 │ Sua vez: Elara , Ação ● Bônus ● Movimento ● Reação ●      │
-│ [⚔️ Atacar] [✨ Habilidade] [🧪 Item] [🏃 Mover]           │
-│ [🛡️ Defender] [💨 Fugir] [💬 Ação Livre] [⏭️ Encerrar]    │
+│ [Atacar] [Habilidade] [Item] [Mover]                       │
+│ [Defender] [Fugir] [Ação Livre] [Encerrar]                 │
 └────────────────────────────────────────────────────────────┘
 ```
 
@@ -1325,7 +1324,7 @@ em cada ponto — o destaque marca a zona de quem joga agora:
 └─────────────────┘   └─────────────────┘   └─────────────────┘
 ```
 
-### Submenu ⚔️ Atacar, escolha de arma
+### Submenu Atacar, escolha de arma
 
 - Lista armas **equipadas** (principal + secundária) + **armas do inventário**
   (espada, arco, besta, adaga, lança, machado, martelo, cajado, etc.) +
@@ -1333,14 +1332,14 @@ em cada ponto — o destaque marca a zona de quem joga agora:
 - Depois mostra o picker de alvo. A intenção `{action:'attack', actor,
   target, weapon}` vai para `/api/combat/action`.
 
-### Submenu ✨ Habilidade, só ativas, etiquetadas
+### Submenu Habilidade, só ativas, etiquetadas
 
 - **Filtra passivas** (Proficiência: Atletismo, Estilo de Combate,
   Resistência a X, Idioma…), vão pra `passivas` (só info, sem botão).
 - Cada ativa traz etiqueta `[Ação]` (azul) ou `[Bônus]` (verde).
 - Desabilitada se o slot já foi gasto.
 
-### Submenu 🧪 Item, consumíveis classificados
+### Submenu Item, consumíveis classificados
 
 - Filtra inventário por **consumíveis** (`_CONSUMABLE_KEYWORDS`: poção,
   pergaminho, óleo, frasco, ácido, fogo alquímico, água benta…) e exclui
@@ -1355,19 +1354,19 @@ em cada ponto — o destaque marca a zona de quem joga agora:
 
 ### Outros botões
 
-- 🛡️ **Defender**, Esquivar (Dodge), Ação.
-- 💨 **Fugir**, Ação + encerra turno (sai do combate, status "fugiu").
-- 💬 **Ação Livre**, fecha temporariamente o overlay, devolve foco ao chat;
+- **Defender**, Esquivar (Dodge), Ação.
+- **Fugir**, Ação + encerra turno (sai do combate, status "fugiu").
+- **Ação Livre**, fecha temporariamente o overlay, devolve foco ao chat;
   o jogador descreve o improviso e a IA arbitra (`make_skill_check`, etc.).
   O overlay reabre no próximo `sync()` se o combate ainda estiver ativo.
-- ⏭️ **Encerrar Turno**, força avanço sem gastar slot.
+- **Encerrar Turno**, força avanço sem gastar slot.
 
 ### Fechar a tela durante o combate
 
 O botão **✕** no cabeçalho fecha a tela **sem encerrar o combate**: o
 jogador pode acessar o menu e sair do jogo no meio da luta. O combate fica
 pausado e o `combat_state` é persistido; ao voltar, retoma de onde parou.
-Uma pílula flutuante **"⚔️ Retomar combate"** reabre a tela. A flag
+Uma pílula flutuante **"Retomar combate"** reabre a tela. A flag
 `_userClosed` impede a reabertura automática no `sync()` enquanto o jogador
 mantém a tela fechada.
 
@@ -1392,7 +1391,7 @@ Quando um lado é derrotado, o servidor **captura o resultado** (vitória/
 derrota, sobreviventes, caídos) antes de `end_combat()` limpar a ordem. O
 cliente renderiza um painel com:
 
-- 🏆 **Vitória!** / 💀 **Derrota…**
+- **Vitória!** / **Derrota…**
 - Duas colunas: **De pé** vs **Caídos**, com status e HP.
 - Botões: **Continuar a história ▶** (chama `/api/combat/recap`, envia o
   texto ao chat → a IA narra a luta inteira + saque) e **Apenas fechar**.
@@ -1409,7 +1408,7 @@ turno) com base no log abaixo, e gere o SAQUE dos inimigos derrotados
 (use add_item/modify_currency se houver). Depois siga a história.
 
 - Eventos
-[R1] Valerius → Goblin 4 (Espada Longa): 🎲 d20=20 +3+2 = 25 vs CA 5 ...
+[R1] Valerius → Goblin 4 (Espada Longa): d20=20 +3+2 = 25 vs CA 5 ...
 [R1] Goblin 4 caiu inconsciente
 …
 
@@ -1511,7 +1510,7 @@ faltando faz a LLM narrar a mecânica sozinha.
 do prompt servida do cache:
 
 ```
-🧮 [TOKENS] prompt=14320 resposta=812 total=15132 | cache=11020 (77% do prompt)
+[TOKENS] prompt=14320 resposta=812 total=15132 | cache=11020 (77% do prompt)
 ```
 
 É o número que diz se aqueles ~11 mil tokens de schema estão custando integral
@@ -1728,6 +1727,28 @@ Ficam fora da escala, de propósito:
 Ainda há ~114 espaçamentos escritos direto no `style=` do HTML, fora do
 alcance da grade. Puxá-los para classes é o passo que fecha o sistema.
 
+**Sem emoji.** O projeto não usa emoji em lugar nenhum: interface, mensagens
+do motor, instrução da IA, logs do servidor e esta documentação. Emoji muda de
+desenho em cada sistema operacional, some em fontes sem suporte e dá à tela um
+ar de chat, não de livro. Onde havia um, hoje há:
+
+- **texto**, nos rótulos de botão, abas, títulos e pílulas ("Retomar
+  combate", "Loja: Forja do Torbin", "Subir de nível");
+- **SVG em linha**, onde o ícone é o elemento inteiro (botão de dado,
+  ilustrações do login) — herda a cor do tema via `currentColor`;
+- **CSS**, nos indicadores (ponto de vida do `/status`, caixa de objetivo de
+  missão).
+
+O emoji também era **sinal**: o servidor e as telas decidiam sucesso ou recusa
+pelo primeiro caractere da mensagem da ferramenta. O contrato agora é em texto
+— a ferramenta que recusa começa com **`Erro:`** ou **`Aviso:`**, e **`Nota:`**
+indica que nada mudou (a magia já era conhecida, a opção já estava marcada).
+Personagem inexistente, que antes voltava sem prefixo nenhum e passava por
+sucesso nas telas, também é `Erro:`. O front reconhece linhas de rolagem pela
+notação (`d20=`, `2d6:`), não por um ícone de dado. `tests/test_sem_emoji.py`
+varre todos os arquivos versionados e falha se um emoji voltar; ficam
+permitidos só sinais tipográficos (✕ ✓ ★ ☰ e setas simples).
+
 ---
 
 ## PWA e instalação
@@ -1780,7 +1801,7 @@ cold start "cru"; a partir daí a tela amigável entra em ação.
 
 ### Instalar como aplicativo
 
-A seção **"📲 Instalar como aplicativo"** no guia de ajuda ("Como Jogar",
+A seção **"Instalar como aplicativo"** no guia de ajuda ("Como Jogar",
 em `utils.js`) é adaptativa:
 
 - **Android (Chrome/Edge)**, capta o evento `beforeinstallprompt` e mostra

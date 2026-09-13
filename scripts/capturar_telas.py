@@ -421,7 +421,7 @@ LOJA_DUAS["lojas"]["boticario da mira"] = {
     ],
 }
 
-# Selo "⬆️ NÍVEL!" da ficha: XP suficiente, nível ainda não subido, nada
+# Selo "NÍVEL!" da ficha: XP suficiente, nível ainda não subido, nada
 # pendente. O popup não promete mais PV calculado no navegador.
 NIVEL_SELO = copy.deepcopy(NIVEL)
 NIVEL_SELO["characters"]["helena"]["sheet"].update({

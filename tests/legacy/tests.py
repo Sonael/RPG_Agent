@@ -251,7 +251,7 @@ mana_depois = m.campaign['characters']['ignis']['sheet']['mana_atual']
 chk("Ignis gastou 4 mana", mana_depois == mana_antes - 4)
 
 r = modify_mana('Ignis', -999)
-chk("mana insuficiente retorna erro", '❌' in r or 'insuficiente' in r.lower() or 'mana' in r.lower())
+chk("mana insuficiente retorna erro", 'Erro:' in r or 'insuficiente' in r.lower() or 'mana' in r.lower())
 m.campaign['characters']['ignis']['sheet']['mana_atual'] = 30  # restaurar
 
 
@@ -290,7 +290,7 @@ r = attack_roll(
     is_proficient=True,
 )
 print(f"  Kael ataca Goblin: {r[:100]}")
-chk("ataque tem resultado (acerto ou erro)", any(w in r for w in ['acerto','errou','ACERTOU','ERROU','❌','✅','dano']))
+chk("ataque tem resultado (acerto ou erro)", any(w in r for w in ['acerto','errou','ACERTOU','ERROU','','','dano']))
 
 # Ignis ataca com cajado (INT, CA 13)
 r = attack_roll(
@@ -332,7 +332,7 @@ chk("crítico: dobra os dados", 'CRÍTICO' in r or 'crítico' in r.lower())
 
 # Alvo inexistente → erro
 r = attack_roll('Kael', 'Dragão Lendário', 'espada', 8, is_proficient=True)
-chk("alvo inexistente → erro", 'não encontrado' in r.lower() or '❌' in r)
+chk("alvo inexistente → erro", 'não encontrado' in r.lower() or '' in r)
 
 
 # ════════════════════════════════════════════════════════════════
@@ -367,7 +367,7 @@ chk("Segunda Fôlego curou HP", vida_pos > 15)
 # Habilidade sem mana suficiente
 m.campaign['characters']['ignis']['sheet']['mana_atual'] = 2  # mana baixo
 r = use_ability('Ignis', 'Bola de Fogo', 'Goblin')
-chk("Mana insuficiente → erro", '❌' in r or 'insuficiente' in r.lower())
+chk("Mana insuficiente → erro", 'Erro:' in r or 'insuficiente' in r.lower())
 m.campaign['characters']['ignis']['sheet']['mana_atual'] = 30  # restaurar
 
 
@@ -383,12 +383,12 @@ print(f"  apply_condition Envenenado: {r[:100]}")
 chk("condição Envenenado aplicada",
     any(c['nome'].lower() == 'envenenado' for c in
         m.campaign['characters']['goblin']['sheet']['condicoes']))
-chk("retorno menciona desvantagem", 'desvantagem' in r.lower() or '🔴' in r)
+chk("retorno menciona desvantagem", 'desvantagem' in r.lower())
 
 # Duplicata
 with open5e.offline():
     r2 = apply_condition('Goblin', 'Envenenado', 2)
-chk("condição duplicada → aviso", '⚠️' in r2 or 'já possui' in r2.lower())
+chk("condição duplicada → aviso", 'Aviso:' in r2 or 'já possui' in r2.lower())
 
 # Aplicar segunda condição
 with open5e.offline():

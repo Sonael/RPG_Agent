@@ -203,10 +203,10 @@ def _mark_at_zero_hp(target: dict, source_name: str = "") -> str:
     if memory.is_party_member(target):
         target["status"] = "inconsciente"
         _log_combat_event("down", source_name, name, msg=f"{name} caiu inconsciente")
-        return " ⚠️  CAIU INCONSCIENTE!"
+        return " CAIU INCONSCIENTE!"
     target["status"] = "morto"
     _log_combat_event("down", source_name, name, msg=f"{name} foi derrotado")
-    return " 💀 DERROTADO!"
+    return " DERROTADO!"
 
 
 def _is_out_of_combat(name: str) -> bool:
@@ -371,13 +371,13 @@ def _auto_advance_turn(actor_name: str = "") -> str:
         _reset_turn_economy(cs)
         memory.save_campaign()
 
-        skip_msg      = f"\n   ⏩ Pulados: {', '.join(skipped)}" if skipped else ""
-        new_round_msg = f"\n   🔔 Nova rodada! Rodada {round_num} começa." if round_num > initial_round else ""
+        skip_msg      = f"\n   Pulados: {', '.join(skipped)}" if skipped else ""
+        new_round_msg = f"\n   Nova rodada! Rodada {round_num} começa." if round_num > initial_round else ""
         order_str     = " → ".join(f"[{n}]" if i == idx else n for i, n in enumerate(order))
         return (
             f"\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"⏭️  TURNO AVANÇADO — Rodada {round_num}{new_round_msg}{skip_msg}\n"
-            f"🎯 Próxima vez: **{current_name}**\n"
+            f"TURNO AVANÇADO — Rodada {round_num}{new_round_msg}{skip_msg}\n"
+            f"Próxima vez: **{current_name}**\n"
             f"   Ordem: {order_str}"
         )
 
@@ -387,7 +387,7 @@ def _auto_advance_turn(actor_name: str = "") -> str:
     cs["current_turn_index"] = 0
     cs["round"]              = 1
     memory.save_campaign()
-    return "\n\n🏳️  Todos os personagens estão fora de combate. Combate encerrado automaticamente."
+    return "\n\nTodos os personagens estão fora de combate. Combate encerrado automaticamente."
 
 
 def _combat_current_actor() -> str:
@@ -428,7 +428,7 @@ def _combat_turn_violation(actor_name: str) -> str | None:
     if not cur or memory.char_key(cur) == akey:
         return None
     return (
-        f"❌ FORA DE ORDEM: não é o turno de {actor_name}. "
+        f"Erro: FORA DE ORDEM: não é o turno de {actor_name}. "
         f"É a vez de **{cur}**.\n"
         f"   • Se {cur} é um NPC inimigo → chame execute_npc_turn().\n"
         f"   • Se o jogador tentou agir adiantado → diga 'ainda não é sua vez' "
@@ -2489,13 +2489,13 @@ def _damage_multiplier(sheet: dict, tipo: str,
     vulner  = _casa("vulnerabilidades")
 
     if imune:
-        return 0.0, f"🛡️ IMUNE a dano {tipo} — nenhum dano aplicado"
+        return 0.0, f"IMUNE a dano {tipo} — nenhum dano aplicado"
     if resiste and vulner:
-        return 1.0, f"⚖️ Resistência e vulnerabilidade a {tipo} se cancelam"
+        return 1.0, f"Resistência e vulnerabilidade a {tipo} se cancelam"
     if resiste:
-        return 0.5, f"🛡️ Resistente a dano {tipo} — dano pela metade"
+        return 0.5, f"Resistente a dano {tipo} — dano pela metade"
     if vulner:
-        return 2.0, f"💥 VULNERÁVEL a dano {tipo} — dano dobrado"
+        return 2.0, f"VULNERÁVEL a dano {tipo} — dano dobrado"
     return 1.0, ""
 
 
@@ -2531,7 +2531,7 @@ def _break_concentration(char: dict, motivo: str = "") -> str:
     sufixo = f" ({motivo})" if motivo else ""
     _log_combat_event("concentration_break", char.get("name", ""), "",
                       msg=f"{char.get('name','')} perdeu a concentração em {magia}{sufixo}")
-    return f"🌀 {char.get('name','')} PERDEU a concentração em {magia}{sufixo}!"
+    return f"{char.get('name','')} PERDEU a concentração em {magia}{sufixo}!"
 
 
 def _start_concentration(char: dict, magia: str) -> str:
@@ -2544,7 +2544,7 @@ def _start_concentration(char: dict, magia: str) -> str:
     nota  = ""
     atual = sheet.get("concentracao")
     if atual and (atual or {}).get("magia", "").lower() != (magia or "").lower():
-        nota = (f"\n   🌀 {char.get('name','')} solta a concentração em "
+        nota = (f"\n   {char.get('name','')} solta a concentração em "
                 f"{atual['magia']} para conjurar {magia}.")
     cs = memory.campaign.get("combat_state", {}) or {}
     sheet["concentracao"] = {"magia": magia, "rodada": int(cs.get("round", 1) or 1)}
@@ -2576,11 +2576,11 @@ def _concentration_save(char: dict, dano: int) -> str:
     marca = " (desvantagem: exaustão)" if exausto else ""
 
     if total >= dc:
-        return (f"🌀 Concentração ({magia}): 🎲 {log_d20}{sinal}{mod} = {total} "
-                f"vs CD {dc}{marca} → ✅ mantida")
+        return (f"Concentração ({magia}): {log_d20}{sinal}{mod} = {total} "
+                f"vs CD {dc}{marca} → mantida")
     quebra = _break_concentration(char, f"falhou no teste CD {dc}")
-    return (f"🌀 Concentração ({magia}): 🎲 {log_d20}{sinal}{mod} = {total} "
-            f"vs CD {dc}{marca} → ❌ FALHOU\n   {quebra}")
+    return (f"Concentração ({magia}): {log_d20}{sinal}{mod} = {total} "
+            f"vs CD {dc}{marca} → FALHOU\n   {quebra}")
 
 
 # ── Aplicação de dano — caminho único de todo dano do jogo ─────────────────
@@ -2639,7 +2639,7 @@ def _apply_damage(target: dict, amount: int = 0, damage_type: str = "",
         sheet["vida_temp"] = temp - absorvido
         dano -= absorvido
         restante = sheet["vida_temp"]
-        notas.append(f"🔵 PV temporários absorveram {absorvido} "
+        notas.append(f"PV temporários absorveram {absorvido} "
                      f"({'restam ' + str(restante) if restante else 'esgotados'})")
 
     hp_antes = int(sheet.get("vida_atual", 0) or 0)
@@ -2791,7 +2791,7 @@ def _checar_alcance(attacker_name: str, target_name: str, weapon: str) -> tuple[
         if dist > 0:
             za, zb = _zona_de(attacker_name), _zona_de(target_name)
             return (
-                f"❌ FORA DE ALCANCE: {attacker_name} está em **{za}** e "
+                f"Erro: FORA DE ALCANCE: {attacker_name} está em **{za}** e "
                 f"{target_name}, em **{zb}**. Corpo-a-corpo só na mesma zona — "
                 f"use move_combatant('{attacker_name}', '{zb}') primeiro "
                 f"(sair de uma zona com inimigo provoca ataque de oportunidade)."
@@ -2842,16 +2842,16 @@ def set_battlefield(zones: str, description: str = "") -> str:
     """
     cs = memory.campaign.get("combat_state", {})
     if not cs.get("is_active"):
-        return "⚠️ Nenhum combate ativo. Chame roll_initiative() primeiro."
+        return "Nenhum combate ativo. Chame roll_initiative() primeiro."
 
     nomes = [z.strip() for z in (zones or "").split(",") if z.strip()]
     if len(nomes) < 2:
-        return ("⚠️ Informe pelo menos DUAS zonas separadas por vírgula "
+        return ("Informe pelo menos DUAS zonas separadas por vírgula "
                 "(ex: 'Portão, Pátio, Sacada'). Com uma só não há distância.")
     if len(nomes) > 6:
-        return "⚠️ No máximo 6 zonas — acima disso a mesa perde o mapa de vista."
+        return "No máximo 6 zonas — acima disso a mesa perde o mapa de vista."
     if len({_norm_txt(n) for n in nomes}) != len(nomes):
-        return "⚠️ Há zonas com o mesmo nome. Dê nomes distintos."
+        return "Há zonas com o mesmo nome. Dê nomes distintos."
 
     descs = [d.strip() for d in (description or "").split(";")]
     cs["zonas"]     = nomes
@@ -2871,7 +2871,7 @@ def set_battlefield(zones: str, description: str = "") -> str:
     _log_combat_event("battlefield", msg="Campo dividido em zonas: " + " → ".join(nomes),
                       zonas=nomes)
     memory.save_campaign()
-    return "🗺️  " + describe_battlefield()
+    return describe_battlefield()
 
 
 def describe_battlefield() -> str:
@@ -2898,7 +2898,7 @@ def describe_battlefield() -> str:
                 continue
             caido = ((ch.get("status", "vivo") or "").lower() in OUT_OF_COMBAT_STATUSES
                      or int((ch.get("sheet") or {}).get("vida_atual", 0) or 0) <= 0)
-            marca = "🟦" if memory.is_party_member(ch) else "🟥"
+            marca = "[grupo]" if memory.is_party_member(ch) else "[inimigo]"
             ocupantes.append(f"{marca} {ch.get('name', nome)}" + (" (fora)" if caido else ""))
         desc = descs.get(z) or ""
         linhas.append(f"  • **{z}**{' — ' + desc if desc else ''}: "
@@ -2923,40 +2923,40 @@ def move_combatant(name: str, zone: str, dash: bool = False) -> str:
     """
     cs = memory.campaign.get("combat_state", {})
     if not cs.get("is_active"):
-        return "⚠️ Nenhum combate ativo."
+        return "Nenhum combate ativo."
     if not _zonas_ativas():
-        return ("⚠️ O campo não tem zonas. Chame set_battlefield() antes de "
+        return ("O campo não tem zonas. Chame set_battlefield() antes de "
                 "mover alguém.")
 
     ch, err = _get_char(name)
     if not ch:
-        return f"⚠️ {err}"
+        return err
     nome_real = ch.get("name", name)
 
     if (ch.get("status", "vivo") or "").lower() in OUT_OF_COMBAT_STATUSES:
-        return f"❌ {nome_real} está fora de combate e não se move."
+        return f"Erro: {nome_real} está fora de combate e não se move."
 
     destino = _zona_canonica(zone)
     if not destino:
-        return (f"⚠️ Zona '{zone}' não existe. Zonas do combate: "
+        return (f"Aviso: Zona '{zone}' não existe. Zonas do combate: "
                 + ", ".join(_zonas()))
 
     origem = _zona_de(nome_real)
     if origem == destino:
-        return f"⚠️ {nome_real} já está em **{destino}**."
+        return f"Aviso: {nome_real} já está em **{destino}**."
 
     zonas = _zonas()
     if origem not in zonas:
         # Nunca foi posicionado: entra direto, sem gastar movimento.
         _por_zona(nome_real, destino)
         memory.save_campaign()
-        return f"📍 {nome_real} entra em **{destino}**."
+        return f"{nome_real} entra em **{destino}**."
 
     passos  = abs(zonas.index(destino) - zonas.index(origem))
     maximo  = 2 if dash else 1
     if passos > maximo:
         extra = "" if dash else " — ou passe dash=True para usar a Disparada"
-        return (f"❌ **{destino}** está a {passos} zonas de **{origem}**. "
+        return (f"Erro: **{destino}** está a {passos} zonas de **{origem}**. "
                 f"O movimento alcança {maximo}{extra}.")
 
     # O bote de quem fica: só dispara se havia inimigo trancando a origem.
@@ -2967,8 +2967,8 @@ def move_combatant(name: str, zone: str, dash: bool = False) -> str:
     # Um ataque de oportunidade pode ter derrubado quem estava saindo.
     if int((ch.get("sheet") or {}).get("vida_atual", 0) or 0) <= 0:
         memory.save_campaign()
-        return (f"🏃 {nome_real} tenta ir de **{origem}** para **{destino}**…"
-                f"{oportunidade}\n   ⏹️  Cai antes de chegar.")
+        return (f"{nome_real} tenta ir de **{origem}** para **{destino}**…"
+                f"{oportunidade}\n   Cai antes de chegar.")
 
     _por_zona(nome_real, destino)
     verbo = "dispara" if dash else "avança"
@@ -2980,8 +2980,8 @@ def move_combatant(name: str, zone: str, dash: bool = False) -> str:
     trancado = _inimigos_na_zona(nome_real, destino)
     aviso = ""
     if trancado:
-        aviso = "\n   ⚔️  Em contato com: " + ", ".join(trancado)
-    return (f"🏃 {nome_real} {verbo} de **{origem}** para **{destino}**."
+        aviso = "\n   Em contato com: " + ", ".join(trancado)
+    return (f"{nome_real} {verbo} de **{origem}** para **{destino}**."
             f"{oportunidade}{aviso}")
 
 
@@ -3018,7 +3018,7 @@ def _rolar_recargas(char: dict) -> list[str]:
         cfg["ultimo_d6"] = d6
         if d6 >= minimo:
             cfg["pronto"] = True
-            voltaram.append(f"🔄 **{nome}** recarregou (d6={d6}, precisa {minimo}+).")
+            voltaram.append(f"**{nome}** recarregou (d6={d6}, precisa {minimo}+).")
     if voltaram:
         for aviso in voltaram:
             _log_combat_event("recharge", char.get("name", ""), "", msg=aviso)
@@ -3046,15 +3046,15 @@ def set_recharge_ability(name: str, ability: str, min_roll: int = 5) -> str:
     """
     ch, err = _get_char(name)
     if not ch:
-        return f"⚠️ {err}"
+        return err
     if not ability.strip():
-        return "⚠️ Informe o nome do poder."
+        return "Informe o nome do poder."
     minimo = max(2, min(6, int(min_roll or 5)))
     sheet  = ch.setdefault("sheet", {}) or ch["sheet"]
     sheet.setdefault("recargas", {})[ability.strip()] = {"min": minimo, "pronto": True}
     memory.save_campaign()
     chance = int(round((7 - minimo) / 6 * 100))
-    return (f"🔄 **{ability.strip()}** de {ch.get('name', name)} agora é poder de "
+    return (f"**{ability.strip()}** de {ch.get('name', name)} agora é poder de "
             f"recarga {minimo}–6 (~{chance}% por turno).")
 
 
@@ -3109,7 +3109,7 @@ def set_legendary_actions(name: str, options: str, count: int = 3) -> str:
     """
     ch, err = _get_char(name)
     if not ch:
-        return f"⚠️ {err}"
+        return err
 
     opcoes = []
     for bruto in (options or "").split(","):
@@ -3127,7 +3127,7 @@ def set_legendary_actions(name: str, options: str, count: int = 3) -> str:
         opcoes.append({"nome": nome, "custo": c})
 
     if not opcoes:
-        return ("⚠️ Informe pelo menos uma opção. "
+        return ("Informe pelo menos uma opção. "
                 "Ex: set_legendary_actions('Dragão', 'Ataque de Cauda, Investida Alada:2')")
 
     total = max(1, min(5, int(count or 3)))
@@ -3136,7 +3136,7 @@ def set_legendary_actions(name: str, options: str, count: int = 3) -> str:
     memory.save_campaign()
 
     lista = ", ".join(f"{o['nome']} ({o['custo']})" for o in opcoes)
-    return (f"👑 {ch.get('name', name)} agora é LENDÁRIA — {total} ações "
+    return (f"{ch.get('name', name)} agora é LENDÁRIA — {total} ações "
             f"lendárias por rodada.\n   Opções: {lista}\n"
             f"   Gaste com legendary_action() no fim do turno de OUTRO "
             f"combatente; o contador volta ao cheio no turno dela.")
@@ -3157,22 +3157,22 @@ def legendary_action(boss_name: str, option: str, target_name: str = "") -> str:
     """
     cs = memory.campaign.get("combat_state", {})
     if not cs.get("is_active"):
-        return "⚠️ Nenhum combate ativo."
+        return "Nenhum combate ativo."
 
     ch, err = _get_char(boss_name)
     if not ch:
-        return f"⚠️ {err}"
+        return err
     nome_real = ch.get("name", boss_name)
 
     lend = (ch.get("sheet") or {}).get("lendarias")
     if not isinstance(lend, dict) or not lend.get("opcoes"):
-        return (f"⚠️ {nome_real} não é uma criatura lendária. "
+        return (f"Aviso: {nome_real} não é uma criatura lendária. "
                 f"Use set_legendary_actions() antes.")
 
     if (ch.get("status", "vivo") or "").lower() in OUT_OF_COMBAT_STATUSES:
-        return f"❌ {nome_real} está fora de combate."
+        return f"Erro: {nome_real} está fora de combate."
     if int((ch.get("sheet") or {}).get("vida_atual", 0) or 0) <= 0:
-        return f"❌ {nome_real} está caído e não age."
+        return f"Erro: {nome_real} está caído e não age."
 
     # A regra: ação lendária acontece no turno DOS OUTROS. No próprio turno o
     # chefe já tem ação, bônus e ataque múltiplo — deixar passar aqui daria a
@@ -3181,7 +3181,7 @@ def legendary_action(boss_name: str, option: str, target_name: str = "") -> str:
     idx   = cs.get("current_turn_index", 0)
     atual = order[idx] if 0 <= idx < len(order) else ""
     if memory.char_key(atual) == memory.char_key(nome_real):
-        return (f"❌ É o turno de {nome_real}. Ação lendária é gasta no fim do "
+        return (f"Erro: É o turno de {nome_real}. Ação lendária é gasta no fim do "
                 f"turno de OUTRO combatente — use as ações normais dela agora.")
 
     escolhida = None
@@ -3191,12 +3191,12 @@ def legendary_action(boss_name: str, option: str, target_name: str = "") -> str:
             break
     if not escolhida:
         disponiveis = ", ".join(o["nome"] for o in lend["opcoes"])
-        return f"⚠️ Opção '{option}' não existe. Disponíveis: {disponiveis}"
+        return f"Aviso: Opção '{option}' não existe. Disponíveis: {disponiveis}"
 
     restantes = int(lend.get("restantes", 0) or 0)
     custo     = int(escolhida.get("custo", 1) or 1)
     if restantes < custo:
-        return (f"❌ {nome_real} tem {restantes} ação(ões) lendária(s) nesta "
+        return (f"Erro: {nome_real} tem {restantes} ação(ões) lendária(s) nesta "
                 f"rodada e '{escolhida['nome']}' custa {custo}. "
                 f"O contador volta ao cheio no turno dela.")
 
@@ -3207,7 +3207,7 @@ def legendary_action(boss_name: str, option: str, target_name: str = "") -> str:
     ataque = _npc_attack_entry(ch.get("sheet") or {}, escolhida["nome"])
     e_ataque = bool(ataque) or _weapon_is_ranged(escolhida["nome"]) or bool(target_name)
 
-    cabecalho = (f"👑 **Ação lendária** — {nome_real} usa "
+    cabecalho = (f"**Ação lendária** — {nome_real} usa "
                  f"**{escolhida['nome']}** ({custo}; restam {sobra}).")
     _log_combat_event("legendary", nome_real, target_name,
                       msg=f"{nome_real} usa ação lendária: {escolhida['nome']}",
@@ -3329,7 +3329,7 @@ def _provoke_opportunity_attacks(leaving_name: str, motivo: str = "fugir") -> st
 
     if not linhas:
         return ""
-    cabecalho = (f"\n\n⚡ ATAQUE(S) DE OPORTUNIDADE — {leaving_name} tenta "
+    cabecalho = (f"\n\nATAQUE(S) DE OPORTUNIDADE — {leaving_name} tenta "
                  f"{motivo} e baixa a guarda:")
     return cabecalho + "\n" + "\n".join(linhas)
 
@@ -3338,11 +3338,11 @@ def _get_char(name: str, allow_dead: bool = False) -> tuple[dict | None, str]:
     """Retorna (char_dict, erro). char é None se não encontrado, sem ficha ou morto."""
     char = memory.campaign["characters"].get(memory.char_key(name))
     if not char:
-        return None, f"Personagem '{name}' não encontrado."
+        return None, f"Erro: Personagem '{name}' não encontrado."
     if not char.get("sheet"):
-        return None, f"'{name}' não tem ficha D&D. Use create_character_sheet primeiro."
+        return None, f"Erro: '{name}' não tem ficha D&D. Use create_character_sheet primeiro."
     if not allow_dead and char.get("status") == "morto":
-        return None, f"❌ {char['name']} está morto e não pode realizar ações."
+        return None, f"Erro: {char['name']} está morto e não pode realizar ações."
     _normalize_sheet(char["sheet"])
     return char, ""
 
@@ -3460,7 +3460,7 @@ def roll_dice(sides: int, count: int = 1, modifier: int = 0) -> str:
     mod_str = (f" {'+' if modifier >= 0 else ''}{modifier}") if modifier != 0 else ""
     detail  = " + ".join(str(r) for r in rolls) if count > 1 else str(rolls[0])
 
-    return f"🎲 {count}d{sides}{mod_str}: [{detail}]{mod_str} = **{total}**"
+    return f"{count}d{sides}{mod_str}: [{detail}]{mod_str} = **{total}**"
 
 
 # ---------------------------------------------------------------------------
@@ -3897,10 +3897,10 @@ def create_character_sheet(
     if existing.get("sheet"):
         s = existing["sheet"]
         return (
-            f"ℹ️ {name} JÁ possui ficha D&D — não recriei (evita zerar atributos "
+            f"Nota: {name} JÁ possui ficha D&D — não recriei (evita zerar atributos "
             f"e duplicar itens). Estado atual: {s.get('classe')} {s.get('raca')} "
-            f"Nv.{s.get('nivel')}, ❤️{s.get('vida_atual')}/{s.get('vida_max')} "
-            f"🛡️CA {s.get('ca')}. Para ajustar use set_stat / learn_spell / "
+            f"Nv.{s.get('nivel')}, {s.get('vida_atual')}/{s.get('vida_max')} "
+            f"CA {s.get('ca')}. Para ajustar use set_stat / learn_spell / "
             f"add_item etc. — NÃO recrie a ficha."
         )
 
@@ -3931,21 +3931,21 @@ def create_character_sheet(
     # Aplica magias iniciais para classes conjuradoras (usa chosen_spells se fornecida)
     chosen = kwargs.get("initial_spells")  # lista opcional de nomes escolhidos pelo wizard
     spells_added = _apply_initial_spells(char_obj, classe, chosen_spells=chosen)
-    spells_str = f"\n   ✨ Magias iniciais: {', '.join(spells_added)}" if spells_added else ""
-    feats_str  = f"\n   📖 Habilidades de classe: {', '.join(all_feats)}" if all_feats else ""
+    spells_str = f"\n   Magias iniciais: {', '.join(spells_added)}" if spells_added else ""
+    feats_str  = f"\n   Habilidades de classe: {', '.join(all_feats)}" if all_feats else ""
 
     if not memory.campaign.get("protagonist"):
         memory.campaign["protagonist"] = name
 
     memory.save_campaign()
     return (
-        f"✅ Ficha criada para {name}!\n"
+        f"Ficha criada para {name}!\n"
         f"   Classe: {classe} | Raça: {raca} | Nível: {nivel} | Prof: +{prof}\n"
         f"   Bônus racial: {bonus_str}{spells_str}{feats_str}\n"
-        f"   ❤️  Vida: {sheet['vida_max']}/{sheet['vida_max']} | ✨ Mana: {sheet['mana_max']}/{sheet['mana_max']} | 🛡️  CA: {sheet['ca']}\n"
+        f"   Vida: {sheet['vida_max']}/{sheet['vida_max']} | Mana: {sheet['mana_max']}/{sheet['mana_max']} | CA: {sheet['ca']}\n"
         f"   FOR {_mod_str(sheet['forca'])}  DES {_mod_str(sheet['destreza'])}  CON {_mod_str(sheet['constituicao'])}\n"
         f"   INT {_mod_str(sheet['inteligencia'])}  SAB {_mod_str(sheet['sabedoria'])}  CAR {_mod_str(sheet['carisma'])}\n"
-        f"   💰 Ouro: 0 | Prata: 0 | Cobre: 0"
+        f"   Ouro: 0 | Prata: 0 | Cobre: 0"
     )
 
 
@@ -4004,22 +4004,22 @@ def get_character_sheet(name: str) -> str:
     )
 
     # Moedas
-    moedas = f"💰 Ouro: {s.get('ouro', 0)} | Prata: {s.get('prata', 0)} | Cobre: {s.get('cobre', 0)}"
+    moedas = f"Ouro: {s.get('ouro', 0)} | Prata: {s.get('prata', 0)} | Cobre: {s.get('cobre', 0)}"
 
     # Death saves (só relevante se HP = 0)
     death_str = ""
     if s["vida_atual"] == 0:
         death_str = (
-            f"\n  ☠️  Testes de Morte — ✅ Sucessos: {s.get('death_saves_sucessos', 0)}/3"
-            f" | ❌ Falhas: {s.get('death_saves_falhas', 0)}/3"
+            f"\n  Testes de Morte — Sucessos: {s.get('death_saves_sucessos', 0)}/3"
+            f" | Falhas: {s.get('death_saves_falhas', 0)}/3"
         )
 
     # PV temporários, concentração e defesas por tipo de dano.
     temp     = _temp_hp(s)
-    temp_str = f"  🔵 +{temp} PV temporários\n" if temp else ""
+    temp_str = f"  +{temp} PV temporários\n" if temp else ""
 
     conc     = s.get("concentracao") or {}
-    conc_str = f"  🌀 Concentrado em: {conc.get('magia')}\n" if conc else ""
+    conc_str = f"  Concentrado em: {conc.get('magia')}\n" if conc else ""
 
     def _linha_traits(rotulo: str, campo: str) -> str:
         entradas = _traits_lookup(s, campo)
@@ -4031,17 +4031,17 @@ def get_character_sheet(name: str) -> str:
         return f"  {rotulo}: {', '.join(tipos)}{cond}\n"
 
     defesas_str = (
-        _linha_traits("🛡️ Imunidades",        "imunidades")
-        + _linha_traits("🛡️ Resistências",    "resistencias")
-        + _linha_traits("💥 Vulnerabilidades", "vulnerabilidades")
+        _linha_traits("Imunidades",        "imunidades")
+        + _linha_traits("Resistências",    "resistencias")
+        + _linha_traits("Vulnerabilidades", "vulnerabilidades")
     )
 
     return (
         f"╔══ {char['name']} — {s['classe']} {s['raca']} Nível {nivel} ══╗\n"
         f"  XP: {xp}/{xp_p}\n"
-        f"  ❤️  Vida [{bar}] {s['vida_atual']}/{s['vida_max']}{death_str}\n"
+        f"  Vida [{bar}] {s['vida_atual']}/{s['vida_max']}{death_str}\n"
         f"{temp_str}"
-        f"  ✨ Mana: {s['mana_atual']}/{s['mana_max']}   🛡️  CA: {s['ca']}   Prof: +{s['proficiencia']}\n"
+        f"  Mana: {s['mana_atual']}/{s['mana_max']}   CA: {s['ca']}   Prof: +{s['proficiencia']}\n"
         f"{conc_str}{defesas_str}"
         f"  ───────────────────────────────────\n"
         f"  FOR {_mod_str(s['forca'])}  DES {_mod_str(s['destreza'])}  CON {_mod_str(s['constituicao'])}\n"
@@ -4069,24 +4069,24 @@ def get_combat_status() -> str:
     if not chars_with_sheet:
         return "Nenhum personagem com ficha D&D em campo."
 
-    lines = ["⚔️  Status de Combate:"]
+    lines = ["Status de Combate:"]
     for ch in chars_with_sheet:
         s    = ch["sheet"]
         bar  = _hp_bar(s["vida_atual"], s["vida_max"])
         pct  = s["vida_atual"] / s["vida_max"] if s["vida_max"] > 0 else 0
-        warn = " ⚠️ INCONSCIENTE" if s["vida_atual"] == 0 else (" ⚠️ CRÍTICO" if pct <= 0.25 else "")
+        warn = " INCONSCIENTE" if s["vida_atual"] == 0 else (" CRÍTICO" if pct <= 0.25 else "")
 
         conds = s.get("condicoes", [])
         cond_tag = ""
         if conds:
             names    = ", ".join(c["nome"].capitalize() for c in conds)
-            cond_tag = f"\n    🔴 Condições: {names}"
+            cond_tag = f"\n    Condições: {names}"
 
         lines.append(
             f"  {ch['name']} (Nv.{s['nivel']} {s['classe']}){warn}\n"
-            f"    ❤️  [{bar}] {s['vida_atual']}/{s['vida_max']}"
-            f"   ✨ {s['mana_atual']}/{s['mana_max']}"
-            f"   🛡️  CA {s['ca']}{cond_tag}"
+            f"    [{bar}] {s['vida_atual']}/{s['vida_max']}"
+            f"   {s['mana_atual']}/{s['mana_max']}"
+            f"   CA {s['ca']}{cond_tag}"
         )
     return "\n".join(lines)
 
@@ -4139,7 +4139,7 @@ def modify_hp(char_name: str, amount: int, reason: str = "",
     if s["vida_atual"] == 0:
         warn = _mark_at_zero_hp(char, reason or "")
     elif pct <= 0.25:
-        warn = " ⚠️  Estado crítico!"
+        warn = " Estado crítico!"
     elif pct <= 0.5:
         warn = " Ferido."
     else:
@@ -4149,13 +4149,13 @@ def modify_hp(char_name: str, amount: int, reason: str = "",
             s["death_saves_sucessos"] = 0
             s["death_saves_falhas"]   = 0
             char["status"]            = "vivo"
-            extra = "\n   ✅ Testes de morte resetados. Personagem estabilizado!"
+            extra = "\n   Testes de morte resetados. Personagem estabilizado!"
 
     memory.save_campaign()
     return (
         f"{char['name']} {acao} {abs(delta)} pv{reason_str}."
         + _fmt_notas(notas, indent="") +
-        f"\n❤️  Vida: {hp_antes} → {s['vida_atual']}/{s['vida_max']}{warn}{extra}"
+        f"\nVida: {hp_antes} → {s['vida_atual']}/{s['vida_max']}{warn}{extra}"
     )
 
 
@@ -4179,14 +4179,14 @@ def grant_temp_hp(char_name: str, amount: int, source: str = "") -> str:
 
     novo = max(0, int(amount or 0))
     if novo <= 0:
-        return f"❌ Quantidade inválida de PV temporários: {amount}."
+        return f"Erro: Quantidade inválida de PV temporários: {amount}."
 
     s      = char["sheet"]
     atual  = _temp_hp(s)
     origem = f" ({source})" if source else ""
 
     if novo <= atual:
-        return (f"🔵 {char['name']} já tem {atual} PV temporários — "
+        return (f"{char['name']} já tem {atual} PV temporários — "
                 f"os {novo}{origem} não se acumulam e são descartados "
                 f"(5e: vale o maior, nunca a soma).")
 
@@ -4195,7 +4195,7 @@ def grant_temp_hp(char_name: str, amount: int, source: str = "") -> str:
                       msg=f"{char['name']} ganhou {novo} PV temporários{origem}")
     substituiu = f" (substitui os {atual} anteriores)" if atual else ""
     memory.save_campaign()
-    return (f"🔵 {char['name']} ganhou **{novo} PV temporários**{origem}"
+    return (f"{char['name']} ganhou **{novo} PV temporários**{origem}"
             f"{substituiu}.\n"
             f"   Eles absorvem dano antes dos PV reais e somem no descanso longo.")
 
@@ -4217,8 +4217,8 @@ def modify_mana(char_name: str, amount: int, reason: str = "") -> str:
     s = char["sheet"]
     if amount < 0 and s["mana_atual"] < abs(amount):
         return (
-            f"❌ {char['name']} não tem mana suficiente!\n"
-            f"✨ Mana atual: {s['mana_atual']}/{s['mana_max']} (necessário: {abs(amount)})"
+            f"Erro: {char['name']} não tem mana suficiente!\n"
+            f"Mana atual: {s['mana_atual']}/{s['mana_max']} (necessário: {abs(amount)})"
         )
 
     mana_antes    = s["mana_atual"]
@@ -4229,7 +4229,7 @@ def modify_mana(char_name: str, amount: int, reason: str = "") -> str:
     memory.save_campaign()
     return (
         f"{char['name']} {acao} {abs(amount)} de mana{reason_str}.\n"
-        f"✨ Mana: {mana_antes} → {s['mana_atual']}/{s['mana_max']}"
+        f"Mana: {mana_antes} → {s['mana_atual']}/{s['mana_max']}"
     )
 
 
@@ -4338,17 +4338,17 @@ def make_skill_check(
 
     skill_label = f"{skill.capitalize()} ({attribute.capitalize()})" if skill else attribute.capitalize()
     result = (
-        f"🎲 Teste de {skill_label} — CD {difficulty}\n"
+        f"Teste de {skill_label} — CD {difficulty}\n"
         f"   {char['name']}: {roll_log} {sign}{mod}(mod) = **{total}**\n"
     )
     if critico:
-        result += "   🌟 CRÍTICO NATURAL! Sucesso automático."
+        result += "   CRÍTICO NATURAL! Sucesso automático."
     elif falha_critica:
-        result += "   💀 FALHA CRÍTICA! Falha automática."
+        result += "   FALHA CRÍTICA! Falha automática."
     elif sucesso:
-        result += f"   ✅ SUCESSO! ({total} ≥ CD {difficulty})"
+        result += f"   SUCESSO! ({total} ≥ CD {difficulty})"
     else:
-        result += f"   ❌ FALHA. ({total} < CD {difficulty})"
+        result += f"   FALHA. ({total} < CD {difficulty})"
 
     return result
 
@@ -4445,17 +4445,17 @@ def social_check(
     skill_cap    = skill.capitalize()
 
     result = (
-        f"🎭 Teste de {skill_cap}{prof_tag} — CD {dc_efetiva}{nota_atitude}\n"
+        f"Teste de {skill_cap}{prof_tag} — CD {dc_efetiva}{nota_atitude}\n"
         f"   {char['name']}{target_str}: d20={d20} {sign}{total_mod}(mod) = **{total}**\n"
     )
     if critico:
-        result += "   🌟 CRÍTICO NATURAL! Sucesso total — reação excepcionalmente positiva."
+        result += "   CRÍTICO NATURAL! Sucesso total — reação excepcionalmente positiva."
     elif falha_critica:
-        result += "   💀 FALHA CRÍTICA! Falha total — reação negativa ou hostil."
+        result += "   FALHA CRÍTICA! Falha total — reação negativa ou hostil."
     elif sucesso:
-        result += f"   ✅ SUCESSO! ({total} ≥ CD {dc_efetiva})"
+        result += f"   SUCESSO! ({total} ≥ CD {dc_efetiva})"
     else:
-        result += f"   ❌ FALHA. ({total} < CD {dc_efetiva})"
+        result += f"   FALHA. ({total} < CD {dc_efetiva})"
 
     memory.save_campaign()
     return result
@@ -4464,7 +4464,7 @@ def social_check(
 # Aviso anexado por attack_roll(end_turn=False). Fica numa constante porque o
 # Ataque Múltiplo precisa removê-lo dos golpes intermediários — ali o turno não
 # avança por ser multiattack, não porque sobrou uma ação bônus.
-_BONUS_ACTION_HINT = "\n   ↩️  Ação bônus disponível — ataque extra pendente neste turno."
+_BONUS_ACTION_HINT = "\n   Ação bônus disponível — ataque extra pendente neste turno."
 
 
 def _npc_attack_entry(sheet: dict, weapon: str) -> dict | None:
@@ -4613,7 +4613,7 @@ def attack_roll(
     if not attacker or not attacker.get("sheet"):
         return f"Atacante '{attacker_name}' não encontrado ou sem ficha D&D."
     if attacker.get("status") == "morto":
-        return f"❌ {attacker_name} está morto e não pode atacar."
+        return f"Erro: {attacker_name} está morto e não pode atacar."
     if not target or not target.get("sheet"):
         return f"Alvo '{target_name}' não encontrado ou sem ficha D&D."
 
@@ -4707,26 +4707,26 @@ def attack_roll(
         active_conds = [c["nome"] for c in _get_conditions(attacker)
                         if CONDITION_EFFECTS.get(c["nome"].lower(), {}).get("attack_disadvantage")]
         disadvantage = True
-        cond_notes.append(f"🔴 {attacker['name']} está {', '.join(active_conds)} → desvantagem automática")
+        cond_notes.append(f"{attacker['name']} está {', '.join(active_conds)} → desvantagem automática")
 
     # Atacante tem condição que concede vantagem (ex: invisível)?
     if _has_condition_effect(attacker, "attack_advantage"):
         active_conds = [c["nome"] for c in _get_conditions(attacker)
                         if CONDITION_EFFECTS.get(c["nome"].lower(), {}).get("attack_advantage")]
         advantage = True
-        cond_notes.append(f"🟢 {attacker['name']} está {', '.join(active_conds)} → vantagem automática")
+        cond_notes.append(f"{attacker['name']} está {', '.join(active_conds)} → vantagem automática")
 
     # Alvo tem condição que concede vantagem ao atacante (Cego, Paralisado, etc.)?
     if _has_condition_effect(target, "defense_disadvantage"):
         active_conds = [c["nome"] for c in _get_conditions(target)
                         if CONDITION_EFFECTS.get(c["nome"].lower(), {}).get("defense_disadvantage")]
         advantage = True
-        cond_notes.append(f"🟢 {target['name']} está {', '.join(active_conds)} → atacante ganha vantagem")
+        cond_notes.append(f"{target['name']} está {', '.join(active_conds)} → atacante ganha vantagem")
 
     # Alvo paralisado / petrificado → crítico automático (melee implícito)
     force_crit = _has_condition_effect(target, "auto_crit")
     if force_crit:
-        cond_notes.append(f"⚡ {target['name']} está paralisado/petrificado → crítico automático!")
+        cond_notes.append(f"{target['name']} está paralisado/petrificado → crítico automático!")
 
     # ── Bônus por Estilo de Combate / Inimigo Favorecido ────────────────────
     # Calcula UMA vez e reusa para a linha de log e para o cálculo final.
@@ -4741,13 +4741,13 @@ def attack_roll(
     style_note     = ""
     if style == "Arquearia" and is_ranged:
         style_atk_bonus = 2
-        style_note     = "🏹 Estilo: Arquearia → +2 atk à distância"
+        style_note     = "Estilo: Arquearia → +2 atk à distância"
     elif style == "Duelo" and not is_ranged and not is_2h_wpn and not has_off:
         style_dmg_bonus = 2
-        style_note      = "🗡️ Estilo: Duelo → +2 dano (arma 1h, sem off-hand)"
+        style_note      = "Estilo: Duelo → +2 dano (arma 1h, sem off-hand)"
     elif style == "Grande Arma" and not is_ranged and is_2h_wpn:
         style_reroll_low = True
-        style_note       = "🪓 Estilo: Grande Arma → re-rola 1s/2s no dado"
+        style_note       = "Estilo: Grande Arma → re-rola 1s/2s no dado"
     # "Combate com Duas Armas" → o bônus se aplica APENAS no ataque off-hand;
     # como esse fluxo é orquestrado pela LLM com 2 chamadas separadas, ela já
     # informa quando é o off-hand passando attack_attribute manualmente. Por
@@ -4766,7 +4766,7 @@ def attack_roll(
         # Match por substring — "humanoid (orc)" casa com "humanoides"
         if target_type and any(t.rstrip("s") in target_type for t in favored):
             favored_bonus = 2
-            style_note = (style_note + " · " if style_note else "") + "🎯 Inimigo Favorecido → +2 dano"
+            style_note = (style_note + " · " if style_note else "") + "Inimigo Favorecido → +2 dano"
 
     # ── Golpe Divino (Domínio de Clérigo / Paladino) ────────────────────────
     # +1d8 (2d8 a partir do nv. 14) de dano elemental UMA vez por turno, ao
@@ -4793,9 +4793,9 @@ def attack_roll(
     falha_critica = (not force_crit) and (d20 == 1)
     if critico and crit_min < 20 and not force_crit and d20 < 20:
         style_note = (style_note + " · " if style_note else "") + \
-                     f"🌟 Crítico ampliado ({crit_min}-20)"
+                     f"Crítico ampliado ({crit_min}-20)"
 
-    result = f"⚔️  {attacker['name']} ataca {target['name']} com {weapon}!\n"
+    result = f"{attacker['name']} ataca {target['name']} com {weapon}!\n"
     if cond_notes:
         result += "   " + "\n   ".join(cond_notes) + "\n"
     if style_note:
@@ -4804,10 +4804,10 @@ def attack_roll(
     result += f"   {roll_log} +{mod}(mod) +{prof}(prof){_atk_style_str} = **{attack_total}** vs CA {target_ca}\n"
 
     if falha_critica:
-        result += "   💀 ERRO CRÍTICO! O ataque falha miseravelmente."
+        result += "   ERRO CRÍTICO! O ataque falha miseravelmente."
         _log_combat_event("attack_fumble", attacker["name"], target["name"],
                           msg=(f"{attacker['name']} → {target['name']} ({weapon}): "
-                               f"🎲 d20=1 → ERRO CRÍTICO"),
+                               f"d20=1 → ERRO CRÍTICO"),
                           weapon=weapon, d20=1, atk_total=attack_total,
                           ca=target_ca)
         if end_turn:
@@ -4852,12 +4852,12 @@ def attack_roll(
         if gd_total:
             bonus_str += f" +{gd_total}(golpe divino)"
 
-        result += f"   {'🌟 CRÍTICO! ' if critico else ''}✅ ACERTO!\n"
+        result += f"   {'CRÍTICO! ' if critico else ''}ACERTO!\n"
         if rerolled:
             _rr = ", ".join(f"{old}→{new}" for _, old, new in rerolled)
-            result += f"   🪓 Grande Arma re-rolou: {_rr}\n"
+            result += f"   Grande Arma re-rolou: {_rr}\n"
         if gd_rolls:
-            result += (f"   ⚡ Golpe Divino: {len(gd_rolls)}d8 "
+            result += (f"   Golpe Divino: {len(gd_rolls)}d8 "
                        f"[{' + '.join(str(r) for r in gd_rolls)}] = {gd_total} "
                        f"dano {gd_tipo}\n")
         _tipo_str = f" ({dmg_type})" if dmg_type else ""
@@ -4880,15 +4880,15 @@ def attack_roll(
         pct       = hp_depois / st["vida_max"] if st["vida_max"] > 0 else 0
 
         result += _fmt_notas(_res["notas"])
-        result += f"\n   {target['name']}: ❤️  {hp_antes} → {hp_depois}/{st['vida_max']}"
+        result += f"\n   {target['name']}: {hp_antes} → {hp_depois}/{st['vida_max']}"
         _dmg_expr = f"[{detail}] +{mod}(mod){bonus_str} = {dmg}"
         _log_combat_event(
             "attack_crit" if critico else "attack_hit",
             attacker["name"], target["name"],
             msg=(f"{attacker['name']} → {target['name']} ({weapon}): "
-                 f"🎲 d20={d20} +{mod}+{prof} = {attack_total} vs CA {target_ca} • "
-                 f"{'🌟 CRÍTICO ' if critico else ''}ACERTO • "
-                 f"💥 dano {_dmg_expr} → HP {hp_antes}→{hp_depois}/{st['vida_max']}"),
+                 f"d20={d20} +{mod}+{prof} = {attack_total} vs CA {target_ca} • "
+                 f"{'CRÍTICO ' if critico else ''}ACERTO • "
+                 f"dano {_dmg_expr} → HP {hp_antes}→{hp_depois}/{st['vida_max']}"),
             weapon=weapon, d20=d20, atk_total=attack_total, ca=target_ca,
             dmg=dmg, dmg_dice=detail, hp=hp_depois, hp_max=st["vida_max"],
             crit=bool(critico),
@@ -4899,18 +4899,18 @@ def attack_roll(
         elif _was_asleep:
             # 5e: uma criatura dormindo (Sleep) acorda ao sofrer dano.
             _wake_sleeper(target)
-            result += f" ⏰ {target['name']} acordou com o golpe!"
+            result += f" {target['name']} acordou com o golpe!"
             _log_combat_event("wake", attacker["name"], target["name"],
                               msg=f"{target['name']} acordou ao sofrer dano")
         elif pct <= 0.25:
-            result += " ⚠️  Estado crítico!"
+            result += " Estado crítico!"
 
         memory.save_campaign()
     else:
-        result += f"   ❌ ERROU! ({attack_total} < CA {target_ca})"
+        result += f"   ERROU! ({attack_total} < CA {target_ca})"
         _log_combat_event("attack_miss", attacker["name"], target["name"],
                           msg=(f"{attacker['name']} → {target['name']} ({weapon}): "
-                               f"🎲 d20={d20} +{mod}+{prof} = {attack_total} "
+                               f"d20={d20} +{mod}+{prof} = {attack_total} "
                                f"vs CA {target_ca} • ERROU"),
                           weapon=weapon, d20=d20, atk_total=attack_total,
                           ca=target_ca)
@@ -4966,7 +4966,7 @@ def learn_ability(
     })
     memory.save_campaign()
     return (
-        f"⚡ {char['name']} aprendeu '{ability_name}'!\n"
+        f"{char['name']} aprendeu '{ability_name}'!\n"
         f"   Dado: {damage_dice} | Custo: {mana_cost} mana\n"
         f"   Efeito: {description}"
     )
@@ -5051,7 +5051,7 @@ def use_ability(
             _d6 = _cfg.get("ultimo_d6")
             _rolagem = f" (último d6: {_d6})" if _d6 else ""
             return (
-                f"❌ **{_rec}** de {char['name']} está GASTO{_rolagem}. "
+                f"Erro: **{_rec}** de {char['name']} está GASTO{_rolagem}. "
                 f"Recarrega com {int(_cfg.get('min', 5) or 5)}+ no d6, rolado "
                 f"sozinho no início do turno dele.\n"
                 f"   Use outra ação nesta rodada."
@@ -5060,8 +5060,8 @@ def use_ability(
     if custo > 0:
         if s["mana_atual"] < custo:
             return (
-                f"❌ {char['name']} não tem mana suficiente para '{ability_name}'!\n"
-                f"✨ Mana: {s['mana_atual']}/{s['mana_max']} (necessário: {custo})"
+                f"Erro: {char['name']} não tem mana suficiente para '{ability_name}'!\n"
+                f"Mana: {s['mana_atual']}/{s['mana_max']} (necessário: {custo})"
             )
         s["mana_atual"] -= custo
 
@@ -5077,9 +5077,9 @@ def use_ability(
     bonus_str  = f" + {bonus}" if bonus > 0 else (f" - {abs(bonus)}" if bonus < 0 else "")
 
     result = (
-        f"✨ {char['name']} usa {hab['nome']}{target_str}!\n"
-        f"   Custo: {custo} mana | ✨ Mana restante: {s['mana_atual']}/{s['mana_max']}\n"
-        f"   🎲 {n_dice}d{sides}: [{detail}]{bonus_str} = **{total_dano}**\n"
+        f"{char['name']} usa {hab['nome']}{target_str}!\n"
+        f"   Custo: {custo} mana | Mana restante: {s['mana_atual']}/{s['mana_max']}\n"
+        f"   {n_dice}d{sides}: [{detail}]{bonus_str} = **{total_dano}**\n"
         f"   Efeito: {hab['descricao']}"
     )
 
@@ -5087,7 +5087,7 @@ def use_ability(
     # sustentava Bênção, Escudo da Fé e Arma Espiritual ao mesmo tempo.
     if _requires_concentration(hab):
         result += _start_concentration(char, hab["nome"])
-        result += f"\n   🌀 {char['name']} está concentrado em {hab['nome']}."
+        result += f"\n   {char['name']} está concentrado em {hab['nome']}."
 
     # ── Aplica efeito ao alvo ────────────────────────────────────────────────
     ctrl_effect = _get_control_effect(hab)
@@ -5160,12 +5160,12 @@ def use_ability(
                 slept.append(f"{tchar['name']} ({hp} HP)")
 
         # Monta linha de resultado do pool
-        result += f"\n   🎯 Pool: **{pool} HP**"
+        result += f"\n   Pool: **{pool} HP**"
         if slept:
-            result += f"\n   💤 Dormindo: {', '.join(slept)}"
+            result += f"\n   Dormindo: {', '.join(slept)}"
             result += f"\n   Pool usado: {pool - remaining} HP | Restante: {remaining} HP"
         else:
-            result += "\n   ⚪ Nenhum alvo foi afetado — todos têm HP alto demais."
+            result += "\n   Nenhum alvo foi afetado — todos têm HP alto demais."
 
     # ══════════════════════════════════════════════════════════════════════════
     # EFEITOS DE ALVO ÚNICO (cura / condição direta / dano)
@@ -5186,21 +5186,21 @@ def use_ability(
                     efeito_sucesso = "sem efeito"
                     return (
                         result +
-                        f"\n\n⏸️  **AGUARDANDO TESTE DE RESISTÊNCIA**\n"
+                        f"\n\n**AGUARDANDO TESTE DE RESISTÊNCIA**\n"
                         f"   Alvo: {target['name']}\n"
                         f"   Atributo: {saving_throw_stat.capitalize()} | CD: {saving_throw_dc}\n"
                         f"   Efeito (falha): **{efeito_falha}** | Efeito (sucesso): **{efeito_sucesso}**\n"
-                        f"\n💬 Mestre: Role {saving_throw_stat.capitalize()} CD {saving_throw_dc}!\n"
+                        f"\nMestre: Role {saving_throw_stat.capitalize()} CD {saving_throw_dc}!\n"
                         f"   Se falhar: use apply_condition('{target['name']}', '{cond_nome}')."
                     )
                 else:
                     return (
                         result +
-                        f"\n\n⏸️  **AGUARDANDO TESTE DE RESISTÊNCIA**\n"
+                        f"\n\n**AGUARDANDO TESTE DE RESISTÊNCIA**\n"
                         f"   Alvo: {target['name']}\n"
                         f"   Atributo: {saving_throw_stat.capitalize()} | CD: {saving_throw_dc}\n"
                         f"   Dano (falha): **{total_dano}** | Dano reduzido (sucesso): **{total_dano // 2}**\n"
-                        f"\n💬 Mestre: Role {saving_throw_stat.capitalize()} CD {saving_throw_dc}!\n"
+                        f"\nMestre: Role {saving_throw_stat.capitalize()} CD {saving_throw_dc}!\n"
                         f"   Após resultado, use modify_hp para aplicar o dano correto."
                     )
 
@@ -5209,14 +5209,14 @@ def use_ability(
 
             if _is_healing_ability(hab):
                 st["vida_atual"] = min(_hp_max_efetivo(st), st["vida_atual"] + total_dano)
-                result += f"\n   {target['name']}: ❤️  {hp_antes} → {st['vida_atual']}/{st['vida_max']}"
+                result += f"\n   {target['name']}: {hp_antes} → {st['vida_atual']}/{st['vida_max']}"
                 if hp_antes == 0:
                     target["status"] = "vivo"
                     st["death_saves_sucessos"] = 0
                     st["death_saves_falhas"]   = 0
-                    result += " ✨ Estabilizado!"
+                    result += " Estabilizado!"
                 elif st["vida_atual"] == st["vida_max"]:
-                    result += " ✨ Vida plena!"
+                    result += " Vida plena!"
 
             elif ctrl_effect is not None:
                 # Condição direta (Hold Person, Charm, Web, etc.) — sem dano
@@ -5224,7 +5224,7 @@ def use_ability(
                 conds = st.setdefault("condicoes", [])
                 if not any(c["nome"].lower() == cond.lower() for c in conds):
                     conds.append({"nome": cond.capitalize(), "duracao": None})
-                result += f"\n   🔴 {target['name']}: {cond.upper()}! (sem dano)"
+                result += f"\n   {target['name']}: {cond.upper()}! (sem dano)"
 
             else:
                 # Dano direto — passa pelo pipeline de tipo/resistência.
@@ -5234,7 +5234,7 @@ def use_ability(
                                      source_name=char["name"], arma_magica=True)
                 hp_antes = _res["hp_antes"]
                 result += _fmt_notas(_res["notas"])
-                result += f"\n   {target['name']}: ❤️  {hp_antes} → {st['vida_atual']}/{st['vida_max']}"
+                result += f"\n   {target['name']}: {hp_antes} → {st['vida_atual']}/{st['vida_max']}"
                 if st["vida_atual"] == 0:
                     result += _mark_at_zero_hp(target, char["name"])
 
@@ -5243,17 +5243,16 @@ def use_ability(
     # NÃO dano. Mostra explicitamente quem foi afetado para não parecer dano.
     _abil_dice = ""
     if hab.get("dado"):
-        _abil_dice = (f" • 🎲 {n_dice}d{sides}: [{detail}]{bonus_str} "
+        _abil_dice = (f" • {n_dice}d{sides}: [{detail}]{bonus_str} "
                       f"= {total_dano}")
     if ctrl_effect is not None and ctrl_effect.get("pool"):
-        cond_emoji = "💤" if ctrl_effect.get("condition", "").lower() in ("inconsciente", "dormindo") else "🔴"
         if hab.get("dado"):
-            _abil_dice = (f" • 🎲 {n_dice}d{sides} (pool): [{detail}]{bonus_str} "
+            _abil_dice = (f" • {n_dice}d{sides} (pool): [{detail}]{bonus_str} "
                           f"= {total_dano} HP")
         if slept:
-            _abil_dice += f" • {cond_emoji} {', '.join(slept)}"
+            _abil_dice += f" • afetados: {', '.join(slept)}"
         else:
-            _abil_dice += " • ⚪ ninguém foi afetado (HP alto demais)"
+            _abil_dice += " • ninguém foi afetado (HP alto demais)"
 
     _log_combat_event(
         "ability", char["name"], target_name,
@@ -5267,7 +5266,7 @@ def use_ability(
     if end_turn:
         result += _auto_advance_turn(char_name)
     else:
-        result += "\n   ↩️  Ação bônus disponível — próxima habilidade/ataque neste turno."
+        result += "\n   Ação bônus disponível — próxima habilidade/ataque neste turno."
     memory.save_campaign()
     return result
 
@@ -5336,7 +5335,7 @@ def equip_item(char_name: str, item_name: str, slot: str = "") -> str:
     memory.save_campaign()
     swap_msg = f"(substituiu {old_item})" if old_item else ""
     return (
-        f"🛡️  {char['name']} equipou '{item['nome']}' no slot [{slot}]. {swap_msg}\n"
+        f"{char['name']} equipou '{item['nome']}' no slot [{slot}]. {swap_msg}\n"
         f"   CA: {ca_antes} → {ca_depois}"
         + (f"\n   (Armadura {'pesada — DES ignorada' if armor_entry and armor_entry.get('dex_bonus') == 'none' else 'média — DES limitada a +2' if armor_entry and armor_entry.get('dex_bonus') == 'cap2' else 'leve — DES completa' if armor_entry else ''})"
            if armor_entry and slot == "armadura" else "")
@@ -5373,7 +5372,7 @@ def unequip_item(char_name: str, slot: str) -> str:
 
     memory.save_campaign()
     return (
-        f"🛡️  {char['name']} desequipou '{item_removido}' do slot [{slot}].\n"
+        f"{char['name']} desequipou '{item_removido}' do slot [{slot}].\n"
         f"   CA: {ca_antes} → {ca_depois}"
     )
 
@@ -5406,7 +5405,7 @@ def apply_condition(char_name: str, condition: str, duration_turns: int = 0) -> 
     c_low = condition.lower()
 
     if any(c["nome"].lower() == c_low for c in conds):
-        return f"⚠️  {char['name']} já possui a condição '{condition}'."
+        return f"Aviso: {char['name']} já possui a condição '{condition}'."
 
     conds.append({
         "nome":    condition.capitalize(),
@@ -5416,13 +5415,13 @@ def apply_condition(char_name: str, condition: str, duration_turns: int = 0) -> 
     # Busca descrição oficial no Open5e
     srd_desc = ""
     en_slug  = CONDITION_PT_TO_EN.get(c_low, c_low)
-    _edbg(f"  🌐 [OPEN5E] Buscando descrição oficial da condição '{condition}' (slug: {en_slug})…")
+    _edbg(f"  [OPEN5E] Buscando descrição oficial da condição '{condition}' (slug: {en_slug})…")
     try:
         r = _req.get(f"https://api.open5e.com/v1/conditions/{en_slug}/", timeout=4)
         if r.ok:
             raw = r.json().get("desc", "")
             srd_desc = " ".join(raw.split())[:300] if raw else ""
-            _edbg(f"  ✅ [OPEN5E] Descrição da condição '{condition}' obtida do SRD.")
+            _edbg(f"  [OPEN5E] Descrição da condição '{condition}' obtida do SRD.")
     except Exception:
         pass
 
@@ -5437,11 +5436,11 @@ def apply_condition(char_name: str, condition: str, duration_turns: int = 0) -> 
     dur_str        = f" por {duration_turns} turno(s)" if duration_turns > 0 else " (indefinidamente)"
     efeito_mecanico = f"\n   Mecânica: {', '.join(efeito_str)}." if efeito_str \
                       else "\n   (Condição narrativa — sem efeito mecânico automático.)"
-    desc_oficial   = f"\n   📖 {srd_desc}" if srd_desc else ""
+    desc_oficial   = f"\n   {srd_desc}" if srd_desc else ""
 
     memory.save_campaign()
     return (
-        f"🔴 {char['name']} recebeu a condição **{condition.capitalize()}**{dur_str}."
+        f"{char['name']} recebeu a condição **{condition.capitalize()}**{dur_str}."
         f"{efeito_mecanico}{desc_oficial}"
     )
 
@@ -5466,10 +5465,10 @@ def remove_condition(char_name: str, condition: str) -> str:
     s["condicoes"] = [c for c in conds if c["nome"].lower() != c_low]
 
     if len(s["condicoes"]) == before:
-        return f"⚠️  {char['name']} não possui a condição '{condition}'."
+        return f"Aviso: {char['name']} não possui a condição '{condition}'."
 
     memory.save_campaign()
-    return f"✅ Condição **{condition.capitalize()}** removida de {char['name']}."
+    return f"Condição **{condition.capitalize()}** removida de {char['name']}."
 
 
 # ---------------------------------------------------------------------------
@@ -5501,18 +5500,17 @@ def modify_currency(char_name: str, currency_type: str, amount: int) -> str:
 
     if amount < 0 and atual < abs(amount):
         return (
-            f"❌ {char['name']} não tem {currency_type} suficiente!\n"
+            f"Erro: {char['name']} não tem {currency_type} suficiente!\n"
             f"   {currency_type.capitalize()} atual: {atual} (necessário: {abs(amount)})"
         )
 
     s[tipo] = max(0, atual + amount)
     acao    = "recebeu" if amount > 0 else "gastou"
-    symbol  = {"ouro": "🪙", "prata": "🥈", "cobre": "🟤"}[tipo]
 
     memory.save_campaign()
     return (
-        f"{symbol} {char['name']} {acao} {abs(amount)} {currency_type}.\n"
-        f"   💰 Ouro: {s.get('ouro', 0)} | Prata: {s.get('prata', 0)} | Cobre: {s.get('cobre', 0)}"
+        f"{char['name']} {acao} {abs(amount)} {currency_type}.\n"
+        f"   Ouro: {s.get('ouro', 0)} | Prata: {s.get('prata', 0)} | Cobre: {s.get('cobre', 0)}"
     )
 
 
@@ -5548,7 +5546,7 @@ def roll_death_save(char_name: str, player_roll: int = 0) -> str:
     s = char["sheet"]
 
     if s["vida_atual"] > 0:
-        return f"⚠️  {char['name']} não está inconsciente (HP: {s['vida_atual']}). Teste de Morte não aplicável."
+        return f"Aviso: {char['name']} não está inconsciente (HP: {s['vida_atual']}). Teste de Morte não aplicável."
 
     # Usa a rolagem do JOGADOR quando fornecida e válida (1–20). Só rola
     # internamente quando nenhum valor veio (teste de morte de NPC).
@@ -5565,9 +5563,9 @@ def roll_death_save(char_name: str, player_roll: int = 0) -> str:
         char["status"]            = "vivo"
         memory.save_campaign()
         return (
-            f"🌟 CRÍTICO NATURAL! {char['name']} se recupera milagrosamente!\n"
+            f"CRÍTICO NATURAL! {char['name']} se recupera milagrosamente!\n"
             f"   d20={roll} → Recupera 1 ponto de vida e estabiliza.\n"
-            f"   ❤️  Vida: 1/{s['vida_max']}"
+            f"   Vida: 1/{s['vida_max']}"
         )
 
     # Natural 1: conta como 2 falhas
@@ -5575,25 +5573,25 @@ def roll_death_save(char_name: str, player_roll: int = 0) -> str:
         s["death_saves_falhas"] = min(3, s.get("death_saves_falhas", 0) + 2)
         falhas = s["death_saves_falhas"]
         result = (
-            f"💀 FALHA CRÍTICA nos Testes de Morte! {char['name']} sofre 2 falhas!\n"
+            f"FALHA CRÍTICA nos Testes de Morte! {char['name']} sofre 2 falhas!\n"
             f"   d20={roll}\n"
-            f"   ✅ Sucessos: {s.get('death_saves_sucessos', 0)}/3 | ❌ Falhas: {falhas}/3"
+            f"   Sucessos: {s.get('death_saves_sucessos', 0)}/3 | Falhas: {falhas}/3"
         )
     elif roll >= 10:
         s["death_saves_sucessos"] = min(3, s.get("death_saves_sucessos", 0) + 1)
         sucessos = s["death_saves_sucessos"]
         result = (
-            f"✅ Teste de Morte bem-sucedido! ({char['name']})\n"
+            f"Teste de Morte bem-sucedido! ({char['name']})\n"
             f"   d20={roll} ≥ 10 → 1 sucesso.\n"
-            f"   ✅ Sucessos: {sucessos}/3 | ❌ Falhas: {s.get('death_saves_falhas', 0)}/3"
+            f"   Sucessos: {sucessos}/3 | Falhas: {s.get('death_saves_falhas', 0)}/3"
         )
     else:
         s["death_saves_falhas"] = min(3, s.get("death_saves_falhas", 0) + 1)
         falhas = s["death_saves_falhas"]
         result = (
-            f"❌ Teste de Morte falhou. ({char['name']})\n"
+            f"Erro: Teste de Morte falhou. ({char['name']})\n"
             f"   d20={roll} < 10 → 1 falha.\n"
-            f"   ✅ Sucessos: {s.get('death_saves_sucessos', 0)}/3 | ❌ Falhas: {falhas}/3"
+            f"   Sucessos: {s.get('death_saves_sucessos', 0)}/3 | Falhas: {falhas}/3"
         )
 
     # Resolução final
@@ -5601,19 +5599,19 @@ def roll_death_save(char_name: str, player_roll: int = 0) -> str:
         s["death_saves_sucessos"] = 0
         s["death_saves_falhas"]   = 0
         char["status"]            = "estabilizado"
-        result += (f"\n   🏥 {char['name']} ESTABILIZOU! Permanece inconsciente (0 HP) "
+        result += (f"\n   {char['name']} ESTABILIZOU! Permanece inconsciente (0 HP) "
                    f"mas não morrerá. Precisa de cura para voltar a agir.")
 
         _log_combat_event("stabilize", char["name"], "",
-                          msg=f"{char['name']} estabilizou (🎲 d20={roll}, inconsciente)",
+                          msg=f"{char['name']} estabilizou (d20={roll}, inconsciente)",
                           d20=roll)
     elif s.get("death_saves_falhas", 0) >= 3:
         s["death_saves_sucessos"] = 0
         s["death_saves_falhas"]   = 0
         char["status"]            = "morto"
-        result += f"\n   ☠️  {char['name']} MORREU. Narre a cena de forma dramática e definitiva."
+        result += f"\n   {char['name']} MORREU. Narre a cena de forma dramática e definitiva."
         _log_combat_event("death", char["name"], "",
-                          msg=f"{char['name']} morreu (🎲 d20={roll})", d20=roll)
+                          msg=f"{char['name']} morreu (d20={roll})", d20=roll)
 
     memory.save_campaign()
     result += _auto_advance_turn(char_name)
@@ -5722,13 +5720,13 @@ def _search_open5e_item(item_name: str) -> dict | None:
     from rpg.open5e import http as _req   # SRD com cache, sessão e retry
 
     slug = item_name.lower().strip().replace(" ", "-").replace("'", "")
-    _edbg(f"  🌐 [OPEN5E] Buscando item mágico '{item_name}' na base SRD (grounding)…")
+    _edbg(f"  [OPEN5E] Buscando item mágico '{item_name}' na base SRD (grounding)…")
 
     try:
         # Tentativa 1: slug exato
         r = _req.get(f"https://api.open5e.com/v1/magicitems/{slug}/", timeout=5)
         if r.ok and r.json().get("name"):
-            _edbg(f"  ✅ [OPEN5E] Item encontrado por slug exato: {r.json().get('name')}")
+            _edbg(f"  [OPEN5E] Item encontrado por slug exato: {r.json().get('name')}")
             return r.json()
     except Exception:
         pass
@@ -5746,12 +5744,12 @@ def _search_open5e_item(item_name: str) -> dict | None:
                 # Prioriza resultado com nome mais próximo
                 item_words = set(item_name.lower().split())
                 best = max(results, key=lambda x: len(item_words & set(x.get("name","").lower().split())))
-                _edbg(f"  ✅ [OPEN5E] Item encontrado por busca textual: {best.get('name')}")
+                _edbg(f"  [OPEN5E] Item encontrado por busca textual: {best.get('name')}")
                 return best
     except Exception:
         pass
 
-    _edbg(f"  ⚠️  [OPEN5E] '{item_name}' não encontrado no SRD → tratado como item customizado/homebrew")
+    _edbg(f"  [OPEN5E] '{item_name}' não encontrado no SRD → tratado como item customizado/homebrew")
     return None
 
 
@@ -5783,7 +5781,7 @@ def identify_item(char_name: str, item_name: str) -> str:
 
         attune_str = ""
         if attune and attune not in ("", "no", "false", False):
-            attune_str = " · ⚠️ Requer sintonização"
+            attune_str = " · Requer sintonização"
 
         # Atualiza a descrição do item no inventário se já existir
         inv = char.get("inventario", [])
@@ -5795,14 +5793,14 @@ def identify_item(char_name: str, item_name: str) -> str:
                 break
 
         return (
-            f"🔮 **{name}**\n"
+            f"**{name}**\n"
             f"   Tipo: {type_} · Raridade: {rarity}{attune_str}\n"
             f"   {desc}"
         )
     else:
         nivel = char.get("sheet", {}).get("nivel", 1)
         return (
-            f"⚠️ '{item_name}' não encontrado no banco D&D 5e (SRD).\n"
+            f"Aviso: '{item_name}' não encontrado no banco D&D 5e (SRD).\n"
             f"   Este parece ser um item customizado/homebrew.\n"
             f"   Certifique-se de que seus efeitos são balanceados para "
             f"um grupo nível {nivel}. Ajuste a descrição se necessário."
@@ -5836,7 +5834,7 @@ def add_item(char_name: str, item_name: str, quantity: int = 1, description: str
         if description:
             existing["descricao"] = description
         memory.save_campaign()
-        return f"📦 {char['name']} agora tem {existing['qtd']}x {item_name}."
+        return f"{char['name']} agora tem {existing['qtd']}x {item_name}."
 
     # Novo item — verifica se parece mágico
     item_dict: dict = {"nome": item_name, "qtd": quantity, "descricao": description}
@@ -5866,7 +5864,7 @@ def add_item(char_name: str, item_name: str, quantity: int = 1, description: str
                 # desequilibra a mesa sem ninguém perceber.
                 item_dict["efeito_mecanico"] = True
                 warning = (
-                    f"\n⚠️  '{item_name}' NÃO EXISTE no SRD de D&D 5e e a "
+                    f"\nAviso: '{item_name}' NÃO EXISTE no SRD de D&D 5e e a "
                     f"descrição promete efeito mecânico.\n"
                     f"   Ou troque por um item real do SRD, ou declare aqui "
                     f"por que ele é equilibrado para um grupo de nível {nivel} "
@@ -5880,7 +5878,7 @@ def add_item(char_name: str, item_name: str, quantity: int = 1, description: str
                 # chamava add_item sem descrição nenhuma.
                 item_dict["efeito_desconhecido"] = True
                 warning = (
-                    f"\n⚠️  '{item_name}' NÃO EXISTE no SRD e entrou sem "
+                    f"\nAviso: '{item_name}' NÃO EXISTE no SRD e entrou sem "
                     f"descrição. Diga o que ele faz — mesmo que seja nada — "
                     f"com add_item(..., description='...') ou "
                     f"justify_custom_item(). Sem isso não há como saber se "
@@ -5888,14 +5886,14 @@ def add_item(char_name: str, item_name: str, quantity: int = 1, description: str
                 )
             else:
                 warning = (
-                    f"\n📎 '{item_name}' não está no SRD — registrado como "
+                    f"\n'{item_name}' não está no SRD — registrado como "
                     f"item próprio da sua campanha. Sem efeito mecânico "
                     f"declarado, então é sabor: nada a balancear."
                 )
 
     inv.append(item_dict)
     memory.save_campaign()
-    return f"📦 {item_name} (×{quantity}) adicionado ao inventário de {char['name']}.{warning}"
+    return f"{item_name} (×{quantity}) adicionado ao inventário de {char['name']}.{warning}"
 
 
 def justify_custom_item(char_name: str, item_name: str, reason: str) -> str:
@@ -5916,19 +5914,19 @@ def justify_custom_item(char_name: str, item_name: str, reason: str) -> str:
     if not char:
         return f"Personagem '{char_name}' não encontrado."
     if not (reason or "").strip():
-        return ("⚠️ Informe a justificativa. Um item inventado sem critério "
+        return ("Informe a justificativa. Um item inventado sem critério "
                 "declarado é exatamente o que esta trava existe para pegar.")
 
     for it in (char.get("inventario") or []):
         if isinstance(it, dict) and _norm_txt(it.get("nome", "")) == _norm_txt(item_name):
             if not it.get("custom"):
-                return (f"✅ '{it.get('nome')}' é item canônico do SRD — "
+                return (f"'{it.get('nome')}' é item canônico do SRD — "
                         f"não precisa de justificativa.")
             it["balanco_justificado"] = reason.strip()
             memory.save_campaign()
-            return (f"📝 Balanço de '{it.get('nome')}' registrado: "
+            return (f"Balanço de '{it.get('nome')}' registrado: "
                     f"{reason.strip()}")
-    return f"⚠️ '{item_name}' não está no inventário de {char.get('name', char_name)}."
+    return f"Aviso: '{item_name}' não está no inventário de {char.get('name', char_name)}."
 
 
 def list_custom_items() -> str:
@@ -5950,15 +5948,15 @@ def list_custom_items() -> str:
             (com_regra if it.get("efeito_mecanico") else so_sabor).append(linha)
 
     if not com_regra and not so_sabor:
-        return ("✅ Nenhum item fora do SRD nesta campanha — tudo o que o "
+        return ("Nenhum item fora do SRD nesta campanha — tudo o que o "
                 "grupo carrega é canônico.")
 
     partes = []
     if com_regra:
-        partes.append(f"⚠️  COM EFEITO MECÂNICO ({len(com_regra)}) — "
+        partes.append(f"Aviso: COM EFEITO MECÂNICO ({len(com_regra)}) — "
                       f"inventados E mexendo na regra:\n" + "\n".join(com_regra))
     if so_sabor:
-        partes.append(f"📎 Só sabor ({len(so_sabor)}) — inventados, sem efeito "
+        partes.append(f"Só sabor ({len(so_sabor)}) — inventados, sem efeito "
                       f"declarado:\n" + "\n".join(so_sabor))
     return "\n\n".join(partes)
 
@@ -5984,7 +5982,7 @@ def remove_item(char_name: str, item_name: str, quantity: int = 1) -> str:
     if item["qtd"] <= quantity:
         inv.remove(item)
         memory.save_campaign()
-        return f"🗑️  {item_name} removido do inventário de {char['name']}."
+        return f"{item_name} removido do inventário de {char['name']}."
 
     item["qtd"] -= quantity
     memory.save_campaign()
@@ -5994,7 +5992,7 @@ def remove_item(char_name: str, item_name: str, quantity: int = 1) -> str:
 def list_inventory(char_name: str) -> str:
     """
     Lista o inventário completo de um personagem, incluindo moedas e equipamentos.
-    Itens customizados (não encontrados no SRD D&D 5e) são marcados com ⚠️.
+    Itens customizados (não encontrados no SRD D&D 5e) são marcados com .
 
     Args:
         char_name: Nome do personagem.
@@ -6006,11 +6004,11 @@ def list_inventory(char_name: str) -> str:
     s   = char.get("sheet", {})
     inv = char.get("inventario", [])
 
-    lines = [f"📦 Inventário de {char['name']}:"]
+    lines = [f"Inventário de {char['name']}:"]
 
     # Moedas
     lines.append(
-        f"  💰 Ouro: {s.get('ouro', 0)} | Prata: {s.get('prata', 0)} | Cobre: {s.get('cobre', 0)}"
+        f"  Ouro: {s.get('ouro', 0)} | Prata: {s.get('prata', 0)} | Cobre: {s.get('cobre', 0)}"
     )
 
     # Equipamentos ativos
@@ -6019,13 +6017,13 @@ def list_inventory(char_name: str) -> str:
     if equipped:
         lines.append("  ── Equipados ──")
         for slot, item in equipped:
-            lines.append(f"  [⚔️  {slot}] {item}")
+            lines.append(f"  [{slot}] {item}")
 
     # Inventário geral
     if inv:
         lines.append("  ── Itens ──")
         for item in inv:
-            custom_tag = " ⚠️ [CUSTOMIZADO]" if item.get("custom") else ""
+            custom_tag = " [CUSTOMIZADO]" if item.get("custom") else ""
             desc = f" — {item['descricao']}" if item.get("descricao") else ""
             lines.append(f"  • {item['nome']} ×{item['qtd']}{custom_tag}{desc}")
     else:
@@ -6067,7 +6065,7 @@ def grant_xp(char_name: str, amount: int, reason: str = "") -> str:
     _carimbar_asi(s)
     s["xp"]     += amount
     reason_str   = f" ({reason})" if reason else ""
-    result       = f"⭐ {char['name']} ganhou {amount} XP{reason_str}. Total: {s['xp']}"
+    result       = f"{char['name']} ganhou {amount} XP{reason_str}. Total: {s['xp']}"
 
     while s["nivel"] < 20 and s["xp"] >= XP_THRESHOLDS[s["nivel"]]:
         s["nivel"]        += 1
@@ -6093,24 +6091,24 @@ def grant_xp(char_name: str, amount: int, reason: str = "") -> str:
         s["xp_proximo"] = XP_THRESHOLDS[s["nivel"]] if s["nivel"] < 20 else s["xp"]
 
         result += (
-            f"\n🎉 LEVEL UP! {char['name']} agora é Nível {s['nivel']}!"
-            f"\n   ❤️  Vida máxima: +{hp_gain} → {s['vida_max']}"
-            f"\n   🛡️  Proficiência: +{s['proficiencia']}"
+            f"\nLEVEL UP! {char['name']} agora é Nível {s['nivel']}!"
+            f"\n   Vida máxima: +{hp_gain} → {s['vida_max']}"
+            f"\n   Proficiência: +{s['proficiencia']}"
         )
         if mana_gain > 0:
-            result += f"\n   ✨ Mana máxima: +{mana_gain} → {s['mana_max']}"
+            result += f"\n   Mana máxima: +{mana_gain} → {s['mana_max']}"
 
         # Aplica habilidades de classe do novo nível automaticamente
         new_feats = _apply_class_features(char, s, s["nivel"])
         if new_feats:
-            result += f"\n   📖 Novas habilidades: {', '.join(new_feats)}"
+            result += f"\n   Novas habilidades: {', '.join(new_feats)}"
         else:
-            result += "\n   📖 Escolha uma nova habilidade ou magia com learn_spell() ou learn_ability()."
+            result += "\n   Escolha uma nova habilidade ou magia com learn_spell() ou learn_ability()."
 
         pend = _escolhas_pendentes(char)
         if pend:
             quais = ", ".join(f"{q['rotulo']} ({q['faltam']})" for q in pend)
-            result += (f"\n   ⏳ Escolhas PENDENTES: {quais}."
+            result += (f"\n   Escolhas PENDENTES: {quais}."
                        f" Quem escolhe é o JOGADOR, na tela de nível"
                        f" — não escolha por ele.")
 
@@ -6285,7 +6283,7 @@ def apply_asi(char_name: str, stat_name: str, points: int = 1) -> str:
 
     chave = _norm_txt(stat_name).replace(" ", "")
     if chave not in _ATRIBUTOS:
-        return (f"❌ '{stat_name}' não é atributo. Use: "
+        return (f"Erro: '{stat_name}' não é atributo. Use: "
                 f"{', '.join(_ATRIBUTOS)}.")
     try:
         pts = max(1, min(_PONTOS_POR_ASI, int(points)))
@@ -6294,15 +6292,15 @@ def apply_asi(char_name: str, stat_name: str, points: int = 1) -> str:
 
     disponiveis = _asi_pontos_pendentes(sheet)
     if disponiveis <= 0:
-        return (f"❌ {char['name']} não tem incremento de atributo pendente. "
+        return (f"Erro: {char['name']} não tem incremento de atributo pendente. "
                 f"Eles vêm nos níveis {sorted(_niveis_asi(sheet.get('classe','')))}.")
     if pts > disponiveis:
-        return (f"❌ Só restam {disponiveis} ponto(s) de incremento para "
+        return (f"Erro: Só restam {disponiveis} ponto(s) de incremento para "
                 f"{char['name']}.")
 
     antes = int(sheet.get(chave, 10) or 10)
     if antes >= _TETO_ATRIBUTO:
-        return (f"❌ {_ATRIBUTO_PT[chave]} de {char['name']} já está em "
+        return (f"Erro: {_ATRIBUTO_PT[chave]} de {char['name']} já está em "
                 f"{antes} — o teto do 5e é {_TETO_ATRIBUTO}. "
                 f"Escolha outro atributo ou um talento.")
     depois = min(_TETO_ATRIBUTO, antes + pts)
@@ -6319,22 +6317,22 @@ def apply_asi(char_name: str, stat_name: str, points: int = 1) -> str:
             sheet["vida_max"] = max(1, int(sheet.get("vida_max", 1) or 1) + ganho)
             sheet["vida_atual"] = min(_hp_max_efetivo(sheet),
                                       int(sheet.get("vida_atual", 0) or 0) + ganho)
-            extra += f"\n   ❤️  Vida máxima: {ganho:+d} → {sheet['vida_max']}"
+            extra += f"\n   Vida máxima: {ganho:+d} → {sheet['vida_max']}"
     if chave == "destreza":
         _recalculate_ca(char)
-        extra += f"\n   🛡️  CA agora: {sheet['ca']}"
+        extra += f"\n   CA agora: {sheet['ca']}"
     novo_mana = _max_mana_for(sheet.get("classe", ""), int(sheet.get("nivel", 1) or 1))
     if novo_mana != int(sheet.get("mana_max", 0) or 0):
         ganho_mana = novo_mana - int(sheet.get("mana_max", 0) or 0)
         sheet["mana_max"] = novo_mana
         sheet["mana_atual"] = min(novo_mana,
                                   int(sheet.get("mana_atual", 0) or 0) + max(0, ganho_mana))
-        extra += f"\n   ✨ Mana máxima: {ganho_mana:+d} → {novo_mana}"
+        extra += f"\n   Mana máxima: {ganho_mana:+d} → {novo_mana}"
 
     memory.save_campaign()
     restam = _asi_pontos_pendentes(sheet)
     sobra = f" Restam {restam} ponto(s)." if restam else " Incremento concluído."
-    return (f"💪 {char['name']}: {_ATRIBUTO_PT[chave]} {antes} → **{depois}** "
+    return (f"{char['name']}: {_ATRIBUTO_PT[chave]} {antes} → **{depois}** "
             f"(modificador {_modifier(depois):+d}).{extra}\n  {sobra}")
 
 
@@ -6373,37 +6371,37 @@ def apply_asi_distribution(char_name: str, distribution) -> str:
     elif isinstance(distribution, dict):
         bruto = dict(distribution)
     else:
-        return "❌ Distribuição inválida. Use {'forca': 1, 'constituicao': 1}."
+        return "Distribuição inválida. Use {'forca': 1, 'constituicao': 1}."
 
     plano: dict[str, int] = {}
     for nome, qtd in bruto.items():
         chave = _norm_txt(str(nome)).replace(" ", "")
         if chave not in _ATRIBUTOS:
-            return (f"❌ '{nome}' não é atributo. Use: {', '.join(_ATRIBUTOS)}. "
+            return (f"Erro: '{nome}' não é atributo. Use: {', '.join(_ATRIBUTOS)}. "
                     f"Nenhum ponto foi aplicado.")
         try:
             n = int(qtd)
         except (TypeError, ValueError):
-            return f"❌ Quantidade inválida para {nome}: {qtd!r}. Nenhum ponto foi aplicado."
+            return f"Erro: Quantidade inválida para {nome}: {qtd!r}. Nenhum ponto foi aplicado."
         if n < 0:
-            return (f"❌ Incremento não retira ponto de atributo ({nome}: {n}). "
+            return (f"Erro: Incremento não retira ponto de atributo ({nome}: {n}). "
                     f"Nenhum ponto foi aplicado.")
         if n:
             plano[chave] = plano.get(chave, 0) + n
 
     total = sum(plano.values())
     if total <= 0:
-        return "❌ Nenhum ponto distribuído."
+        return "Nenhum ponto distribuído."
 
     disponiveis = _asi_pontos_pendentes(sheet)
     if total > disponiveis:
-        return (f"❌ {total} ponto(s) distribuídos, mas {char['name']} só tem "
+        return (f"Erro: {total} ponto(s) distribuídos, mas {char['name']} só tem "
                 f"{disponiveis} de incremento. Nenhum ponto foi aplicado.")
 
     for chave, n in plano.items():
         antes = int(sheet.get(chave, 10) or 10)
         if antes + n > _TETO_ATRIBUTO:
-            return (f"❌ {_ATRIBUTO_PT[chave]} iria a {antes + n}, acima do teto de "
+            return (f"Erro: {_ATRIBUTO_PT[chave]} iria a {antes + n}, acima do teto de "
                     f"{_TETO_ATRIBUTO}. Nenhum ponto foi aplicado.")
 
     # Tudo validado: agora aplica. apply_asi recebe no máximo 2 por chamada
@@ -6416,7 +6414,7 @@ def apply_asi_distribution(char_name: str, distribution) -> str:
         while restam > 0:
             fatia = min(_PONTOS_POR_ASI, restam)
             msg = apply_asi(char_name, chave, fatia)
-            if msg.lstrip().startswith("❌"):          # não deveria: validado acima
+            if msg.lstrip().startswith("Erro:"):          # não deveria: validado acima
                 linhas.append(msg)
                 break
             linhas.append(msg.split("\n")[0])
@@ -6512,7 +6510,7 @@ def levelup_action(action: str, char: str = "", feature: str = "",
 
     actions: variante | asi | asi_lote | talento | subir
 
-    'subir' é o selo "⬆️ NÍVEL!" da ficha. Ele gravava o nível direto pela
+    'subir' é o selo "NÍVEL!" da ficha. Ele gravava o nível direto pela
     rota de edição, com PV calculados no navegador, e pulava tudo o que o
     grant_xp faz: habilidades da classe, mana, contador de incremento. Agora é
     grant_xp com 0 de XP — o laço de subida roda com o XP que a ficha já tem.
@@ -6538,14 +6536,14 @@ def levelup_action(action: str, char: str = "", feature: str = "",
         msg = grant_xp(char, 0, "subida de nível confirmada na ficha")
         if int(sh.get("nivel", 1) or 1) == antes:
             return {"ok": False,
-                    "message": (f"❌ {alvo['name']} ainda não tem XP para o nível "
+                    "message": (f"Erro: {alvo['name']} ainda não tem XP para o nível "
                                 f"{antes + 1} ({sh.get('xp', 0)}/{sh.get('xp_proximo', '?')})."),
                     "snapshot": levelup_snapshot(char)}
     else:
         return {"ok": False, "message": f"Ação '{action}' desconhecida.",
                 "snapshot": levelup_snapshot(char)}
 
-    ok = not msg.lstrip().startswith(("⚠️", "❌", "ℹ️"))
+    ok = not msg.lstrip().startswith(("Aviso:", "Erro:", "Nota:"))
     return {"ok": ok, "message": msg, "snapshot": levelup_snapshot(char)}
 
 # ===========================================================================
@@ -6690,8 +6688,7 @@ def check_encumbrance(char_name: str) -> str:
     if not char:
         return err
     estado, carga, cap = _estado_de_carga(char)
-    barra = {"livre": "✅", "sobrecarregado": "⚠️", "imovel": "🛑"}[estado]
-    linhas = [f"{barra} {char['name']}: **{carga:.1f} kg** de {cap:.1f} kg "
+    linhas = [f"{char['name']}: **{carga:.1f} kg** de {cap:.1f} kg "
               f"(FOR {(char.get('sheet') or {}).get('forca', 10)}) — {estado}"]
     if estado == "sobrecarregado":
         linhas.append("   Desvantagem em ataques e testes de FOR/DES/CON.")
@@ -6785,7 +6782,7 @@ def open_shop(shop_name: str, items: str, location: str = "") -> str:
     """
     nome_loja = (shop_name or "").strip()
     if not nome_loja:
-        return "⚠️ A loja precisa de um nome."
+        return "A loja precisa de um nome."
 
     estoque = []
     sem_preco = []
@@ -6820,10 +6817,10 @@ def open_shop(shop_name: str, items: str, location: str = "") -> str:
                         "descricao": descricao})
 
     if not estoque:
-        return ("⚠️ Nenhum item com preço. O SRD não conhece: "
+        return ("Nenhum item com preço. O SRD não conhece: "
                 + ", ".join(sem_preco) + ". Informe o preço no formato "
                 "'nome:preço' (ex: 'Amuleto do Corvo:75').") if sem_preco else \
-               "⚠️ Informe ao menos um item."
+               "Informe ao menos um item."
 
     # Chamar open_shop de novo ACRESCENTA ao estoque; antes substituía, e uma
     # segunda chamada para pôr um item a mais apagava a loja inteira.
@@ -6851,8 +6848,8 @@ def open_shop(shop_name: str, items: str, location: str = "") -> str:
             novos.append(item["nome"])
     memory.save_campaign()
 
-    cabeca = (f"🏪 **{nome_loja}** atualizada" if ja_existia
-              else f"🏪 **{nome_loja}** aberta")
+    cabeca = (f"**{nome_loja}** atualizada" if ja_existia
+              else f"**{nome_loja}** aberta")
     linhas = [cabeca + (f" em {loja['local']}" if loja.get("local") else "") + ":"]
     for i in loja["estoque"]:
         q = "" if i["qtd"] >= 99 else f"  (x{i['qtd']})"
@@ -6861,7 +6858,7 @@ def open_shop(shop_name: str, items: str, location: str = "") -> str:
     if repostos and ja_existia:
         linhas.append("   ↻ Preço/estoque atualizados: " + ", ".join(repostos))
     if sem_preco:
-        linhas.append("   ⚠️ Sem preço (fora do SRD, não entraram): "
+        linhas.append("   Sem preço (fora do SRD, não entraram): "
                       + ", ".join(sem_preco))
     return "\n".join(linhas)
 
@@ -6876,8 +6873,8 @@ def list_shop(shop_name: str) -> str:
     loja = _lojas().get(_norm_txt(shop_name))
     if not loja:
         abertas = ", ".join(l["nome"] for l in _lojas().values()) or "nenhuma"
-        return f"⚠️ Loja '{shop_name}' não encontrada. Abertas: {abertas}."
-    linhas = [f"🏪 **{loja['nome']}**"
+        return f"Aviso: Loja '{shop_name}' não encontrada. Abertas: {abertas}."
+    linhas = [f"**{loja['nome']}**"
               + (f" — {loja['local']}" if loja.get("local") else "")]
     for i in loja["estoque"]:
         q = "" if i["qtd"] >= 99 else f"  (restam {i['qtd']})"
@@ -7037,9 +7034,10 @@ def shop_action(action: str, shop: str = "", char: str = "",
         return {"ok": False, "message": f"Ação '{action}' desconhecida.",
                 "snapshot": shop_snapshot(shop, char)}
 
-    # As ferramentas sinalizam recusa pelo prefixo, do mesmo jeito que na tela
-    # de combate — é o contrato que já existe e que os testes cobrem.
-    ok = not msg.lstrip().startswith(("⚠️", "❌", "💸"))
+    # As ferramentas sinalizam recusa pelo PREFIXO da mensagem ("Erro:",
+    # "Aviso:"). Era um emoji até o repositório abandonar emoji; o contrato é
+    # o mesmo, só que em texto — legível no log e para a IA.
+    ok = not msg.lstrip().startswith(("Aviso:", "Erro:"))
     return {"ok": ok, "message": msg, "snapshot": shop_snapshot(shop, char)}
 
 
@@ -7077,12 +7075,12 @@ def buy_item(char_name: str, shop_name: str, item_name: str, quantity: int = 1) 
         return err
     loja = _lojas().get(_norm_txt(shop_name))
     if not loja:
-        return f"⚠️ Loja '{shop_name}' não encontrada."
+        return f"Aviso: Loja '{shop_name}' não encontrada."
 
     linha = next((i for i in loja["estoque"]
                   if _norm_txt(i["nome"]) == _norm_txt(item_name)), None)
     if not linha:
-        return (f"⚠️ '{item_name}' não está à venda em {loja['nome']}. "
+        return (f"Aviso: '{item_name}' não está à venda em {loja['nome']}. "
                 f"Use list_shop('{loja['nome']}').")
 
     try:
@@ -7090,13 +7088,13 @@ def buy_item(char_name: str, shop_name: str, item_name: str, quantity: int = 1) 
     except (TypeError, ValueError):
         qtd = 1
     if linha["qtd"] < qtd:
-        return f"⚠️ {loja['nome']} tem só {linha['qtd']}x {linha['nome']}."
+        return f"Aviso: {loja['nome']} tem só {linha['qtd']}x {linha['nome']}."
 
     sheet = char["sheet"]
     custo_cobre = linha["preco"] * 100 * qtd
     if not _pagar(sheet, custo_cobre):
         tem = _cobre_total(sheet)
-        return (f"💸 {char['name']} não tem como pagar: "
+        return (f"Erro: {char['name']} não tem como pagar: "
                 f"{linha['preco'] * qtd} po pedidos, "
                 f"{tem // 100} po e {(tem % 100) // 10} pp na bolsa.")
 
@@ -7112,9 +7110,9 @@ def buy_item(char_name: str, shop_name: str, item_name: str, quantity: int = 1) 
     estado, carga, cap = _estado_de_carga(char)
     aviso = ""
     if estado != "livre":
-        aviso = (f"\n   ⚠️ Carga: {carga:.1f}/{cap:.1f} kg — **{estado}**. "
+        aviso = (f"\n   Carga: {carga:.1f}/{cap:.1f} kg — **{estado}**. "
                  f"Veja check_encumbrance().")
-    return (f"🪙 {char['name']} comprou {qtd}x {linha['nome']} por "
+    return (f"{char['name']} comprou {qtd}x {linha['nome']} por "
             f"{linha['preco'] * qtd} po em {loja['nome']}.\n"
             f"   Bolsa: {sheet['ouro']} po, {sheet['prata']} pp, {sheet['cobre']} pc{aviso}")
 
@@ -7136,27 +7134,27 @@ def sell_item(char_name: str, shop_name: str, item_name: str, quantity: int = 1)
         return err
     loja = _lojas().get(_norm_txt(shop_name))
     if not loja:
-        return f"⚠️ Loja '{shop_name}' não encontrada."
+        return f"Aviso: Loja '{shop_name}' não encontrada."
 
     inv  = char.get("inventario") or []
     item = next((i for i in inv
                  if isinstance(i, dict)
                  and _norm_txt(i.get("nome", "")) == _norm_txt(item_name)), None)
     if not item:
-        return f"⚠️ {char['name']} não tem '{item_name}'."
+        return f"Aviso: {char['name']} não tem '{item_name}'."
 
     try:
         qtd = max(1, int(quantity))
     except (TypeError, ValueError):
         qtd = 1
     if int(item.get("qtd", 1) or 1) < qtd:
-        return f"⚠️ {char['name']} tem só {item.get('qtd', 1)}x {item['nome']}."
+        return f"Aviso: {char['name']} tem só {item.get('qtd', 1)}x {item['nome']}."
 
     na_loja = next((i for i in loja["estoque"]
                     if _norm_txt(i["nome"]) == _norm_txt(item_name)), None)
     tabela  = na_loja["preco"] if na_loja else (_preco_do_srd(item["nome"]) or 0)
     if tabela <= 0:
-        return (f"⚠️ Sem preço de referência para '{item['nome']}'. "
+        return (f"Aviso: Sem preço de referência para '{item['nome']}'. "
                 f"Ponha o item na loja com open_shop() informando o preço.")
 
     ganho = max(1, (tabela // 2)) * qtd
@@ -7170,7 +7168,7 @@ def sell_item(char_name: str, shop_name: str, item_name: str, quantity: int = 1)
         na_loja["qtd"] = min(99, na_loja["qtd"] + qtd)
     memory.save_campaign()
 
-    return (f"🪙 {char['name']} vendeu {qtd}x {item_name} por {ganho} po "
+    return (f"{char['name']} vendeu {qtd}x {item_name} por {ganho} po "
             f"(metade da tabela: {tabela} po) em {loja['nome']}.\n"
             f"   Bolsa: {sheet['ouro']} po, {sheet.get('prata', 0)} pp, "
             f"{sheet.get('cobre', 0)} pc")
@@ -7249,11 +7247,11 @@ def advance_time(hours: int, reason: str = "") -> str:
     try:
         h = int(hours)
     except (TypeError, ValueError):
-        return "⚠️ Informe as horas como número inteiro."
+        return "Informe as horas como número inteiro."
     if h <= 0:
-        return "⚠️ Informe pelo menos 1 hora."
+        return "Informe pelo menos 1 hora."
     if h > 720:
-        return "⚠️ No máximo 720 horas (30 dias) por chamada."
+        return "No máximo 720 horas (30 dias) por chamada."
 
     r     = _relogio()
     antes = _hora_legivel()
@@ -7263,13 +7261,13 @@ def advance_time(hours: int, reason: str = "") -> str:
     memory.save_campaign()
 
     motivo = f" — {reason}" if reason else ""
-    virou  = "\n   🌅 O dia virou." if total >= 24 else ""
-    return f"🕰️  {antes} → **{_hora_legivel()}**{motivo}{virou}"
+    virou  = "\n   O dia virou." if total >= 24 else ""
+    return f"{antes} → **{_hora_legivel()}**{motivo}{virou}"
 
 
 def get_world_time() -> str:
     """Que horas são no mundo, e há quanto tempo o grupo não dorme."""
-    linhas = [f"🕰️  {_hora_legivel()}"]
+    linhas = [f"{_hora_legivel()}"]
     agora  = _agora_em_horas()
     for ch in memory.campaign.get("characters", {}).values():
         if not memory.is_party_member(ch) or not ch.get("sheet"):
@@ -7280,7 +7278,7 @@ def get_world_time() -> str:
             linhas.append(f"   • {nome}: ainda não fez descanso longo nesta campanha.")
             continue
         horas = agora - int(ultimo)
-        aviso = "  ⚠️ acima de 24h" if horas >= 24 else ""
+        aviso = "  acima de 24h" if horas >= 24 else ""
         linhas.append(f"   • {nome}: {horas}h desde o último descanso longo{aviso}")
     exaustos = [
         f"{c.get('name')} ({(c.get('sheet') or {}).get('exaustao')})"
@@ -7288,7 +7286,7 @@ def get_world_time() -> str:
         if int(((c.get("sheet") or {}).get("exaustao") or 0)) > 0
     ]
     if exaustos:
-        linhas.append("   😩 Exaustão: " + ", ".join(exaustos))
+        linhas.append("   Exaustão: " + ", ".join(exaustos))
     return "\n".join(linhas)
 
 
@@ -7357,14 +7355,14 @@ def add_exhaustion(char_name: str, levels: int = 1, reason: str = "") -> str:
     s["exaustao"] = depois
 
     motivo = f" ({reason})" if reason else ""
-    linhas = [f"😩 {char['name']}: exaustão {antes} → **{depois}**{motivo}"]
+    linhas = [f"{char['name']}: exaustão {antes} → **{depois}**{motivo}"]
     for nivel in range(1, depois + 1):
         linhas.append(f"   {nivel}. {EXAUSTAO_EFEITOS[nivel]}")
 
     if depois >= 6:
         char["status"] = "morto"
         s["vida_atual"] = 0
-        linhas.append("   💀 Exaustão nível 6 — o personagem MORRE.")
+        linhas.append("   Exaustão nível 6 — o personagem MORRE.")
         _log_combat_event("death", char["name"], "",
                           msg=f"{char['name']} morreu de exaustão")
     elif depois >= 4:
@@ -7372,7 +7370,7 @@ def add_exhaustion(char_name: str, levels: int = 1, reason: str = "") -> str:
         teto = _hp_max_efetivo(s)
         if int(s.get("vida_atual", 0) or 0) > teto:
             s["vida_atual"] = teto
-            linhas.append(f"   ❤️  PV máximo efetivo agora é {teto} — vida ajustada.")
+            linhas.append(f"   PV máximo efetivo agora é {teto} — vida ajustada.")
 
     memory.save_campaign()
     return "\n".join(linhas)
@@ -7392,7 +7390,7 @@ def remove_exhaustion(char_name: str, levels: int = 1) -> str:
     s     = char["sheet"]
     antes = _exaustao(s)
     if antes == 0:
-        return f"✅ {char['name']} não está exausto."
+        return f"{char['name']} não está exausto."
     try:
         n = max(1, int(levels))
     except (TypeError, ValueError):
@@ -7400,8 +7398,8 @@ def remove_exhaustion(char_name: str, levels: int = 1) -> str:
     s["exaustao"] = max(0, antes - n)
     memory.save_campaign()
     if s["exaustao"] == 0:
-        return f"✅ {char['name']}: exaustão {antes} → **0**. Recuperado."
-    return (f"😌 {char['name']}: exaustão {antes} → **{s['exaustao']}** "
+        return f"{char['name']}: exaustão {antes} → **0**. Recuperado."
+    return (f"{char['name']}: exaustão {antes} → **{s['exaustao']}** "
             f"({EXAUSTAO_EFEITOS[s['exaustao']]}).")
 
 
@@ -7435,9 +7433,9 @@ def short_rest(char_name: str) -> str:
 
     memory.save_campaign()
     return (
-        f"🛌 {char['name']} faz um descanso curto.\n"
+        f"{char['name']} faz um descanso curto.\n"
         f"   Rola {n_dice}d{hit_die}: [{' + '.join(str(r) for r in rolls)}]\n"
-        f"   Cura: +{hp_ganho} pv | ❤️  Vida: {hp_antes} → "
+        f"   Cura: +{hp_ganho} pv | Vida: {hp_antes} → "
         f"{s['vida_atual']}/{s['vida_max']}{_nota_teto(s)}"
     )
 
@@ -7469,7 +7467,7 @@ def use_hit_die(char_name: str, count: int = 1) -> str:
 
     if hd_restantes <= 0:
         return (
-            f"❌ {char['name']} não tem dados de vida disponíveis.\n"
+            f"Erro: {char['name']} não tem dados de vida disponíveis.\n"
             f"   Faça um descanso longo para recuperar todos os {hd_max} dados."
         )
 
@@ -7488,8 +7486,8 @@ def use_hit_die(char_name: str, count: int = 1) -> str:
     con_str    = f" {'+' if con_mod >= 0 else ''}{con_mod * count}(CON×{count})" if con_mod != 0 else ""
     detail_str = " + ".join(str(r) for r in rolls) if count > 1 else str(rolls[0])
     return (
-        f"🎲 {char['name']} usa {count}d{hit_die}: [{detail_str}]{con_str} = +{hp_ganho} PV\n"
-        f"   ❤️  {hp_antes} → {s['vida_atual']}/{s['vida_max']}\n"
+        f"{char['name']} usa {count}d{hit_die}: [{detail_str}]{con_str} = +{hp_ganho} PV\n"
+        f"   {hp_antes} → {s['vida_atual']}/{s['vida_max']}\n"
         f"   Dados de vida restantes: {s['hit_dice_remaining']}/{hd_max}"
     )
 
@@ -7512,7 +7510,7 @@ def long_rest(char_name: str) -> str:
     cs = memory.campaign.get("combat_state", {})
     if cs.get("is_active"):
         return (
-            f"❌ Impossível descansar — {char_name} está em combate!\n"
+            f"Erro: Impossível descansar — {char_name} está em combate!\n"
             f"   Encerre o combate com end_combat() antes de descansar."
         )
 
@@ -7527,7 +7525,7 @@ def long_rest(char_name: str) -> str:
     if ultimo is not None and agora - int(ultimo) < 24:
         faltam = 24 - (agora - int(ultimo))
         return (
-            f"❌ {char['name']} já descansou nas últimas 24 horas "
+            f"Erro: {char['name']} já descansou nas últimas 24 horas "
             f"({agora - int(ultimo)}h atrás). Faltam **{faltam}h**.\n"
             f"   Agora: {_hora_legivel()}. Um descanso longo por dia — é o que\n"
             f"   faz mana e poderes diários serem recurso.\n"
@@ -7579,15 +7577,15 @@ def long_rest(char_name: str) -> str:
     s["condicoes"] = [c for c in s["condicoes"] if c.get("duracao") is None]
 
     removidas = len(conds_antes) - len(s["condicoes"])
-    cond_msg  = f"\n   ✅ {removidas} condição(ões) temporária(s) removida(s)." if removidas else ""
+    cond_msg  = f"\n   {removidas} condição(ões) temporária(s) removida(s)." if removidas else ""
 
     memory.save_campaign()
     return (
-        f"🌙 {char['name']} faz um descanso longo.\n"
-        f"   ❤️  Vida restaurada: {s['vida_atual']}/{s['vida_max']}{_nota_teto(s)}\n"
-        f"   ✨ Mana restaurada: {s['mana_max']}/{s['mana_max']}"
+        f"{char['name']} faz um descanso longo.\n"
+        f"   Vida restaurada: {s['vida_atual']}/{s['vida_max']}{_nota_teto(s)}\n"
+        f"   Mana restaurada: {s['mana_max']}/{s['mana_max']}"
         f"{cond_msg}"
-        + (f"\n   🔵 {temp_perdidos} PV temporários expiraram." if temp_perdidos else "")
+        + (f"\n   {temp_perdidos} PV temporários expiraram." if temp_perdidos else "")
         + (f"\n   {conc_msg}" if conc_msg else "")
     )
 
@@ -7639,13 +7637,13 @@ def set_stat(char_name: str, stat_name: str, value: int) -> str:
             hp_adj          = delta * nivel
             s["vida_max"]   = max(1, s.get("vida_max", 1) + hp_adj)
             s["vida_atual"] = max(0, min(s["vida_max"], s.get("vida_atual", 0) + hp_adj))
-            extra += f"\n   ❤️  Vida máx: {hp_adj:+d} → {s['vida_max']}"
+            extra += f"\n   Vida máx: {hp_adj:+d} → {s['vida_max']}"
 
         if key == "destreza":
             ca_antes = s.get("ca", 10)
             _recalculate_ca(char)
             if s.get("ca", ca_antes) != ca_antes:
-                extra += f"\n   🛡️  CA: {ca_antes} → {s['ca']}"
+                extra += f"\n   CA: {ca_antes} → {s['ca']}"
 
         # O pool de mana NÃO muda ao alterar o atributo de conjuração — na
         # variante de Pontos de Magia ele depende só do nível. O atributo
@@ -7654,7 +7652,7 @@ def set_stat(char_name: str, stat_name: str, value: int) -> str:
         s[key] = value
 
     memory.save_campaign()
-    return f"✅ {char['name']}: {stat_name} {old_val} → {value}.{extra}"
+    return f"{char['name']}: {stat_name} {old_val} → {value}.{extra}"
 
 
 # ---------------------------------------------------------------------------
@@ -7714,7 +7712,7 @@ def roll_initiative(characters_names: str) -> str:
         else [n.strip() for n in characters_names.split(",") if n.strip()]
     )
     if not names:
-        return "⚠️ Informe ao menos um personagem."
+        return "Informe ao menos um personagem."
 
     results      = []
     auto_created = []
@@ -7776,15 +7774,15 @@ def roll_initiative(characters_names: str) -> str:
 
     memory.save_campaign()
 
-    lines = ["⚔️  Iniciativa rolada! Ordem de combate:"]
+    lines = ["Iniciativa rolada! Ordem de combate:"]
     for i, r in enumerate(results):
         marker = " ◀ PRIMEIRO" if i == 0 else ""
         lines.append(f"  {i + 1}. {r['name']}: {r['log']}{marker}")
-    lines.append(f"\n🎯 Rodada 1 — vez de: **{results[0]['name']}**")
+    lines.append(f"\nRodada 1 — vez de: **{results[0]['name']}**")
 
     if auto_created:
         lines.append(
-            f"\nℹ️  Ficha padrão criada para: {', '.join(auto_created)} "
+            f"\nNota: Ficha padrão criada para: {', '.join(auto_created)} "
             "(HP 12, CA 12). Use create_character_sheet para customizar."
         )
 
@@ -7800,11 +7798,11 @@ def next_turn() -> str:
     """
     cs = memory.campaign.get("combat_state", {})
     if not cs.get("is_active"):
-        return "⚠️ Nenhum combate ativo. Use roll_initiative para iniciar."
+        return "Nenhum combate ativo. Use roll_initiative para iniciar."
 
     order = cs.get("initiative_order", [])
     if not order:
-        return "⚠️ Ordem de iniciativa vazia. Rode roll_initiative primeiro."
+        return "Ordem de iniciativa vazia. Rode roll_initiative primeiro."
 
     # Auto-cura: se o atual morreu/fugiu "no lugar", desencalha o ponteiro
     # ANTES da trava de idempotência (senão ela reportaria um morto).
@@ -7812,10 +7810,10 @@ def next_turn() -> str:
     _heal_current_turn()
     cs = memory.campaign.get("combat_state", {})
     if not cs.get("is_active"):
-        return "🏳️  Combate encerrado — nenhum combatente restante."
+        return "Combate encerrado — nenhum combatente restante."
     order = cs.get("initiative_order", [])
     if not order:
-        return "🏳️  Combate encerrado."
+        return "Combate encerrado."
 
     # Se a auto-cura JÁ avançou o ponteiro (o atual havia saído de combate),
     # ESSE foi o avanço deste next_turn() — não avançar de novo (senão pula
@@ -7828,8 +7826,8 @@ def next_turn() -> str:
         round_n = cs.get("round", 1)
         order_str = " → ".join(f"[{n}]" if i == idx else n for i, n in enumerate(order))
         return (
-            f"⏭️  Turno avançado (combatente anterior saiu de combate) — "
-            f"Rodada {round_n}\n🎯 Vez de: **{cur}**\n   Ordem: {order_str}"
+            f"Turno avançado (combatente anterior saiu de combate) — "
+            f"Rodada {round_n}\nVez de: **{cur}**\n   Ordem: {order_str}"
         )
 
     # Trava de idempotência: se a ferramenta de ação (attack_roll / use_ability /
@@ -7843,8 +7841,8 @@ def next_turn() -> str:
         round_n  = cs.get("round", 1)
         order_str = " → ".join(f"[{n}]" if i == idx else n for i, n in enumerate(order))
         return (
-            f"ℹ️  Turno já avançado pela ferramenta de ação.\n"
-            f"⏭️  Rodada {round_n} — vez de: **{current}**\n"
+            f"Nota: Turno já avançado pela ferramenta de ação.\n"
+            f"Rodada {round_n} — vez de: **{current}**\n"
             f"   Ordem: {order_str}"
         )
 
@@ -7877,13 +7875,13 @@ def next_turn() -> str:
         _reset_turn_economy(cs)
         memory.save_campaign()
 
-        skip_msg  = f"\n⏩ Pulados: {', '.join(skipped)}" if skipped else ""
-        round_msg = f"\n🔔 Nova rodada! Rodada {round_num} começa." if new_round else ""
+        skip_msg  = f"\nPulados: {', '.join(skipped)}" if skipped else ""
+        round_msg = f"\nNova rodada! Rodada {round_num} começa." if new_round else ""
         # O que os chefes lendários fizeram na virada (ver _inicio_de_turno).
         lend_msg = "".join("\n" + m for m in (cs.pop("_lendarias_msg", None) or []))
         return (
-            f"⏭️  Turno avançado — Rodada {round_num}{round_msg}{skip_msg}{lend_msg}\n"
-            f"🎯 Vez de: **{current_name}**\n"
+            f"Turno avançado — Rodada {round_num}{round_msg}{skip_msg}{lend_msg}\n"
+            f"Vez de: **{current_name}**\n"
             f"   Ordem: {' → '.join(f'[{n}]' if i == idx else n for i, n in enumerate(order))}"
         )
 
@@ -7892,7 +7890,7 @@ def next_turn() -> str:
     cs["current_turn_index"] = 0
     cs["round"]              = 1
     memory.save_campaign()
-    return "🏳️  Todos os personagens estão fora de combate.\nCombate encerrado automaticamente."
+    return "Todos os personagens estão fora de combate.\nCombate encerrado automaticamente."
 
 
 def end_combat() -> str:
@@ -7916,7 +7914,7 @@ def end_combat() -> str:
             _sh["concentracao"] = None
         _sh.pop("reacao_rodada", None)
     memory.save_campaign()
-    return "🏳️  Combate encerrado. Iniciativa e rastreador de turnos limpos."
+    return "Combate encerrado. Iniciativa e rastreador de turnos limpos."
 
 
 # ---------------------------------------------------------------------------
@@ -7949,7 +7947,7 @@ def recruit_character(npc_name: str, role: str = "aliado") -> str:
 
     if not char:
         return (
-            f"❌ '{npc_name}' não encontrado na campanha. "
+            f"Erro: '{npc_name}' não encontrado na campanha. "
             f"Crie a ficha primeiro com create_character_sheet() ou roll_initiative()."
         )
 
@@ -7976,7 +7974,7 @@ def recruit_character(npc_name: str, role: str = "aliado") -> str:
     # Bloqueia recrutamento de NPCs muito mais poderosos — narrativamente impossível
     if level_gap >= 10:
         return (
-            f"🚫 RECRUTAMENTO BLOQUEADO — disparidade de poder extrema.\n"
+            f"RECRUTAMENTO BLOQUEADO — disparidade de poder extrema.\n"
             f"   {char['name']} é Nível {npc_nivel}; grupo em torno de Nível {avg_nivel:.0f}.\n"
             f"   Um personagem {int(level_gap)} níveis acima não tem motivo narrativo para "
             f"se juntar como subordinado a um grupo iniciante.\n"
@@ -7991,7 +7989,7 @@ def recruit_character(npc_name: str, role: str = "aliado") -> str:
     # Aviso para disparidade moderada (5-9 níveis) — possível com justificativa forte
     if level_gap >= 5:
         warning = (
-            f"⚠️  AVISO: {char['name']} é Nível {npc_nivel}, "
+            f"Aviso: {char['name']} é Nível {npc_nivel}, "
             f"{int(level_gap)} níveis acima do grupo (Nível ~{avg_nivel:.0f}).\n"
             f"   Recrutamento só faz sentido com justificativa narrativa muito forte\n"
             f"   (dívida de vida, missão pessoal urgente, único capaz de ajudar, etc.).\n"
@@ -8024,9 +8022,9 @@ def recruit_character(npc_name: str, role: str = "aliado") -> str:
     )
     return (
         f"{warning}"
-        f"🤝 {char['name']} agora é {role_label}!\n"
+        f"{char['name']} agora é {role_label}!\n"
         f"   Status anterior: {old_status} → {role_clean}\n"
-        f"   ❤️  Vida: {hp}/{hp_max} | CA: {sheet.get('ca', '?')}{classe_note}\n"
+        f"   Vida: {hp}/{hp_max} | CA: {sheet.get('ca', '?')}{classe_note}\n"
         f"   {char['name']} passará a receber XP junto com o grupo e participará "
         f"de combates como aliado."
     )
@@ -8074,11 +8072,11 @@ def resolve_saving_throw(
     dano_real  = damage_if_fail // 2 if passou else damage_if_fail
 
     sign       = "+" if mod >= 0 else ""
-    resultado  = "✅ PASSOU" if passou else "❌ FALHOU"
+    resultado  = "PASSOU" if passou else "FALHOU"
     reducao    = " (metade do dano)" if passou else " (dano completo)"
 
     result = (
-        f"🎲 Saving Throw — {char['name']} ({attribute.capitalize()} CD {dc})\n"
+        f"Saving Throw — {char['name']} ({attribute.capitalize()} CD {dc})\n"
         f"   Resultado informado: **{player_roll}** {sign}{mod}(mod) vs CD {dc} → {resultado}\n"
         f"   Dano aplicado: **{dano_real}**{reducao}\n"
     )
@@ -8090,11 +8088,11 @@ def resolve_saving_throw(
     pct       = hp_depois / s["vida_max"] if s["vida_max"] > 0 else 0
 
     result += "".join(f"   {n}\n" for n in _res["notas"])
-    result += f"   {char['name']}: ❤️  {hp_antes} → {hp_depois}/{s['vida_max']}"
+    result += f"   {char['name']}: {hp_antes} → {hp_depois}/{s['vida_max']}"
     if hp_depois == 0:
         result += _mark_at_zero_hp(char)
     elif pct <= 0.25:
-        result += " ⚠️  Estado crítico!"
+        result += " Estado crítico!"
 
     # O save ocorre durante o turno do CONJURADOR (use_ability pausou sem
     # avançar). O ponteiro ainda aponta para ele → avança a partir do atual.
@@ -8291,7 +8289,7 @@ def learn_spell(char_name: str, spell_name: str) -> str:
     en_query = SPELL_PT_TO_EN.get(spell_name.lower().strip(), spell_name.lower().strip())
     # Slug: "magic missile" → "magic-missile"
     slug     = en_query.lower().strip().replace(" ", "-").replace("'", "")
-    _edbg(f"  🌐 [OPEN5E] Buscando magia '{spell_name}' (en: '{en_query}') na base SRD (grounding)…")
+    _edbg(f"  [OPEN5E] Buscando magia '{spell_name}' (en: '{en_query}') na base SRD (grounding)…")
 
     try:
         # Tentativa 1: busca por slug exato (mais precisa)
@@ -8336,16 +8334,16 @@ def learn_spell(char_name: str, spell_name: str) -> str:
                 # Fallback offline
                 existing = [h["nome"].lower() for h in char.get("habilidades", [])]
                 if spell_name.lower() in existing:
-                    return f"ℹ️ {char['name']} já conhece {spell_name}."
+                    return f"Nota: {char['name']} já conhece {spell_name}."
                 char.setdefault("habilidades", []).append({
                     "nome": spell_name, "descricao": "Magia aprendida (API offline).",
                     "custo_mana": 4, "dado": "",
                 })
                 memory.save_campaign()
-                return f"✨ {char['name']} aprendeu {spell_name}. (dados simplificados — API indisponível)"
+                return f"{char['name']} aprendeu {spell_name}. (dados simplificados — API indisponível)"
 
     if not results:
-        return f"❌ Magia '{spell_name}' não encontrada. Verifique o nome ou use learn_ability()."
+        return f"Erro: Magia '{spell_name}' não encontrada. Verifique o nome ou use learn_ability()."
 
     spell       = results[0]
     # Corrige nível com banco local quando a API retorna valor incorreto
@@ -8356,7 +8354,7 @@ def learn_spell(char_name: str, spell_name: str) -> str:
 
     if nivel < min_char_lv:
         return (
-            f"❌ {char['name']} (nv {nivel}) não pode aprender {spell_name} ainda. "
+            f"Erro: {char['name']} (nv {nivel}) não pode aprender {spell_name} ainda. "
             f"Requer personagem nível {min_char_lv} (magia nível {spell_level})."
         )
 
@@ -8367,14 +8365,14 @@ def learn_spell(char_name: str, spell_name: str) -> str:
         spell_classes = spell.get("dnd_class", "").lower()
         if spell_classes and en_class not in spell_classes:
             return (
-                f"❌ **{spell_name}** não está na lista de magias de {char_class.capitalize()}.\n"
+                f"Erro: **{spell_name}** não está na lista de magias de {char_class.capitalize()}.\n"
                 f"   Disponível para: {spell.get('dnd_class', 'desconhecido')}\n"
                 f"   Use learn_spell() com uma magia adequada para {char_class}."
             )
 
     existing = [h["nome"].lower() for h in char.get("habilidades", [])]
     if spell_name.lower() in existing:
-        return f"ℹ️ {char['name']} já conhece {spell_name}."
+        return f"Nota: {char['name']} já conhece {spell_name}."
 
     dado  = ""
     dmg   = spell.get("damage", {})
@@ -8401,7 +8399,7 @@ def learn_spell(char_name: str, spell_name: str) -> str:
     memory.save_campaign()
 
     return (
-        f"✨ {char['name']} aprendeu **{spell_name}** "
+        f"{char['name']} aprendeu **{spell_name}** "
         f"(nível {spell_level}, {mana} mana{ritual}{concentr})!\n"
         f"   {escola} · Dado: {dado or 'sem dano direto'}"
     )
@@ -8447,7 +8445,7 @@ def _fetch_open5e_monsters(cr: float, limit: int = 15) -> list[dict]:
     """Busca monstros do Open5e com CR correto. Retorna lista vazia se falhar."""
     from rpg.open5e import http as _req   # SRD com cache, sessão e retry
     cr_str = _cr_to_open5e_str(cr)
-    _edbg(f"  🌐 [OPEN5E] Buscando monstros reais com CR≈{cr_str} na base SRD (grounding)…")
+    _edbg(f"  [OPEN5E] Buscando monstros reais com CR≈{cr_str} na base SRD (grounding)…")
     try:
         r = _req.get(
             "https://api.open5e.com/v1/monsters/",
@@ -8455,7 +8453,7 @@ def _fetch_open5e_monsters(cr: float, limit: int = 15) -> list[dict]:
             timeout=5,
         )
         if not r.ok:
-            _edbg(f"  ⚠️  [OPEN5E] Resposta HTTP {r.status_code} ao buscar monstros CR {cr_str}")
+            _edbg(f"  [OPEN5E] Resposta HTTP {r.status_code} ao buscar monstros CR {cr_str}")
             return []
         results = r.json().get("results", [])
         # Filtra monstros cujo CR real está próximo do solicitado
@@ -8463,11 +8461,11 @@ def _fetch_open5e_monsters(cr: float, limit: int = 15) -> list[dict]:
         target = _cr_str_to_float(cr_str)
         tol    = max(0.5, target * 0.5)
         filtrados = [m for m in results if abs(_cr_str_to_float(m.get("challenge_rating", 0)) - target) <= tol]
-        _edbg(f"  ✅ [OPEN5E] {len(filtrados)} monstro(s) com CR compatível: "
+        _edbg(f"  [OPEN5E] {len(filtrados)} monstro(s) com CR compatível: "
               f"{', '.join(m.get('name', '?') for m in filtrados[:6])}")
         return filtrados
     except Exception as e:
-        _edbg(f"  ⚠️  [OPEN5E] Falha de rede ao buscar monstros (API offline?): {e}")
+        _edbg(f"  [OPEN5E] Falha de rede ao buscar monstros (API offline?): {e}")
         return []
 
 
@@ -8492,10 +8490,10 @@ def _open5e_monster_to_block(m: dict, label: str) -> str:
     if actions:
         atk  = actions[0]
         dado = _extract_damage_from_action(atk)
-        atk_line = f"\n   ⚔️ {atk.get('name', 'Ataque')}: {dado or 'ver descrição'} dano"
+        atk_line = f"\n   {atk.get('name', 'Ataque')}: {dado or 'ver descrição'} dano"
     return (
         f"── {label}: **{name}** (CR {cr}) ──\n"
-        f"   {size} {type_} | ❤️ {hp} HP | 🛡️ CA {ac} | 💨 {spd_str}\n"
+        f"   {size} {type_} | {hp} HP | CA {ac} | {spd_str}\n"
         f"   {stats_line}{atk_line}\n"
         f"   → create_character_sheet('{name}', hp_max={hp}, ca={ac})"
     )
@@ -8529,7 +8527,7 @@ def suggest_encounter(party_level: int, party_size: int = 4, difficulty: str = "
     horde_cr  = _xp_to_cr(budget / _enc_multiplier(horde_cnt) / horde_cnt)
 
     header = (
-        f"⚔️  ENCONTRO BALANCEADO — Grupo Nv.{party_level} × {party_size}\n"
+        f"ENCONTRO BALANCEADO — Grupo Nv.{party_level} × {party_size}\n"
         f"Dificuldade: **{diff_name}**  |  Orçamento: {budget} XP ({per_char}/personagem)\n"
     )
 
@@ -8561,7 +8559,7 @@ def suggest_encounter(party_level: int, party_size: int = 4, difficulty: str = "
         lines.append(_enc_block(f"OPÇÃO C — Horda ×{horde_cnt}", horde_cnt, horde_cr, budget))
 
     # Instrução interna à LLM — filtrada antes de exibir na UI (server.py).
-    lines += ["", "[[llm]]💡 Use os stats em create_character_sheet ANTES de roll_initiative.",
+    lines += ["", "[[llm]]Use os stats em create_character_sheet ANTES de roll_initiative.",
               "   Adapte os nomes ao tema da campanha.[[/llm]]"]
     return "\n".join(lines)
 
@@ -8657,7 +8655,7 @@ def set_feature_choice(char_name: str, feature_name: str, choice: str) -> str:
     if not meta:
         avail = ", ".join(sorted(FEATURE_VARIANTS.keys()))
         return (
-            f"❌ Feature '{feature_name}' não tem variantes registradas.\n"
+            f"Erro: Feature '{feature_name}' não tem variantes registradas.\n"
             f"   Features com subescolha: {avail}."
         )
 
@@ -8668,7 +8666,7 @@ def set_feature_choice(char_name: str, feature_name: str, choice: str) -> str:
     )
     if not has_feat:
         return (
-            f"❌ {char['name']} ainda não tem a habilidade '{feature_name}'. "
+            f"Erro: {char['name']} ainda não tem a habilidade '{feature_name}'. "
             f"Suba de nível ou conceda a feature antes de escolher variante."
         )
 
@@ -8686,21 +8684,21 @@ def set_feature_choice(char_name: str, feature_name: str, choice: str) -> str:
             if cur == target:
                 fc.pop(feature_name, None)
                 memory.save_campaign()
-                return f"🗑️ Removida a escolha '{target}' de {feature_name}."
-            return f"ℹ️ {target!r} não estava marcado em {feature_name}."
+                return f"Removida a escolha '{target}' de {feature_name}."
+            return f"Nota: {target!r} não estava marcado em {feature_name}."
         cur_list = list(cur or [])
         if target in cur_list:
             cur_list.remove(target)
             fc[feature_name] = cur_list
             memory.save_campaign()
-            return f"🗑️ Removido {target!r} de {feature_name}."
-        return f"ℹ️ {target!r} não estava marcado em {feature_name}."
+            return f"Removido {target!r} de {feature_name}."
+        return f"Nota: {target!r} não estava marcado em {feature_name}."
 
     # Validação
     if choice not in options:
         opts_str = ", ".join(sorted(options.keys()))
         return (
-            f"❌ '{choice}' não é uma opção de {feature_name}.\n"
+            f"Erro: '{choice}' não é uma opção de {feature_name}.\n"
             f"   Opções disponíveis: {opts_str}."
         )
 
@@ -8719,22 +8717,22 @@ def set_feature_choice(char_name: str, feature_name: str, choice: str) -> str:
         granted_str = ""
         if archetype_granted:
             granted_str = (
-                f"\n   🎁 Sub-features concedidas neste nível: "
+                f"\n   Sub-features concedidas neste nível: "
                 f"{', '.join(archetype_granted)}."
             )
         return (
-            f"✅ {char['name']} agora tem {feature_name}: **{choice}**.\n"
+            f"{char['name']} agora tem {feature_name}: **{choice}**.\n"
             f"   {desc}{granted_str}"
         )
 
     # Multi-pick
     cur_list = list(cur or [])
     if choice in cur_list:
-        return f"ℹ️ {choice!r} já está marcado em {feature_name}."
+        return f"Nota: {choice!r} já está marcado em {feature_name}."
     if len(cur_list) >= pick:
         atual = ", ".join(cur_list)
         return (
-            f"❌ {char['name']} já escolheu {len(cur_list)}/{pick} em {feature_name}: {atual}.\n"
+            f"Erro: {char['name']} já escolheu {len(cur_list)}/{pick} em {feature_name}: {atual}.\n"
             f"   Remova uma antes: set_feature_choice('{char['name']}', "
             f"'{feature_name}', 'remove:<nome>')."
         )
@@ -8743,7 +8741,7 @@ def set_feature_choice(char_name: str, feature_name: str, choice: str) -> str:
     memory.save_campaign()
     desc = options[choice].get("descricao", "")
     return (
-        f"✅ {char['name']} aprendeu {feature_name}: **{choice}** "
+        f"{char['name']} aprendeu {feature_name}: **{choice}** "
         f"({len(cur_list)}/{pick}).\n   {desc}"
     )
 
@@ -8783,20 +8781,20 @@ def choose_feat(char_name: str, feat_name: str) -> str:
     if rastreado:
         if _asi_pontos_pendentes(sheet) < _PONTOS_POR_ASI:
             return (
-                f"❌ {char['name']} não tem um incremento inteiro pendente "
+                f"Erro: {char['name']} não tem um incremento inteiro pendente "
                 f"({_asi_pontos_pendentes(sheet)} ponto(s)). Um talento substitui "
                 f"um incremento completo, de {_PONTOS_POR_ASI} pontos."
             )
     elif nivel not in _niveis_asi(sheet.get("classe", "")):
         return (
-            f"❌ {char['name']} está no nível {nivel}. Talentos só podem ser "
+            f"Erro: {char['name']} está no nível {nivel}. Talentos só podem ser "
             f"escolhidos nos níveis {sorted(_niveis_asi(sheet.get('classe', '')))}."
         )
 
     # Verifica se já tem esse talento
     existing_names = {h.get("nome", "").lower() for h in char.get("habilidades", [])}
     if feat_name.lower() in existing_names:
-        return f"ℹ️ {char['name']} já possui o talento '{feat_name}'."
+        return f"Nota: {char['name']} já possui o talento '{feat_name}'."
 
     # Busca no Open5e
     feat_data = None
@@ -8819,7 +8817,7 @@ def choose_feat(char_name: str, feat_name: str) -> str:
 
     if not feat_data:
         return (
-            f"❌ Talento '{feat_name}' não encontrado no Open5e (SRD).\n"
+            f"Erro: Talento '{feat_name}' não encontrado no Open5e (SRD).\n"
             f"   Verifique o nome em inglês ou use learn_ability() para habilidades customizadas."
         )
 
@@ -8859,7 +8857,7 @@ def choose_feat(char_name: str, feat_name: str) -> str:
     bonus_info  = f"\n   Bônus aplicado: {', '.join(bonus_applied)}" if bonus_applied else ""
 
     return (
-        f"🌟 {char['name']} aprendeu o talento **{name_en}**!{prereq_info}{bonus_info}\n"
+        f"{char['name']} aprendeu o talento **{name_en}**!{prereq_info}{bonus_info}\n"
         f"   {desc}"
     )
 
@@ -9043,7 +9041,7 @@ def spawn_monster(
 
     if not monster_data:
         return (
-            f"⚠️ Monstro '{monster_name}' não encontrado no Open5e. "
+            f"Aviso: Monstro '{monster_name}' não encontrado no Open5e. "
             f"Usando ficha padrão via roll_initiative() ou crie manualmente com "
             f"create_character_sheet(). Verifique o nome em inglês "
             f"(ex: 'goblin', 'orc', 'zombie', 'bandit', 'wolf')."
@@ -9164,9 +9162,9 @@ def spawn_monster(
     memory.save_campaign()
 
     names_str  = ", ".join(created_names)
-    atk_info   = f" | ⚔️ {arma_principal} ({arma_dado})" if arma_principal else ""
+    atk_info   = f" | {arma_principal} ({arma_dado})" if arma_principal else ""
     sec_info   = f" + {arma_secundaria}" if arma_secundaria else ""
-    ma_info    = f" | 🗡️ Ataque Múltiplo ×{multiattack}" if multiattack > 1 else ""
+    ma_info    = f" | Ataque Múltiplo ×{multiattack}" if multiattack > 1 else ""
     qty_label  = f"{quantity}×" if quantity > 1 else ""
 
     def _traits_line(rotulo: str, entradas: list) -> str:
@@ -9178,14 +9176,14 @@ def spawn_monster(
         return f"\n   {rotulo}: {', '.join(tipos)}{cond}"
 
     traits_info = (
-        _traits_line("🛡️ Imunidades",      imunidades)
-        + _traits_line("🛡️ Resistências",  resistencias)
-        + _traits_line("💥 Vulnerabilidades", vulnerabilidades)
+        _traits_line("Imunidades",      imunidades)
+        + _traits_line("Resistências",  resistencias)
+        + _traits_line("Vulnerabilidades", vulnerabilidades)
     )
 
     return (
-        f"👹 {qty_label}{base_name} criado(s) com stats reais (Open5e)!\n"
-        f"   CR {cr_label} | ❤️ HP {hp_max} | 🛡️ CA {ac}{atk_info}{sec_info}{ma_info}\n"
+        f"{qty_label}{base_name} criado(s) com stats reais (Open5e)!\n"
+        f"   CR {cr_label} | HP {hp_max} | CA {ac}{atk_info}{sec_info}{ma_info}\n"
         f"   FOR {str_}  DES {dex}  CON {con}  INT {int_}  SAB {wis}  CAR {cha}"
         f"{traits_info}\n"
         f"   Personagens: {names_str}"
@@ -9230,14 +9228,14 @@ def set_npc_strategy(npc_name: str, strategy: str) -> str:
     """
     cs = memory.campaign.get("combat_state", {})
     if not cs.get("is_active"):
-        return "⚠️ Nenhum combate ativo."
+        return "Nenhum combate ativo."
     strategy = strategy.lower().strip()
     if strategy not in NPC_STRATEGIES:
         opts = ", ".join(NPC_STRATEGIES.keys())
-        return f"⚠️ Estratégia '{strategy}' inválida. Opções: {opts}"
+        return f"Aviso: Estratégia '{strategy}' inválida. Opções: {opts}"
     cs.setdefault("npc_strategies", {})[npc_name.lower()] = strategy
     memory.save_campaign()
-    return f"🎯 Estratégia de {npc_name} definida: **{strategy}** — {NPC_STRATEGIES[strategy]}"
+    return f"Estratégia de {npc_name} definida: **{strategy}** — {NPC_STRATEGIES[strategy]}"
 
 
 # ── Repertório do NPC ──────────────────────────────────────────────────────
@@ -9332,7 +9330,7 @@ def _npc_usar_poder(npc: dict, npc_name: str, poder: str, alvo: str) -> str:
         end_turn         = True,
         _skip_turn_check = True,
     )
-    return f"💥 {npc_name} descarrega **{poder}**!\n{resultado}"
+    return f"{npc_name} descarrega **{poder}**!\n{resultado}"
 
 
 def _npc_recuar_para_atirar(npc: dict, npc_name: str) -> str:
@@ -9361,7 +9359,7 @@ def _npc_recuar_para_atirar(npc: dict, npc_name: str) -> str:
         candidatos = [i + 1, i - 1]
     for j in candidatos:
         if 0 <= j < len(zonas) and not _inimigos_na_zona(npc_name, zonas[j]):
-            return "🏹 " + move_combatant(npc_name, zonas[j]).lstrip("🏃 ")
+            return "Recua para atirar: " + move_combatant(npc_name, zonas[j])
     return ""
 
 
@@ -9379,28 +9377,28 @@ def execute_npc_turn(npc_name: str = "") -> str:
     """
     cs = memory.campaign.get("combat_state", {})
     if not cs.get("is_active"):
-        return "⚠️ Nenhum combate ativo."
+        return "Nenhum combate ativo."
 
     # Auto-cura: desencalha o ponteiro se o atual saiu de combate.
     _heal_current_turn()
     cs = memory.campaign.get("combat_state", {})
     if not cs.get("is_active"):
-        return "🏳️  Combate encerrado — nenhum combatente restante."
+        return "Combate encerrado — nenhum combatente restante."
 
     order = cs.get("initiative_order", [])
     if not order:
-        return "⚠️ Ordem de iniciativa vazia."
+        return "Ordem de iniciativa vazia."
 
     # O motor é a autoridade: age SEMPRE pelo combatente do turno atual,
     # ignorando um npc_name divergente que o LLM possa ter passado.
     idx      = cs.get("current_turn_index", 0)
     npc_name = order[idx] if 0 <= idx < len(order) else ""
     if not npc_name:
-        return "⚠️ Não foi possível determinar o NPC atual."
+        return "Não foi possível determinar o NPC atual."
 
     npc, err = _get_char(npc_name)
     if not npc:
-        return f"⚠️ NPC '{npc_name}' não encontrado: {err}"
+        return f"Erro: NPC '{npc_name}' não encontrado: {err.removeprefix('Erro: ')}"
 
     # Definição canônica de grupo (memory.is_party_member): party_member,
     # protagonista ou campaign["party"].
@@ -9408,7 +9406,7 @@ def execute_npc_turn(npc_name: str = "") -> str:
 
     if memory.is_party_member(npc):
         return (
-            f"⚠️ {npc_name} é um personagem do grupo — use attack_roll() "
+            f"Aviso: {npc_name} é um personagem do grupo — use attack_roll() "
             f"conforme instrução do jogador."
         )
 
@@ -9421,7 +9419,7 @@ def execute_npc_turn(npc_name: str = "") -> str:
     for _nome_rec, _cfg in (npc_sheet.get("recargas") or {}).items():
         if _cfg.get("pronto") and _cfg.get("ultimo_d6"):
             avisos_recarga.append(
-                f"🔄 **{_nome_rec}** recarregou (d6={_cfg.pop('ultimo_d6')}).")
+                f"**{_nome_rec}** recarregou (d6={_cfg.pop('ultimo_d6')}).")
 
     # Lógica de fuga (covarde)
     if strategy == "covarde":
@@ -9436,7 +9434,7 @@ def execute_npc_turn(npc_name: str = "") -> str:
             memory.save_campaign()
             advance = _auto_advance_turn(npc_name)
             return (
-                f"💨 {npc_name} está com {int(hp_pct * 100)}% de HP e FOGE do combate!"
+                f"{npc_name} está com {int(hp_pct * 100)}% de HP e FOGE do combate!"
                 f"{oportunidade}{advance}"
             )
 
@@ -9458,7 +9456,7 @@ def execute_npc_turn(npc_name: str = "") -> str:
         })
 
     if not targets:
-        return f"⚔️ {npc_name} não encontra alvos válidos. Verifique se o combate deve encerrar com end_combat()."
+        return f"{npc_name} não encontra alvos válidos. Verifique se o combate deve encerrar com end_combat()."
 
     # Seleção de alvo por estratégia
     if strategy == "agressivo":
@@ -9533,7 +9531,7 @@ def execute_npc_turn(npc_name: str = "") -> str:
         partes.append(aviso_recuo)
     alvo_nome = target["name"]
     if n_ataques > 1:
-        partes.append(f"🗡️  {npc_name} usa Ataque Múltiplo ({n_ataques} ataques):")
+        partes.append(f"{npc_name} usa Ataque Múltiplo ({n_ataques} ataques):")
 
     for i in range(n_ataques):
         # O alvo pode ter caído no golpe anterior — 5e manda redirecionar os
@@ -9542,7 +9540,7 @@ def execute_npc_turn(npc_name: str = "") -> str:
             restantes = [t["name"] for t in targets
                          if t["name"] != alvo_nome and _alvo_valido(t["name"])]
             if not restantes:
-                partes.append(f"   ⏹️  Sem alvos de pé — {npc_name} interrompe a investida.")
+                partes.append(f"   Sem alvos de pé — {npc_name} interrompe a investida.")
                 partes.append(_auto_advance_turn(npc_name))
                 break
             alvo_nome = restantes[0]
@@ -9762,7 +9760,7 @@ def _gastar_lendarias_dos_chefes(quem_comeca: str) -> list[str]:
 
         alvo = _alvo_de_lendaria(chefe)
         saida = legendary_action(chefe.get("name", nome), escolha["nome"], alvo)
-        if not saida.startswith(("❌", "⚠️")):
+        if not saida.startswith(("Erro:", "Aviso:")):
             avisos.append(saida)
     return avisos
 
@@ -10080,7 +10078,7 @@ def combat_action(action: str, actor: str = "", target: str = "",
         key = slot + "_usada"
         if eco.get(key):
             rotulo = "Ação" if slot == "acao" else "Ação Bônus"
-            return (f"❌ {actor} já usou sua {rotulo} neste turno. "
+            return (f"Erro: {actor} já usou sua {rotulo} neste turno. "
                     f"Use 'Encerrar Turno' ou a outra parte da economia.")
         eco[key] = True
         return None
@@ -10151,7 +10149,7 @@ def combat_action(action: str, actor: str = "", target: str = "",
                     mp_max = int(sheet_pre.get("mana_max", 0) or 0)
                     return {
                         "ok": False,
-                        "message": (f"❌ {actor} não tem mana suficiente para "
+                        "message": (f"Erro: {actor} não tem mana suficiente para "
                                     f"'{hab_pre.get('nome', ability)}' "
                                     f"(precisa {custo_pre}, tem {mp_atual}/{mp_max}). "
                                     f"A Ação/Bônus deste turno NÃO foi gasta."),
@@ -10218,18 +10216,18 @@ def combat_action(action: str, actor: str = "", target: str = "",
                 _log_combat_event(
                     "item_heal", actor, recv["name"],
                     msg=(f"{actor} usou {slot_inv['nome']} em {recv['name']} "
-                         f"[{tag_eco}]: 🎲 {n_d}d{sides}: [{detail}] +{bonus} = "
+                         f"[{tag_eco}]: {n_d}d{sides}: [{detail}] +{bonus} = "
                          f"{heal} cura • HP {hp_antes}→{hp_depois}/{hp_max}"),
                     item=slot_inv["nome"], rolls=list(rolls), heal=heal,
                     hp=hp_depois, hp_max=hp_max, slot=slot,
                 )
-                msg = (f"🧪 {actor} usou {slot_inv['nome']} em {recv['name']} "
+                msg = (f"{actor} usou {slot_inv['nome']} em {recv['name']} "
                        f"[{tag_eco}]: +{heal} HP ({hp_antes}→{hp_depois}/{hp_max}).")
             else:
                 _log_combat_event("item_use", actor, target,
                                   msg=f"{actor} usou {slot_inv['nome']}",
                                   item=slot_inv["nome"], slot=slot)
-                msg = f"🧪 {actor} usou {slot_inv['nome']}."
+                msg = f"{actor} usou {slot_inv['nome']}."
             slot_inv["qtd"] = int(slot_inv.get("qtd", 1) or 1) - 1
             if slot_inv["qtd"] <= 0:
                 try: inv.remove(slot_inv)
@@ -10246,7 +10244,7 @@ def combat_action(action: str, actor: str = "", target: str = "",
                         "snapshot": combat_snapshot()}
             if eco.get("movimento_usado"):
                 return {"ok": False,
-                        "message": f"❌ {actor} já se moveu neste turno.",
+                        "message": f"Erro: {actor} já se moveu neste turno.",
                         "snapshot": combat_snapshot()}
             dash = bool(weapon and weapon.lower() == "dash")
             if dash:
@@ -10257,7 +10255,7 @@ def combat_action(action: str, actor: str = "", target: str = "",
             # Só marca o movimento como gasto se ele realmente aconteceu —
             # uma recusa (zona inexistente, longe demais) não pode queimar o
             # turno do jogador.
-            if not msg.startswith(("❌", "⚠️")):
+            if not msg.startswith(("Erro:", "Aviso:")):
                 eco["movimento_usado"] = True
             elif dash:
                 eco["acao_usada"] = False
@@ -10268,7 +10266,7 @@ def combat_action(action: str, actor: str = "", target: str = "",
                 return {"ok": False, "message": err, "snapshot": combat_snapshot()}
             _log_combat_event("defend", actor, "",
                               msg=f"{actor} defendeu-se (Esquivar — Ação)")
-            msg = f"🛡️ {actor} esquiva-se (Dodge)."
+            msg = f"{actor} esquiva-se (Dodge)."
 
         elif a == "flee":
             err = _use_slot(eco, "acao")
@@ -10284,7 +10282,7 @@ def combat_action(action: str, actor: str = "", target: str = "",
             ch["status"] = "fugiu"
             _log_combat_event("flee", actor, "", msg=f"{actor} fugiu do combate")
             memory.save_campaign()
-            msg = f"💨 {actor} fugiu do combate!{oportunidade}"
+            msg = f"{actor} fugiu do combate!{oportunidade}"
             force_end = True
 
         elif a in ("pass", "end_turn"):
@@ -10350,7 +10348,7 @@ def combat_action(action: str, actor: str = "", target: str = "",
             _log_combat_event("side_wiped", msg=f"Combate decidido — {quem} fora de ação")
             msg += "\n" + end_combat()
 
-    # Se chegou até aqui, a ação foi aceita pelo motor. "❌" pode aparecer
+    # Se chegou até aqui, a ação foi aceita pelo motor. "" pode aparecer
     # na narrativa de um ataque que ERROU — ainda é sucesso da ação.
     # Recusas reais retornam ok=False mais cedo (early returns).
     return {"ok": True, "message": msg, "snapshot": combat_snapshot()}

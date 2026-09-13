@@ -483,7 +483,7 @@ def test_encerrar_missao(campanha):
     tools.add_quest("Caçar o Lobo", "…", reward="50 po")
     saida = tools.complete_quest("Caçar o Lobo", "concluida", "O lobo era um lobisomem.")
 
-    assert "🏆" in saida and "50 po" in saida
+    assert "concluida" in saida and "50 po" in saida
     m = campanha["quests"]["caçar o lobo"]
     assert m["status"] == "concluida"
     assert m["desfecho"] == "O lobo era um lobisomem."

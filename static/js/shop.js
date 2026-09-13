@@ -72,9 +72,9 @@
 
         <div class="shp-abas" role="tablist">
           <button id="shp-aba-comprar" class="shp-aba" role="tab"
-                  onclick="window.Shop._aba('comprar')">🪙 Comprar</button>
+                  onclick="window.Shop._aba('comprar')">Comprar</button>
           <button id="shp-aba-vender" class="shp-aba" role="tab"
-                  onclick="window.Shop._aba('vender')">📦 Vender</button>
+                  onclick="window.Shop._aba('vender')">Vender</button>
         </div>
 
         <div id="shp-lista" class="shp-lista"></div>
@@ -153,10 +153,10 @@
 
     el.innerHTML = `
       <div class="shp-bolsa-quem">${troca}</div>
-      <div class="shp-bolsa-moedas">💰 ${moedas(c)}</div>
+      <div class="shp-bolsa-moedas">${moedas(c)}</div>
       <div class="shp-carga">
         <div class="shp-carga-topo">
-          <span>🎒 Carga</span>
+          <span>Carga</span>
           <span class="shp-carga-num">${c.carga} / ${c.capacidade} kg — ${esc(rotulo)}</span>
         </div>
         <div class="shp-carga-barra">
@@ -306,8 +306,8 @@
     const aqui = snap.lojas_aqui || [];
     if (snap.loja_aqui && loja.nome && !_open) {
       pill.textContent = aqui.length > 1
-        ? `🏪 ${aqui.length} lojas em ${snap.local_atual || loja.local}`
-        : `🏪 ${loja.nome}`;
+        ? `${aqui.length} lojas em ${snap.local_atual || loja.local}`
+        : `Loja: ${loja.nome}`;
       pill.classList.remove('hidden');
     } else {
       pill.classList.add('hidden');

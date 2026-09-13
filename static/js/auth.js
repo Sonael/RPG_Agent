@@ -70,7 +70,7 @@ async function submitAuth() {
 function showPendingConfirmation(email) {
   document.querySelector('.page-right').innerHTML = `
     <div style="display:flex; flex-direction:column; justify-content:center; align-items:center; height:100%; text-align:center; padding: 40px;">
-      <div style="font-size:56px; margin-bottom:20px;">📬</div>
+      <div style="margin-bottom:20px;"><svg viewBox="0 0 24 24" width="56" height="56" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color:var(--ink-user);"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3.5 6.5l8.5 6 8.5-6"/></svg></div>
       <div style="font-family:'Playfair Display',serif; font-size:22px; color:var(--text-main); margin-bottom:15px;">
         Confirme o seu email
       </div>
@@ -136,7 +136,7 @@ async function handleEmailConfirmation() {
 function showConfirmingScreen() {
   document.querySelector('.page-right').innerHTML = `
     <div id="confirm-msg" style="display:flex; flex-direction:column; justify-content:center; align-items:center; height:100%; text-align:center; padding:40px;">
-      <div style="font-size:48px; margin-bottom:18px;">⏳</div>
+      <div style="margin-bottom:18px;"><svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color:var(--ink-user);"><path d="M6 3h12M6 21h12M7 3c0 5 10 5 10 9s-10 4-10 9M17 3c0 5-10 5-10 9s10 4 10 9"/></svg></div>
       <div style="font-family:'Playfair Display',serif; font-size:20px; color:var(--text-main); margin-bottom:10px;">A confirmar email...</div>
       <div style="font-family:'Lora',serif; font-size:14px; color:var(--text-muted);">Aguarde um momento</div>
     </div>
@@ -147,7 +147,7 @@ function showConfirmSuccess() {
   const msg = document.getElementById('confirm-msg');
   if (!msg) return;
   msg.innerHTML = `
-    <div style="font-size:40px;margin-bottom:14px;">✅</div>
+    <div style="margin-bottom:14px;"><svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color:var(--ink-user);"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.8 2.8L16.5 9.5"/></svg></div>
     <div style="font-family:'Cinzel',serif;font-size:15px;color:var(--green);letter-spacing:0.06em;">Email confirmado!</div>
     <div style="font-size:12px;color:var(--text-muted);margin-top:10px;font-family:'JetBrains Mono',monospace;">Redirecionando para o menu...</div>
   `;

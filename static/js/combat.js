@@ -69,7 +69,7 @@
       const pill = document.createElement('button');
       pill.id = 'cbt-reopen';
       pill.className = 'hidden';
-      pill.textContent = '⚔️ Retomar combate';
+      pill.textContent = 'Retomar combate';
       pill.onclick = () => window.Combat._reopen();
       document.body.appendChild(pill);
     }
@@ -105,7 +105,7 @@
     </div>`;
   }
 
-  // Crista do painel de fim. SVG e não emoji: o 🏆 é desenhado pelo sistema
+  // Crista do painel de fim. SVG e não emoji: um troféu em emoji é desenhado pelo sistema
   // operacional e muda de forma e de cor entre Windows, Android e iOS — num
   // painel comemorativo isso aparece como remendo.
   const CRISTA_VITORIA =
@@ -163,7 +163,7 @@
       </div>
       <div class="cbt-meta">
         <span>${meta || '—'}</span>
-        <span class="cbt-ca" title="Classe de Armadura">🛡️ ${c.ca}</span>
+        <span class="cbt-ca" title="Classe de Armadura">CA ${c.ca}</span>
       </div>
       <div class="cbt-bars">
         ${bar('HP', c.hp, c.hp_max, 'hp',
@@ -294,24 +294,24 @@
     const itemUsable = (hasAcaoItem && !acaoUsed) || (hasBonusItem && !bonusUsed);
 
     let html =
-      `<button class="cbt-btn" ${acaoDis} onclick="window.Combat._sel('attack')">⚔️ Atacar</button>`;
+      `<button class="cbt-btn" ${acaoDis} onclick="window.Combat._sel('attack')">Atacar</button>`;
     if ((cur.habilidades || []).length) {
       const d = (habUsable && !_busy) ? '' : 'disabled';
-      html += `<button class="cbt-btn" ${d} onclick="window.Combat._sel('ability')">✨ Habilidade</button>`;
+      html += `<button class="cbt-btn" ${d} onclick="window.Combat._sel('ability')">Habilidade</button>`;
     }
     if ((cur.itens_combate || []).length) {
       const d = (itemUsable && !_busy) ? '' : 'disabled';
-      html += `<button class="cbt-btn" ${d} onclick="window.Combat._sel('item')">🧪 Item</button>`;
+      html += `<button class="cbt-btn" ${d} onclick="window.Combat._sel('item')">Item</button>`;
     }
     if (temZonas) {
       const d = (moveUsed || _busy) ? 'disabled' : '';
-      html += `<button class="cbt-btn" ${d} onclick="window.Combat._sel('move')">🏃 Mover</button>`;
+      html += `<button class="cbt-btn" ${d} onclick="window.Combat._sel('move')">Mover</button>`;
     }
     html +=
-      `<button class="cbt-btn" ${acaoDis} onclick="window.Combat._act({action:'defend',actor:'${actorEsc}'})">🛡️ Defender</button>` +
-      `<button class="cbt-btn" ${acaoDis} onclick="window.Combat._act({action:'flee',actor:'${actorEsc}'})">💨 Fugir</button>` +
-      `<button class="cbt-btn" ${dis} onclick="window.Combat._free()">💬 Ação Livre</button>` +
-      `<button class="cbt-btn cbt-primary" ${dis} onclick="window.Combat._act({action:'end_turn',actor:'${actorEsc}'})">⏭️ Encerrar Turno</button>`;
+      `<button class="cbt-btn" ${acaoDis} onclick="window.Combat._act({action:'defend',actor:'${actorEsc}'})">Defender</button>` +
+      `<button class="cbt-btn" ${acaoDis} onclick="window.Combat._act({action:'flee',actor:'${actorEsc}'})">Fugir</button>` +
+      `<button class="cbt-btn" ${dis} onclick="window.Combat._free()">Ação Livre</button>` +
+      `<button class="cbt-btn cbt-primary" ${dis} onclick="window.Combat._act({action:'end_turn',actor:'${actorEsc}'})">Encerrar Turno</button>`;
     btnEl.innerHTML = html;
     acompanharAlturaDaBarra();
   }
@@ -537,7 +537,7 @@
         + `<div class="cbt-picker-btns">`
         + armas.map(w =>
             `<button class="cbt-btn" title="${esc(w.origem)}" onclick="window.Combat._selWeapon('${esc(w.nome).replace(/'/g,"\\'")}')">`
-            + `⚔️ ${esc(w.nome)}<small> · ${esc(w.origem)}</small></button>`
+            + `${esc(w.nome)}<small> · ${esc(w.origem)}</small></button>`
           ).join('')
         + `<button class="cbt-btn cbt-cancel" onclick="window.Combat._cancel()">✕ Cancelar</button>`
         + `</div>`;
@@ -578,7 +578,7 @@
               .map(c => c.name);
             const risco = ocupada.length ? ` <small>· ${esc(ocupada.join(', '))}</small>` : '';
             return `<button class="cbt-btn" onclick="window.Combat._mover('${esc(o.z).replace(/'/g,"\'")}',${dash})">`
-                 + `🏃 ${esc(o.z)}${risco}`
+                 + `${esc(o.z)}${risco}`
                  + (dash ? ` <em class="cbt-eco-tag eco-acao">Disparada</em>` : '')
                  + `</button>`;
           }).join('')
@@ -601,7 +601,7 @@
         + itens.map(it =>
             `<button class="cbt-btn" ${dis(it.tipo_acao)} title="${esc(it.descricao)}" `
             + `onclick="window.Combat._selItem('${esc(it.nome).replace(/'/g,"\\'")}','${esc(it.kind)}')">`
-            + `🧪 ${esc(it.nome)} <small>×${it.qtd}${it.dice ? ' · ' + esc(it.dice) : ''}</small>`
+            + `${esc(it.nome)} <small>×${it.qtd}${it.dice ? ' · ' + esc(it.dice) : ''}</small>`
             + ` <em class="cbt-eco-tag eco-${it.tipo_acao}">${tag(it.tipo_acao)}</em></button>`
           ).join('')
         + `<button class="cbt-btn cbt-cancel" onclick="window.Combat._cancel()">✕ Cancelar</button>`
@@ -626,7 +626,7 @@
                         : mode === 'pool' ? ' <small>· área</small>' : '';
           return `<button class="cbt-btn" ${dis(h.tipo_acao)} title="${esc(h.descricao)}" `
             + `onclick="window.Combat._selHab('${esc(h.nome).replace(/'/g,"\\'")}','${mode}')">`
-            + `✨ ${esc(h.nome)}${h.custo_mana ? ` <small>(${h.custo_mana}✨)</small>` : ''}`
+            + `${esc(h.nome)}${h.custo_mana ? ` <small>(${h.custo_mana} mana)</small>` : ''}`
             + `${h.dado ? ` <small>· ${esc(h.dado)}</small>` : ''}`
             + `${modeTag}`
             + ` <em class="cbt-eco-tag eco-${h.tipo_acao}">${tag(h.tipo_acao)}</em></button>`;

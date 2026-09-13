@@ -185,7 +185,7 @@ class FerramentasDoTurno(BaseToolset):
         if modo == "tela":
             motivos.append("combate na tela")
         extra = f" (−{removidas}: {', '.join(motivos)})" if removidas else ""
-        print(f"  🧰 [FERRAMENTAS] modo={modo} dnd={usa_dnd} → "
+        print(f"  [FERRAMENTAS] modo={modo} dnd={usa_dnd} → "
               f"{len(entregues)}/{len(self._todas)} entregues{extra}", flush=True)
 
     async def close(self) -> None:

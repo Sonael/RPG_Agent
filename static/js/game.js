@@ -36,14 +36,6 @@ const STATE_TOOLS = new Set([
   'resolve_saving_throw',
 ]);
 
-const COND_ICONS = {
-  'cego': '👁️', 'envenenado': '🟢', 'amedrontado': '😨',
-  'paralisado': '⚡', 'atordoado': '💫', 'inconsciente': '💀',
-  'enfeitiçado': '🔮', 'exausto': '😓', 'deitado': '⬇️',
-  'invisível': '👻', 'petrificado': '🪨', 'amaldiçoado': '🖤',
-  'restrito': '🔗', 'em chamas': '🔥', 'sangrando': '🩸',
-};
-
 function _condInfo(cd) {
   if (typeof cd === 'object' && cd !== null) return { nome: cd.nome || '?', dur: cd.duracao };
   return { nome: String(cd), dur: undefined };
@@ -257,7 +249,7 @@ async function sendToAgent(text, registrar) {
         else if (ev.type === 'correction') {
           const n = ev.violations?.length || 1;
           const corrId = appendTyping();
-          updateTyping(corrId, `🔄 Verificador: ${n} violação(ões) detectada(s) — corrigindo...`);
+          updateTyping(corrId, `Verificador: ${n} violação(ões) detectada(s) — corrigindo...`);
           window._correctionTypId = corrId;
         }
         else if (ev.type === 'text') {
@@ -283,9 +275,9 @@ async function sendToAgent(text, registrar) {
           const list = (ev.characters || []).join(', ');
           if (list) {
             appendSystem(`<div class="cmd-list-box" style="text-align:center;">`
-              + `<div class="cmd-list-title" style="border:none;margin:0;">⬆️ Subiu de Nível</div>`
+              + `<div class="cmd-list-title" style="border:none;margin:0;">Subiu de Nível</div>`
               + `<div style="font-size:13px;color:var(--ink-user);">${escapeHtml(list)}</div></div>`);
-            if (typeof showToast === 'function') showToast('⬆️ ' + list);
+            if (typeof showToast === 'function') showToast('Subiu de nível: ' + list);
           }
         }
         else if (ev.type === 'error') {
@@ -352,7 +344,7 @@ async function handleSlash(raw) {
   if (cmd === '/ajuda') {
     const isDnd = window._lastMem ? (window._lastMem.dnd_mode === true || window._lastMem.campaign_type === 'dnd') : false;
     const dndText = isDnd ? `
-      <div class="cmd-list-item" style="margin-top:10px;"><b style="font-family:'Playfair Display',serif;">⚔️ Comandos D&D</b></div>
+      <div class="cmd-list-item" style="margin-top:10px;"><b style="font-family:'Playfair Display',serif;">Comandos D&D</b></div>
       <div class="cmd-list-item"><b>/ficha [nome]</b> · Atributos, CA e equipamentos</div>
       <div class="cmd-list-item"><b>/inventario [nome]</b> · Itens e moedas</div>
       <div class="cmd-list-item"><b>/habilidades [nome]</b> · Magias e poderes</div>
@@ -363,7 +355,7 @@ async function handleSlash(raw) {
 
     const html = `
     <div class="cmd-list-box">
-      <div class="cmd-list-title">📜 Comandos Disponíveis</div>
+      <div class="cmd-list-title">Comandos Disponíveis</div>
       <div class="cmd-list-item"><b>/personagens</b> · NPCs e status</div>
       <div class="cmd-list-item"><b>/locais</b> · Locais registrados</div>
       <div class="cmd-list-item"><b>/grupo</b> · Companheiros</div>
@@ -392,29 +384,29 @@ async function handleSlash(raw) {
       const renderChar = c => `<div class="cmd-list-item"><b>${c.name}</b> (${c.status || 'vivo'})<br><span style="color:var(--text-muted);font-size:13px;">${c.description || ''}</span></div>`;
       const partyList  = (mem.party || []).map(renderChar).join(sep);
       const npcList    = (mem.characters || []).map(renderChar).join(sep);
-      const partyHtml  = partyList ? `<div class="cmd-list-title" style="font-size:11px;margin-top:10px;border:none;padding:0 0 4px;">🫂 ${(window._campaignConfig?.party_label || 'Grupo').toUpperCase()}</div>${partyList}` : '';
-      const npcHtml    = npcList   ? `<div class="cmd-list-title" style="font-size:11px;margin-top:${partyList?'14px':'0'};border:none;padding:0 0 4px;">👤 OUTROS</div>${npcList}` : '';
-      html = `<div class="cmd-list-box"><div class="cmd-list-title">👥 Personagens na Memória</div>${partyHtml || ''}${npcHtml || ''}${!partyList && !npcList ? 'Nenhum personagem.' : ''}</div>`;
+      const partyHtml  = partyList ? `<div class="cmd-list-title" style="font-size:11px;margin-top:10px;border:none;padding:0 0 4px;">${(window._campaignConfig?.party_label || 'Grupo').toUpperCase()}</div>${partyList}` : '';
+      const npcHtml    = npcList   ? `<div class="cmd-list-title" style="font-size:11px;margin-top:${partyList?'14px':'0'};border:none;padding:0 0 4px;">OUTROS</div>${npcList}` : '';
+      html = `<div class="cmd-list-box"><div class="cmd-list-title">Personagens na Memória</div>${partyHtml || ''}${npcHtml || ''}${!partyList && !npcList ? 'Nenhum personagem.' : ''}</div>`;
     }
     else if (cmd === '/locais') {
       const list = (mem.locations || []).map(l => `<div class="cmd-list-item"><b>${l.name}</b><br><span style="color:var(--text-muted);font-size:13px;">${l.description}</span></div>`).join('<hr style="border:none;border-top:1px dashed var(--page-edge);margin:8px 0;">');
-      html = `<div class="cmd-list-box"><div class="cmd-list-title">📍 Locais Registrados</div>${list || 'Nenhum local.'}</div>`;
+      html = `<div class="cmd-list-box"><div class="cmd-list-title">Locais Registrados</div>${list || 'Nenhum local.'}</div>`;
     }
     else if (cmd === '/flags') {
       const fl = Object.entries(mem.quest_flags);
-      const list = fl.map(([k, v]) => `<div class="cmd-list-item"><b>${k}</b> ➜ ${v}</div>`).join('');
-      html = `<div class="cmd-list-box"><div class="cmd-list-title">🚩 Flags de História</div>${list || 'Nenhuma flag.'}</div>`;
+      const list = fl.map(([k, v]) => `<div class="cmd-list-item"><b>${k}</b> → ${v}</div>`).join('');
+      html = `<div class="cmd-list-box"><div class="cmd-list-title">Flags de História</div>${list || 'Nenhuma flag.'}</div>`;
     }
     else if (cmd === '/grupo') {
       const list = mem.party.map(p => `<div class="cmd-list-item"><b>${p.name}</b> (${p.role})<br><span style="color:var(--text-muted);font-size:13px;">${p.notes || ''}</span></div>`).join('<hr style="border:none;border-top:1px dashed var(--page-edge);margin:8px 0;">');
-      html = `<div class="cmd-list-box"><div class="cmd-list-title">🫂 ${window._campaignConfig?.party_label || 'Grupo de Aventureiros'}</div>${list || 'Grupo vazio.'}</div>`;
+      html = `<div class="cmd-list-box"><div class="cmd-list-title">${window._campaignConfig?.party_label || 'Grupo de Aventureiros'}</div>${list || 'Grupo vazio.'}</div>`;
     }
     else if (cmd === '/eventos') {
       const list = mem.events.slice(-5).map(e => `<div class="cmd-list-item"><b>#${e.index} — ${e.location}</b><br><span style="color:var(--text-muted);font-size:13px;">${e.summary}</span></div>`).join('<hr style="border:none;border-top:1px dashed var(--page-edge);margin:8px 0;">');
-      html = `<div class="cmd-list-box"><div class="cmd-list-title">📜 Últimos 5 Eventos</div>${list || 'Nenhum evento.'}</div>`;
+      html = `<div class="cmd-list-box"><div class="cmd-list-title">Últimos 5 Eventos</div>${list || 'Nenhum evento.'}</div>`;
     }
     else if (cmd === '/contexto') {
-      html = `<div class="cmd-list-box"><div class="cmd-list-title">📖 Memória Completa</div><div class="cmd-list-item"><b>Capítulo:</b> ${mem.chapter} · <b>Local:</b> ${mem.current_location}</div><div class="cmd-list-item" style="margin-top:10px;">${mem.story_summary}</div></div>`;
+      html = `<div class="cmd-list-box"><div class="cmd-list-title">Memória Completa</div><div class="cmd-list-item"><b>Capítulo:</b> ${mem.chapter} · <b>Local:</b> ${mem.current_location}</div><div class="cmd-list-item" style="margin-top:10px;">${mem.story_summary}</div></div>`;
     }
     appendSystem(html); return true;
   }
@@ -423,13 +415,13 @@ async function handleSlash(raw) {
     const mem = await (await authFetch(`${API}/api/memory`)).json();
     mem.diary = mem.diary || [];
     const list = [...mem.diary].reverse().slice(0, 5).map(d => `<div class="cmd-list-item"><b>Cap.${d.chapter} — ${d.title}</b><br><span style="color:var(--text-muted);font-size:13px;">${d.content}</span></div>`).join('<hr style="border:none;border-top:1px dashed var(--page-edge);margin:8px 0;">');
-    appendSystem(`<div class="cmd-list-box"><div class="cmd-list-title">🔖 Diário (Últimas Entradas)</div>${list || 'Diário vazio.'}</div>`);
+    appendSystem(`<div class="cmd-list-box"><div class="cmd-list-title">Diário (Últimas Entradas)</div>${list || 'Diário vazio.'}</div>`);
     return true;
   }
 
   if (cmd === '/exportar') {
     const d = await (await authFetch(`${API}/api/diary/export`, { method: 'POST' })).json();
-    appendSystem(`<div class="cmd-list-box" style="text-align:center;"><div class="cmd-list-title" style="border:none;margin:0;">✅ Diário Exportado</div><div style="font-size:13px;color:var(--ink-main);">Arquivo: <b>${d.path.split('/').pop()}</b></div></div>`); 
+    appendSystem(`<div class="cmd-list-box" style="text-align:center;"><div class="cmd-list-title" style="border:none;margin:0;">Diário Exportado</div><div style="font-size:13px;color:var(--ink-main);">Arquivo: <b>${d.path.split('/').pop()}</b></div></div>`); 
     return true;
   }
 
@@ -463,9 +455,9 @@ async function handleSlash(raw) {
         const hpAtual = c.vida_atual ?? c.hp ?? '?';
         const hpMax   = c.vida_max  ?? c.hp_max ?? '?';
         return `<div class="cmd-sheet">
-          <div class="cmd-sheet-title">👤 ${c.name}</div>
+          <div class="cmd-sheet-title">${c.name}</div>
           <div class="cmd-sheet-sub">${c.description || 'NPC'} · Status: ${c.status || 'vivo'}</div>
-          <div class="cmd-sheet-bars"><span>❤️ ${hpAtual}/${hpMax} HP</span></div>
+          <div class="cmd-sheet-bars"><span>${hpAtual}/${hpMax} HP</span></div>
         </div>`;
       }
       const s = c.sheet; const eq = s.equipamentos || {};
@@ -474,14 +466,14 @@ async function handleSlash(raw) {
       const hpVis = `<span class="bar-fill">${'█'.repeat(hpBar)}</span><span class="bar-empty">${'█'.repeat(10-hpBar)}</span>`;
 
       return `<div class="cmd-sheet">
-        <div class="cmd-sheet-title">🛡️ Ficha — ${c.name}</div>
+        <div class="cmd-sheet-title">Ficha — ${c.name}</div>
         <div class="cmd-sheet-sub">${s.classe === 'npc'
           ? `${s.raca ? s.raca.charAt(0).toUpperCase()+s.raca.slice(1) : 'NPC'} · CR ${s.cr ?? '—'} · HP ${s.vida_max}`
           : `Nível ${s.nivel} ${s.classe} (${s.raca}) · XP: ${s.xp}/${s.xp_proximo}`}</div>
         <div class="cmd-sheet-bars">
-          <span>❤️ ${hpVis} ${s.vida_atual}/${s.vida_max} HP</span>
-          <span>✨ ${s.mana_atual}/${s.mana_max} Mana</span>
-          <span>🛡️ CA ${s.ca}</span>
+          <span>${hpVis} ${s.vida_atual}/${s.vida_max} HP</span>
+          <span>${s.mana_atual}/${s.mana_max} Mana</span>
+          <span>CA ${s.ca}</span>
         </div>
         <div class="cmd-sheet-stats">
           <div><span class="cmd-label">FOR</span><br>${s.forca}(${_mod(s.forca)})</div>
@@ -493,7 +485,7 @@ async function handleSlash(raw) {
         </div>
         <div class="cmd-sheet-details">
           <span class="cmd-label">Equipado:</span> Arma: ${eq.arma_principal || '—'} · Armadura: ${eq.armadura || '—'} · Escudo: ${eq.escudo || '—'} · Amuleto: ${eq.amuleto || '—'}<br>
-          <span class="cmd-label">Condições:</span> ${conds} | <span class="cmd-label">Saves de morte:</span> ✅ ${s.death_saves_sucessos || 0} / ❌ ${s.death_saves_falhas || 0}
+          <span class="cmd-label">Condições:</span> ${conds} | <span class="cmd-label">Saves de morte:</span> ${s.death_saves_sucessos || 0} sucesso(s) / ${s.death_saves_falhas || 0} falha(s)
         </div>
       </div>`;
     }).join('<hr style="border:none;border-top:1px dashed var(--page-edge);margin:15px 0;">');
@@ -510,8 +502,8 @@ async function handleSlash(raw) {
       const s = c.sheet; const inv = c.inventario || [];
       const items = inv.length ? inv.map(i => `<li><b>${i.nome}</b> ×${i.qtd} <span style="color:var(--text-muted);font-size:12px;">${i.descricao ? `— ${i.descricao}` : ''}</span></li>`).join('') : '<li>Bolsa vazia</li>';
       return `<div class="cmd-sheet" style="padding-bottom:0;border:none;">
-        <div class="cmd-sheet-title">🎒 Inventário — ${c.name}</div>
-        <div class="cmd-sheet-bars" style="margin-bottom:10px;">🪙 <b>${s.ouro||0}</b> Ouro · 🥈 <b>${s.prata||0}</b> Prata · 🟤 <b>${s.cobre||0}</b> Cobre</div>
+        <div class="cmd-sheet-title">Inventário — ${c.name}</div>
+        <div class="cmd-sheet-bars" style="margin-bottom:10px;"><b>${s.ouro||0}</b> Ouro · <b>${s.prata||0}</b> Prata · <b>${s.cobre||0}</b> Cobre</div>
         <ul class="cmd-sheet-list">${items}</ul>
       </div>`;
     }).join('<hr style="border:none;border-top:1px dashed var(--page-edge);margin:15px 0;">');
@@ -527,8 +519,8 @@ async function handleSlash(raw) {
     const text = chars.map(c => {
       const habs = c.habilidades || [];
       const list = habs.length ? habs.map(h => `<div class="cmd-list-item"><b>${h.nome}</b> <span style="font-size:12px;color:var(--text-muted);">(Dado: ${h.dado} · ${h.custo_mana} mana)</span><br><span style="font-size:13px;color:var(--text-muted);">${h.descricao}</span></div>`).join('') : '<div class="cmd-list-item">Nenhuma habilidade aprendida.</div>';
-      const mana = c.sheet ? ` — ✨ Mana: <b>${c.sheet.mana_atual}/${c.sheet.mana_max}</b>` : '';
-      return `<div class="cmd-sheet-title" style="margin-bottom:10px;">⚡ Habilidades — ${c.name}${mana}</div>${list}`;
+      const mana = c.sheet ? ` — Mana: <b>${c.sheet.mana_atual}/${c.sheet.mana_max}</b>` : '';
+      return `<div class="cmd-sheet-title" style="margin-bottom:10px;">Habilidades — ${c.name}${mana}</div>${list}`;
     }).join('<hr style="border:none;border-top:1px dashed var(--page-edge);margin:15px 0;">');
     appendSystem(`<div class="cmd-list-box">${text}</div>`); return true;
   }
@@ -541,14 +533,14 @@ async function handleSlash(raw) {
     const lines = chars.map(c => {
       const s = c.sheet;
       const hpPct = s.vida_max > 0 ? Math.round((s.vida_atual / s.vida_max) * 100) : 0;
-      const hpIcon = hpPct > 60 ? '🟢' : hpPct > 30 ? '🟡' : '🔴';
-      const conds = s.condicoes?.length ? ` <span style="color:var(--text-dim);font-size:12px;">⚠️ ${s.condicoes.map(cd => cd.nome || cd).join(', ')}</span>` : '';
+      const hpNivel = hpPct > 60 ? 'ok' : hpPct > 30 ? 'atencao' : 'baixo';
+      const conds = s.condicoes?.length ? ` <span style="color:var(--text-dim);font-size:12px;">${s.condicoes.map(cd => cd.nome || cd).join(', ')}</span>` : '';
       return `<div class="cmd-list-item" style="display:flex;justify-content:space-between;border-bottom:1px dashed var(--page-edge);padding-bottom:5px;margin-bottom:8px;">
-        <span>${hpIcon} <b>${c.name}</b>${conds}</span>
-        <span style="font-size:13px;">❤️ ${s.vida_atual}/${s.vida_max} HP &nbsp; ✨ ${s.mana_atual}/${s.mana_max} Mana &nbsp; 🛡️ CA ${s.ca}</span>
+        <span><span class="hp-ponto hp-ponto-${hpNivel}" aria-hidden="true"></span><b>${c.name}</b>${conds}</span>
+        <span style="font-size:13px;">${s.vida_atual}/${s.vida_max} HP &nbsp; ${s.mana_atual}/${s.mana_max} Mana &nbsp; CA ${s.ca}</span>
       </div>`;
     });
-    appendSystem(`<div class="cmd-list-box"><div class="cmd-list-title">⚔️ Status do Grupo</div>${lines.join('')}</div>`); return true;
+    appendSystem(`<div class="cmd-list-box"><div class="cmd-list-title">Status do Grupo</div>${lines.join('')}</div>`); return true;
   }
 
   if (cmd.startsWith('/condicoes')) {
@@ -559,17 +551,17 @@ async function handleSlash(raw) {
 
     const lines = chars.map(c => {
       const conds = c.sheet?.condicoes || [];
-      if (!conds.length) return `<div class="cmd-list-item"><b>${c.name}</b> — ✅ Sem condições ativas</div>`;
-      return `<div class="cmd-list-item"><b>${c.name}</b> — ${conds.map(cd => `<span style="color:var(--ink-sys);">🔴 ${cd.nome || cd}${typeof cd.duracao === 'number' && cd.duracao > 0 ? ` (${cd.duracao}t)` : ''}</span>`).join(' · ')}</div>`;
+      if (!conds.length) return `<div class="cmd-list-item"><b>${c.name}</b> — Sem condições ativas</div>`;
+      return `<div class="cmd-list-item"><b>${c.name}</b> — ${conds.map(cd => `<span style="color:var(--ink-sys);">${cd.nome || cd}${typeof cd.duracao === 'number' && cd.duracao > 0 ? ` (${cd.duracao}t)` : ''}</span>`).join(' · ')}</div>`;
     });
-    appendSystem(`<div class="cmd-list-box"><div class="cmd-list-title">🔴 Condições Ativas</div>${lines.join('')}</div>`); return true;
+    appendSystem(`<div class="cmd-list-box"><div class="cmd-list-title">Condições Ativas</div>${lines.join('')}</div>`); return true;
   }
 
   if (cmd === '/combate') {
     const mem = window._lastMem || await (await authFetch(`${API}/api/memory`)).json();
     const cs = mem.combat_state;
     if (!cs || !cs.is_active) {
-      appendSystem('<div class="cmd-list-box"><div class="cmd-list-title">⚔️ Combate</div><div style="text-align:center;">Nenhum combate em andamento.</div></div>');
+      appendSystem('<div class="cmd-list-box"><div class="cmd-list-title">Combate</div><div style="text-align:center;">Nenhum combate em andamento.</div></div>');
       return true;
     }
     const order = cs.initiative_order || [];
@@ -578,7 +570,7 @@ async function handleSlash(raw) {
       const arrow = i === idx ? ' <b style="color:var(--ink-sys);">◀ VEZ ATUAL</b>' : i < idx ? ' <span style="text-decoration:line-through;color:var(--text-muted);">(já agiu)</span>' : '';
       return `<div class="cmd-list-item" style="padding-left:15px;">${i + 1}. ${n}${arrow}</div>`;
     }).join('');
-    appendSystem(`<div class="cmd-list-box"><div class="cmd-list-title">⚔️ Ordem de Iniciativa — Rodada ${cs.round}</div><div style="margin-bottom:10px;font-size:14px;text-align:center;"><b>Vez de:</b> <span style="color:var(--ink-user);">${order[idx] || '?'}</span></div>${list}</div>`);
+    appendSystem(`<div class="cmd-list-box"><div class="cmd-list-title">Ordem de Iniciativa — Rodada ${cs.round}</div><div style="margin-bottom:10px;font-size:14px;text-align:center;"><b>Vez de:</b> <span style="color:var(--ink-user);">${order[idx] || '?'}</span></div>${list}</div>`);
     return true;
   }
 
@@ -587,12 +579,12 @@ async function handleSlash(raw) {
     const formula = mRolar[1].trim();
     const rollRe = /^(\d*)d(\d+)([+-]\d+)?$/i;
     const match  = formula.replace(/\s+/g, '').match(rollRe);
-    if (!match) { appendSystem(`<p>⚠️ Fórmula inválida: <b>${formula}</b></p>`); return true; }
+    if (!match) { appendSystem(`<p>Fórmula inválida: <b>${formula}</b></p>`); return true; }
     
     const numDice = parseInt(match[1] || '1');
     const sides   = parseInt(match[2]);
     const bonus   = parseInt(match[3] || '0');
-    if (numDice < 1 || numDice > 20 || sides < 2 || sides > 100) { appendSystem('<p>⚠️ Limites: 1–20 dados, d2–d100.</p>'); return true; }
+    if (numDice < 1 || numDice > 20 || sides < 2 || sides > 100) { appendSystem('<p>Limites: 1–20 dados, d2–d100.</p>'); return true; }
     
     const rolls  = Array.from({ length: numDice }, () => Math.floor(Math.random() * sides) + 1);
     const rawSum = rolls.reduce((a, b) => a + b, 0);
@@ -605,7 +597,7 @@ async function handleSlash(raw) {
     const row = document.createElement('div'); row.className = 'msg-row system';
     row.innerHTML = `
       <div class="sys-card">
-        <div class="sys-card-badge" style="color:var(--ink-user); border-color:var(--ink-user);">🎲 Rolagem Local: ${formula}</div>
+        <div class="sys-card-badge" style="color:var(--ink-user); border-color:var(--ink-user);">Rolagem Local: ${formula}</div>
         <div class="sys-card-body">
           Resultado: <span class="sys-number">${rollStr}</span>${bonStr} = <strong>${total}</strong>${tag}
         </div>
@@ -618,7 +610,7 @@ async function handleSlash(raw) {
   }
 
   if (cmd === '/resumo') {
-    appendUser('📜 Solicitando recapitulação...');
+    appendUser('Solicitando recapitulação...');
     await sendToAgent('Faça um resumo dramático e imersivo de todos os eventos importantes. Use get_full_context para garantir precisão.', false);
     return true;
   }
@@ -637,22 +629,6 @@ async function handleSlash(raw) {
 // ═══════════════════════════════════════
 //  UI de Ferramentas / Combate (Onde a Mágica RPG Acontece)
 // ═══════════════════════════════════════
-
-const TOOL_META = {
-  get_character: '👤', get_location: '📍', get_scene_context: '🧭', get_full_context: '📚',
-  get_recent_events: '📜', get_flag: '🚩', get_diary: '📖', list_characters: '👥',
-  list_locations: '🗺️', list_party: '🫂', list_flags: '🚩', save_character: '💾',
-  save_location: '💾', save_event: '💾', set_flag: '🔖', add_diary_entry: '✍️',
-  update_character_status: '🔄', update_story_summary: '🔄', update_world_state: '🔄',
-  add_party_member: '➕', remove_party_member: '➖', clear_flag: '🗑️',
-  roll_dice: '🎲', attack_roll: '⚔️', make_skill_check: '🎯', use_ability: '⚡',
-  roll_death_save: '💀', modify_hp: '❤️', modify_mana: '✨', grant_xp: '⭐',
-  short_rest: '🛌', long_rest: '🌙',
-  create_character_sheet: '📋', get_character_sheet: '📋', get_combat_status: '⚔️',
-  add_item: '📦', remove_item: '🗑️', list_inventory: '📦', learn_ability: '📖',
-  set_stat: '🔧', equip_item: '🗡️', unequip_item: '🗡️', apply_condition: '🔴',
-  remove_condition: '🟢', modify_currency: '💰',
-};
 
 const TOOL_LABEL = {
   get_character: 'lendo personagem', get_location: 'lendo local', get_scene_context: 'verificando cena',
@@ -680,22 +656,27 @@ function appendToolLog(tools) {
   if (!tools.length) return;
   const c = document.getElementById('chat-history'); const w = document.createElement('div'); w.className = 'tool-log';
   tools.forEach(t => {
-    const icon = TOOL_META[t.name] || '⚙️'; const label = TOOL_LABEL[t.name] || t.name;
+    const label = TOOL_LABEL[t.name] || t.name;
     const arg = t.args && Object.keys(t.args).length ? `"${String(Object.values(t.args)[0]).substring(0, 40)}"` : '';
     const el = document.createElement('div'); el.className = `tool-item ${t.kind}`;
     el.title = JSON.stringify(t.args, null, 2);
-    el.innerHTML = `<span class="tool-item-icon">${icon}</span><span>${label}</span>${arg ? `<span class="tool-item-args">${arg}</span>` : ''}`;
+    el.innerHTML = `<span>${label}</span>${arg ? `<span class="tool-item-args">${arg}</span>` : ''}`;
     w.appendChild(el);
   });
   c.appendChild(w); scrollDown();
 }
+
+// Linha copiada da saída de uma ferramenta. Antes o reconhecimento era pelo
+// emoji inicial que o motor punha em cada linha; sem emoji, é pelo formato:
+// notação de dado, os rótulos fixos das ferramentas e os prefixos de recusa.
+const LINHA_DE_FERRAMENTA = /^\s*(?:\d*d\d+\s*[:=(\[]|d20=|Dano:|Custo:|Cura:|Vida:|Mana:|Erro:|Aviso:|Nota:|CRÍTICO|FALHA CRÍTICA|ACERTO!|ERROU!|TURNO AVANÇADO|Próxima vez:)/;
 
 function splitDiceAndNarrative(text) {
   const lines = text.split('\n');
   const raw = [], narrative = [];
   let inRawBlock = true;
   for (const line of lines) {
-    if (inRawBlock && /^[\s]*(?:🎲|⚔️|✨|❤️|⚡|💀|🌙|🛌|⭐|\s+d20=|\s+Dano:|\s+Custo:|\s+Cura:|\s+Vida:|[✅❌🌟💀⚠️])/.test(line)) {
+    if (inRawBlock && LINHA_DE_FERRAMENTA.test(line)) {
       raw.push(line);
     } else {
       inRawBlock = false;
@@ -728,19 +709,19 @@ function _parseMd(text) {
 
 function appendDiceResultLog(toolName, content) {
   const labels = {
-    attack_roll:      { badge: '⚔️ Ação de Combate',              color: 'var(--ink-sys)' },
-    make_skill_check: { badge: '🎯 Teste de Habilidade',           color: 'var(--ink-user)' },
-    roll_dice:        { badge: '🎲 Rolagem de Dados',              color: 'var(--ink-user)' },
-    use_ability:      { badge: '⚡ Magia / Habilidade',            color: '#7b5ea7' },
-    roll_death_save:  { badge: '💀 Resistência à Morte',           color: 'var(--ink-sys)' },
-    modify_hp:        { badge: '❤️ Pontos de Vida',                color: '#c05858' },
-    modify_mana:      { badge: '✨ Mana',                          color: '#4a6bbf' },
-    grant_xp:         { badge: '⭐ Experiência',                   color: '#a07828' },
-    short_rest:       { badge: '🛌 Descanso Curto',                color: 'var(--green)' },
-    long_rest:        { badge: '🌙 Descanso Longo',                color: 'var(--green)' },
-    advance_turn:     { badge: '⏩ Turno Avançado',                color: 'var(--ink-sys)' },
+    attack_roll:      { badge: 'Ação de Combate',              color: 'var(--ink-sys)' },
+    make_skill_check: { badge: 'Teste de Habilidade',           color: 'var(--ink-user)' },
+    roll_dice:        { badge: 'Rolagem de Dados',              color: 'var(--ink-user)' },
+    use_ability:      { badge: 'Magia / Habilidade',            color: '#7b5ea7' },
+    roll_death_save:  { badge: 'Resistência à Morte',           color: 'var(--ink-sys)' },
+    modify_hp:        { badge: 'Pontos de Vida',                color: '#c05858' },
+    modify_mana:      { badge: 'Mana',                          color: '#4a6bbf' },
+    grant_xp:         { badge: 'Experiência',                   color: '#a07828' },
+    short_rest:       { badge: 'Descanso Curto',                color: 'var(--green)' },
+    long_rest:        { badge: 'Descanso Longo',                color: 'var(--green)' },
+    advance_turn:     { badge: 'Turno Avançado',                color: 'var(--ink-sys)' },
   };
-  const cfg = labels[toolName] || { badge: '⚙️ Sistema', color: 'var(--text-muted)' };
+  const cfg = labels[toolName] || { badge: 'Sistema', color: 'var(--text-muted)' };
 
   // Parse markdown + destacar padrões RPG
   let body = _parseMd(content.trim())
@@ -790,12 +771,12 @@ function rollPlayerDie(sides) {
   row.className = 'msg-row system';
   row.innerHTML = `
     <div class="sys-card">
-      <div class="sys-card-badge" style="color:var(--ink-user); border-color:var(--ink-user);">🎲 Sua Rolagem: 1d${sides}${modStr}</div>
+      <div class="sys-card-badge" style="color:var(--ink-user); border-color:var(--ink-user);">Sua Rolagem: 1d${sides}${modStr}</div>
       <div class="sys-card-body">
         <span class="sys-number">${rawRoll}</span>${modStr ? ` <em>(${modStr})</em>` : ''} = <strong>${total}</strong>${statusLabel}
       </div>
       <div style="font-family:'Lora',serif; font-size:11px; color:var(--text-dim); margin-top:10px; text-align:center; font-style:italic;">
-        Enviado ao Oráculo 🔒
+        Enviado ao Oráculo
       </div>
     </div>`;
   document.getElementById('chat-history').appendChild(row); scrollDown();
@@ -863,9 +844,13 @@ function removeTyping(id) { document.getElementById(id)?.remove(); }
 
 function processDiceRolls(text) {
   if(!text) return '';
-  return text.replace(/(🎲[^\n]+)/g, (match) => {
-    const isCrit   = /CRÍTICO\s*NATURAL|🌟\s*CRÍTICO|🌟/.test(match);
-    const isFumble = /FALHA\s*CRÍTICA|💀\s*FALHA|💀/.test(match);
+  // Linhas com rolagem (notação de dado ou d20=). Antes o gancho era o emoji
+  // de dado no começo da linha, que o motor não usa mais.
+  // Destaca do primeiro dado até o fim da linha, como era com o emoji: não
+  // embrulha a linha inteira, para não quebrar marcação de lista do markdown.
+  return text.replace(/((?:\bd20=|\b\d+d\d+\s*[:=(\[])[^\n]*)/g, (match) => {
+    const isCrit   = /CRÍTICO/.test(match);
+    const isFumble = /FALHA\s*CRÍTICA/.test(match);
     const color = isCrit ? 'var(--green)' : isFumble ? 'var(--red)' : 'var(--ink-user)';
     return `<span style="font-weight:600;color:${color};">${match}</span>`;
   });
@@ -972,14 +957,14 @@ function buildDndCharCard(c, idx, type) {
   let html = `<div class="char-card editable" onclick="openEditModal('${modalType}','${keyEsc}',${dataRef})">`;
   html += `<div class="char-name">${escapeHtml(c.name || '')}`;
   html += `<div style="display:flex;align-items:center;gap:6px;">`;
-  if (canLevelUp) html += `<span class="levelup-badge" onclick="gameLevelUpClick(event,'${keyEsc}','${type}',${idx})" title="XP suficiente para upar!">⬆️ NÍVEL!</span>`;
+  if (canLevelUp) html += `<span class="levelup-badge" onclick="gameLevelUpClick(event,'${keyEsc}','${type}',${idx})" title="XP suficiente para subir de nível">Subir de nível</span>`;
   if (c.status) html += `<span class="char-status ${stCls}">${escapeHtml(c.status)}</span>`;
-  if (ca !== null) html += `<span class="dnd-ca">🛡️ ${ca}</span>`;
+  if (ca !== null) html += `<span class="dnd-ca">CA ${ca}</span>`;
   html += `</div></div>`;
 
   if (sheet) {
-    html += `<div class="stat-bar-wrap"><div class="stat-bar-label"><span>❤️ HP</span><span>${hpCur}/${hpMax}</span></div><div class="stat-bar-track"><div class="stat-bar-fill" style="width:${hpPct}%;background:var(--ink-sys);"></div></div></div>`;
-    if (manaMax !== null && manaMax > 0) html += `<div class="stat-bar-wrap"><div class="stat-bar-label"><span>✨ Mana</span><span>${manaCur}/${manaMax}</span></div><div class="stat-bar-track"><div class="stat-bar-fill" style="width:${manaPct}%;background:var(--ink-user);"></div></div></div>`;
+    html += `<div class="stat-bar-wrap"><div class="stat-bar-label"><span>HP</span><span>${hpCur}/${hpMax}</span></div><div class="stat-bar-track"><div class="stat-bar-fill" style="width:${hpPct}%;background:var(--ink-sys);"></div></div></div>`;
+    if (manaMax !== null && manaMax > 0) html += `<div class="stat-bar-wrap"><div class="stat-bar-label"><span>Mana</span><span>${manaCur}/${manaMax}</span></div><div class="stat-bar-track"><div class="stat-bar-fill" style="width:${manaPct}%;background:var(--ink-user);"></div></div></div>`;
     if (condicoes.length) {
       html += `<div class="condition-badges">`;
       condicoes.forEach(cd => {
@@ -1065,7 +1050,7 @@ function renderMissoes(quests) {
     const feitos = objs.filter(o => o.feito).length;
     const passos = objs.map(o =>
       `<div class="missao-passo ${o.feito ? 'feito' : ''}">`
-      + `${o.feito ? '☑' : '☐'} ${escapeHtml(o.texto || '')}</div>`).join('');
+      + `<span class="missao-marca" aria-hidden="true"></span>${escapeHtml(o.texto || '')}</div>`).join('');
     const contador = objs.length ? `<span class="missao-contagem">${feitos}/${objs.length}</span>` : '';
     const dono = q.quem_deu ? `<div class="missao-dono">de ${escapeHtml(q.quem_deu)}</div>` : '';
     return `<div class="missao-item"><div class="missao-titulo">`
@@ -1415,7 +1400,6 @@ function gameLevelUpClick(event, charKey, type, idx) {
                 box-shadow:0 20px 60px rgba(0,0,0,0.35);padding:28px;max-width:380px;
                 width:calc(100vw - 32px);font-family:'Lora',serif;position:relative;">
       <div style="text-align:center;margin-bottom:20px;">
-        <div style="font-size:36px;margin-bottom:6px;">⬆️</div>
         <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:var(--text-main);">
           ${escapeHtml(data.name)} sobe para<br>Nível ${novoNivel}!
         </div>
@@ -1424,30 +1408,30 @@ function gameLevelUpClick(event, charKey, type, idx) {
       <div style="background:rgba(255,243,196,0.5);border:1px solid #f0c030;border-radius:8px;padding:14px;margin-bottom:18px;">
         <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#7a4f00;margin-bottom:10px;">O motor aplica</div>
         <div style="display:flex;flex-direction:column;gap:7px;font-size:13px;">
-          <div>❤️ <strong>Vida máxima: 1d${cls.hit_die} + CON</strong>
+          <div><strong>Vida máxima: 1d${cls.hit_die} + CON</strong>
             <span style="font-size:11px;color:var(--text-muted);">(rolado na confirmação)</span></div>
-          ${profMudou ? `<div>🛡️ <strong>Proficiência: +${novaProf}</strong></div>` : ''}
-          <div>📜 <strong>Habilidades da classe</strong> do nível ${novoNivel}</div>
-          ${isCaster ? `<div>✨ <strong>Mana</strong> recalculada pela tabela</div>` : ''}
+          ${profMudou ? `<div><strong>Proficiência: +${novaProf}</strong></div>` : ''}
+          <div><strong>Habilidades da classe</strong> do nível ${novoNivel}</div>
+          ${isCaster ? `<div><strong>Mana</strong> recalculada pela tabela</div>` : ''}
         </div>
       </div>
 
       <div style="background:rgba(38,75,130,0.06);border:1px solid rgba(38,75,130,0.2);border-radius:8px;padding:14px;margin-bottom:18px;font-size:13px;">
-        🎯 Estilo, arquétipo e incremento de atributo, se houver, abrem na
+        Estilo, arquétipo e incremento de atributo, se houver, abrem na
         <strong>tela de nível</strong> logo depois.
-        ${isCaster ? `<div style="margin-top:6px;">✨ Magias novas continuam em <strong>Editar Ficha Completa</strong>.</div>` : ''}
+        ${isCaster ? `<div style="margin-top:6px;">Magias novas continuam em <strong>Editar Ficha Completa</strong>.</div>` : ''}
       </div>
 
       <div style="display:flex;flex-direction:column;gap:10px;">
         <button id="levelup-popup-confirmar" onclick="gameConfirmLevelUp('${nomeJs}')"
           style="width:100%;padding:11px;background:#f0c030;color:#3a2800;border:none;border-radius:7px;
                  cursor:pointer;font-size:14px;font-family:'Lora',serif;font-weight:700;letter-spacing:0.02em;">
-          ✅ Confirmar Nível ${novoNivel}
+          Confirmar Nível ${novoNivel}
         </button>
         <button onclick="document.getElementById('levelup-popup').remove();openEditModal('${type === 'party' ? 'character' : type}','${charKey}',window._lastMem.${type === 'party' ? 'party' : 'characters'}[${idx}])"
           style="width:100%;padding:9px;background:none;color:var(--ink-user);border:1px solid var(--page-edge);
                  border-radius:7px;cursor:pointer;font-size:13px;font-family:'Lora',serif;">
-          📝 Editar Ficha Completa
+          Editar Ficha Completa
         </button>
         <button onclick="document.getElementById('levelup-popup').remove()"
           style="width:100%;padding:7px;background:none;color:var(--text-muted);border:none;cursor:pointer;font-size:12px;">
@@ -1533,7 +1517,7 @@ function showHabInfo(event, sp, regIdx, alreadyHas, limitReached) {
     ${alreadyHas
       ? `<div style="text-align:center;font-size:12px;color:var(--green,#2d8a4e);padding:6px 0;">✓ Já adicionada</div>`
       : limitReached
-        ? `<div style="text-align:center;font-size:12px;color:var(--ink-sys,#8b3a3a);padding:6px 0;">⚠️ Limite de cantrips/magias atingido (use a aba de habilidades)</div>`
+        ? `<div style="text-align:center;font-size:12px;color:var(--ink-sys,#8b3a3a);padding:6px 0;">Limite de cantrips/magias atingido (use a aba de habilidades)</div>`
         : `<button onclick="_habInfoRegistry[${regIdx}]()"
              style="width:100%;padding:9px;background:var(--ink-user,#264b82);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-family:'Lora',serif;font-weight:600;letter-spacing:0.02em;">
              + Adicionar
@@ -1774,8 +1758,8 @@ function gameBuildHabSection() {
 
   const tabBar = `
     <div style="display:flex;border-bottom:1px solid var(--page-edge);margin-bottom:12px;">
-      <button style="${tabStyle(habTab==='feats')}"  onclick="gameSetHabTab('feats')">📜 Habilidades</button>
-      ${showSpellTab ? `<button style="${tabStyle(habTab==='spells')}" onclick="gameSetHabTab('spells')">✨ Magias</button>` : ''}
+      <button style="${tabStyle(habTab==='feats')}"  onclick="gameSetHabTab('feats')">Habilidades</button>
+      ${showSpellTab ? `<button style="${tabStyle(habTab==='spells')}" onclick="gameSetHabTab('spells')">Magias</button>` : ''}
     </div>`;
 
   // ── Conteúdo da aba ──────────────────────────────────────────────────
@@ -1807,13 +1791,13 @@ function gameBuildHabSection() {
     tabContent = `
       <div style="margin-bottom:12px;">
         <div style="font-size:11px;color:var(--ink-user);margin-bottom:8px;">
-          Magias de <strong>${escapeHtml(classe)}</strong> até Nv.${maxSl} · SRD Open5e${_gHabLimit ? `<span style="font-size:10px;font-family:monospace;color:var(--text-muted);margin-left:8px;">| C: ${_gHabCantripCnt}/${_gHabLimit.maxCantrips} ✨ ${_gHabLeveledCnt}/${_gHabLimit.maxSpells}</span>` : ''}
+          Magias de <strong>${escapeHtml(classe)}</strong> até Nv.${maxSl} · SRD Open5e${_gHabLimit ? `<span style="font-size:10px;font-family:monospace;color:var(--text-muted);margin-left:8px;">| C: ${_gHabCantripCnt}/${_gHabLimit.maxCantrips} ${_gHabLeveledCnt}/${_gHabLimit.maxSpells}</span>` : ''}
         </div>
         <div id="game-lvl-btns" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;">${levelBtns}</div>
         <div style="display:flex;gap:8px;margin-bottom:8px;">
           <input value="${query}" placeholder="Buscar magia (ex: fireball)..."
             oninput="_gameHabState._spellQuery=this.value;gameTriggerSpellSearch()" style="flex:1;font-size:13px;">
-          <button class="clean-button" style="width:auto;padding:4px 10px;margin:0;font-size:12px;" onclick="gameDoSpellSearch()">🔍</button>
+          <button class="clean-button" style="width:auto;padding:4px 10px;margin:0;font-size:12px;" onclick="gameDoSpellSearch()">Buscar</button>
         </div>
         <div class="ed-search-results-list" style="max-height:260px;" id="game-spell-panel">${gameBuildSpellPanelList()}</div>
       </div>`;
@@ -1834,7 +1818,7 @@ function gameBuildHabSection() {
 
   return `
     <div style="border-top:1px solid var(--page-edge);margin-top:16px;padding-top:16px;">
-      <div style="font-family:'Playfair Display',serif;font-size:14px;font-weight:700;color:var(--text-main);margin-bottom:10px;">✨ HABILIDADES & MAGIAS</div>
+      <div style="font-family:'Playfair Display',serif;font-size:14px;font-weight:700;color:var(--text-main);margin-bottom:10px;">HABILIDADES & MAGIAS</div>
       ${tabBar}
       ${tabContent}
       <div style="margin-top:4px;">${habList}</div>
@@ -1874,7 +1858,7 @@ function gameRefreshMonsterSearch() {
   const el = document.getElementById('game-monster-results');
   if (!el) return;
   if (_gameMonsterState.loading) {
-    el.innerHTML = '<div style="padding:6px;color:var(--text-muted);font-size:12px;">⏳ Buscando…</div>';
+    el.innerHTML = '<div style="padding:6px;color:var(--text-muted);font-size:12px;">Buscando…</div>';
     return;
   }
   if (!_gameMonsterState.results?.length) { el.innerHTML = ''; return; }
@@ -1886,7 +1870,7 @@ function gameRefreshMonsterSearch() {
         <span style="font-size:10px;color:var(--text-muted);">${(m.tipo||'')} · CR ${m.cr}</span>
       </div>
       <div style="font-size:10px;font-family:monospace;color:var(--text-muted);margin-top:2px;">
-        FOR ${m.forca} DES ${m.destreza} CON ${m.constituicao} INT ${m.inteligencia} SAB ${m.sabedoria} CAR ${m.carisma} · CA ${m.ca} · HP ${m.vida}${m.arma_principal ? ` · ⚔️ ${(m.arma_principal).replace(/&/g,'&amp;').replace(/</g,'&lt;')}` : ''}
+        FOR ${m.forca} DES ${m.destreza} CON ${m.constituicao} INT ${m.inteligencia} SAB ${m.sabedoria} CAR ${m.carisma} · CA ${m.ca} · HP ${m.vida}${m.arma_principal ? ` · ${(m.arma_principal).replace(/&/g,'&amp;').replace(/</g,'&lt;')}` : ''}
       </div>
     </div>`;
   }).join('');
@@ -2020,7 +2004,7 @@ function buildEditFields(type, data) {
           : selField('sheet_raca', 'Raça', racaVal || 'humano', racaOpts);
 
         html += `<div style="border-top:1px solid var(--page-edge);margin:12px 0 8px;padding-top:14px;">
-          <div style="font-family:'Playfair Display',serif;font-size:14px;color:var(--text-main);margin-bottom:12px;font-weight:700;">⚔️ FICHA D&D</div>
+          <div style="font-family:'Playfair Display',serif;font-size:14px;color:var(--text-main);margin-bottom:12px;font-weight:700;">FICHA D&D</div>
 
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
             ${selField('sheet_classe','Classe', classeVal, classeOpts, { onchange: 'gameOnClassChange(this.value)' })}
@@ -2070,9 +2054,9 @@ function buildEditFields(type, data) {
 
           <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">Moedas</div>
           <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;">
-            ${numField('sheet_ouro','🟡 Ouro', s.ouro??0, 0, 999999)}
-            ${numField('sheet_prata','⚪ Prata', s.prata??0, 0, 999999)}
-            ${numField('sheet_cobre','🟤 Cobre', s.cobre??0, 0, 999999)}
+            ${numField('sheet_ouro','Ouro', s.ouro??0, 0, 999999)}
+            ${numField('sheet_prata','Prata', s.prata??0, 0, 999999)}
+            ${numField('sheet_cobre','Cobre', s.cobre??0, 0, 999999)}
           </div>
 
           <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">Equipamentos</div>

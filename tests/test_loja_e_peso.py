@@ -7,7 +7,7 @@ Três defeitos que só apareceram quando simulei um grupo entrando numa forja.
    com o nome em português, então "Espada Longa" devolvia zero resultados e
    `open_shop` recusava o estoque inteiro:
 
-       ⚠️ Nenhum item com preço. O SRD não conhece: Espada Longa,
+       Nenhum item com preço. O SRD não conhece: Espada Longa,
           Machado de Batalha, Cota de Malha, Escudo, Adaga.
 
    `WEAPON_PT_TO_EN` já existia no arquivo e nenhuma das duas funções usava.
@@ -236,7 +236,7 @@ def test_forja_pode_vender_pocao(campanha):
     """
     saida = td.open_shop("Forja do Torbin", "Espada Longa:15; Poção de Cura:50:3")
     assert "Poção de Cura" in saida
-    assert "⚠️" not in saida
+    assert "Aviso:" not in saida
 
 
 # ---------------------------------------------------------------------------

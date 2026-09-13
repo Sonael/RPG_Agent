@@ -163,8 +163,8 @@ function escapeHtml(s) {
 let _dlgResolve = null;
 
 const DLG = {
-  info:    { icon:'ℹ', ibg:'rgba(68,136,204,0.15)',  ic:'var(--blue)',      accent:'linear-gradient(90deg,transparent,var(--blue),transparent)' },
-  warning: { icon:'⚠', ibg:'rgba(200,168,75,0.12)',  ic:'var(--gold)',      accent:'linear-gradient(90deg,transparent,var(--gold-dim),transparent)' },
+  info:    { icon:'i', ibg:'rgba(68,136,204,0.15)',  ic:'var(--blue)',      accent:'linear-gradient(90deg,transparent,var(--blue),transparent)' },
+  warning: { icon:'!', ibg:'rgba(200,168,75,0.12)',  ic:'var(--gold)',      accent:'linear-gradient(90deg,transparent,var(--gold-dim),transparent)' },
   danger:  { icon:'✕', ibg:'rgba(196,68,68,0.15)',   ic:'var(--red)',       accent:'linear-gradient(90deg,transparent,var(--red),transparent)' },
   success: { icon:'✓', ibg:'rgba(74,170,128,0.15)',  ic:'var(--green)',     accent:'linear-gradient(90deg,transparent,var(--green),transparent)' },
 };
@@ -520,7 +520,7 @@ const _GUIDE_HTML = `
       <div id="guide-mode-banner" class="guide-banner"></div>
 
       <details class="guide-sec guide-install-block" id="guide-install-sec">
-        <summary>📲 Instalar como aplicativo</summary>
+        <summary>Instalar como aplicativo</summary>
         <div class="guide-sec-body">
           <p id="guide-install-status" class="guide-tip" style="display:none;"></p>
           <p>
@@ -530,23 +530,23 @@ const _GUIDE_HTML = `
             ocupar espaço nem passar por loja nenhuma.
           </p>
           <button type="button" id="guide-install-btn" class="guide-install-btn" style="display:none;">
-            📲 Instalar agora
+            Instalar agora
           </button>
           <div id="guide-install-android">
-            <h4 class="guide-h4">🤖 Android (Chrome)</h4>
+            <h4 class="guide-h4">Android (Chrome)</h4>
             <ul>
               <li>Toque no menu <b>⋮</b> no canto superior direito.</li>
               <li>Escolha <b>«Instalar aplicativo»</b> (ou «Adicionar à tela inicial»).</li>
-              <li>Confirme — o ícone ⚔️ aparece na sua tela inicial.</li>
+              <li>Confirme — o ícone do RPG Agent aparece na sua tela inicial.</li>
             </ul>
           </div>
           <div id="guide-install-ios">
-            <h4 class="guide-h4">🍎 iPhone / iPad (Safari)</h4>
+            <h4 class="guide-h4">iPhone / iPad (Safari)</h4>
             <ul>
               <li>Abra o site no <b>Safari</b> (só funciona pelo Safari).</li>
               <li>Toque no botão <b>Compartilhar</b> (o quadrado com a seta ↑).</li>
               <li>Role a lista e escolha <b>«Adicionar à Tela de Início»</b>.</li>
-              <li>Toque em <b>Adicionar</b> — o ícone ⚔️ aparece na tela inicial.</li>
+              <li>Toque em <b>Adicionar</b> — o ícone do RPG Agent aparece na tela inicial.</li>
             </ul>
           </div>
           <p class="guide-tip">
@@ -558,7 +558,7 @@ const _GUIDE_HTML = `
       </details>
 
       <details class="guide-sec" open>
-        <summary>🗣️ Conversando com o Mestre</summary>
+        <summary>Conversando com o Mestre</summary>
         <div class="guide-sec-body">
           <p>Não existe forma "certa" de escrever. Diga o que quiser fazer:</p>
           <ul>
@@ -580,7 +580,7 @@ const _GUIDE_HTML = `
       </details>
 
       <details class="guide-sec">
-        <summary>✋ Você manda na história — corrigindo o Mestre</summary>
+        <summary>Você manda na história — corrigindo o Mestre</summary>
         <div class="guide-sec-body">
           <p>
             Esta é talvez a parte mais importante: <b>se você não gostar de
@@ -607,7 +607,7 @@ const _GUIDE_HTML = `
       </details>
 
       <details class="guide-sec">
-        <summary>📖 A barra lateral: Mundo, Enciclopédia e Diário</summary>
+        <summary>A barra lateral: Mundo, Enciclopédia e Diário</summary>
         <div class="guide-sec-body">
           <p>
             Durante o jogo, a barra lateral mostra o "estado" da sua aventura.
@@ -626,7 +626,7 @@ const _GUIDE_HTML = `
       </details>
 
       <details class="guide-sec">
-        <summary>🧩 Os conceitos do jogo</summary>
+        <summary>Os conceitos do jogo</summary>
         <div class="guide-sec-body">
           <p>Tudo o que o Mestre "lembra" é organizado nestes registros:</p>
           <dl class="guide-dl">
@@ -672,7 +672,7 @@ const _GUIDE_HTML = `
       </details>
 
       <details class="guide-sec">
-        <summary>⌨️ Quando o Mestre esquece de salvar algo — comandos /</summary>
+        <summary>Quando o Mestre esquece de salvar algo — comandos /</summary>
         <div class="guide-sec-body">
           <p>
             Dentro do jogo, digite <b>/</b> no campo de mensagem para abrir o
@@ -711,7 +711,7 @@ const _GUIDE_HTML = `
       </details>
 
       <details class="guide-sec">
-        <summary>✏️ Editando e corrigindo à mão</summary>
+        <summary>Editando e corrigindo à mão</summary>
         <div class="guide-sec-body">
           <p>
             Durante o jogo, tudo na barra lateral pode ser ajustado
@@ -729,7 +729,7 @@ const _GUIDE_HTML = `
       </details>
 
       <details id="guide-dnd-sec" class="guide-sec guide-dnd-block">
-        <summary>🎲 Modo D&amp;D — regras de verdade</summary>
+        <summary>Modo D&amp;D — regras de verdade</summary>
         <div class="guide-sec-body">
           <p class="guide-dnd-note">
             <b>Atenção:</b> esta seção só vale para campanhas de
@@ -750,9 +750,9 @@ const _GUIDE_HTML = `
               Inteligência, Sabedoria, Carisma), Vida (HP), Mana (MP) para
               magias, Classe de Armadura (CA), nível, classe e raça.</dd>
 
-            <dt>O botão de dados 🎲</dt>
+            <dt>O botão de dados</dt>
             <dd>Quando o jogo pede um teste, você rola o seu próprio dado (d20
-              e companhia) pelo botão 🎲 ao lado do campo de mensagem. O
+              e companhia) pelo botão de dado ao lado do campo de mensagem. O
               resultado <b>real</b> que você tirou é o que conta.</dd>
 
             <dt>Inventário e moedas</dt>
@@ -786,23 +786,23 @@ const _GUIDE_HTML = `
             <li><code>/rolar &lt;XdY+Z&gt;</code> — rola uma fórmula (ex.: /rolar 2d6+3)</li>
           </ul>
 
-          <h4 class="guide-h4">⚔️ O combate: dois modos</h4>
+          <h4 class="guide-h4">O combate: dois modos</h4>
           <p>
             O combate acontece por <b>turnos</b>, seguindo uma ordem de
             iniciativa. Você escolhe como quer vivê-lo (na barra lateral →
             aba <b>Mundo</b> → <b>Modo de Combate</b>):
           </p>
           <ul>
-            <li><b>📖 Narrado pela IA</b> — o Mestre descreve cada turno no
+            <li><b>Narrado pela IA</b> — o Mestre descreve cada turno no
               próprio chat, como o resto da história.</li>
-            <li><b>⚔️ Tela tática</b> — abre uma tela dedicada (o "Pergaminho
+            <li><b>Tela tática</b> — abre uma tela dedicada (o "Pergaminho
               Épico") com cards de Vida/Mana e botões: <b>Atacar, Habilidade,
               Item, Mover, Defender, Fugir</b> e <b>Encerrar Turno</b>. Os
               inimigos agem sozinhos. No fim da luta, o Mestre narra a batalha
               inteira de uma vez.</li>
           </ul>
 
-          <h4 class="guide-h4">🗺️ Onde cada um está</h4>
+          <h4 class="guide-h4">Onde cada um está</h4>
           <p>
             Quando o lugar importa (uma ponte, um pátio com arqueiros no alto),
             o Mestre divide o campo em <b>zonas</b> — uma trilha que aparece no
@@ -823,7 +823,7 @@ const _GUIDE_HTML = `
             custa a Ação.
           </p>
 
-          <h4 class="guide-h4">👑 Chefes</h4>
+          <h4 class="guide-h4">Chefes</h4>
           <p>
             Criaturas lendárias agem <b>fora do próprio turno</b>: entre uma
             vez e outra, o chefe emenda um golpe. E poderes de <b>recarga</b>
@@ -840,9 +840,9 @@ const _GUIDE_HTML = `
       </details>
 
       <details class="guide-sec">
-        <summary>🌍 O mundo entre as aventuras</summary>
+        <summary>O mundo entre as aventuras</summary>
         <div class="guide-sec-body">
-          <h4 class="guide-h4">🕰️ O tempo passa</h4>
+          <h4 class="guide-h4">O tempo passa</h4>
           <p>
             Viagem, vigília, espera pelo anoitecer: tudo consome horas, e a
             barra lateral mostra o <b>dia e a hora</b> quando a sua campanha
@@ -857,7 +857,7 @@ const _GUIDE_HTML = `
             só um.
           </p>
 
-          <h4 class="guide-h4">📜 Missões</h4>
+          <h4 class="guide-h4">Missões</h4>
           <p>
             Quando você aceita uma tarefa, ela vira uma <b>missão</b> na barra
             lateral, com os objetivos e o progresso de cada um. Não precisa
@@ -865,7 +865,7 @@ const _GUIDE_HTML = `
             escrito, junto com a recompensa prometida.
           </p>
 
-          <h4 class="guide-h4">🤝 O que os NPCs lembram</h4>
+          <h4 class="guide-h4">O que os NPCs lembram</h4>
           <p>
             Cada personagem guarda uma <b>atitude</b> em relação ao grupo, de
             hostil a leal, que sobe e desce conforme o que vocês fazem. E ela
@@ -874,7 +874,7 @@ const _GUIDE_HTML = `
             verdade.
           </p>
 
-          <h4 class="guide-h4">🎒 Peso e dinheiro</h4>
+          <h4 class="guide-h4">Peso e dinheiro</h4>
           <p>
             O que você carrega tem peso. Passando da metade do que aguenta,
             você fica <b>sobrecarregado</b>: desvantagem em ataques e em
@@ -887,7 +887,7 @@ const _GUIDE_HTML = `
       </details>
 
       <details class="guide-sec">
-        <summary>💡 Dicas rápidas</summary>
+        <summary>Dicas rápidas</summary>
         <div class="guide-sec-body">
           <ul>
             <li>Seja específico: quanto mais detalhe na sua ação, melhor a narração.</li>
@@ -1041,7 +1041,7 @@ function _refreshInstallSection() {
   // Já instalado: mostra confirmação e esconde instruções/botão.
   if (_isStandalone()) {
     status.style.display = '';
-    status.textContent = '✅ Você já está usando o RPG Agent instalado como aplicativo.';
+    status.textContent = 'Você já está usando o RPG Agent instalado como aplicativo.';
     if (btn) btn.style.display = 'none';
     if (android) android.style.display = 'none';
     if (ios) ios.style.display = 'none';

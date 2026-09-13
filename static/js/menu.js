@@ -519,7 +519,7 @@ function onImportJsonChange() {
     const missing  = required.filter(k => !(k in parsed));
     if (missing.length) {
       status.style.color = 'var(--gold-dim)';
-      status.textContent = `⚠ JSON válido mas faltam campos: ${missing.join(', ')}`;
+      status.textContent = `Atenção: JSON válido, mas faltam campos: ${missing.join(', ')}`;
     } else {
       const chars = Object.keys(parsed.characters||{}).length;
       const locs  = Object.keys(parsed.locations||{}).length;
@@ -1055,7 +1055,7 @@ function wzRenderEquipChoices(i) {
 
   const equipSection = (def.choices || []).length > 0
     ? `<div style="border-top:1px solid var(--page-edge);padding-top:14px;margin-top:6px;">`+
-      `<span class="cwc-label" style="margin-bottom:10px;">⚔️ Equipamentos Iniciais</span>`+
+      `<span class="cwc-label" style="margin-bottom:10px;">Equipamentos Iniciais</span>`+
       groupsHtml+
       (fixedNames ? `<div style="font-size:10px;color:var(--text-dim);margin-top:2px;">+ fixos: ${fixedNames}</div>` : '')+
       `</div>`
@@ -1400,12 +1400,12 @@ function wzBuildSpellPanel(i) {
 
   return `
     <div>
-      <div style="font-size:11px;color:var(--ink-user);margin-bottom:8px;">${scopeMsg} · SRD Open5e${_wzLimit ? `<span style="font-size:10px;font-family:monospace;color:var(--text-muted);margin-left:8px;">| C: ${_wzCantripCnt}/${_wzLimit.maxCantrips} ✨ ${_wzLeveledCnt}/${_wzLimit.maxSpells}</span>` : ''}</div>
+      <div style="font-size:11px;color:var(--ink-user);margin-bottom:8px;">${scopeMsg} · SRD Open5e${_wzLimit ? `<span style="font-size:10px;font-family:monospace;color:var(--text-muted);margin-left:8px;">| C: ${_wzCantripCnt}/${_wzLimit.maxCantrips} ${_wzLeveledCnt}/${_wzLimit.maxSpells}</span>` : ''}</div>
       <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;">${levelBtns}</div>
       <div style="display:flex;gap:8px;margin-bottom:8px;">
         <input id="wz-spell-q-${i}" value="${query}" placeholder="Buscar magia (ex: fireball)..."
           oninput="wzChars[${i}]._spellQuery=this.value;wzTriggerSpellSearch(${i})" style="flex:1;font-size:13px;">
-        <button class="clean-button" style="width:auto;padding:4px 10px;margin:0;font-size:12px;" onclick="wzDoSpellSearch(${i})">🔍</button>
+        <button class="clean-button" style="width:auto;padding:4px 10px;margin:0;font-size:12px;" onclick="wzDoSpellSearch(${i})">Buscar</button>
       </div>
       <div class="ed-search-results-list" style="max-height:300px;">${listHtml}</div>
       ${selected.length ? `<div style="font-size:11px;color:var(--text-muted);margin-top:10px;display:flex;flex-wrap:wrap;gap:4px;align-items:center;">
@@ -1439,7 +1439,7 @@ function wzAddSpell(i, spell) {
   // Atualiza o painel de magias (chips de selecionadas + marcador ✓) e o contador da aba
   wzRefreshSpellPanel(i);
   const tabEl = document.getElementById(`wz-hab-tab-spells-${i}`);
-  if (tabEl) tabEl.textContent = `✨ Magias (${char._selectedSpells.length})`;
+  if (tabEl) tabEl.textContent = `Magias (${char._selectedSpells.length})`;
 }
 function wzRemoveSpell(i, nome) {
   const char = wzChars[i];
@@ -1448,7 +1448,7 @@ function wzRemoveSpell(i, nome) {
   wzRefreshSpellPanel(i);
   const tabEl = document.getElementById(`wz-hab-tab-spells-${i}`);
   if (tabEl) tabEl.textContent = char._selectedSpells.length
-    ? `✨ Magias (${char._selectedSpells.length})` : '✨ Magias';
+    ? `Magias (${char._selectedSpells.length})` : 'Magias';
 }
 
 const CLASS_DATA_WZ = {
@@ -1629,7 +1629,7 @@ async function generateLore() {
   const btn = document.getElementById('wz-ai-btn');
   const status = document.getElementById('wz-ai-status');
   btn.disabled = true;
-  btn.textContent = '⏳ Gerando...';
+  btn.textContent = 'Gerando...';
   status.textContent = '';
   try {
     const keys  = typeof window.getApiKeys === 'function' ? window.getApiKeys() : {};
@@ -1755,7 +1755,7 @@ async function generateLore() {
     status.textContent = `✕ ${e.message}`;
   } finally {
     btn.disabled = false;
-    btn.textContent = '✨ Gerar com IA';
+    btn.textContent = 'Gerar com IA';
   }
 }
 
@@ -1993,7 +1993,7 @@ function wzRefreshMonsterSearch(i) {
   const el = document.getElementById(`wz-monster-results-${i}`);
   if (!el) return;
   const char = wzChars[i];
-  if (char._monsterLoading) { el.innerHTML = '<div style="padding:6px;color:var(--text-muted);font-size:12px;">⏳ Buscando…</div>'; return; }
+  if (char._monsterLoading) { el.innerHTML = '<div style="padding:6px;color:var(--text-muted);font-size:12px;">Buscando…</div>'; return; }
   if (!char._monsterResults?.length) { el.innerHTML = ''; return; }
   el.innerHTML = char._monsterResults.map((m, idx) => {
     const mJson = JSON.stringify(m).replace(/"/g, '&quot;');
@@ -2003,7 +2003,7 @@ function wzRefreshMonsterSearch(i) {
         <span style="font-size:10px;color:var(--text-muted);">${escHtml(m.tipo)} · CR ${escHtml(m.cr)}</span>
       </div>
       <div style="font-size:10px;font-family:monospace;color:var(--text-muted);margin-top:2px;">
-        FOR ${m.forca} DES ${m.destreza} CON ${m.constituicao} INT ${m.inteligencia} SAB ${m.sabedoria} CAR ${m.carisma} · CA ${m.ca} · HP ${m.vida}${m.arma_principal ? ` · ⚔️ ${escHtml(m.arma_principal)}` : ''}
+        FOR ${m.forca} DES ${m.destreza} CON ${m.constituicao} INT ${m.inteligencia} SAB ${m.sabedoria} CAR ${m.carisma} · CA ${m.ca} · HP ${m.vida}${m.arma_principal ? ` · ${escHtml(m.arma_principal)}` : ''}
       </div>
     </div>`;
   }).join('');
@@ -2067,7 +2067,7 @@ function edRefreshMonsterSearch(i) {
   if (!el) return;
   const ch = edChars[i];
   if (ch._monsterLoading) {
-    el.innerHTML = '<div style="padding:6px;color:var(--text-muted);font-size:12px;">⏳ Buscando…</div>';
+    el.innerHTML = '<div style="padding:6px;color:var(--text-muted);font-size:12px;">Buscando…</div>';
     return;
   }
   if (!ch._monsterResults?.length) { el.innerHTML = ''; return; }
@@ -2079,7 +2079,7 @@ function edRefreshMonsterSearch(i) {
         <span style="font-size:10px;color:var(--text-muted);">${escHtml(m.tipo)} · CR ${escHtml(m.cr)}</span>
       </div>
       <div style="font-size:10px;font-family:monospace;color:var(--text-muted);margin-top:2px;">
-        FOR ${m.forca} DES ${m.destreza} CON ${m.constituicao} INT ${m.inteligencia} SAB ${m.sabedoria} CAR ${m.carisma} · CA ${m.ca} · HP ${m.vida}${m.arma_principal ? ` · ⚔️ ${escHtml(m.arma_principal)}` : ''}
+        FOR ${m.forca} DES ${m.destreza} CON ${m.constituicao} INT ${m.inteligencia} SAB ${m.sabedoria} CAR ${m.carisma} · CA ${m.ca} · HP ${m.vida}${m.arma_principal ? ` · ${escHtml(m.arma_principal)}` : ''}
       </div>
     </div>`;
   }).join('');
@@ -2394,7 +2394,7 @@ function wzAddClassFeature(i, feat) {
   wzRefreshFeatPanel(i);   // atualiza a lista dentro do painel (chips de selecionadas)
   // Atualiza o contador na aba sem re-renderizar o painel inteiro
   const tabEl = document.getElementById(`wz-hab-tab-feats-${i}`);
-  if (tabEl) tabEl.textContent = `📜 Habilidades (${char._selectedFeats.length})`;
+  if (tabEl) tabEl.textContent = `Habilidades (${char._selectedFeats.length})`;
 }
 function wzRemoveFeat(i, nome) {
   const char = wzChars[i];
@@ -2403,7 +2403,7 @@ function wzRemoveFeat(i, nome) {
   wzRefreshFeatPanel(i);
   const tabEl = document.getElementById(`wz-hab-tab-feats-${i}`);
   if (tabEl) tabEl.textContent = char._selectedFeats.length
-    ? `📜 Habilidades (${char._selectedFeats.length})` : '📜 Habilidades';
+    ? `Habilidades (${char._selectedFeats.length})` : 'Habilidades';
 }
 
 // ── Wizard: seção D&D completa (refrescável parcialmente) ────────────────────
@@ -2464,7 +2464,7 @@ function wzBuildDndSectionHtml(i) {
       </div>
       <div><span class="cwc-label">HP / CA do monstro</span>
         <div style="font-size:13px;color:var(--text-muted);padding:6px 0;">
-          ${char._monsterHp != null ? `❤️ ${char._monsterHp} · 🛡️ ${char._monsterCa}` : '—'}
+          ${char._monsterHp != null ? `PV ${char._monsterHp} · CA ${char._monsterCa}` : '—'}
         </div>
       </div>
     </div>` : `
@@ -2511,9 +2511,9 @@ function wzBuildDndSectionHtml(i) {
     </div>
     ${calc ? `
     <div class="dnd-calc-row">
-      <div class="dnd-calc-item">❤️ HP <span id="wz-hp-${i}">${char._monsterHp ?? calc.hp}</span></div>
-      <div class="dnd-calc-item">🛡️ CA <span id="wz-ca-${i}">${char._monsterCa ?? calc.ca}</span></div>
-      ${calc.mana > 0 ? `<div class="dnd-calc-item">✨ Mana <span id="wz-mn-${i}">${calc.mana}</span></div>` : ''}
+      <div class="dnd-calc-item">HP <span id="wz-hp-${i}">${char._monsterHp ?? calc.hp}</span></div>
+      <div class="dnd-calc-item">CA <span id="wz-ca-${i}">${char._monsterCa ?? calc.ca}</span></div>
+      ${calc.mana > 0 ? `<div class="dnd-calc-item">Mana <span id="wz-mn-${i}">${calc.mana}</span></div>` : ''}
       <div class="dnd-calc-item">d${calc.hit_die} hit die${char.classe !== 'npc' ? ` · Prof +${edProfForLevel(nivel)}` : ''}</div>
     </div>` : ''}`;
 
@@ -2560,8 +2560,8 @@ function wzBuildDndSectionHtml(i) {
       `color:${active?'var(--ink-user)':'var(--text-muted)'};font-weight:${active?'700':'400'};`+
       `transition:color 0.15s,border-color 0.15s;`;
 
-    const featLabel  = selFeats.length  ? `📜 Habilidades (${selFeats.length})`  : '📜 Habilidades';
-    const spellLabel = selSpells.length ? `✨ Magias (${selSpells.length})` : '✨ Magias';
+    const featLabel  = selFeats.length  ? `Habilidades (${selFeats.length})`  : 'Habilidades';
+    const spellLabel = selSpells.length ? `Magias (${selSpells.length})` : 'Magias';
 
     const tabBar = `<div style="display:flex;border-bottom:1px solid var(--page-edge);margin-bottom:12px;">
       ${showFeatTab  ? `<button id="wz-hab-tab-feats-${i}"  style="${tabStyle(habTab==='feats')}"  onclick="wzSetHabTab(${i},'feats')">${featLabel}</button>`  : ''}
@@ -2585,7 +2585,7 @@ function wzBuildDndSectionHtml(i) {
 
     habHtml = `
       <div style="border-top:1px solid var(--page-edge);padding-top:14px;margin-top:6px;">
-        <span class="cwc-label" style="margin-bottom:10px;">✨ Habilidades & Magias</span>
+        <span class="cwc-label" style="margin-bottom:10px;">Habilidades & Magias</span>
         ${tabBar}
         ${tabContent}
         ${emptyHint}
@@ -2645,7 +2645,7 @@ function wzRenderStatGrid(i) {
 // ── Campos específicos por tema narrativo ────────────────────────────────
 const THEME_CHAR_FIELDS = {
   fantasia: {
-    icon: '⚔️', label: 'Fantasia — Arquétipo & Poderes',
+    label: 'Fantasia — Arquétipo & Poderes',
     color: 'rgba(200,168,75,0.08)', border: 'rgba(200,168,75,0.22)',
     primary: 'arquetipo',
     fields: [
@@ -2656,7 +2656,7 @@ const THEME_CHAR_FIELDS = {
     ],
   },
   romance: {
-    icon: '💌', label: 'Romance — Emoções & Segredos',
+    label: 'Romance — Emoções & Segredos',
     color: 'rgba(200,80,120,0.08)', border: 'rgba(200,80,120,0.22)',
     primary: 'papel',
     fields: [
@@ -2668,7 +2668,7 @@ const THEME_CHAR_FIELDS = {
     ],
   },
   horror: {
-    icon: '🕯️', label: 'Horror — Psique & Sobrevivência',
+    label: 'Horror — Psique & Sobrevivência',
     color: 'rgba(180,40,40,0.08)', border: 'rgba(180,40,40,0.25)',
     primary: 'tipo',
     fields: [
@@ -2680,7 +2680,7 @@ const THEME_CHAR_FIELDS = {
     ],
   },
   misterio: {
-    icon: '🔍', label: 'Mistério — Posição & Informações',
+    label: 'Mistério — Posição & Informações',
     color: 'rgba(60,120,180,0.08)', border: 'rgba(60,120,180,0.22)',
     primary: 'papel',
     fields: [
@@ -2691,7 +2691,7 @@ const THEME_CHAR_FIELDS = {
     ],
   },
   scifi: {
-    icon: '🚀', label: 'Sci-Fi — Especialidade & Facção',
+    label: 'Sci-Fi — Especialidade & Facção',
     color: 'rgba(40,140,200,0.08)', border: 'rgba(40,140,200,0.22)',
     primary: 'especialidade',
     fields: [
@@ -2703,7 +2703,7 @@ const THEME_CHAR_FIELDS = {
     ],
   },
   faroeste: {
-    icon: '🤠', label: 'Faroeste — Reputação & Lei',
+    label: 'Faroeste — Reputação & Lei',
     color: 'rgba(160,100,40,0.08)', border: 'rgba(160,100,40,0.25)',
     primary: 'arquetipo',
     fields: [
@@ -2745,7 +2745,6 @@ function wzRenderThemeExtras(i, theme, char) {
 
   let html = `<div style="border-top:1px solid var(--border);margin-top:4px;padding-top:14px;">
     <div style="font-family:'Cinzel',serif;font-size:10px;letter-spacing:0.12em;text-transform:uppercase;margin-bottom:14px;display:flex;align-items:center;gap:6px;">
-      <span>${cfg.icon}</span>
       <span style="color:var(--gold-dim);">${cfg.label}</span>
     </div>`;
 
@@ -2938,7 +2937,7 @@ function showHabInfo(event, sp, regIdx, alreadyHas, limitReached) {
     ${alreadyHas
       ? `<div style="text-align:center;font-size:12px;color:var(--green,#2d8a4e);padding:6px 0;">✓ Já adicionada</div>`
       : limitReached
-        ? `<div style="text-align:center;font-size:12px;color:var(--ink-sys,#8b3a3a);padding:6px 0;">⚠️ Limite de cantrips/magias atingido (use a aba de habilidades)</div>`
+        ? `<div style="text-align:center;font-size:12px;color:var(--ink-sys,#8b3a3a);padding:6px 0;">Limite de cantrips/magias atingido (use a aba de habilidades)</div>`
         : `<button onclick="_habInfoRegistry[${regIdx}]()"
              style="width:100%;padding:9px;background:var(--ink-user,#264b82);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-family:'Lora',serif;font-weight:600;letter-spacing:0.02em;">
              + Adicionar
@@ -3198,7 +3197,7 @@ async function createCampaignFromWizard() {
 
   const btn = document.getElementById('wz-create-btn');
   btn.disabled = true;
-  btn.textContent = '⏳ Criando...';
+  btn.textContent = 'Criando...';
   document.getElementById('wz-err').textContent = '';
 
   try {
@@ -3226,7 +3225,7 @@ async function createCampaignFromWizard() {
       story_input:   '',
       genre:         '',
     };
-    btn.textContent = '⏳ Iniciando...';
+    btn.textContent = 'Iniciando...';
     const keys = typeof window.getApiKeys === 'function' ? window.getApiKeys() : {};
     if (keys.google_api_key)   sessionPayload.google_api_key   = keys.google_api_key;
     if (keys.deepseek_api_key) sessionPayload.deepseek_api_key = keys.deepseek_api_key;
@@ -3254,7 +3253,7 @@ async function createCampaignFromWizard() {
   } catch (e) {
     document.getElementById('wz-err').textContent = e.message;
     btn.disabled = false;
-    btn.textContent = '⚔️ Criar e Iniciar';
+    btn.textContent = 'Criar e Iniciar';
   }
 }
 
@@ -3937,13 +3936,13 @@ function edBuildSpellPanel(i) {
 
   return `
     <div>
-      <div style="font-size:11px;color:var(--ink-user);margin-bottom:8px;">${scopeMsg} · SRD Open5e${_edLimit ? `<span style="font-size:10px;font-family:monospace;color:var(--text-muted);margin-left:8px;">| C: ${_edCantripCnt}/${_edLimit.maxCantrips} ✨ ${_edLeveledCnt}/${_edLimit.maxSpells}</span>` : ''}</div>
+      <div style="font-size:11px;color:var(--ink-user);margin-bottom:8px;">${scopeMsg} · SRD Open5e${_edLimit ? `<span style="font-size:10px;font-family:monospace;color:var(--text-muted);margin-left:8px;">| C: ${_edCantripCnt}/${_edLimit.maxCantrips} ${_edLeveledCnt}/${_edLimit.maxSpells}</span>` : ''}</div>
       <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;">${levelBtns}</div>
       <div style="display:flex;gap:8px;margin-bottom:8px;">
         <input id="ed-spell-q-${i}" value="${query}" placeholder="Buscar magia (ex: fireball)..."
           oninput="edChars[${i}]._spellQuery=this.value;edTriggerSpellSearch(${i})" style="flex:1;font-size:13px;">
         <button class="clean-button" style="width:auto;padding:4px 10px;margin:0;font-size:12px;"
-          onclick="edDoSpellSearch(${i})">🔍</button>
+          onclick="edDoSpellSearch(${i})">Buscar</button>
       </div>
       <div class="ed-search-results-list" style="max-height:300px;" id="ed-spell-results-${i}">${listHtml}</div>
     </div>`;
@@ -4038,7 +4037,7 @@ function edBuildDndSections(i) {
   // ─── Ficha Principal (sempre livre) ─────────────────────────────
   const fichaHtml = `
     <div class="ed-dnd-section">
-      <div class="ed-dnd-section-title">⚔️ Ficha D&D</div>
+      <div class="ed-dnd-section-title">Ficha D&D</div>
       <div class="cwc-row2">
         <div><span class="cwc-label">Classe</span>
           <select onchange="edSheetChange(${i},'classe',this.value);edChars[${i}]._classFeatures=[];edChars[${i}]._spellResults=[];edChars[${i}]._spellLevelFilter=null;edChars[${i}]._habTab=CASTER_CLASSES_WZ.has(this.value)?'spells':'feats';if(!edChars[${i}].freeMode){edChars[${i}]._featLoading=true;edLoadClassFeatures(${i});}edRefreshDndSections(${i})">
@@ -4129,7 +4128,7 @@ function edBuildDndSections(i) {
   if (freeMode) {
     statsHtml = `
       <div class="ed-dnd-section">
-        <div class="ed-dnd-section-title">🎲 Atributos — Modo Livre</div>
+        <div class="ed-dnd-section-title">Atributos — Modo Livre</div>
         <div class="stat-grid">
           ${ED_STATS.map(stat => `
             <div class="stat-cell">
@@ -4149,7 +4148,7 @@ function edBuildDndSections(i) {
     const asiCnt = edAsiCount(nivel);
     statsHtml = `
       <div class="ed-dnd-section">
-        <div class="ed-dnd-section-title">🎲 Atributos — Point Buy + ASI</div>
+        <div class="ed-dnd-section-title">Atributos — Point Buy + ASI</div>
         <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px;font-size:12px;">
           <div class="pb-budget" style="padding:6px 10px;border-radius:4px;background:rgba(0,0,0,0.03);">
             <span style="color:var(--text-muted);">Point Buy: ${bud.pbUsed}/${bud.pbBudget}</span>
@@ -4169,7 +4168,7 @@ function edBuildDndSections(i) {
   // ─── Combate (sempre livre) ───────────────────────────────────────
   const combateHtml = `
     <div class="ed-dnd-section">
-      <div class="ed-dnd-section-title">❤️ Combate & Recursos</div>
+      <div class="ed-dnd-section-title">Combate & Recursos</div>
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">
         <div><span class="cwc-label">Vida Atual</span><input type="number" min="0" value="${s.vida_atual??10}" onchange="edSheetChange(${i},'vida_atual',this.value)"></div>
         <div><span class="cwc-label">Vida Máxima</span><input type="number" min="1" value="${s.vida_max??10}" onchange="edSheetChange(${i},'vida_max',this.value)"></div>
@@ -4187,7 +4186,7 @@ function edBuildDndSections(i) {
   // ─── Riqueza & Equipamento ────────────────────────────────────────
   const equipHtml = `
     <div class="ed-dnd-section">
-      <div class="ed-dnd-section-title">💰 Riqueza & Equipamentos</div>
+      <div class="ed-dnd-section-title">Riqueza & Equipamentos</div>
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px;">
         <div><span class="cwc-label">Ouro</span><input type="number" min="0" value="${s.ouro??0}" onchange="edSheetChange(${i},'ouro',this.value)"></div>
         <div><span class="cwc-label">Prata</span><input type="number" min="0" value="${s.prata??0}" onchange="edSheetChange(${i},'prata',this.value)"></div>
@@ -4218,7 +4217,7 @@ function edBuildDndSections(i) {
   const invHtml = `
     <div class="ed-dnd-section">
       <div class="ed-dnd-section-title" style="display:flex;justify-content:space-between;align-items:center;">
-        <span>🎒 Inventário</span>
+        <span>Inventário</span>
         ${invBtns}
       </div>
       ${!freeMode && ch._showItemSearch ? `<div id="ed-item-panel-${i}" style="margin-bottom:10px;">${edBuildItemPanel(i)}</div>` : ''}
@@ -4260,8 +4259,8 @@ function edBuildDndSections(i) {
 
   const edTabBar = (showFeatTab || showSpellTab) ? `
     <div style="display:flex;border-bottom:1px solid var(--page-edge);margin-bottom:12px;">
-      ${showFeatTab  ? `<button id="ed-hab-tab-feats-${i}"  style="${edTabStyle(edHabTab==='feats')}"  onclick="edSetHabTab(${i},'feats')">📜 Habilidades</button>`  : ''}
-      ${showSpellTab ? `<button id="ed-hab-tab-spells-${i}" style="${edTabStyle(edHabTab==='spells')}" onclick="edSetHabTab(${i},'spells')">✨ Magias</button>` : ''}
+      ${showFeatTab  ? `<button id="ed-hab-tab-feats-${i}"  style="${edTabStyle(edHabTab==='feats')}"  onclick="edSetHabTab(${i},'feats')">Habilidades</button>`  : ''}
+      ${showSpellTab ? `<button id="ed-hab-tab-spells-${i}" style="${edTabStyle(edHabTab==='spells')}" onclick="edSetHabTab(${i},'spells')">Magias</button>` : ''}
       <button class="clean-button" style="width:auto;padding:3px 10px;margin:0 0 4px auto;font-size:11px;" onclick="addEdAbility(${i})">+ Manual</button>
     </div>` : `
     <div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
@@ -4277,7 +4276,7 @@ function edBuildDndSections(i) {
 
   const habHtml = `
     <div class="ed-dnd-section">
-      <div class="ed-dnd-section-title">✨ Habilidades & Magias</div>
+      <div class="ed-dnd-section-title">Habilidades & Magias</div>
       ${edTabBar}
       ${edTabContent}
       ${ch.habilidades.length ? ch.habilidades.map((h, j) => `
@@ -4468,7 +4467,7 @@ async function saveEditedCampaign() {
 
   const btn = document.getElementById('ed-save-btn');
   btn.disabled = true;
-  btn.textContent = '⏳ Salvando...';
+  btn.textContent = 'Salvando...';
 
   const newName = document.getElementById('ed-name').value.trim();
   const isDnd   = edIsDnd();

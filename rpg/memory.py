@@ -504,7 +504,7 @@ def save_campaign() -> None:
 
     # TRAVA 1: Só salva se tiver nome definido
     if not campaign or not campaign.get("name"):
-        print("⚠️ [ALERTA] Tentativa de salvar abortada: Memória sem nome de campanha.")
+        print("[ALERTA] Tentativa de salvar abortada: Memória sem nome de campanha.")
         return
 
     # TRAVA 2: Protege contra sobrescrever dados existentes com memória vazia
@@ -518,7 +518,7 @@ def save_campaign() -> None:
                 has_summary = len(campaign.get("story_summary", "")) > 0
                 has_chars   = len(campaign.get("characters", {})) > 0
                 if not has_history and not has_summary and not has_chars:
-                    print(f"⚠️ [PROTEÇÃO] Bloqueado sobrescrever '{campaign['name']}' com dados vazios.")
+                    print(f"Aviso: [PROTEÇÃO] Bloqueado sobrescrever '{campaign['name']}' com dados vazios.")
                     return
         except Exception:
             pass  # Se não conseguir checar, deixa salvar
@@ -529,14 +529,14 @@ def save_campaign() -> None:
         campaign["conversation_history"] = hist[-MAX_HISTORY_SAVED:]
 
     if not uid or not name:
-        print("⚠️ [ALERTA] Save abortado: contexto de sessão não vinculado.")
+        print("[ALERTA] Save abortado: contexto de sessão não vinculado.")
         return
 
     try:
         database.save_campaign(uid, name, dict(campaign))
-        print(f"✅ Campanha '{campaign['name']}' persistida no Supabase.")
+        print(f"Campanha '{campaign['name']}' persistida no Supabase.")
     except Exception as e:
-        print(f"❌ Erro crítico ao salvar no Supabase: {e}")
+        print(f"Erro crítico ao salvar no Supabase: {e}")
 
 
 def export_diary_md() -> str:

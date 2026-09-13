@@ -431,7 +431,7 @@ def test_atirador_recua_antes_de_atirar(povoar):
     saida = td.execute_npc_turn()
 
     assert td._zona_de("Arqueiro") != "Portão", saida
-    assert "🏹" in saida
+    assert "Recua para atirar" in saida
 
 
 def test_atirador_livre_nao_recua(povoar):

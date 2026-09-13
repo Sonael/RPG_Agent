@@ -22,7 +22,7 @@
     }
   </script>
   <link rel="icon"
-    href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚔️</text></svg>">
+    type="image/png" href="/static/icons/favicon-32.png">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -153,9 +153,9 @@
               </div>
               <div id="combat-mode-toggle" class="combat-mode-toggle">
                 <button type="button" data-mode="narrado" class="cm-opt active"
-                  onclick="setCombatMode('narrado')">📖 Narrado pela IA</button>
+                  onclick="setCombatMode('narrado')">Narrado pela IA</button>
                 <button type="button" data-mode="tela" class="cm-opt"
-                  onclick="setCombatMode('tela')">⚔️ Tela tática</button>
+                  onclick="setCombatMode('tela')">Tela tática</button>
               </div>
               <div id="combat-mode-hint"></div>
             </div>
@@ -242,7 +242,7 @@
 
         <div id="turn-tracker" class="hidden">
           <div id="turn-tracker-inner">
-            <div id="tt-round-label">⚔️ <span id="tt-round">Rodada 1</span></div>
+            <div id="tt-round-label"><span id="tt-round">Rodada 1</span></div>
             <div id="tt-cards"></div>
           </div>
         </div>
@@ -258,7 +258,7 @@
             </div>
 
             <div class="input-row">
-              <button id="dice-tray-btn" title="Rolar dado (jogador)" onclick="toggleDiceTray()">🎲</button>
+              <button id="dice-tray-btn" title="Rolar dado (jogador)" aria-label="Rolar dado" onclick="toggleDiceTray()"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="3"/><circle cx="8.5" cy="8.5" r="1.2" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></svg></button>
               <textarea id="chat-input" placeholder="O que fará a seguir? (/ para comandos)"
                 onkeydown="handleKey(event)" oninput="onInputChange(this)"></textarea>
               <button id="send-btn" onclick="sendMessage()">Enviar</button>

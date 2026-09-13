@@ -80,7 +80,7 @@ def get_character(name: str) -> str:
     sheet_summary = (
         f"\n── Ficha D&D ──────────────────────\n"
         f"  {s['classe']} {s['raca']} Nível {s['nivel']} | XP {s['xp']}/{s.get('xp_proximo', '?')}\n"
-        f"  ❤️  {s['vida_atual']}/{s['vida_max']}  ✨ {s['mana_atual']}/{s['mana_max']}  🛡️  CA {s['ca']}\n"
+        f"  PV {s['vida_atual']}/{s['vida_max']}  Mana {s['mana_atual']}/{s['mana_max']}  CA {s['ca']}\n"
         f"  FOR {_ms(s['forca'])}  DES {_ms(s['destreza'])}  CON {_ms(s['constituicao'])}\n"
         f"  INT {_ms(s['inteligencia'])}  SAB {_ms(s['sabedoria'])}  CAR {_ms(s['carisma'])}\n"
         f"  Prof: +{s['proficiencia']}"
@@ -475,11 +475,11 @@ def add_quest(title: str, description: str, objectives: str = "",
     """
     titulo = (title or "").strip()
     if not titulo:
-        return "⚠️ A missão precisa de um título."
+        return "A missão precisa de um título."
 
     chave = _chave_missao(titulo)
     if chave in _missoes():
-        return (f"⚠️ Já existe a missão '{titulo}'. Use update_quest_objective() "
+        return (f"Aviso: Já existe a missão '{titulo}'. Use update_quest_objective() "
                 f"para marcar progresso ou complete_quest() para encerrá-la.")
 
     passos = [o.strip() for o in (objectives or "").split(";") if o.strip()]
@@ -494,11 +494,11 @@ def add_quest(title: str, description: str, objectives: str = "",
     }
     memory.save_campaign()
 
-    linhas = [f"📜 Missão aceita: **{titulo}**"]
+    linhas = [f"Missão aceita: **{titulo}**"]
     if giver:
         linhas.append(f"   De: {giver}")
     for o in passos:
-        linhas.append(f"   ☐ {o}")
+        linhas.append(f"   [ ] {o}")
     if reward:
         linhas.append(f"   Recompensa combinada: {reward}")
     return "\n".join(linhas)
@@ -515,7 +515,7 @@ def update_quest_objective(title: str, objective: str, done: bool = True) -> str
     """
     missao = _missoes().get(_chave_missao(title))
     if not missao:
-        return f"⚠️ Missão '{title}' não encontrada. Veja list_quests()."
+        return f"Aviso: Missão '{title}' não encontrada. Veja list_quests()."
 
     alvo = (objective or "").lower().strip()
     achou = None
@@ -534,10 +534,10 @@ def update_quest_objective(title: str, objective: str, done: bool = True) -> str
 
     feitos = sum(1 for o in missao["objetivos"] if o["feito"])
     total  = len(missao["objetivos"])
-    marca  = "☑" if done else "☐"
+    marca  = "[x]" if done else "[ ]"
     fim = ""
     if feitos == total and total > 0 and missao["status"] == "ativa":
-        fim = ("\n   ⭐ Todos os objetivos concluídos — encerre com "
+        fim = ("\n   Todos os objetivos concluídos — encerre com "
                "complete_quest() e entregue a recompensa.")
     return (f"{marca} {missao['titulo']}: {achou['texto']}  "
             f"({feitos}/{total}){fim}")
@@ -554,11 +554,11 @@ def complete_quest(title: str, outcome: str = "concluida", notes: str = "") -> s
     """
     missao = _missoes().get(_chave_missao(title))
     if not missao:
-        return f"⚠️ Missão '{title}' não encontrada. Veja list_quests()."
+        return f"Aviso: Missão '{title}' não encontrada. Veja list_quests()."
 
     fim = (outcome or "concluida").lower().strip()
     if fim not in _STATUS_MISSAO or fim == "ativa":
-        return (f"⚠️ Desfecho '{outcome}' inválido. Use: concluida, falhou "
+        return (f"Aviso: Desfecho '{outcome}' inválido. Use: concluida, falhou "
                 f"ou abandonada.")
 
     missao["status"]   = fim
@@ -567,8 +567,7 @@ def complete_quest(title: str, outcome: str = "concluida", notes: str = "") -> s
         missao["desfecho"] = notes
     memory.save_campaign()
 
-    icone = {"concluida": "🏆", "falhou": "💀", "abandonada": "🚪"}[fim]
-    linha = f"{icone} Missão **{missao['titulo']}** — {fim}."
+    linha = f"Missão **{missao['titulo']}** — {fim}."
     if fim == "concluida" and missao.get("recompensa"):
         linha += (f"\n   Recompensa combinada: {missao['recompensa']} "
                   f"— entregue com add_item()/modify_currency().")
@@ -594,7 +593,7 @@ def list_quests(include_closed: bool = False) -> str:
 
     linhas = []
     if ativas:
-        linhas.append("📜 Missões ativas:")
+        linhas.append("Missões ativas:")
         for m in ativas:
             feitos = sum(1 for o in m["objetivos"] if o["feito"])
             total  = len(m["objetivos"])
@@ -605,16 +604,14 @@ def list_quests(include_closed: bool = False) -> str:
                 cabeca += f" — de {m['quem_deu']}"
             linhas.append(cabeca)
             for o in m["objetivos"]:
-                linhas.append(f"      {'☑' if o['feito'] else '☐'} {o['texto']}")
+                linhas.append(f"      {'[x]' if o['feito'] else '[ ]'} {o['texto']}")
     else:
         linhas.append("Nenhuma missão ativa.")
 
     if include_closed and fechadas:
         linhas.append("\nEncerradas:")
         for m in fechadas:
-            icone = {"concluida": "🏆", "falhou": "💀", "abandonada": "🚪"}.get(
-                m["status"], "•")
-            linhas.append(f"  {icone} {m['titulo']} — {m['status']}")
+            linhas.append(f"  - {m['titulo']} — {m['status']}")
     elif fechadas:
         linhas.append(f"\n({len(fechadas)} encerrada(s) — "
                       f"list_quests(include_closed=True) para ver)")
@@ -630,13 +627,13 @@ def get_quest(title: str) -> str:
     """
     missao = _missoes().get(_chave_missao(title))
     if not missao:
-        return f"⚠️ Missão '{title}' não encontrada. Veja list_quests()."
-    linhas = [f"📜 **{missao['titulo']}** ({missao['status']})",
+        return f"Aviso: Missão '{title}' não encontrada. Veja list_quests()."
+    linhas = [f"**{missao['titulo']}** ({missao['status']})",
               f"   {missao.get('descricao', '')}"]
     if missao.get("quem_deu"):
         linhas.append(f"   Encomendada por: {missao['quem_deu']}")
     for o in missao["objetivos"]:
-        linhas.append(f"   {'☑' if o['feito'] else '☐'} {o['texto']}")
+        linhas.append(f"   {'[x]' if o['feito'] else '[ ]'} {o['texto']}")
     if missao.get("recompensa"):
         linhas.append(f"   Recompensa: {missao['recompensa']}")
     if missao.get("desfecho"):
@@ -710,7 +707,7 @@ def adjust_attitude(name: str, delta: int, reason: str = "") -> str:
     try:
         d = int(delta)
     except (TypeError, ValueError):
-        return "⚠️ Informe delta como número inteiro (ex: -15, 30)."
+        return "Informe delta como número inteiro (ex: -15, 30)."
 
     antes  = atitude_de(char)
     depois = max(-100, min(100, antes + d))
@@ -727,12 +724,11 @@ def adjust_attitude(name: str, delta: int, reason: str = "") -> str:
 
     r_antes, _        = _faixa_atitude(antes)
     r_depois, conduta = _faixa_atitude(depois)
-    seta   = "📈" if d > 0 else "📉"
     motivo = f" — {reason}" if reason else ""
-    linha  = (f"{seta} {char['name']}: atitude {antes:+d} → **{depois:+d}** "
+    linha  = (f"{char['name']}: atitude {antes:+d} → **{depois:+d}** "
               f"({r_depois}){motivo}")
     if r_antes != r_depois:
-        linha += f"\n   ⚡ Mudou de faixa: {r_antes} → **{r_depois}**. {conduta}."
+        linha += f"\n   Mudou de faixa: {r_antes} → **{r_depois}**. {conduta}."
     memory.save_campaign()
     return linha
 
@@ -939,9 +935,9 @@ def get_scene_context(extra_characters: str = "", extra_locations: str = "") -> 
 
     def _warn(ch, s):
         st = (ch.get("status") or "").lower()
-        if st == "morto":                          return " 💀"
-        if s["vida_atual"] == 0:                   return " ⚠️INCONSCIENTE"
-        if s["vida_atual"] <= s["vida_max"] // 4:  return " ⚠️CRÍTICO"
+        if st == "morto":                          return ""
+        if s["vida_atual"] == 0:                   return " INCONSCIENTE"
+        if s["vida_atual"] <= s["vida_max"] // 4:  return " CRÍTICO"
         return ""
 
     def _conds(ch):
@@ -957,22 +953,22 @@ def get_scene_context(extra_characters: str = "", extra_locations: str = "") -> 
         current = order[idx] if order and 0 <= idx < len(order) else "?"
         lines = []
         for i, nome in enumerate(order):
-            mark = "🎯" if i == idx else "  "
+            mark = "->" if i == idx else "  "
             ch   = c["characters"].get(memory.char_key(nome))
             if not ch or not ch.get("sheet"):
                 lines.append(f"  {mark} {nome}")
                 continue
             s    = ch["sheet"]
-            icon = "" if memory.is_party_member(ch) else "👹 "
-            mana = f"  ✨{s['mana_atual']}/{s['mana_max']}" if s.get("mana_max", 0) else ""
+            icon = "" if memory.is_party_member(ch) else "[inimigo] "
+            mana = f"  Mana {s['mana_atual']}/{s['mana_max']}" if s.get("mana_max", 0) else ""
             lines.append(
                 f"  {mark} {icon}{ch['name']} Nv.{s['nivel']} {s['classe']}"
-                f"  ❤️[{_bar(s['vida_atual'], s['vida_max'])}]{s['vida_atual']}/{s['vida_max']}"
-                f"{mana}  🛡️CA{s['ca']}{_warn(ch, s)}{_conds(ch)}"
+                f"  PV[{_bar(s['vida_atual'], s['vida_max'])}]{s['vida_atual']}/{s['vida_max']}"
+                f"{mana}  CA {s['ca']}{_warn(ch, s)}{_conds(ch)}"
             )
         order_str = " → ".join(f"[{n}]" if i == idx else n for i, n in enumerate(order))
         parts.append(
-            f"⚔️  COMBATE ATIVO — Rodada {round_n} | 🎯 Vez de: {current}\n"
+            f"COMBATE ATIVO — Rodada {round_n} | Vez de: {current}\n"
             + "\n".join(lines)
             + f"\n   Ordem: {order_str}"
         )
@@ -988,8 +984,8 @@ def get_scene_context(extra_characters: str = "", extra_locations: str = "") -> 
                 s = ch["sheet"]
                 status_lines.append(
                     f"  {ch['name']} Nv.{s['nivel']} {s['classe']}{_warn(ch, s)}"
-                    f"  ❤️[{_bar(s['vida_atual'], s['vida_max'])}]{s['vida_atual']}/{s['vida_max']}"
-                    f"  ✨{s['mana_atual']}/{s['mana_max']}  🛡️CA{s['ca']}{_conds(ch)}"
+                    f"  PV[{_bar(s['vida_atual'], s['vida_max'])}]{s['vida_atual']}/{s['vida_max']}"
+                    f"  Mana {s['mana_atual']}/{s['mana_max']}  CA {s['ca']}{_conds(ch)}"
                 )
             parts.append("Status D&D:\n" + "\n".join(status_lines))
 

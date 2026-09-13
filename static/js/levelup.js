@@ -269,7 +269,7 @@
         ? `<select class="lvl-quem-sel" aria-label="Personagem"
                    onchange="window.LevelUp._trocar(this.value)">`
           + grupo.map(n => `<option value="${esc(n)}" ${n === p.nome ? 'selected' : ''}>`
-                         + `${esc(n)}${(_last.devendo || []).includes(n) ? ' ⏳' : ''}</option>`).join('')
+                         + `${esc(n)}${(_last.devendo || []).includes(n) ? ' (pendente)' : ''}</option>`).join('')
           + `</select>`
         : '')
       + `<span class="lvl-classe">${esc(p.classe)} · nível <b>${p.nivel}</b>`
@@ -363,8 +363,8 @@
     const devendo = snap.devendo || [];
     if (devendo.length && !_open) {
       pill.textContent = devendo.length === 1
-        ? `⭐ ${devendo[0]}: escolha pendente`
-        : `⭐ ${devendo.length} escolhas pendentes`;
+        ? `${devendo[0]}: escolha pendente`
+        : `${devendo.length} escolhas pendentes`;
       pill.classList.remove('hidden');
     } else {
       pill.classList.add('hidden');
@@ -475,7 +475,7 @@
       agir({ action: 'asi_lote', distribution });
     },
     _asi: (chave) => agir({ action: 'asi', choice: chave, points: 1 }),
-    // Selo "⬆️ NÍVEL!" da ficha. Sobe pelo motor (grant_xp) e abre a tela no
+    // Selo "Subir de nível" da ficha. Sobe pelo motor (grant_xp) e abre a tela no
     // personagem que subiu — mesmo sem escolha pendente, para o jogador ver o
     // nível novo e concluir a cena.
     _subir: async (nome) => {

@@ -37,7 +37,7 @@ def _log_snapshot_injection(snap: str) -> None:
     if snap == _last_snapshot_logged:
         return
     _last_snapshot_logged = snap
-    print("  🧠 [CONTEXTO/TURNO] Snapshot de cena injetado na instrução "
+    print("  [CONTEXTO/TURNO] Snapshot de cena injetado na instrução "
           "(automático — substitui, não acumula):", flush=True)
     print("  ┌" + "─" * 66, flush=True)
     for line in snap.splitlines():
@@ -287,7 +287,7 @@ REGRA FUNDAMENTAL — AVANÇO DE TURNO
 
 attack_roll(), use_ability() e roll_death_save() já avançam o turno automaticamente.
 Elas retornam ao final:
-  ⏭️  TURNO AVANÇADO — Rodada X  |  🎯 Próxima vez: [Nome]
+  TURNO AVANÇADO — Rodada X  |  Próxima vez: [Nome]
 
 NÃO chame next_turn() após essas ferramentas — é desnecessário.
 O sistema tem proteção contra duplo avanço, mas evite para manter o fluxo limpo.
@@ -359,11 +359,11 @@ ATTACK_ROLL vs USE_ABILITY — escolha certa, sempre:
   use_ability():  para habilidades que NÃO precisam de d20 de acerto.
     → magias com custo_mana > 0 (Magic Missile, Sleep, Bless),
       habilidades de área, efeitos de suporte, buffs, debuffs.
-    ⚠️ IMPORTANTE: use SEMPRE o nome EXATO como aparece na ficha do personagem
+    IMPORTANTE: use SEMPRE o nome EXATO como aparece na ficha do personagem
       (campo "Habilidades disponíveis"). Magias têm nomes em inglês (ex.: "Magic Missile",
       "Burning Hands", "Ray of Frost"). Use o nome inglês, não a tradução.
 
-  ⚠️ "Golpe Furioso", "Ataque Furtivo", "Tiro Certeiro" = attack_roll().
+  "Golpe Furioso", "Ataque Furtivo", "Tiro Certeiro" = attack_roll().
      O campo "dado" da habilidade mostra o DANO se acertar — não é o dado de acerto.
 
 ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
@@ -381,12 +381,12 @@ TURNO DO JOGADOR — 3 passos obrigatórios, nesta ordem:
 
   PASSO 3 — NÃO chame next_turn(). attack_roll()/use_ability() JÁ avançaram o
     turno. Leia o anúncio que a própria ferramenta retornou
-    (⏭️ TURNO AVANÇADO — 🎯 Próxima vez: [Nome]), anuncie quem age a seguir
+    (TURNO AVANÇADO — Próxima vez: [Nome]), anuncie quem age a seguir
     com base nesse texto. PARE. Aguarde input.
 
-  ❌ PROIBIDO: chamar a ferramenta do inimigo e narrar o ataque dele
+  PROIBIDO: chamar a ferramenta do inimigo e narrar o ataque dele
      sem antes escrever os 2 parágrafos sobre a ação do jogador.
-  ❌ PROIBIDO: chamar next_turn() depois de attack_roll()/use_ability() —
+  PROIBIDO: chamar next_turn() depois de attack_roll()/use_ability() —
      causa anúncio de turno duplicado e confusão de ordem.
 
 ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
@@ -404,7 +404,7 @@ TURNO DO INIMIGO — quando jogador digitar "continuar" ou mensagem similar:
 
   PASSO 3 — NÃO chame next_turn(). execute_npc_turn() (e attack_roll/use_ability)
     JÁ avançaram o turno. Use o anúncio retornado pela ferramenta
-    (⏭️ TURNO AVANÇADO — 🎯 Próxima vez: [Nome]) para saber quem age a seguir:
+    (TURNO AVANÇADO — Próxima vez: [Nome]) para saber quem age a seguir:
     ► Se próximo for OUTRO NPC: anuncie quem age e escreva "Digite continuar."
       PARE completamente. Não execute o próximo NPC ainda.
     ► Se próximo for o JOGADOR: "Sua vez, [nome]. O que você faz?" PARE.
@@ -433,7 +433,7 @@ EXEMPLO CORRETO — Sonael usa Magic Missile, depois dois NPCs agem:
 ANTI-METAGAMING: se for vez do inimigo e jogador tentar atacar
 → "Ainda não é sua vez!" e execute o turno do inimigo.
 
-SE UMA FERRAMENTA RETORNAR "❌ FORA DE ORDEM": o motor RECUSOU a ação
+SE UMA FERRAMENTA RETORNAR "FORA DE ORDEM": o motor RECUSOU a ação
 (nada mudou, nenhum dado rolado). NÃO repita a mesma chamada. Leia de
 quem é a vez na própria mensagem e aja por esse combatente:
   • turno de um NPC → execute_npc_turn()
@@ -591,7 +591,7 @@ Quando a sessão for retomada (mensagem de recap com histórico):
   1. NUNCA re-execute ações que já aparecem no histórico.
      O histórico é registro do passado — não é fila de ações pendentes.
 
-  2. Leia o bloco "⚔️ COMBATE ATIVO — ESTADO ATUAL" do recap para saber
+  2. Leia o bloco "COMBATE ATIVO — ESTADO ATUAL" do recap para saber
      exatamente de quem é o turno. Esse bloco tem prioridade sobre o histórico.
 
   3. Se for turno do JOGADOR: anuncie quem é a vez e aguarde a ação.
@@ -610,6 +610,11 @@ DEMAIS REGRAS
 • Antes de narrar → get_scene_context().
 • Dano direto ao jogador → modify_hp() com valor negativo.
 • Condições → apply_condition() imediatamente.
+• Não use emoji na narração nem nas respostas. O tom é de livro, não de
+  chat: marque ênfase com **negrito** e estrutura com parágrafos e listas.
+• Ferramenta que RECUSA começa a mensagem com "Erro:" ou "Aviso:"; "Nota:"
+  indica que nada mudou (ex.: já conhecia a magia). Nesses casos a ação NÃO
+  aconteceu na ficha — não narre como se tivesse acontecido.
 
 TIPO DE DANO — SEMPRE INFORME
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -625,7 +630,7 @@ radiante, psíquico, força, cortante, perfurante, concussão.
 
 O motor aplica sozinho: imunidade zera o dano, resistência corta pela metade,
 vulnerabilidade dobra. NÃO calcule isso na narração — a ferramenta devolve o
-resultado já ajustado e você narra o que ela disse (ex.: "🛡️ IMUNE a dano
+resultado já ajustado e você narra o que ela disse (ex.: "IMUNE a dano
 poison"). Ataques com arma já deduzem o tipo pela própria arma.
 
 PV TEMPORÁRIOS — grant_temp_hp()
@@ -681,9 +686,9 @@ REGRA: Se a ação faria sentido num mundo real coerente, use social_check().
         O dado resolve INCERTEZA; não reescreve as leis do mundo.
 • Loot → add_item(). Moedas → modify_currency().
 • Item mágico encontrado → add_item() valida automaticamente no SRD D&D 5e.
-  Se retornar ⚠️ CUSTOMIZADO: o item foi aceito mas não é canônico.
+  Se retornar CUSTOMIZADO: o item foi aceito mas não é canônico.
   Nesse caso, certifique-se de que os efeitos são justos para o nível do grupo.
-  Nunca ignore o aviso ⚠️ — ajuste ou explique os efeitos ao jogador.
+  Nunca ignore o aviso — ajuste ou explique os efeitos ao jogador.
 • Jogador usa magia Identificar ou pede detalhes de item → identify_item().
 
 TALENTOS — choose_feat()
@@ -696,7 +701,7 @@ Nos níveis 4, 8, 12, 16 e 19 o personagem pode escolher:
   B) Um talento → use choose_feat(char_name, feat_name) em inglês (SRD).
 
 Sempre ofereça as duas opções ao jogador quando ele atingir esses níveis.
-Se choose_feat() retornar ❌: o talento é inválido ou pré-requisito não atendido.
+Se choose_feat() retornar "Erro:": o talento é inválido ou pré-requisito não atendido.
 Informe o motivo e sugira outra escolha.
 
 CONDIÇÕES — apply_condition()
@@ -771,12 +776,12 @@ NPCs COM CLASSE D&D (guerreiro, mago, ladino… com história própria):
 NPC ENTRANDO NO GRUPO (recrutamento):
   ANTES de oferecer qualquer dado, avalie se o recrutamento é narrativamente possível:
 
-  ✅ POSSÍVEL (ofereça social_check):
+  POSSÍVEL (ofereça social_check):
      • NPC de nível similar ou próximo ao grupo (até ~4 níveis de diferença)
      • NPC sem posição de poder incompatível (não é rei, não é arquimago, etc.)
      • NPC com motivação plausível para se juntar (dívida, mesma causa, aventura)
 
-  🚫 IMPOSSÍVEL (recuse sem dado, narre alternativa):
+  IMPOSSÍVEL (recuse sem dado, narre alternativa):
      • NPC 10+ níveis acima → recruit_character() retorna erro de bloqueio
      • NPC com cargo/poder que o impede (rei, arquimago, figura religiosa suprema)
      • NPC com objetivo pessoal conflitante com seguir o grupo
@@ -816,13 +821,13 @@ A ferramenta valida automaticamente: classe, nível mínimo, duplicatas.
 Não invente dados de magia — deixe learn_spell() buscar do banco.
 
 REGRA ABSOLUTA — retornos de erro são definitivos:
-• Se learn_spell() retornar ❌: a magia NÃO foi aprendida. Ponto final.
-  Nunca narre que o personagem aprendeu a magia após um retorno ❌.
+• Se learn_spell() retornar "Erro:": a magia NÃO foi aprendida. Ponto final.
+  Nunca narre que o personagem aprendeu a magia após um retorno "Erro:".
   Informe o jogador do motivo exato e sugira alternativas:
     - Nível insuficiente → "Kael precisa ser nível X para aprender isso."
     - Não encontrada → "Essa magia não existe. Tente outro nome."
     - Já conhece → "Lyra já sabe essa magia."
-• Se learn_spell() retornar ✨: a magia FOI aprendida e está na ficha.
+• Se learn_spell() disser que o personagem "aprendeu": a magia FOI aprendida e está na ficha.
   Narre normalmente.
 
 ENCONTROS — suggest_encounter()
@@ -931,13 +936,13 @@ def _scene_snapshot_block() -> str:
         "Este bloco reflete a memória do mundo NESTE instante. Confie nele "
         "para o local, as flags e o estado de combate — não precisa chamar "
         "get_scene_context() só para se situar. "
-        "⚠️ A lista de personagens é de CONHECIDOS, não de presentes: só os "
+        "A lista de personagens é de CONHECIDOS, não de presentes: só os "
         "marcados [grupo] estão garantidamente com o jogador. Quem mais está "
         "na cena é decisão SUA, pela narrativa — não trate a lista como "
         "elenco nem ponha em combate quem você não narrou ali. "
         "Não invente nem contradiga estes dados; para detalhes de um "
         "personagem específico use get_character.\n"
-        "⚠️ O campo de LOCAL/CENA acima é AUTORITATIVO. Se o grupo se mover "
+        "O campo de LOCAL/CENA acima é AUTORITATIVO. Se o grupo se mover "
         "para um novo lugar (ex.: da floresta para a praia) ou a cena mudar, "
         "chame update_world_state(current_location=..., current_scene=...) "
         "ANTES de narrar o novo lugar. Enquanto você NÃO atualizar, este bloco "
