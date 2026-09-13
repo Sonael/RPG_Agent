@@ -1109,6 +1109,46 @@ Abre sozinha quando a **assinatura** das pendências muda — ou seja, quando um
 nível novo criou escolha. Abrir sempre que houvesse pendência prenderia numa
 tela que reabre a cada turno quem decidiu deixar para depois.
 
+A assinatura é calculada **no servidor, sobre o grupo inteiro**
+(`_assinatura_pendencias`), e lembrada no `localStorage` por campanha — fechar
+no ✕ e dar F5 não reabre. Quando ninguém deve nada, a memória é apagada: sem
+isso uma pendência que voltasse igual à anterior (o incremento de 2 pontos do
+nível 8, com a mesma assinatura do nível 4) nunca mais abria a tela.
+
+### A fila das telas
+
+Combate, nível e loja decidem sozinhos se aparecem, e antes não sabiam uns dos
+outros: os três `sync()` rodavam em paralelo, e quem carregava a página parado
+numa forja com escolha de nível pendente via as duas telas abrirem juntas, uma
+empilhada na outra.
+
+`sincronizarTelas()` em `game.js` roda os três **em série e nesta ordem**:
+combate, nível, loja. Nível vem antes da loja porque a escolha muda a compra —
+um ponto em Força muda a carga que cabe na mochila. Cada tela também se recusa
+a abrir sozinha por cima de outra já aberta e, nesse caso, **não** marca que
+abriu; quando uma tela fecha, ela dispara `rpg:tela-fechou` e a fila roda de
+novo, dando a vez para quem esperava. A série também resolve outra corrida:
+`refreshMemory()` costuma ser chamado duas vezes seguidas (resultado de
+ferramenta e fim do turno).
+
+### O selo "⬆️ NÍVEL!"
+
+O selo no cartão do personagem (aba Enciclopédia) aparece quando o XP já passa
+do limite e o nível não subiu — XP ajustado à mão, por exemplo. Ele gravava o
+nível direto pela rota de edição, com PV calculados no navegador pela média do
+dado, e pulava tudo o que o `grant_xp` faz: habilidades da classe, mana,
+contador de incremento. Depois abria o modal de edição.
+
+Agora o popup só confirma, e não promete número que não controla ("1d10 + CON,
+rolado na confirmação"). A confirmação chama `levelup_action('subir')`, que é
+`grant_xp` com 0 de XP — o laço de subida roda com o XP que a ficha já tem — e
+a tela de nível abre no personagem. Magia nova continua em "Editar Ficha
+Completa": a tela de nível não trata escolha de magias.
+
+O popup usava `background: var(--page-bg)`, variável que não existe no CSS: o
+cartão sempre saiu transparente, com o texto da página atravessando o conteúdo.
+Agora usa `--page-right`, como os outros diálogos, e há teste medindo a cor.
+
 O botão do rodapé muda de **função**, não só de rótulo: desabilitado enquanto
 este personagem deve algo (sair devendo é o que a tela existe para impedir; o
 ✕ continua fechando), atalho para o próximo do grupo quando outro deve, e
@@ -1180,11 +1220,19 @@ motor passou a calcular direito, não vira escolha nenhuma. Missões, atitudes e
 relógio **não** ganharam tela: são listas, e lista se resolve com um cartão no
 chat, como `/ficha` e `/inventario` já fazem.
 
-A tela abre **sozinha** quando o grupo entra num local que tem loja
-(`open_shop(..., location=...)`), e só na primeira vez que aquela loja
-aparece: loja é estado que persiste, e reabrir a tela em toda cena por causa
-de uma ferraria visitada no capítulo 2 seria intromissão. Fechada, fica uma
-pílula no canto para voltar. "Encerrar as compras" manda
+A tela abre **sozinha uma vez por visita** a um local que tem loja
+(`open_shop(..., location=...)`). Loja é estado que persiste, e reabrir a tela
+em toda cena por causa de uma ferraria visitada no capítulo 2 seria
+intromissão. Recarregar a página parado na forja não reabre; sair da cidade e
+voltar é uma visita nova e reabre. A memória da visita fica no `localStorage`,
+por campanha: é conveniência de quem joga naquele navegador, não estado do
+mundo. Antes ela vivia numa variável, e um F5 bastava para a loja pular na
+cara de novo.
+
+Com mais de uma loja no mesmo local, o cabeçalho ganha um seletor e a pílula
+diz "🏪 2 lojas em Oakhaven". Antes a tela só conhecia a primeira loja do
+local — o boticário ao lado da forja era inalcançável. Fechada, fica a pílula
+no canto para voltar. "Encerrar as compras" manda
 `[COMPRAS RESOLVIDAS NA TELA]` para a IA narrar a saída — o mesmo desenho do
 recap de combate: a tela resolve os números, a narração continua sendo dela.
 

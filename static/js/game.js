@@ -1153,16 +1153,38 @@ function renderMemory(mem) {
     lEl.innerHTML = !locs.length ? '<span class="empty-state">Nenhum local ainda.</span>' : locs.map((l, i) => `<div class="char-card editable" onclick="openEditModal('location','${l.name.toLowerCase().replace(/'/g, "\\'")}',window._lastMem.locations[${i}])"><div class="char-name">${l.name}</div><div class="char-desc">${(l.description || '').substring(0, 100)}${(l.description || '').length > 100 ? '…' : ''}</div></div>`).join('');
   }
 
-  // Sincroniza a tela de combate tática (módulo isolado em combat.js).
-  try { if (window.Combat) window.Combat.sync(); } catch (_) {}
-  // A tela de loja pendura no MESMO gancho: ela decide sozinha se aparece
-  // (só quando existe loja no local atual e ainda não foi vista).
-  try { if (window.Shop) window.Shop.sync(); } catch (_) {}
-  // E a tela de nível no mesmo lugar: ela também decide sozinha se aparece
-  // (só quando alguém do grupo está DEVENDO uma escolha que ainda não foi
-  // mostrada).
-  try { if (window.LevelUp) window.LevelUp.sync(); } catch (_) {}
+  // As telas (combate, nível, loja) decidem sozinhas se aparecem — mas pela
+  // fila abaixo, uma de cada vez.
+  sincronizarTelas();
 }
+
+// ── Fila das telas ──────────────────────────────────────────────────────────
+// Cada tela pergunta ao servidor "devo aparecer?" e decide sozinha. O que elas
+// não sabiam era que as outras existiam: os três sync() rodavam em paralelo, e
+// ao carregar a página parado numa forja com uma escolha de nível pendente as
+// duas telas abriam juntas, uma empilhada na outra.
+//
+// Agora rodam em SÉRIE e nesta ordem de prioridade: combate, nível, loja. A de
+// nível vem antes da loja porque a escolha muda a compra — um ponto em Força
+// muda a carga que cabe na mochila. Cada tela também se recusa a abrir sozinha
+// por cima de outra já aberta; quando uma fecha, ela dispara 'rpg:tela-fechou'
+// e a fila roda de novo, dando a vez para quem esperava.
+//
+// Em série também porque refreshMemory() costuma ser chamado duas vezes seguidas
+// (resultado de ferramenta e fim do turno): sem a fila, duas rodadas corriam
+// ao mesmo tempo e competiam pela mesma decisão.
+let _filaTelas = Promise.resolve();
+function sincronizarTelas() {
+  const rodada = async () => {
+    try { if (window.Combat)  await window.Combat.sync();  } catch (_) {}
+    try { if (window.LevelUp) await window.LevelUp.sync(); } catch (_) {}
+    try { if (window.Shop)    await window.Shop.sync();    } catch (_) {}
+  };
+  _filaTelas = _filaTelas.then(rodada, rodada);
+  return _filaTelas;
+}
+window.sincronizarTelas = sincronizarTelas;
+window.addEventListener('rpg:tela-fechou', () => { sincronizarTelas(); });
 
 // Editor do estado do mundo: capítulo, LOCAL atual, CENA atual e resumo.
 // Permite corrigir manualmente o local/cena caso o agente esqueça de chamar
@@ -1320,17 +1342,24 @@ function gameLevelUpClick(event, charKey, type, idx) {
     : window._lastMem?.characters?.[idx];
   if (!data?.sheet) return;
 
+  // Fundo em --page-right, a mesma variável dos outros diálogos. O popup antigo
+  // usava --page-bg, que NÃO existe no CSS: o cartão saía transparente, com o
+  // texto da página atravessando o conteúdo.
+  //
+  // O que este popup NÃO faz mais: calcular PV no navegador e gravar a ficha
+  // pela rota de edição. Esse caminho pulava tudo que o grant_xp faz — as
+  // habilidades da classe do nível novo, a mana, o contador de incremento de
+  // atributo — e usava a média do dado enquanto o motor rola. Agora o botão
+  // só confirma; quem sobe o nível é o motor, e as escolhas abrem na tela de
+  // nível. Por isso o popup não promete número nenhum que ele não controla.
   const sheet     = data.sheet;
   const novoNivel = (sheet.nivel || 1) + 1;
   const classeKey = (sheet.classe || 'guerreiro').toLowerCase();
   const cls       = GAME_CLASS_DATA[classeKey] || { hit_die: 8, label: sheet.classe };
-  const conMod    = Math.floor(((sheet.constituicao || 10) - 10) / 2);
-  const hpGain    = Math.max(1, Math.floor(cls.hit_die / 2) + 1 + conMod);
   const novaProf  = gameProfForLevel(novoNivel);
   const profMudou = novaProf !== gameProfForLevel(sheet.nivel || 1);
-  const temASI    = GAME_ASI_LEVELS.has(novoNivel);
   const isCaster  = GAME_CASTER_CLASSES.has(classeKey);
-  const maxSpell  = gameMaxSpellLevel(novoNivel);
+  const nomeJs    = (data.name || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 
   const popup = document.createElement('div');
   popup.id = 'levelup-popup';
@@ -1338,7 +1367,7 @@ function gameLevelUpClick(event, charKey, type, idx) {
     'position:fixed;z-index:10001;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);';
 
   popup.innerHTML = `
-    <div style="background:var(--page-bg);border:2px solid #f0c030;border-radius:14px;
+    <div style="background:var(--page-right);border:2px solid #f0c030;border-radius:14px;
                 box-shadow:0 20px 60px rgba(0,0,0,0.35);padding:28px;max-width:380px;
                 width:calc(100vw - 32px);font-family:'Lora',serif;position:relative;">
       <div style="text-align:center;margin-bottom:20px;">
@@ -1349,26 +1378,24 @@ function gameLevelUpClick(event, charKey, type, idx) {
       </div>
 
       <div style="background:rgba(255,243,196,0.5);border:1px solid #f0c030;border-radius:8px;padding:14px;margin-bottom:18px;">
-        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#7a4f00;margin-bottom:10px;">Ganhos automáticos</div>
-        <div style="display:flex;flex-direction:column;gap:7px;">
-          <div style="font-size:13px;">❤️ <strong>+${hpGain} HP máximo</strong>
-            <span style="font-size:11px;color:var(--text-muted);">(${cls.hit_die/2|0}+1 + CON ${conMod>=0?'+':''}${conMod})</span></div>
-          ${profMudou ? `<div style="font-size:13px;">🛡️ <strong>Proficiência: +${novaProf}</strong> <span style="font-size:11px;color:var(--text-muted);">(era +${gameProfForLevel(sheet.nivel||1)})</span></div>` : ''}
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#7a4f00;margin-bottom:10px;">O motor aplica</div>
+        <div style="display:flex;flex-direction:column;gap:7px;font-size:13px;">
+          <div>❤️ <strong>Vida máxima: 1d${cls.hit_die} + CON</strong>
+            <span style="font-size:11px;color:var(--text-muted);">(rolado na confirmação)</span></div>
+          ${profMudou ? `<div>🛡️ <strong>Proficiência: +${novaProf}</strong></div>` : ''}
+          <div>📜 <strong>Habilidades da classe</strong> do nível ${novoNivel}</div>
+          ${isCaster ? `<div>✨ <strong>Mana</strong> recalculada pela tabela</div>` : ''}
         </div>
       </div>
 
-      ${(temASI || isCaster) ? `
-      <div style="background:rgba(38,75,130,0.06);border:1px solid rgba(38,75,130,0.2);border-radius:8px;padding:14px;margin-bottom:18px;">
-        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--ink-user);margin-bottom:10px;">Requer sua escolha</div>
-        <div style="display:flex;flex-direction:column;gap:7px;font-size:13px;">
-          ${temASI ? `<div>🎯 <strong>Melhoria de Atributo (ASI)</strong> — aumente 2 atributos em +1, ou um em +2</div>` : ''}
-          ${isCaster ? `<div>✨ <strong>Novos slots de magia</strong> até Nível ${maxSpell} — escolha novas magias na aba Magias</div>` : ''}
-          <div>📜 <strong>Novas habilidades de classe</strong> — veja na aba Habilidades</div>
-        </div>
-      </div>` : ''}
+      <div style="background:rgba(38,75,130,0.06);border:1px solid rgba(38,75,130,0.2);border-radius:8px;padding:14px;margin-bottom:18px;font-size:13px;">
+        🎯 Estilo, arquétipo e incremento de atributo, se houver, abrem na
+        <strong>tela de nível</strong> logo depois.
+        ${isCaster ? `<div style="margin-top:6px;">✨ Magias novas continuam em <strong>Editar Ficha Completa</strong>.</div>` : ''}
+      </div>
 
       <div style="display:flex;flex-direction:column;gap:10px;">
-        <button onclick="gameConfirmLevelUp('${charKey}','${type}',${idx},${novoNivel},${hpGain},${novaProf})"
+        <button id="levelup-popup-confirmar" onclick="gameConfirmLevelUp('${nomeJs}')"
           style="width:100%;padding:11px;background:#f0c030;color:#3a2800;border:none;border-radius:7px;
                  cursor:pointer;font-size:14px;font-family:'Lora',serif;font-weight:700;letter-spacing:0.02em;">
           ✅ Confirmar Nível ${novoNivel}
@@ -1389,48 +1416,16 @@ function gameLevelUpClick(event, charKey, type, idx) {
   popup.addEventListener('click', e => { if (e.target === popup) popup.remove(); });
 }
 
-async function gameConfirmLevelUp(charKey, type, idx, novoNivel, hpGain, novaProf) {
+// Confirma a subida pelo MOTOR. Antes: PUT da ficha inteira com nível, PV e
+// proficiência calculados aqui, seguido do modal de edição aberto por cima.
+// Agora: levelup_action('subir') → grant_xp com o XP que a ficha já tem, e a
+// tela de nível abre no personagem — sem segundo modal competindo com ela.
+async function gameConfirmLevelUp(nome) {
   document.getElementById('levelup-popup')?.remove();
-
-  const data = type === 'party'
-    ? window._lastMem?.party?.[idx]
-    : window._lastMem?.characters?.[idx];
-  if (!data?.sheet) return;
-
-  const sheet = data.sheet;
-  const newSheet = {
-    ...sheet,
-    nivel:        novoNivel,
-    vida_max:     (sheet.vida_max  || 0) + hpGain,
-    vida_atual:   (sheet.vida_atual || 0) + hpGain,
-    proficiencia: novaProf,
-    xp_proximo:   gameXpForNextLevel(novoNivel),
-  };
-
-  const url = `${API}/api/memory/characters/${encodeURIComponent(charKey)}`;
-  try {
-    const res = await authFetch(url, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...data, sheet: newSheet }),
-    });
-    if (res.ok) {
-      showToast(`⬆️ ${data.name} agora é nível ${novoNivel}! +${hpGain} HP`);
-      await refreshMemory();
-      // Abre modal para o usuário escolher magias / ASI
-      const newIdx = type === 'party'
-        ? window._lastMem.party.findIndex(p => p.name.toLowerCase() === charKey)
-        : window._lastMem.characters.findIndex(c => c.name.toLowerCase() === charKey);
-      if (newIdx !== -1) {
-        const newData = type === 'party' ? window._lastMem.party[newIdx] : window._lastMem.characters[newIdx];
-        openEditModal('character', charKey, newData);
-      }
-    } else {
-      const e = await res.json();
-      await showAlert('Erro', e.error || 'Não foi possível salvar.', 'danger');
-    }
-  } catch (_) {
-    await showAlert('Erro', 'Falha de conexão ao salvar.', 'danger');
+  if (window.LevelUp && typeof window.LevelUp._subir === 'function') {
+    await window.LevelUp._subir(nome);
+  } else {
+    await showAlert('Erro', 'A tela de nível não carregou. Recarregue a página.', 'danger');
   }
 }
 

@@ -20,7 +20,31 @@
   let _busy  = false;
   let _last  = {};
   let _quem  = '';
-  let _visto = '';     // assinatura das pendências que já abriram a tela
+
+  // ---- Memória de "já abriu por estas pendências" -----------------------
+  // A assinatura (calculada no servidor, sobre o grupo todo) do que abriu a
+  // tela da última vez. Ficava numa variável: fechar no ✕ e dar F5 reabria.
+  // Agora fica no localStorage, por campanha.
+  function campanhaAtual() {
+    try { return (JSON.parse(localStorage.getItem('rpg_session') || '{}').campaign) || ''; }
+    catch (_) { return ''; }
+  }
+  const CHAVE_MEMORIA = () => `rpg_telas::${campanhaAtual()}::nivel_visto`;
+  function assinaturaVista() {
+    try { return localStorage.getItem(CHAVE_MEMORIA()) || ''; } catch (_) { return ''; }
+  }
+  function marcarVista(assinatura) {
+    try {
+      if (assinatura) localStorage.setItem(CHAVE_MEMORIA(), assinatura);
+      else localStorage.removeItem(CHAVE_MEMORIA());
+    } catch (_) { /* sem storage, só perde a memória entre recargas */ }
+  }
+
+  // Nenhuma tela abre sozinha por cima de outra. A de nível tem prioridade
+  // sobre a loja na fila, mas se a loja JÁ estiver aberta (o jogador está
+  // comprando) e um grant_xp chegar, esta espera a loja fechar.
+  const OUTRAS_TELAS = ['combat-on', 'shop-on'];
+  const outraTelaAberta = () => OUTRAS_TELAS.some(c => document.body.classList.contains(c));
 
   // Rascunho do incremento de atributo, igual ao wizard de criação: o jogador
   // sobe e desce com + e − e NADA vai ao servidor até "Confirmar". Vive aqui e
@@ -309,18 +333,26 @@
       const snap = await getState();
       if (!snap) return;
 
-      // Assinatura do que está pendente. A tela abre sozinha quando ela MUDA
-      // — ou seja, quando um nível novo criou escolha. Abrir toda vez que
-      // houvesse pendência prenderia o jogador que decidiu deixar para
-      // depois numa tela que reabre a cada turno.
-      const assinatura = (snap.devendo || []).join('|') + '::' +
-        (snap.pendencias || []).map(p => `${p.rotulo}:${p.faltam}`).join(',');
+      // A tela abre sozinha quando a assinatura das pendências MUDA — quando um
+      // nível novo criou escolha. Abrir sempre que houvesse pendência prenderia
+      // quem decidiu deixar para depois numa tela que reabre a cada turno.
+      const assinatura = snap.assinatura || '';
+
+      if (!assinatura) {
+        // Nada pendente: esquece. Sem isto, uma pendência que voltasse IGUAL
+        // à anterior (o incremento de 2 pontos do nível 8 depois do do nível
+        // 4, com a mesma assinatura) nunca mais abriria a tela.
+        if (assinaturaVista()) marcarVista('');
+      } else if (assinatura !== assinaturaVista() && !_open && !outraTelaAberta()) {
+        // Se outra tela estiver aberta, NÃO marca como vista: a fila tenta de
+        // novo quando ela fechar.
+        marcarVista(assinatura);
+        abrir();
+        atualizarPilula(snap);
+        return;
+      }
 
       atualizarPilula(snap);
-      if ((snap.pendencias || []).length && assinatura !== _visto && !_open) {
-        _visto = assinatura;
-        abrir();
-      }
       if (_open) render(snap); else _last = snap;
     } catch (_) { /* a tela de nível nunca derruba o turno */ }
   }
@@ -356,6 +388,8 @@
     document.body.classList.remove('levelup-on');
     _open = false;
     atualizarPilula(_last || {});
+    // Avisa a fila: a loja que esperava esta tela fechar pode abrir agora.
+    window.dispatchEvent(new Event('rpg:tela-fechou'));
   }
 
   function mensagem(txt, ok) {
@@ -441,6 +475,31 @@
       agir({ action: 'asi_lote', distribution });
     },
     _asi: (chave) => agir({ action: 'asi', choice: chave, points: 1 }),
+    // Selo "⬆️ NÍVEL!" da ficha. Sobe pelo motor (grant_xp) e abre a tela no
+    // personagem que subiu — mesmo sem escolha pendente, para o jogador ver o
+    // nível novo e concluir a cena.
+    _subir: async (nome) => {
+      if (_busy) return;
+      _busy = true;
+      try {
+        const res = await doAction({ action: 'subir', char: nome });
+        _busy = false;
+        if (!res) return;
+        const primeira = (res.message || '').split('\n').find(l => l.includes('LEVEL UP'))
+                      || (res.message || '').split('\n')[0];
+        if (window.showToast) window.showToast(primeira);
+        if (res.ok === false) return;
+        _quem = nome;
+        // A tela abre AGORA, pelo clique; a fila não deve reabri-la por conta
+        // da mesma pendência logo em seguida.
+        marcarVista((res.snapshot || {}).assinatura || '');
+        if (!_open) abrir(); else if (res.snapshot) render(res.snapshot);
+        if (typeof window.refreshMemory === 'function') window.refreshMemory();
+      } catch (_) {
+        _busy = false;
+        if (window.showToast) window.showToast('Falha de conexão ao subir de nível.');
+      }
+    },
     _talento: () => {
       const el = q('lvl-talento-nome');
       const nome = (el && el.value || '').trim();
@@ -449,5 +508,6 @@
     },
   };
 
-  document.addEventListener('DOMContentLoaded', () => { ensureDom(); sync(); });
+  // Só monta o DOM; quem chama sync() é a fila de telas do game.js.
+  document.addEventListener('DOMContentLoaded', () => { ensureDom(); });
 })();

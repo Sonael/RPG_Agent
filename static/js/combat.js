@@ -502,6 +502,9 @@
     if (el) el.classList.add('hidden');
     document.body.classList.remove('combat-on');
     _open = false;
+    // A fila de telas (game.js) espera o combate: nível e loja não abrem
+    // sozinhas por cima dele. Fechou, é a vez delas.
+    window.dispatchEvent(new Event('rpg:tela-fechou'));
     if (triggerRecap && !_ending) {
       _ending = true;
       finishWithNarration().finally(() => { _ending = false; });

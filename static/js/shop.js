@@ -20,9 +20,36 @@
   let _loja   = '';      // chave da loja aberta na tela
   let _quem   = '';      // comprador selecionado
   let _aba    = 'comprar';
-  let _vista  = '';      // última loja que abriu sozinha (evita reabrir)
 
   const esc = (s) => (window.escapeHtml ? window.escapeHtml(s) : String(s == null ? '' : s));
+
+  // ---- Memória de "já abriu nesta visita" --------------------------------
+  // A tela abre sozinha UMA vez por visita a um local: recarregar a página
+  // parado na forja não reabre, mas sair da cidade e voltar reabre. Antes isso
+  // vivia numa variável, e um F5 bastava para a loja pular na cara de novo.
+  //
+  // Fica no localStorage, por campanha. É conveniência de quem está jogando
+  // neste navegador, não estado do mundo — não precisa ir ao servidor.
+  function campanhaAtual() {
+    try { return (JSON.parse(localStorage.getItem('rpg_session') || '{}').campaign) || ''; }
+    catch (_) { return ''; }
+  }
+  const CHAVE_MEMORIA = () => `rpg_telas::${campanhaAtual()}::loja_visita`;
+  function visitaVista() {
+    try { return localStorage.getItem(CHAVE_MEMORIA()) || ''; } catch (_) { return ''; }
+  }
+  function marcarVisita(local) {
+    try {
+      if (local) localStorage.setItem(CHAVE_MEMORIA(), local);
+      else localStorage.removeItem(CHAVE_MEMORIA());
+    } catch (_) { /* sem storage, a tela só perde a memória entre recargas */ }
+  }
+
+  // Nenhuma tela abre sozinha por cima de outra. A fila em game.js já roda
+  // combate → nível → loja nessa ordem; esta checagem é o que faz a loja
+  // ESPERAR em vez de se empilhar sobre a de nível.
+  const OUTRAS_TELAS = ['combat-on', 'levelup-on'];
+  const outraTelaAberta = () => OUTRAS_TELAS.some(c => document.body.classList.contains(c));
 
   // ---- DOM ---------------------------------------------------------
   function ensureDom() {
@@ -38,6 +65,7 @@
                   title="Fechar — a loja continua aberta e pode ser revisitada">✕</button>
           <h1 class="shp-title">O Balcão <span id="shp-nome">—</span></h1>
           <div id="shp-local" class="shp-local"></div>
+          <div id="shp-lojas" class="shp-lojas"></div>
         </header>
 
         <div id="shp-bolsa" class="shp-bolsa"></div>
@@ -216,6 +244,17 @@
     document.getElementById('shp-nome').textContent  = loja.nome ? `— ${loja.nome}` : '';
     document.getElementById('shp-local').textContent = loja.local || '';
 
+    // Mais de uma loja neste local: seletor. Sem ele a segunda loja da cidade
+    // era inalcançável pela tela.
+    const aqui = _last.lojas_aqui || [];
+    document.getElementById('shp-lojas').innerHTML = aqui.length > 1
+      ? `<select class="shp-loja-sel" aria-label="Loja"
+                 onchange="window.Shop._trocarLoja(this.value)">`
+        + aqui.map(l => `<option value="${esc(l.chave)}" ${l.chave === loja.chave ? 'selected' : ''}>`
+                       + `${esc(l.nome)}</option>`).join('')
+        + `</select>`
+      : '';
+
     document.getElementById('shp-aba-comprar')
       .classList.toggle('shp-aba-on', _aba === 'comprar');
     document.getElementById('shp-aba-vender')
@@ -228,21 +267,34 @@
   // ---- Sincronia ---------------------------------------------------
   async function sync() {
     try {
-      const snap = await getState();
+      let snap = await getState();
       if (!snap) return;
 
-      const chave = (snap.loja || {}).chave || '';
-      atualizarPilula(snap);
-
-      // Abre SOZINHA quando o grupo entra numa loja nova. Loja é estado que
-      // persiste: reabrir a tela toda vez que existisse uma ferraria em
-      // qualquer lugar do mundo seria intromissão, por isso o gatilho é a
-      // loja DESTE local e só na primeira vez que ela aparece.
-      if (snap.loja_aqui && chave && chave !== _vista && !_open) {
-        _vista = chave;
-        _loja  = chave;
-        abrir();
+      // A loja escolhida no seletor pertence ao local ANTERIOR: esquece e
+      // pergunta de novo, senão a tela abriria mostrando a forja da outra
+      // cidade.
+      const aqui = snap.lojas_aqui || [];
+      if (_loja && !aqui.some(l => l.chave === _loja)) {
+        _loja = '';
+        snap = await getState();
+        if (!snap) return;
       }
+
+      if (!snap.loja_aqui) {
+        // Saiu do local: a próxima chegada é uma visita nova.
+        if (visitaVista()) marcarVisita('');
+      } else if (snap.local_chave && snap.local_chave !== visitaVista()
+                 && !_open && !outraTelaAberta()) {
+        // Abre SOZINHA na chegada. Loja é estado que persiste; o gatilho é a
+        // VISITA a um local que tem loja, uma vez. Se outra tela estiver
+        // aberta, NÃO marca a visita — a fila tenta de novo quando ela fechar.
+        marcarVisita(snap.local_chave);
+        abrir();
+        atualizarPilula(snap);
+        return;
+      }
+
+      atualizarPilula(snap);
       if (_open) render(snap); else _last = snap;
     } catch (_) { /* a tela de loja nunca derruba o turno */ }
   }
@@ -251,8 +303,11 @@
     const pill = document.getElementById('shp-reopen');
     if (!pill) return;
     const loja = (snap.loja || {});
+    const aqui = snap.lojas_aqui || [];
     if (snap.loja_aqui && loja.nome && !_open) {
-      pill.textContent = `🏪 ${loja.nome}`;
+      pill.textContent = aqui.length > 1
+        ? `🏪 ${aqui.length} lojas em ${snap.local_atual || loja.local}`
+        : `🏪 ${loja.nome}`;
       pill.classList.remove('hidden');
     } else {
       pill.classList.add('hidden');
@@ -276,6 +331,8 @@
     document.body.classList.remove('shop-on');
     _open = false;
     atualizarPilula(_last || {});
+    // Avisa a fila: se alguma tela esperava esta fechar, é a vez dela.
+    window.dispatchEvent(new Event('rpg:tela-fechou'));
   }
 
   function mensagem(txt, ok) {
@@ -330,10 +387,14 @@
     _reabrir: abrir,
     _sair: sair,
     _aba: (a) => { _aba = a; render(_last); },
+    _trocarLoja: (chave) => { _loja = chave; getState().then(render).catch(() => {}); },
     _quem: (n) => { _quem = n; getState().then(render).catch(() => {}); },
     _comprar: (item, q) => agir('buy', item, q),
     _vender:  (item, q) => agir('sell', item, q),
   };
 
-  document.addEventListener('DOMContentLoaded', () => { ensureDom(); sync(); });
+  // Só monta o DOM. Quem chama sync() é a fila de telas do game.js, na ordem
+  // combate → nível → loja: um sync() próprio aqui corria em paralelo com o
+  // da tela de nível e as duas podiam abrir juntas no carregamento.
+  document.addEventListener('DOMContentLoaded', () => { ensureDom(); });
 })();

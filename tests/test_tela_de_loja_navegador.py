@@ -68,7 +68,10 @@ def pagina(loja_no_ar):
         # Sem token no localStorage o game.html manda para o login, e lá o
         # shop.js nem chega a ser carregado — foi assim que a primeira versão
         # deste teste "falhou" sem haver defeito nenhum na tela.
-        ctx.add_init_script(cap._script_de_semente(nome, "pergaminho", cap.HISTORICO))
+        # Sem limpar a memória de telas: os testes de recarga provam justamente
+        # que ela sobrevive. Cada teste já roda em contexto novo.
+        ctx.add_init_script(cap._script_de_semente(
+            nome, "pergaminho", cap.HISTORICO, limpar_memoria_de_telas=False))
         pg = ctx.new_page()
 
         erros = []
@@ -78,6 +81,7 @@ def pagina(loja_no_ar):
         pg.goto(f"{url}/game.html", wait_until="networkidle")
         cap._sanear(pg)
         pg.wait_for_selector("#shop-overlay:not(.hidden)", timeout=10000)
+        pg.url_base = url
         yield pg, erros
         nav.close()
 
@@ -183,3 +187,87 @@ def test_a_tela_nao_solta_erro_no_console(pagina):
     pg.click("#shp-aba-comprar")
     pg.wait_for_timeout(400)
     assert not erros, f"erros no console: {erros[:3]}"
+
+
+# ---- quando a tela abre ----------------------------------------------------
+
+def _semear(url, estado):
+    import requests
+    requests.post(f"{url}/__estado", json=estado, timeout=10)
+
+
+def test_recarregar_no_mesmo_local_nao_reabre(pagina):
+    """
+    A tela abre UMA vez por visita. A memória vivia numa variável e um F5,
+    parado na forja, fazia a loja pular na cara de novo.
+    """
+    pg, _ = pagina
+    pg.click(".shp-close")
+    pg.wait_for_timeout(400)
+    pg.reload(wait_until="networkidle")
+    pg.wait_for_timeout(1500)
+
+    assert not pg.is_visible("#shop-overlay"), "reabriu depois do F5"
+    assert pg.is_visible("#shp-reopen")
+
+
+def test_sair_do_local_e_voltar_reabre(pagina):
+    """Uma visita nova é uma chegada nova: a tela abre de novo."""
+    import copy
+    import capturar_telas as cap
+    pg, _ = pagina
+    pg.click(".shp-close")
+    pg.wait_for_timeout(400)
+
+    fora = copy.deepcopy(cap.LOJA)
+    fora["current_location"] = "Luminas"
+    _semear(pg.url_base, fora)
+    pg.evaluate("window.sincronizarTelas()")
+    pg.wait_for_timeout(500)
+    assert not pg.is_visible("#shp-reopen"), "pílula da forja fora de Oakhaven"
+
+    _semear(pg.url_base, cap.LOJA)
+    pg.evaluate("window.sincronizarTelas()")
+    pg.wait_for_selector("#shop-overlay:not(.hidden)", timeout=5000)
+
+
+def test_duas_lojas_no_local_tem_seletor_e_pilula_propria(pagina):
+    """
+    Com a forja e um boticário em Oakhaven, o boticário era inalcançável: a
+    tela e a pílula só conheciam a primeira loja do local.
+    """
+    import copy
+    import capturar_telas as cap
+    pg, _ = pagina
+    estado = copy.deepcopy(cap.LOJA)
+    estado["lojas"]["boticario da mira"] = {
+        "nome": "Boticário da Mira", "local": "Oakhaven",
+        "estoque": [{"nome": "Poção de Cura", "preco": 50, "qtd": 3, "descricao": ""}],
+    }
+    _semear(pg.url_base, estado)
+    pg.evaluate("window.sincronizarTelas()")
+    pg.wait_for_selector(".shp-loja-sel", timeout=5000)
+
+    opcoes = pg.eval_on_selector_all(".shp-loja-sel option", "els => els.map(e => e.textContent.trim())")
+    assert opcoes == ["Forja do Torbin", "Boticário da Mira"]
+
+    pg.select_option(".shp-loja-sel", "boticario da mira")
+    pg.wait_for_timeout(600)
+    assert "Boticário da Mira" in pg.inner_text(".shp-title")
+    assert "Poção de Cura" in pg.inner_text("#shp-lista")
+
+    pg.click(".shp-close")
+    pg.wait_for_timeout(400)
+    assert "2 lojas em Oakhaven" in pg.inner_text("#shp-reopen")
+
+
+def test_seletor_de_comprador_mostra_o_nome(pagina):
+    """
+    O seletor de comprador chegou a desabar para "I ▾": um `max-width` em
+    porcentagem, resolvido contra um pai que tem a largura do próprio conteúdo.
+    Nenhum teste de clique pegava — o <select> continuava funcionando, só não
+    dava para ler. Mede a largura renderizada.
+    """
+    pg, _ = pagina
+    caixa = pg.locator(".shp-quem").bounding_box()
+    assert caixa and caixa["width"] >= 90, f"seletor espremido: {caixa}"

@@ -6428,6 +6428,24 @@ def apply_asi_distribution(char_name: str, distribution) -> str:
     return "\n".join(linhas + [fim])
 
 
+def _assinatura_pendencias(grupo: list) -> str:
+    """
+    Resumo estável de TUDO que o grupo deve escolher, para a tela saber se algo
+    mudou desde a última vez que abriu.
+
+    É calculada aqui, sobre o grupo inteiro, e não no navegador sobre o
+    personagem selecionado: antes, trocar o seletor para quem não devia nada
+    mudava a assinatura e a tela achava que havia pendência nova.
+    """
+    partes = []
+    for c in grupo:
+        pend = _escolhas_pendentes(c)
+        if pend:
+            itens = ",".join(f"{q['rotulo']}/{q['faltam']}" for q in pend)
+            partes.append(f"{c.get('name', '')}:{itens}")
+    return "|".join(sorted(partes))
+
+
 def levelup_snapshot(char_name: str = "") -> dict:
     """Estado da subida de nível para a tela (JSON-serializável)."""
     grupo = [c for c in memory.campaign.get("characters", {}).values()
@@ -6445,7 +6463,7 @@ def levelup_snapshot(char_name: str = "") -> dict:
 
     if not alvo:
         return {"tem_personagem": False, "grupo": [], "pendencias": [],
-                "devendo": [], "personagem": None}
+                "devendo": [], "personagem": None, "assinatura": ""}
 
     s = alvo.get("sheet") or {}
     nivel = int(s.get("nivel", 1) or 1)
@@ -6456,6 +6474,7 @@ def levelup_snapshot(char_name: str = "") -> dict:
 
     return {
         "tem_personagem": True,
+        "assinatura": _assinatura_pendencias(grupo),
         "grupo": [c.get("name", "") for c in grupo],
         # Quem mais está devendo escolha: a tela avisa sem fazer o jogador
         # abrir um por um.
@@ -6491,7 +6510,12 @@ def levelup_action(action: str, char: str = "", feature: str = "",
     """
     Aplica UMA escolha de subida de nível vinda da tela.
 
-    actions: variante | asi | asi_lote | talento
+    actions: variante | asi | asi_lote | talento | subir
+
+    'subir' é o selo "⬆️ NÍVEL!" da ficha. Ele gravava o nível direto pela
+    rota de edição, com PV calculados no navegador, e pulava tudo o que o
+    grant_xp faz: habilidades da classe, mana, contador de incremento. Agora é
+    grant_xp com 0 de XP — o laço de subida roda com o XP que a ficha já tem.
 
     Só despacho, igual à tela de loja: quem valida e aplica é
     set_feature_choice / apply_asi / choose_feat — as mesmas do mestre.
@@ -6505,6 +6529,18 @@ def levelup_action(action: str, char: str = "", feature: str = "",
         msg = apply_asi_distribution(char, distribution or {})
     elif a == "talento":
         msg = choose_feat(char, choice)
+    elif a == "subir":
+        alvo, err = _get_char(char, allow_dead=True)
+        if not alvo:
+            return {"ok": False, "message": err, "snapshot": levelup_snapshot(char)}
+        sh = alvo["sheet"]
+        antes = int(sh.get("nivel", 1) or 1)
+        msg = grant_xp(char, 0, "subida de nível confirmada na ficha")
+        if int(sh.get("nivel", 1) or 1) == antes:
+            return {"ok": False,
+                    "message": (f"❌ {alvo['name']} ainda não tem XP para o nível "
+                                f"{antes + 1} ({sh.get('xp', 0)}/{sh.get('xp_proximo', '?')})."),
+                    "snapshot": levelup_snapshot(char)}
     else:
         return {"ok": False, "message": f"Ação '{action}' desconhecida.",
                 "snapshot": levelup_snapshot(char)}
@@ -6954,6 +6990,14 @@ def shop_snapshot(shop_name: str = "", buyer: str = "") -> dict:
     return {
         "tem_loja":  bool(escolhida),
         "loja_aqui": bool(aqui),
+        # TODAS as lojas deste local. Antes a tela só conhecia aqui[0]: com uma
+        # forja e um boticário na mesma cidade, o boticário nunca aparecia —
+        # nem sozinho, nem pela pílula.
+        "lojas_aqui": [{"nome": l.get("nome", ""), "chave": _norm_txt(l.get("nome", ""))}
+                       for l in aqui],
+        # A tela abre sozinha UMA vez por visita a um local. Ela precisa de uma
+        # chave estável do local para lembrar disso entre recargas da página.
+        "local_chave": _norm_txt(local),
         "loja": {
             "nome":  escolhida.get("nome", "") if escolhida else "",
             "local": escolhida.get("local", "") if escolhida else "",

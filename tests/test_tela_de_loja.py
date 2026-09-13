@@ -225,3 +225,36 @@ def test_as_rotas_da_loja_estao_registradas():
     rotas = {r.rule for r in server.app.url_map.iter_rules()}
     assert "/api/shop/state" in rotas
     assert "/api/shop/action" in rotas
+
+
+# ---------------------------------------------------------------------------
+# 6. Mais de uma loja no mesmo local
+# ---------------------------------------------------------------------------
+
+def test_snapshot_lista_todas_as_lojas_do_local(forja):
+    """
+    Antes a tela só conhecia a primeira loja do local: com uma forja e um
+    boticário em Oakhaven, o boticário nunca aparecia — nem sozinho, nem pela
+    pílula.
+    """
+    td.open_shop("Boticário da Mira", "Corda:1", location="Oakhaven")
+    td.open_shop("Taverna de Luminas", "Corda:1", location="Luminas")
+
+    snap = td.shop_snapshot()
+    nomes = [l["nome"] for l in snap["lojas_aqui"]]
+
+    assert nomes == ["Forja do Torbin", "Boticário da Mira"]
+    assert "Taverna de Luminas" not in nomes
+
+
+def test_snapshot_abre_a_loja_pedida_entre_as_do_local(forja):
+    td.open_shop("Boticário da Mira", "Corda:1", location="Oakhaven")
+    snap = td.shop_snapshot("Boticário da Mira")
+    assert snap["loja"]["nome"] == "Boticário da Mira"
+    assert [i["nome"] for i in snap["estoque"]] == ["Corda"]
+
+
+def test_chave_do_local_e_estavel(forja):
+    """A tela lembra "já abri nesta visita" por essa chave, entre recargas."""
+    memory.campaign["current_location"] = "  OAKHAVEN "
+    assert td.shop_snapshot()["local_chave"] == "oakhaven"

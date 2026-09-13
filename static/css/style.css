@@ -2340,13 +2340,30 @@ body.shop-on { overflow: hidden; }
 }
 .shp-bolsa-quem { font-weight: 700; }
 .shp-quem {
-  width: auto; max-width: 45%;          /* idem: `select` global é 100% */
+  /* `width: auto` porque o `select` global é 100%. O limite é em rem e NÃO em
+     porcentagem: a versão anterior usava `max-width: 45%`, só que o pai
+     (.shp-bolsa-quem) tem a largura do próprio conteúdo — a porcentagem se
+     resolvia contra ela mesma e o seletor desabava para "I ▾", sem nome. */
+  width: auto; max-width: 14rem;
   font-family: 'Lora', serif; font-size: 0.95rem; font-weight: 700;
   color: var(--shp-dark); background: var(--shp-paper);
   border: 1px solid var(--shp-gold); border-radius: 6px;
   padding: var(--esp-1) var(--esp-2);
 }
 .shp-bolsa-moedas { font-size: 0.95rem; }
+
+/* Seletor de lojas do local (só aparece com mais de uma). Mesmo desenho do
+   seletor de comprador: sem estilo próprio ele herdava a regra global de
+   <select> — largura inteira, sublinhado e texto azul — e parecia outro app. */
+.shp-lojas:empty { display: none; }
+.shp-lojas { margin-top: var(--esp-2); }
+.shp-loja-sel {
+  width: auto; max-width: 100%;
+  font-family: 'Lora', serif; font-size: 0.92rem; font-weight: 700;
+  color: var(--shp-dark); background: var(--shp-paper);
+  border: 1px solid var(--shp-gold); border-radius: 6px;
+  padding: var(--esp-1) var(--esp-3);
+}
 .shp-carga { flex: 1 1 220px; min-width: 200px; }
 .shp-carga-topo {
   display: flex; justify-content: space-between;

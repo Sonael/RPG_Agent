@@ -408,6 +408,28 @@ NIVEL = {
 }
 
 
+# Duas lojas no mesmo local. A tela só conhecia a primeira: o boticário era
+# inalcançável. A captura mostra o seletor que resolve isso.
+LOJA_DUAS = copy.deepcopy(LOJA)
+LOJA_DUAS["lojas"]["boticario da mira"] = {
+    "nome": "Boticário da Mira", "local": "Oakhaven",
+    "estoque": [
+        {"nome": "Poção de Cura", "preco": 50, "qtd": 3,
+         "descricao": "recupera 2d4+2 pontos de vida"},
+        {"nome": "Antídoto", "preco": 50, "qtd": 2,
+         "descricao": "vantagem contra veneno por 1 hora"},
+    ],
+}
+
+# Selo "⬆️ NÍVEL!" da ficha: XP suficiente, nível ainda não subido, nada
+# pendente. O popup não promete mais PV calculado no navegador.
+NIVEL_SELO = copy.deepcopy(NIVEL)
+NIVEL_SELO["characters"]["helena"]["sheet"].update({
+    "nivel": 3, "xp": 2800, "xp_proximo": 2700, "asi_pontos_gastos": 0,
+    "feature_choices": {"Estilo de Combate": "Defesa", "Arquétipo Marcial": "Campeão"},
+})
+
+
 # Combate COM ZONAS (onda 3): o campo dividido em trilha, cada um em sua zona.
 COMBATE_ZONAS = copy.deepcopy(COMBATE_ATIVO)
 COMBATE_ZONAS["characters"]["natasha"] = {"sheet": {"vida_atual": 21}}
@@ -600,6 +622,9 @@ TELAS = [
      "estado": LOJA, "espera": 700,
      "js": "window.Shop._close()",
      "exigir": "#shp-reopen:not(.hidden)"},
+    {"nome": "loja-duas-no-local", "pagina": "/game.html",
+     "estado": LOJA_DUAS, "espera": 700,
+     "exigir": ".shp-loja-sel"},
 
     # ── Subida de nível ──────────────────────────────────────────────
     # Sem `js` para abrir: o gatilho automático (alguém está devendo escolha)
@@ -623,6 +648,12 @@ TELAS = [
      "estado": NIVEL, "espera": 700,
      "js": "window.LevelUp._trocar('Stelar')",
      "exigir": ".lvl-ok"},
+    {"nome": "nivel-selo-da-ficha", "pagina": "/game.html",
+     "estado": NIVEL_SELO, "espera": 400,
+     # O selo mora no cartão do grupo, na aba Enciclopédia.
+     "js": "switchTab('enciclopedia');"
+           "setTimeout(() => document.querySelector('.levelup-badge').click(), 300)",
+     "exigir": "#levelup-popup"},
 
     # ── Combate ──────────────────────────────────────────────────────
     {"nome": "combate-regua-de-turnos", "pagina": "/game.html",
@@ -657,7 +688,8 @@ TELAS = [
 #  Captura
 # ═══════════════════════════════════════════════════════════════════════
 
-def _script_de_semente(nome_campanha: str, tema: str, historico: list) -> str:
+def _script_de_semente(nome_campanha: str, tema: str, historico: list,
+                       limpar_memoria_de_telas: bool = True) -> str:
     """
     Roda antes de qualquer script da página: finge um usuário logado e uma
     sessão de jogo em andamento, para que login/menu/jogo não redirecionem.
@@ -676,6 +708,16 @@ def _script_de_semente(nome_campanha: str, tema: str, historico: list) -> str:
       try {{
         localStorage.setItem('rpg_theme', {json.dumps(tema)});
         window.__campanha = {json.dumps(nome_campanha)};
+
+        // As telas de loja e nível lembram "já abri" no localStorage, e o
+        // localStorage sobrevive entre as capturas deste mesmo navegador: sem
+        // limpar, a captura 30 acharia que a loja já abriu na 29 e não abriria.
+        // Os testes de navegador que provam essa memória desligam a limpeza.
+        if ({'true' if limpar_memoria_de_telas else 'false'}) {{
+          Object.keys(localStorage)
+            .filter(k => k.startsWith('rpg_telas::'))
+            .forEach(k => localStorage.removeItem(k));
+        }}
 
         // A tela de login pula direto para o menu quando encontra um token
         // salvo. Como o localStorage sobrevive entre as capturas, aqui a

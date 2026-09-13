@@ -450,3 +450,75 @@ def test_bonus_de_atributo_do_talento_para_no_20(helena, srd_com_talento):
     helena["sheet"]["forca"] = 20
     td.choose_feat("Helena", "Brawny")
     assert helena["sheet"]["forca"] == 20
+
+
+# ---------------------------------------------------------------------------
+# 8. Assinatura das pendências e o selo de nível
+# ---------------------------------------------------------------------------
+
+def test_assinatura_cobre_o_grupo_e_nao_o_personagem_selecionado(campanha, povoar):
+    """
+    A tela abre quando a assinatura MUDA. Ela era montada no navegador sobre o
+    personagem selecionado, e trocar o seletor para quem não devia nada já
+    mudava a assinatura. Agora é do grupo inteiro.
+    """
+    povoar(criar_ficha("Stelar", grupo=True, nivel=3),
+           criar_ficha("Helena", grupo=True, nivel=4))
+    for nome in ("stelar", "helena"):
+        ch = memory.campaign["characters"][nome]
+        ch["sheet"].update({"classe": "guerreiro", "asi_pontos_gastos": 0})
+        ch["habilidades"] = []
+
+    por_helena = td.levelup_snapshot("Helena")["assinatura"]
+    por_stelar = td.levelup_snapshot("Stelar")["assinatura"]
+
+    assert por_helena == por_stelar
+    assert "Helena:Incremento de Atributo/2" in por_helena
+
+
+def test_assinatura_vazia_quando_ninguem_deve(helena):
+    td.set_feature_choice("Helena", "Estilo de Combate", "Defesa")
+    td.set_feature_choice("Helena", "Arquétipo Marcial", "Campeão")
+    td.apply_asi("Helena", "forca", 2)
+    assert td.levelup_snapshot()["assinatura"] == ""
+
+
+def test_selo_sobe_de_nivel_pelo_grant_xp(campanha, povoar, monkeypatch):
+    """
+    O selo "⬆️ NÍVEL!" gravava o nível pela rota de edição, com PV calculados no
+    navegador, e pulava as habilidades da classe, a mana e o contador de
+    incremento. Agora é grant_xp com 0 de XP.
+    """
+    povoar(criar_ficha("Helena", grupo=True, nivel=3))
+    ch = memory.campaign["characters"]["helena"]
+    ch["sheet"].update({"classe": "guerreiro", "xp": 2800, "xp_proximo": 2700})
+    ch["sheet"].pop("asi_pontos_gastos", None)
+    ch["habilidades"] = []
+
+    chamadas = []
+    real = td.grant_xp
+
+    def espiao(*a, _r=real, **k):
+        chamadas.append(a)
+        return _r(*a, **k)
+
+    monkeypatch.setattr(td, "grant_xp", espiao)
+    r = td.levelup_action("subir", char="Helena")
+
+    assert r["ok"] is True
+    assert chamadas and chamadas[0][:2] == ("Helena", 0)
+    assert ch["sheet"]["nivel"] == 4
+    # O contador começou a valer: o incremento do nível 4 aparece.
+    assert [q for q in r["snapshot"]["pendencias"] if q["tipo"] == "asi"]
+
+
+def test_selo_sem_xp_suficiente_nao_sobe(campanha, povoar):
+    povoar(criar_ficha("Helena", grupo=True, nivel=3))
+    ch = memory.campaign["characters"]["helena"]
+    ch["sheet"].update({"classe": "guerreiro", "xp": 1000, "xp_proximo": 2700})
+
+    r = td.levelup_action("subir", char="Helena")
+
+    assert r["ok"] is False
+    assert "ainda não tem XP" in r["message"]
+    assert ch["sheet"]["nivel"] == 3

@@ -58,31 +58,62 @@ def _semear(url, estado):
     requests.post(f"{url}/__estado", json=estado, timeout=10)
 
 
+def _fundir(a, b):
+    """Merge recursivo, o mesmo que /__estado faz: dicts se fundem."""
+    r = copy.deepcopy(a)
+    for k, v in b.items():
+        if isinstance(v, dict) and isinstance(r.get(k), dict):
+            r[k] = _fundir(r[k], v)
+        else:
+            r[k] = copy.deepcopy(v)
+    return r
+
+
 @pytest.fixture
-def pagina(app_no_ar):
+def navegador(app_no_ar):
+    """
+    Abre o jogo num estado qualquer, SEMPRE em contexto novo do navegador.
+
+    Contexto novo porque as telas agora lembram "já abri" no localStorage: um
+    teste que abrisse a tela de nível deixaria a memória para o seguinte, e o
+    seguinte veria a tela não abrir sem motivo nenhum na tela.
+    """
     from playwright.sync_api import sync_playwright
 
     url, nome, cap = app_no_ar
-    # Semeado por TESTE: o servidor é de módulo porque subir é caro, mas a
-    # campanha não pode ser — um ponto de atributo gasto num teste faria o
-    # seguinte começar com a conta errada.
-    _semear(url, cap.NIVEL)
     with sync_playwright() as pw:
         nav = pw.chromium.launch()
-        ctx = nav.new_context(viewport={"width": 1440, "height": 980})
-        ctx.add_init_script(cap._script_de_semente(nome, "pergaminho", cap.HISTORICO))
-        pg = ctx.new_page()
 
-        erros = []
-        pg.on("pageerror", lambda e: erros.append(str(e)))
-        pg.on("console", lambda m: erros.append(m.text) if m.type == "error" else None)
+        def abrir(estado, esperar="#levelup-overlay:not(.hidden)"):
+            # Semeado por abertura: o servidor é de módulo porque subir é caro,
+            # mas a campanha não pode ser.
+            _semear(url, estado)
+            ctx = nav.new_context(viewport={"width": 1440, "height": 980})
+            # SEM limpar a memória de telas: é justamente ela que alguns testes
+            # daqui provam (recarregar não reabre).
+            ctx.add_init_script(cap._script_de_semente(
+                nome, "pergaminho", cap.HISTORICO, limpar_memoria_de_telas=False))
+            pg = ctx.new_page()
+            erros = []
+            pg.on("pageerror", lambda e: erros.append(str(e)))
+            pg.on("console", lambda m: erros.append(m.text) if m.type == "error" else None)
+            pg.goto(f"{url}/game.html", wait_until="networkidle")
+            cap._sanear(pg)
+            if esperar:
+                pg.wait_for_selector(esperar, timeout=10000)
+            else:
+                pg.wait_for_timeout(1500)
+            pg.url_base = url
+            return pg, erros
 
-        pg.goto(f"{url}/game.html", wait_until="networkidle")
-        cap._sanear(pg)
-        pg.wait_for_selector("#levelup-overlay:not(.hidden)", timeout=10000)
-        pg.url_base = url
-        yield pg, erros
+        yield abrir
         nav.close()
+
+
+@pytest.fixture
+def pagina(navegador):
+    import capturar_telas as cap
+    return navegador(cap.NIVEL)
 
 
 # ---- seletores -------------------------------------------------------------
@@ -341,3 +372,117 @@ def test_a_tela_nao_solta_erro_no_console(pagina):
     pg.select_option(".lvl-quem-sel", "Stelar")
     pg.wait_for_timeout(500)
     assert not erros, f"erros no console: {erros[:3]}"
+
+
+# ---- quando a tela abre ----------------------------------------------------
+
+def test_fechar_e_recarregar_nao_reabre(pagina):
+    """
+    A memória de "já abri por estas pendências" vivia numa variável: fechar no
+    ✕ e dar F5 reabria a tela. Agora fica no localStorage, por campanha.
+    """
+    pg, _ = pagina
+    _clicar(pg, ".lvl-close", 400)
+    pg.reload(wait_until="networkidle")
+    pg.wait_for_timeout(1500)
+
+    assert not pg.is_visible("#levelup-overlay"), "reabriu depois do F5"
+    assert pg.is_visible("#lvl-reopen"), "a pílula tinha que continuar lá"
+
+
+def test_pendencia_igual_volta_a_abrir_depois_de_resolvida(pagina):
+    """
+    Defeito latente da versão anterior: resolvida a pendência, a memória
+    guardava a assinatura antiga. Se a próxima pendência saísse IGUAL — o
+    incremento de 2 pontos do nível 8 depois do do nível 4 —, a tela nunca
+    mais abria sozinha.
+    """
+    pg, _ = pagina
+    import capturar_telas as cap
+    _clicar(pg, _opcao("Defesa"), 500)
+    _clicar(pg, _opcao("Campeão"), 500)
+    _clicar(pg, _mais("forca"))
+    _clicar(pg, _mais("forca"))
+    _clicar(pg, ".lvl-asi-confirmar", 900)
+    _clicar(pg, ".lvl-close", 900)          # dispara a fila: nada pendente, esquece
+
+    _semear(pg.url_base, cap.NIVEL)         # as MESMAS pendências de novo
+    pg.evaluate("window.sincronizarTelas()")
+    pg.wait_for_selector("#levelup-overlay:not(.hidden)", timeout=5000)
+
+
+def test_loja_espera_a_tela_de_nivel_fechar(navegador):
+    """
+    Na forja, com escolha de nível pendente, as duas telas abriam juntas, uma
+    empilhada na outra. Agora a fila abre a de nível primeiro — a escolha muda
+    a compra — e a loja só quando ela fecha.
+    """
+    import capturar_telas as cap
+    pg, _ = navegador(_fundir(cap.NIVEL, cap.LOJA))
+    pg.wait_for_timeout(1200)
+
+    assert pg.is_visible("#levelup-overlay")
+    assert not pg.is_visible("#shop-overlay"), "a loja abriu por cima da tela de nível"
+
+    _clicar(pg, ".lvl-close", 300)
+    pg.wait_for_selector("#shop-overlay:not(.hidden)", timeout=5000)
+    assert not pg.is_visible("#levelup-overlay")
+
+
+def test_selo_de_nivel_sobe_pelo_motor_e_abre_a_tela(navegador):
+    """
+    O selo "⬆️ NÍVEL!" da ficha gravava o nível direto, com PV calculados no
+    navegador, sem as habilidades da classe nem o contador de incremento — e
+    abria o modal de edição. Agora sobe pelo grant_xp e abre a tela de nível.
+    """
+    import capturar_telas as cap
+    estado = copy.deepcopy(cap.NIVEL)
+    sh = estado["characters"]["helena"]["sheet"]
+    sh.update({"nivel": 3, "xp": 2800, "xp_proximo": 2700, "asi_pontos_gastos": 0,
+               "feature_choices": {"Estilo de Combate": "Defesa",
+                                   "Arquétipo Marcial": "Campeão"}})
+
+    pg, _ = navegador(estado, esperar=None)
+    assert not pg.is_visible("#levelup-overlay"), "nada pendente antes de subir"
+
+    # O selo mora no cartão do grupo, na aba Enciclopédia — o caminho do jogador.
+    _clicar(pg, ".tab-btn[data-tab='enciclopedia']", 300)
+    pg.wait_for_selector(".levelup-badge", state="visible", timeout=5000)
+    _clicar(pg, ".levelup-badge", 400)
+    popup = pg.inner_text("#levelup-popup")
+    assert "rolado" in popup, "o popup ainda promete PV calculado no navegador"
+
+    _clicar(pg, "#levelup-popup-confirmar", 300)
+    pg.wait_for_selector("#levelup-overlay:not(.hidden)", timeout=5000)
+    pg.wait_for_timeout(500)
+
+    assert "nível 4" in pg.inner_text(".lvl-classe").lower()
+    assert "Incremento de Atributo" in _titulos(pg), "contador de incremento não começou"
+    assert not pg.is_visible("#edit-overlay"), "o modal de edição abriu junto"
+
+
+def test_seletor_de_personagem_mostra_o_nome(pagina):
+    """Mesma classe de defeito do seletor da loja: medir, não só clicar."""
+    pg, _ = pagina
+    caixa = pg.locator(".lvl-quem-sel").bounding_box()
+    assert caixa and caixa["width"] >= 90, f"seletor espremido: {caixa}"
+
+
+def test_popup_do_selo_e_opaco(navegador):
+    """
+    O popup usava background: var(--page-bg), variável que não existe no CSS —
+    o cartão ficava transparente e o texto da página atravessava o conteúdo.
+    """
+    import capturar_telas as cap
+    estado = copy.deepcopy(cap.NIVEL)
+    estado["characters"]["helena"]["sheet"].update(
+        {"nivel": 3, "xp": 2800, "xp_proximo": 2700,
+         "feature_choices": {"Estilo de Combate": "Defesa", "Arquétipo Marcial": "Campeão"}})
+    pg, _ = navegador(estado, esperar=None)
+    _clicar(pg, ".tab-btn[data-tab='enciclopedia']", 300)
+    pg.wait_for_selector(".levelup-badge", state="visible", timeout=5000)
+    _clicar(pg, ".levelup-badge", 400)
+
+    fundo = pg.evaluate(
+        "() => getComputedStyle(document.querySelector('#levelup-popup > div')).backgroundColor")
+    assert fundo not in ("rgba(0, 0, 0, 0)", "transparent"), f"popup transparente: {fundo}"
