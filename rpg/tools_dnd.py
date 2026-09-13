@@ -14,6 +14,7 @@ Novidades (v2):
   • roll_death_save estruturado
 """
 
+import copy
 import os
 import random
 import re
@@ -5286,13 +5287,44 @@ def use_ability(
 # 7. Equipamentos e CA Dinâmica  (NOVO)
 # ---------------------------------------------------------------------------
 
+# Ordem dos slots em toda a interface.
+_SLOTS = ("armadura", "escudo", "arma_principal", "arma_secundaria", "amuleto")
+_PALAVRAS_DE_AMULETO = ("amuleto", "colar", "pingente", "talisma", "medalhao")
+
+
+def _slots_para_item(nome: str) -> list[str]:
+    """
+    Onde um item pode ser equipado, pelo que o motor SABE dele.
+
+    Antes, equip_item sem slot mandava para "armadura" tudo o que não
+    reconhecia: uma Corda de Cânhamo equipada tirava a cota de malha do corpo
+    e deixava a CA em 10 + DES. Item que o motor não reconhece não tem slot;
+    quem sabe o que ele é informa o slot.
+    """
+    armadura = _armadura_na_tabela(nome)
+    if armadura:
+        return [armadura["slot"]]
+    base = _norm_txt(nome)
+    if _arma_conhecida(nome) or any(_norm_txt(k) in base for k in _WEAPON_KEYWORDS):
+        return ["arma_principal", "arma_secundaria"]
+    if any(k in base for k in _PALAVRAS_DE_AMULETO):
+        return ["amuleto"]
+    return []
+
+
+def _slots_ocupados_por(equip: dict, nome: str, exceto: str = "") -> list[str]:
+    alvo = _norm_txt(nome)
+    return [s for s, v in equip.items() if s != exceto and v and _norm_txt(v) == alvo]
+
+
 def equip_item(char_name: str, item_name: str, slot: str = "") -> str:
     """
     Equipa um item de um personagem, recalculando a CA automaticamente.
     O item deve estar no inventário do personagem.
 
-    Slots válidos: armadura, escudo, arma_principal, amuleto.
-    Se o slot não for informado, a ferramenta tenta inferir pelo tipo de item.
+    Slots: armadura, escudo, arma_principal, arma_secundaria, amuleto.
+    Sem slot, a ferramenta usa o que sabe do item (armadura e escudo pela
+    tabela, arma pelo nome); item que ela não reconhece exige o slot.
 
     Armaduras pesadas ignoram o modificador de Destreza na CA.
     Armaduras médias limitam o bônus de Destreza a +2.
@@ -5302,39 +5334,58 @@ def equip_item(char_name: str, item_name: str, slot: str = "") -> str:
     Args:
         char_name: Nome do personagem.
         item_name: Nome exato do item no inventário.
-        slot:      Slot de equipamento: armadura, escudo, arma_principal, amuleto.
-                   Pode ser deixado vazio se óbvio pelo nome do item.
+        slot:      Slot de equipamento. Pode ficar vazio se o item for óbvio.
     """
     char, err = _get_char(char_name)
     if not char:
         return err
 
-    # Verificar se item está no inventário
     inv  = char.get("inventario", [])
-    item = next((i for i in inv if i["nome"].lower() == item_name.lower()), None)
+    item = next((i for i in inv if isinstance(i, dict)
+                 and _norm_txt(i.get("nome", "")) == _norm_txt(item_name)), None)
     if not item:
-        return f"'{item_name}' não está no inventário de {char['name']}. Adicione com add_item primeiro."
+        return (f"Erro: '{item_name}' não está no inventário de {char['name']}. "
+                f"Adicione com add_item primeiro.")
 
     s     = char["sheet"]
-    equip = s.setdefault("equipamentos", {"armadura": None, "escudo": None, "arma_principal": None, "amuleto": None})
+    equip = s.setdefault("equipamentos", {})
+    for nome_slot in _SLOTS:
+        equip.setdefault(nome_slot, None)
 
-    # Inferir slot se não fornecido
-    item_lower  = item_name.lower()
-    armor_entry = _armadura_na_tabela(item_name)
+    possiveis   = _slots_para_item(item["nome"])
+    armor_entry = _armadura_na_tabela(item["nome"])
+    slot = (slot or "").strip().lower()
     if not slot:
-        if armor_entry:
-            slot = armor_entry["slot"]
-        elif any(w in item_lower for w in ("espada", "arco", "adaga", "lança", "maça", "machado", "cajado", "varinha")):
-            slot = "arma_principal"
-        elif any(w in item_lower for w in ("amuleto", "colar", "pingente")):
-            slot = "amuleto"
-        else:
-            slot = "armadura"
+        if not possiveis:
+            return (f"Erro: Não sei onde equipar '{item['nome']}'. Informe o slot: "
+                    f"{', '.join(_SLOTS)}.")
+        # Arma: a mão principal, ou a secundária se a principal já tem outra.
+        slot = possiveis[0]
+        if slot == "arma_principal" and equip.get("arma_principal") \
+                and not equip.get("arma_secundaria"):
+            slot = "arma_secundaria"
+    if slot not in _SLOTS:
+        return f"Erro: Slot '{slot}' inválido. Use: {', '.join(_SLOTS)}."
 
-    slot = slot.lower()
-    valid_slots = set(equip.keys())
-    if slot not in valid_slots:
-        return f"Slot '{slot}' inválido. Use: {', '.join(sorted(valid_slots))}."
+    # Armadura e escudo mexem na CA: só entra o que o motor sabe o que é. Com
+    # slot explícito isto era livre, e "Bugiganga do Vhar" ia para o corpo.
+    if slot in ("armadura", "escudo"):
+        dados = armor_entry or (_fetch_armor_data(item["nome"]) if slot == "armadura" else None)
+        if not dados or dados.get("slot", "armadura") != slot:
+            return (f"Erro: '{item['nome']}' não é {'armadura' if slot == 'armadura' else 'escudo'} "
+                    f"que o motor conheça — a CA não teria de onde vir.")
+    elif armor_entry:
+        return f"Erro: '{item['nome']}' é {armor_entry['slot']}, não vai no slot [{slot}]."
+
+    if equip.get(slot) and _norm_txt(equip[slot]) == _norm_txt(item["nome"]):
+        return f"Nota: {char['name']} já está com '{item['nome']}' em [{slot}]."
+
+    # Uma unidade não ocupa dois slots: com 1 adaga no inventário, pô-la nas
+    # duas mãos dava dois ataques com uma arma só.
+    em_uso = len(_slots_ocupados_por(equip, item["nome"], exceto=slot))
+    if em_uso >= int(item.get("qtd", 1) or 1):
+        return (f"Erro: {char['name']} tem {item.get('qtd', 1)}x '{item['nome']}' e já "
+                f"está usando {'todas' if em_uso > 1 else 'essa'} em outro slot.")
 
     ca_antes     = s["ca"]
     old_item     = equip.get(slot)
@@ -5359,22 +5410,23 @@ def unequip_item(char_name: str, slot: str) -> str:
 
     Args:
         char_name: Nome do personagem.
-        slot:      Slot a desocupar: armadura, escudo, arma_principal, amuleto.
+        slot:      Slot a desocupar: armadura, escudo, arma_principal,
+                   arma_secundaria, amuleto.
     """
     char, err = _get_char(char_name)
     if not char:
         return err
 
     s     = char["sheet"]
-    equip = s.get("equipamentos", {})
-    slot  = slot.lower()
+    equip = s.setdefault("equipamentos", {})
+    slot  = (slot or "").strip().lower()
 
-    if slot not in equip:
-        return f"Slot '{slot}' inválido. Use: {', '.join(sorted(equip.keys()))}."
+    if slot not in _SLOTS:
+        return f"Erro: Slot '{slot}' inválido. Use: {', '.join(_SLOTS)}."
 
     item_removido = equip.get(slot)
     if not item_removido:
-        return f"{char['name']} não tem nada equipado no slot [{slot}]."
+        return f"Nota: {char['name']} não tem nada equipado no slot [{slot}]."
 
     ca_antes   = s["ca"]
     equip[slot] = None
@@ -5386,6 +5438,36 @@ def unequip_item(char_name: str, slot: str) -> str:
         f"{char['name']} desequipou '{item_removido}' do slot [{slot}].\n"
         f"   CA: {ca_antes} → {ca_depois}"
     )
+
+
+def _desequipar_o_que_saiu(char: dict, nome: str) -> str:
+    """
+    Tira do corpo o que não está mais na mochila.
+
+    remove_item e sell_item diminuíam a quantidade sem olhar os slots: vender
+    a cota de malha na loja deixava a CA 16 de uma armadura que já era da
+    loja. Chamada depois de toda remoção; devolve a nota para o texto da
+    ferramenta (vazia se nada mudou).
+    """
+    sheet = char.get("sheet") or {}
+    equip = sheet.get("equipamentos") or {}
+    item = next((i for i in (char.get("inventario") or []) if isinstance(i, dict)
+                 and _norm_txt(i.get("nome", "")) == _norm_txt(nome)), None)
+    restam = int(item.get("qtd", 1) or 1) if item else 0
+    # A mão secundária solta primeiro: a arma principal é a do ataque.
+    ocupados = sorted(_slots_ocupados_por(equip, nome),
+                      key=lambda s: 0 if s == "arma_secundaria" else 1)
+    tirados = []
+    while len(ocupados) > restam:
+        slot = ocupados.pop(0)
+        equip[slot] = None
+        tirados.append(slot)
+    if not tirados:
+        return ""
+    ca_antes = sheet.get("ca")
+    _recalculate_ca(char)
+    return (f"\n   '{nome}' saiu do slot [{', '.join(tirados)}]"
+            + (f" — CA {ca_antes} → {sheet['ca']}" if ca_antes != sheet.get("ca") else "") + ".")
 
 
 # ---------------------------------------------------------------------------
@@ -5776,11 +5858,16 @@ def identify_item(char_name: str, item_name: str) -> str:
         char_name: Nome do personagem que possui o item.
         item_name: Nome do item a identificar.
     """
-    char = memory.campaign["characters"].get(memory.char_key(char_name))
+    char, err = _get_char(char_name, allow_dead=True)
     if not char:
-        return f"Personagem '{char_name}' não encontrado."
+        return err
 
     result = _search_open5e_item(item_name)
+    # O item conferido fica marcado, seja qual for o resultado: a Mochila só
+    # oferece "Identificar" para o que ainda não passou pelo SRD.
+    inv = char.get("inventario", [])
+    alvo = next((i for i in inv if isinstance(i, dict)
+                 and _norm_txt(i.get("nome", "")) == _norm_txt(item_name)), None)
 
     if result:
         name     = result.get("name", item_name)
@@ -5795,13 +5882,11 @@ def identify_item(char_name: str, item_name: str) -> str:
             attune_str = " · Requer sintonização"
 
         # Atualiza a descrição do item no inventário se já existir
-        inv = char.get("inventario", [])
-        for item in inv:
-            if item["nome"].lower() == item_name.lower():
-                item["descricao"] = f"[{rarity}] {desc[:200]}"
-                item.pop("custom", None)  # Remove flag custom se era do SRD
-                memory.save_campaign()
-                break
+        if alvo:
+            alvo["descricao"] = f"[{rarity}] {desc[:200]}"
+            alvo["custom"] = False          # conferido e canônico
+            alvo["identificado"] = True
+            memory.save_campaign()
 
         return (
             f"**{name}**\n"
@@ -5809,6 +5894,11 @@ def identify_item(char_name: str, item_name: str) -> str:
             f"   {desc}"
         )
     else:
+        if alvo:
+            # Fora do SRD: a mesma marca que add_item dá, e conferido.
+            alvo["custom"] = True
+            alvo["identificado"] = True
+            memory.save_campaign()
         nivel = char.get("sheet", {}).get("nivel", 1)
         return (
             f"Aviso: '{item_name}' não encontrado no banco D&D 5e (SRD).\n"
@@ -5983,21 +6073,25 @@ def remove_item(char_name: str, item_name: str, quantity: int = 1) -> str:
     """
     char = memory.campaign["characters"].get(memory.char_key(char_name))
     if not char:
-        return f"Personagem '{char_name}' não encontrado."
+        return f"Erro: Personagem '{char_name}' não encontrado."
 
     inv  = char.get("inventario", [])
-    item = next((i for i in inv if i["nome"].lower() == item_name.lower()), None)
+    item = next((i for i in inv if isinstance(i, dict)
+                 and _norm_txt(i.get("nome", "")) == _norm_txt(item_name)), None)
     if not item:
-        return f"'{item_name}' não está no inventário de {char['name']}."
+        return f"Erro: '{item_name}' não está no inventário de {char['name']}."
 
+    nome = item["nome"]
     if item["qtd"] <= quantity:
         inv.remove(item)
+        nota = _desequipar_o_que_saiu(char, nome)
         memory.save_campaign()
-        return f"{item_name} removido do inventário de {char['name']}."
+        return f"{nome} removido do inventário de {char['name']}.{nota}"
 
     item["qtd"] -= quantity
+    nota = _desequipar_o_que_saiu(char, nome)
     memory.save_campaign()
-    return f"{char['name']} agora tem {item['qtd']}x {item_name}."
+    return f"{char['name']} agora tem {item['qtd']}x {nome}.{nota}"
 
 
 def list_inventory(char_name: str) -> str:
@@ -6731,6 +6825,152 @@ def check_encumbrance(char_name: str) -> str:
     return "\n".join(linhas)
 
 
+# ── Mochila ────────────────────────────────────────────────────────────────
+# A tela junta o que estava espalhado em três ferramentas e no editor livre:
+# o que está no corpo (e a CA que isso dá), o que está na mochila (e o peso),
+# e o que ainda não foi conferido no SRD. Como nas outras telas, ela só
+# despacha: quem equipa, larga e identifica são equip_item, unequip_item,
+# remove_item e identify_item.
+
+_ROTULO_DO_SLOT = {
+    "armadura": "Armadura", "escudo": "Escudo", "arma_principal": "Mão principal",
+    "arma_secundaria": "Mão secundária", "amuleto": "Pescoço",
+}
+_TIPO_DE_ARMADURA = {"full": "leve", "cap2": "média", "none": "pesada", "shield": "escudo"}
+
+
+def _a_identificar(item: dict) -> bool:
+    """
+    Item que parece mágico e nunca foi conferido no SRD. add_item confere na
+    entrada (e grava `custom`); item vindo do editor, do wizard ou de saque
+    antigo não passou por lá.
+    """
+    if item.get("identificado") or "custom" in item:
+        return False
+    return _looks_magic(item.get("nome", ""), item.get("descricao", ""))
+
+
+def _ca_se_equipar(char: dict, nome: str, slot: str) -> int | None:
+    """
+    CA que o personagem teria com o item no slot — a prévia do botão.
+    Só para o que está na tabela de armaduras: prévia não pode ir à rede.
+    """
+    if slot not in ("armadura", "escudo") or not _armadura_na_tabela(nome):
+        return None
+    copia = copy.deepcopy(char)
+    copia["sheet"].setdefault("equipamentos", {})[slot] = nome
+    _recalculate_ca(copia)
+    return copia["sheet"]["ca"]
+
+
+def inventory_snapshot(char_name: str = "") -> dict:
+    """Estado da Mochila para a tela (JSON-serializável)."""
+    grupo = _grupo_com_ficha()
+    alvo = None
+    if char_name:
+        alvo = next((c for c in grupo
+                     if _norm_txt(c.get("name", "")) == _norm_txt(char_name)), None)
+    alvo = alvo or (grupo[0] if grupo else None)
+    base = {"tem_personagem": bool(alvo), "grupo": [c.get("name", "") for c in grupo],
+            "personagem": None}
+    if not alvo:
+        return base
+
+    s = alvo["sheet"]
+    equip = s.get("equipamentos") or {}
+    estado, carga, cap = _estado_de_carga(alvo)
+
+    equipados = []
+    for slot in _SLOTS:
+        nome = equip.get(slot)
+        detalhe = ""
+        dados = _armadura_na_tabela(nome) if nome else None
+        if dados:
+            # "base": a CA do cabeçalho já soma a Destreza, e "CA 13" ao lado de
+            # uma CA 14 parecia conta errada.
+            detalhe = (f"+{dados['ca_base']} CA" if dados["dex_bonus"] == "shield"
+                       else f"CA base {dados['ca_base']} · {_TIPO_DE_ARMADURA.get(dados['dex_bonus'], '')}")
+        equipados.append({"slot": slot, "rotulo": _ROTULO_DO_SLOT[slot],
+                          "item": nome or "", "detalhe": detalhe,
+                          # Equipado sem estar na mochila: ficha antiga ou do
+                          # editor. Continua valendo; a tela só avisa.
+                          "fora_da_mochila": bool(nome) and not any(
+                              isinstance(i, dict) and _norm_txt(i.get("nome", "")) == _norm_txt(nome)
+                              for i in (alvo.get("inventario") or []))})
+
+    itens = []
+    ca_atual = int(s.get("ca", 10) or 10)
+    for it in (alvo.get("inventario") or []):
+        if not isinstance(it, dict):
+            continue
+        nome = it.get("nome", "")
+        qtd = int(it.get("qtd", 1) or 1)
+        peso = _peso_do_item(it)
+        em = _slots_ocupados_por(equip, nome)
+        opcoes = []
+        for slot in _slots_para_item(nome):
+            if slot in em:
+                continue
+            # Sem unidade livre, o botão não aparece: a regra é do equip_item,
+            # aqui só não se oferece o clique que ele vai recusar.
+            if len(em) >= qtd:
+                continue
+            opcoes.append({"slot": slot, "rotulo": _ROTULO_DO_SLOT[slot],
+                           "ca_previa": _ca_se_equipar(alvo, nome, slot),
+                           "substitui": equip.get(slot) or ""})
+        itens.append({
+            "nome": nome, "qtd": qtd, "descricao": it.get("descricao", ""),
+            "peso": round(peso, 2), "peso_total": round(peso * qtd, 2),
+            "custom": bool(it.get("custom")),
+            "equipado_em": [_ROTULO_DO_SLOT[x] for x in em if x in _ROTULO_DO_SLOT],
+            "opcoes_de_equipar": opcoes,
+            "a_identificar": _a_identificar(it),
+        })
+
+    base["personagem"] = {
+        "nome": alvo.get("name", ""), "classe": s.get("classe", ""),
+        "nivel": int(s.get("nivel", 1) or 1), "forca": int(s.get("forca", 10) or 10),
+        "ca": ca_atual,
+        "moedas": {"ouro": int(s.get("ouro", 0) or 0), "prata": int(s.get("prata", 0) or 0),
+                   "cobre": int(s.get("cobre", 0) or 0)},
+        "carga": {"kg": carga, "capacidade": cap, "estado": estado,
+                  "metade": round(cap / 2, 1)},
+        "equipados": equipados,
+        "itens": itens,
+    }
+    return base
+
+
+def inventory_action(action: str, char: str = "", item: str = "", slot: str = "") -> dict:
+    """
+    Aplica UMA intenção da Mochila.
+
+    actions: equipar | desequipar | largar | identificar
+
+    Só despacho: equip_item, unequip_item, remove_item (uma unidade) e
+    identify_item — as mesmas ferramentas do mestre.
+    """
+    a = (action or "").lower().strip()
+    if a == "equipar":
+        msg = equip_item(char, item, slot)
+    elif a == "desequipar":
+        msg = unequip_item(char, slot)
+    elif a == "largar":
+        msg = remove_item(char, item, 1)
+    elif a == "identificar":
+        msg = identify_item(char, item)
+    else:
+        return {"ok": False, "message": f"Erro: Ação '{action}' desconhecida.",
+                "snapshot": inventory_snapshot(char)}
+
+    if a == "identificar":
+        # "Aviso: não está no SRD" é resultado da conferência, não recusa.
+        ok = not msg.lstrip().startswith("Erro:")
+    else:
+        ok = not msg.lstrip().startswith(("Aviso:", "Erro:", "Nota:"))
+    return {"ok": ok, "message": msg, "snapshot": inventory_snapshot(char)}
+
+
 # ── Loja ───────────────────────────────────────────────────────────────────
 
 def _lojas() -> dict:
@@ -7187,6 +7427,7 @@ def sell_item(char_name: str, shop_name: str, item_name: str, quantity: int = 1)
     item["qtd"] = int(item.get("qtd", 1) or 1) - qtd
     if item["qtd"] <= 0:
         inv.remove(item)
+    nota_equip = _desequipar_o_que_saiu(char, item["nome"])
     if na_loja:
         na_loja["qtd"] = min(99, na_loja["qtd"] + qtd)
     memory.save_campaign()
@@ -7194,7 +7435,7 @@ def sell_item(char_name: str, shop_name: str, item_name: str, quantity: int = 1)
     return (f"{char['name']} vendeu {qtd}x {item_name} por {ganho} po "
             f"(metade da tabela: {tabela} po) em {loja['nome']}.\n"
             f"   Bolsa: {sheet['ouro']} po, {sheet.get('prata', 0)} pp, "
-            f"{sheet.get('cobre', 0)} pc")
+            f"{sheet.get('cobre', 0)} pc{nota_equip}")
 
 
 # ===========================================================================

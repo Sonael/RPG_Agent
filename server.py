@@ -2636,6 +2636,30 @@ def levelup_action_route():
     ))
 
 
+@app.route("/api/inventory/state", methods=["GET"])
+@require_auth
+def inventory_state_route():
+    from rpg import tools_dnd
+    return jsonify(tools_dnd.inventory_snapshot(
+        (request.args.get("personagem") or "").strip()))
+
+
+@app.route("/api/inventory/action", methods=["POST"])
+@require_auth
+def inventory_action_route():
+    from rpg import tools_dnd
+    d = request.json or {}
+    action = (d.get("action") or "").strip()
+    if not action:
+        return jsonify({"ok": False, "message": "Ação ausente."}), 400
+    return jsonify(tools_dnd.inventory_action(
+        action,
+        char=(d.get("char") or "").strip(),
+        item=(d.get("item") or "").strip(),
+        slot=(d.get("slot") or "").strip(),
+    ))
+
+
 @app.route("/api/grimoire/state", methods=["GET"])
 @require_auth
 def grimoire_state_route():

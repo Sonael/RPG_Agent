@@ -90,17 +90,18 @@ abre o loop **percepção → deliberação → ação → verificação** em de
 7. [Sistema de combate](#sistema-de-combate)
 8. [Tela de nível ("A Ascensão")](#tela-de-nível-a-ascensão)
 9. [Tela de magias ("O Grimório")](#tela-de-magias-o-grimório)
-10. [Tela de loja ("O Balcão")](#tela-de-loja-o-balcão)
-11. [Tela de descanso ("A Fogueira")](#tela-de-descanso-a-fogueira)
-12. [Tela de combate tática (Pergaminho Épico)](#tela-de-combate-tática-pergaminho-épico)
-13. [Tools, o catálogo do agente](#tools-o-catálogo-do-agente)
-14. [Endpoints HTTP](#endpoints-http)
-15. [Frontend](#frontend)
-16. [PWA e instalação](#pwa-e-instalação)
-17. [Testes e garantias](#testes-e-garantias)
-18. [Estrutura de arquivos](#estrutura-de-arquivos)
-19. [Configuração e execução](#configuração-e-execução)
-20. [Limitações conhecidas](#limitações-conhecidas)
+10. [Tela de equipamento ("A Mochila")](#tela-de-equipamento-a-mochila)
+11. [Tela de loja ("O Balcão")](#tela-de-loja-o-balcão)
+12. [Tela de descanso ("A Fogueira")](#tela-de-descanso-a-fogueira)
+13. [Tela de combate tática (Pergaminho Épico)](#tela-de-combate-tática-pergaminho-épico)
+14. [Tools, o catálogo do agente](#tools-o-catálogo-do-agente)
+15. [Endpoints HTTP](#endpoints-http)
+16. [Frontend](#frontend)
+17. [PWA e instalação](#pwa-e-instalação)
+18. [Testes e garantias](#testes-e-garantias)
+19. [Estrutura de arquivos](#estrutura-de-arquivos)
+20. [Configuração e execução](#configuração-e-execução)
+21. [Limitações conhecidas](#limitações-conhecidas)
 
 ---
 
@@ -1327,6 +1328,73 @@ As duas telas agora marcam como vista a assinatura que está na tela enquanto
 ela está aberta. `test_escolher_e_fechar_nao_reabre_sozinha` falha com o
 `levelup.js` anterior e passa com o corrigido.
 
+## Tela de equipamento ("A Mochila")
+
+A sexta tela junta o que estava espalhado em três ferramentas e no editor
+livre da ficha: **o que está no corpo** (e a CA que isso dá), **o que está na
+mochila** (e quanto pesa) e **o que ainda não foi conferido no SRD**.
+
+**Não abre sozinha.** Nada no mundo pede "agora arrume a mochila"; ela abre
+pelo atalho **Mochila** no cartão de cada personagem do grupo (ao lado do
+Grimório, para quem conjura). Fechar não manda nada ao mestre — vestir uma
+armadura não é cena. Com ela aberta, as outras telas esperam, e a fila só a
+redesenha com o que mudar no chat (saque, compra, venda).
+
+**O que mostra.** No cabeçalho, os três números que mudam a cada clique: a
+CA, a barra de carga com a marca da metade (acima dela, desvantagem) e as
+moedas. À esquerda os cinco slots, sempre na mesma ordem — armadura, escudo,
+mão principal, mão secundária, pescoço —, com o botão **Tirar**. À direita os
+itens, cada um com peso, onde está equipado, a marca "próprio da campanha" e
+os botões:
+
+- **vestir/empunhar** num slot possível, com a **prévia de CA** ("Armadura
+  CA 14 → 16") antes de vestir — é o que faz a troca ser decisão;
+- **Identificar**, só para item que parece mágico e nunca passou pelo SRD
+  (`add_item` confere na entrada; item vindo do editor ou de saque antigo não
+  passou);
+- **Largar 1**.
+
+A regra de onde cada item pode ir, a prévia e o peso vêm do motor
+(`inventory_snapshot`); os botões chamam `equip_item`, `unequip_item`,
+`remove_item` e `identify_item` (`inventory_action`, só despacho).
+
+### O que a Mochila expôs
+
+Construí-la passou por `equip_item`, `remove_item` e `sell_item`, e os três
+tinham defeitos que nenhum teste via. Medidos no commit anterior, guerreira
+de DES 10:
+
+```
+vestiu Cota de Malha                       CA 16
+vendeu a Cota de Malha na loja             CA 16, inventário vazio, slot armadura: "Cota de Malha"
+equip_item("Corda de Cânhamo") sem slot    foi para [armadura], tirou a cota, CA 10
+1 Adaga em arma_principal e arma_secundaria  aceitou
+equip_item de item que não existe          "'Espada Inexistente' não está..." (sem prefixo)
+```
+
+- **O que sai da mochila sai do corpo.** `remove_item` e `sell_item` agora
+  chamam `_desequipar_o_que_saiu`: se sobram menos unidades do que slots
+  ocupados, o slot solta (a mão secundária primeiro) e a CA é recalculada — o
+  texto da ferramenta diz "CA 16 → 10". Item equipado que nunca esteve no
+  inventário (ficha antiga, editor) não é tocado; a tela o marca como "fora
+  da mochila".
+- **Item desconhecido não tem slot.** Sem slot, `equip_item` usa o que sabe
+  (`_slots_para_item`: armadura e escudo pela tabela, arma pelo nome, amuleto
+  por palavra); o resto é recusado pedindo o slot. Armadura e escudo, mesmo
+  com slot explícito, só entram se o motor souber a CA; armadura não entra em
+  slot de arma.
+- **Uma unidade, um slot.** Duas adagas vão nas duas mãos; uma não.
+- **Recusas com prefixo** (`Erro:`/`Nota:`) em `equip_item`, `unequip_item`,
+  `remove_item` e `identify_item`, que também passou a usar `_get_char`.
+- `arma_secundaria` virou slot de primeira classe no `equip_item` (antes só
+  existia se o editor a tivesse criado na ficha).
+- `identify_item` marca o item como conferido (`identificado`, e `custom`
+  quando não está no SRD), para a Mochila não oferecer "Identificar" de novo.
+
+Limitação conhecida: a busca de item mágico no Open5e é **em inglês**. Um
+"Manto Élfico" não é achado ("Cloak of Elvenkind" seria) e sai como item da
+campanha; um mapa de nomes em português para itens mágicos resolveria.
+
 ## Tela de loja ("O Balcão")
 
 A segunda tela do jogo, e a primeira construída depois de perguntar **por que**
@@ -1851,6 +1919,8 @@ ferramentas do mestre.
   `{action: buy|sell, shop, char, item, quantity}`.
 - `GET /api/rest/state` / `POST /api/rest/action`
   `{action: dado|concluir|cancelar, char}`.
+- `GET /api/inventory/state?personagem=` / `POST /api/inventory/action`
+  `{action: equipar|desequipar|largar|identificar, char, item, slot}`.
 - `GET /api/grimoire/state?personagem=&q=&nivel=&resumo=1` /
   `POST /api/grimoire/action` `{action: aprender, char, spell, q, spell_level}`.
 
@@ -1909,10 +1979,11 @@ ferramentas do mestre.
   economia 5e, submenus de arma/habilidade/item, picker de variantes,
   modal de fim, botão de fechar + pílula de retomar, toggle de modo.
   **Zero regra de jogo no cliente**, só renderiza snapshot e envia intents.
-- **`levelup.js`**, **`grimoire.js`**, **`shop.js`** e **`rest.js`**, as telas
-  de nível, magias, loja e descanso. Mesma regra: renderizam o snapshot do
-  motor e despacham intenções. A fila que decide qual abre primeiro (combate,
-  nível, grimório, descanso, loja) e o empilhamento das pílulas ficam em
+- **`levelup.js`**, **`grimoire.js`**, **`inventory.js`**, **`shop.js`** e
+  **`rest.js`**, as telas de nível, magias, equipamento, loja e descanso.
+  Mesma regra: renderizam o snapshot do motor e despacham intenções. A fila
+  que decide qual abre primeiro (combate, nível, grimório, descanso, loja; a
+  Mochila só abre pelo atalho) e o empilhamento das pílulas ficam em
   `game.js`.
 
 ### Tema

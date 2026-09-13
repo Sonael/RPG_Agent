@@ -38,6 +38,8 @@ const STATE_TOOLS = new Set([
   'offer_rest', 'use_hit_die',
   // learn_spell muda as vagas do grimório e a lista de habilidades.
   'learn_spell',
+  // Mochila: o que entra, sai ou é conferido aparece com ela aberta.
+  'add_item', 'remove_item', 'identify_item', 'buy_item', 'sell_item',
 ]);
 
 function _condInfo(cd) {
@@ -978,13 +980,17 @@ function buildDndCharCard(c, idx, type) {
       });
       html += `</div>`;
     }
-    // Conjurador do grupo ganha o atalho para o Grimório, numa linha própria:
-    // no cabeçalho, ao lado do nome, do status e da CA, ele espremia a CA em
-    // duas linhas na lateral estreita. stopPropagation porque o cartão inteiro
-    // abre o modal de edição.
-    const conjura = type === 'party'
-      && GAME_CASTER_CLASSES.has(String(sheet.classe || '').toLowerCase());
-    if (conjura) html += `<div class="grimorio-linha"><span class="grimorio-link" role="button" tabindex="0" onclick="event.stopPropagation(); window.Grimoire && window.Grimoire._abrir('${nameEsc}')" title="Abrir o Grimório">Grimório</span></div>`;
+    // Atalhos das telas do personagem, numa linha própria: no cabeçalho, ao
+    // lado do nome, do status e da CA, eles espremiam a CA em duas linhas na
+    // lateral estreita. Mochila para todo o grupo; Grimório só para quem
+    // conjura. stopPropagation porque o cartão inteiro abre o modal de edição.
+    if (type === 'party') {
+      const conjura = GAME_CASTER_CLASSES.has(String(sheet.classe || '').toLowerCase());
+      html += `<div class="cartao-atalhos">`
+        + `<span class="cartao-atalho mochila-link" role="button" tabindex="0" onclick="event.stopPropagation(); window.Inventory && window.Inventory._abrir('${nameEsc}')" title="Abrir a Mochila">Mochila</span>`
+        + (conjura ? `<span class="cartao-atalho grimorio-link" role="button" tabindex="0" onclick="event.stopPropagation(); window.Grimoire && window.Grimoire._abrir('${nameEsc}')" title="Abrir o Grimório">Grimório</span>` : '')
+        + `</div>`;
+    }
   } else {
     const desc = c.notes || c.description || '';
     if (desc) html += `<div class="char-desc">${escapeHtml(desc.substring(0, 90))}${desc.length > 90 ? '…' : ''}</div>`;
@@ -1181,6 +1187,8 @@ function sincronizarTelas() {
     try { if (window.Grimoire) await window.Grimoire.sync(); } catch (_) {}
     try { if (window.Rest)    await window.Rest.sync();    } catch (_) {}
     try { if (window.Shop)    await window.Shop.sync();    } catch (_) {}
+    // A Mochila não abre sozinha: aberta, só redesenha com o que mudou.
+    try { if (window.Inventory) await window.Inventory.sync(); } catch (_) {}
   };
   _filaTelas = _filaTelas.then(rodada, rodada);
   return _filaTelas;

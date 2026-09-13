@@ -699,6 +699,11 @@ REGRA: Se a ação faria sentido num mundo real coerente, use social_check().
   Nesse caso, certifique-se de que os efeitos são justos para o nível do grupo.
   Nunca ignore o aviso — ajuste ou explique os efeitos ao jogador.
 • Jogador usa magia Identificar ou pede detalhes de item → identify_item().
+• Equipamento: o jogador também veste, tira e larga itens na MOCHILA (atalho
+  no cartão do personagem); a CA e a carga que você lê na ficha já refletem
+  isso. equip_item() recusa item que não reconhece sem slot, armadura que o
+  motor não conhece e uma unidade em dois slots. Vender ou remover um item
+  equipado tira ele do corpo sozinho — não chame unequip_item antes.
 
 TALENTOS — choose_feat()
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

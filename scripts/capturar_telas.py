@@ -523,6 +523,40 @@ GRIMORIO_CHEIO["characters"]["helena"]["habilidades"] += [
 ]
 
 
+# MOCHILA. Stelar veste um camisão de malha (CA 14 com DES 12) e carrega uma
+# cota de malha e um escudo sem usar: os botões mostram a prévia "CA 14 → 16",
+# que é o que a tela existe para mostrar. Uma adaga só (não cabe nas duas
+# mãos), um manto élfico nunca conferido no SRD e coisas comuns de viagem.
+MOCHILA = {
+    "characters": {
+        "stelar": {
+            "sheet": {"forca": 16, "destreza": 12, "ca": 14,
+                      "ouro": 38, "prata": 6, "cobre": 0,
+                      "equipamentos": {"armadura": "Camisão de Malha", "escudo": None,
+                                       "arma_principal": "Espada Longa",
+                                       "arma_secundaria": None, "amuleto": None}},
+            "inventario": [
+                {"nome": "Espada Longa", "qtd": 1, "descricao": ""},
+                {"nome": "Camisão de Malha", "qtd": 1, "descricao": ""},
+                {"nome": "Cota de Malha", "qtd": 1, "descricao": "tirada do cavaleiro caído"},
+                {"nome": "Escudo", "qtd": 1, "descricao": ""},
+                {"nome": "Adaga", "qtd": 1, "descricao": ""},
+                {"nome": "Manto Élfico", "qtd": 1,
+                 "descricao": "tecido cinza que muda de tom com a luz"},
+                {"nome": "Poção de Cura", "qtd": 2, "descricao": "recupera 2d4+2 PV"},
+                {"nome": "Tocha", "qtd": 5, "descricao": ""},
+                {"nome": "Corda de Cânhamo", "qtd": 1, "descricao": "15 metros"},
+            ],
+        },
+    },
+}
+
+# A mesma mochila numa Stelar de Força 8: capacidade de 54 kg, metade em 27 —
+# a cota de malha que ela carregou do campo de batalha a deixa sobrecarregada.
+MOCHILA_PESADA = copy.deepcopy(MOCHILA)
+MOCHILA_PESADA["characters"]["stelar"]["sheet"]["forca"] = 8
+
+
 # DESCANSO CURTO depois de uma emboscada. Cada um do grupo retrata um estado do
 # botão de dado, porque é isso que a tela comunica:
 #   • Helena, muito ferida e com a reserva cheia — o caso de gastar;
@@ -817,6 +851,25 @@ TELAS = [
      "estado": GRIMORIO, "espera": 900,
      "js": "window.Grimoire._abrir(); setTimeout(() => window.Grimoire._close(), 500)",
      "exigir": "#grm-reopen:not(.hidden)"},
+
+    # ── Mochila ──────────────────────────────────────────────────────
+    # Não abre sozinha (nada no mundo pede "arrume a mochila"): o `js` faz o
+    # que o atalho do cartão do grupo faz.
+    {"nome": "mochila", "pagina": "/game.html",
+     "estado": MOCHILA, "espera": 900,
+     "js": "window.Inventory._abrir('Stelar')",
+     "exigir": ".inv-item"},
+    {"nome": "mochila-armadura-trocada", "pagina": "/game.html",
+     "estado": MOCHILA, "espera": 1200,
+     # Veste a cota de malha: o print mostra a CA nova no cabeçalho, a linha
+     # "CA 14 → 16" no rodapé e o camisão de volta à mochila com a prévia.
+     "js": "window.Inventory._abrir('Stelar');"
+           "setTimeout(() => window.Inventory._equipar('Cota de Malha', 'armadura'), 700)",
+     "exigir": "#inv-msg:not(:empty)"},
+    {"nome": "mochila-sobrecarregada", "pagina": "/game.html",
+     "estado": MOCHILA_PESADA, "espera": 900,
+     "js": "window.Inventory._abrir('Stelar')",
+     "exigir": ".inv-carga-cheia"},
 
     # ── Descanso ─────────────────────────────────────────────────────
     # Abre sozinha pela proposta do mestre, como a loja e o nível.
