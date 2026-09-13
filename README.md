@@ -1232,7 +1232,17 @@ cara de novo.
 Com mais de uma loja no mesmo local, o cabeçalho ganha um seletor e a pílula
 diz "🏪 2 lojas em Oakhaven". Antes a tela só conhecia a primeira loja do
 local — o boticário ao lado da forja era inalcançável. Fechada, fica a pílula
-no canto para voltar. "Encerrar as compras" manda
+no canto para voltar.
+
+No mobile a pílula (e as de combate e nível, que dividem o canto) fica **acima
+do bloco de entrada**, não na borda da tela. O `#input-area` tem
+`padding-bottom` largo de propósito, para a barra do sistema — gestos, 3
+botões, home indicator —, e a pílula caía por cima da dica "Digite / para ver
+os comandos". A posição é medida por `posicionarPilulas()` em `game.js` e vai
+para `--pilula-base`: um valor fixo no CSS não serviria, porque o bloco cresce
+para cima quando a bandeja de dados abre, e o menu de comandos flutua acima
+dele sem entrar na sua altura. Um `ResizeObserver` nos dois reposiciona. No
+desktop a variável não é definida e vale o padrão de 20px da borda. "Encerrar as compras" manda
 `[COMPRAS RESOLVIDAS NA TELA]` para a IA narrar a saída — o mesmo desenho do
 recap de combate: a tela resolve os números, a narração continua sendo dela.
 

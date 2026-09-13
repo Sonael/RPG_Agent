@@ -271,3 +271,86 @@ def test_seletor_de_comprador_mostra_o_nome(pagina):
     pg, _ = pagina
     caixa = pg.locator(".shp-quem").bounding_box()
     assert caixa and caixa["width"] >= 90, f"seletor espremido: {caixa}"
+
+
+# ---- posição da pílula -----------------------------------------------------
+#
+# No mobile o espaço abaixo do campo de mensagem é da barra do sistema — o
+# #input-area tem padding-bottom largo de propósito —, e a pílula caía por cima
+# da dica "Digite / para ver os comandos". Agora fica acima do bloco de entrada
+# e de tudo que cresce a partir dele.
+
+def _retangulo(pg, seletor):
+    return pg.evaluate(
+        "(s) => { const r = document.querySelector(s).getBoundingClientRect();"
+        " return {top: r.top, bottom: r.bottom}; }", seletor)
+
+
+@pytest.fixture
+def loja_mobile(loja_no_ar):
+    from playwright.sync_api import sync_playwright
+    import requests
+
+    url, nome, cap = loja_no_ar
+    requests.post(f"{url}/__estado", json=cap.LOJA, timeout=10)
+    with sync_playwright() as pw:
+        nav = pw.chromium.launch()
+        ctx = nav.new_context(viewport={"width": 375, "height": 812},
+                              is_mobile=True, has_touch=True)
+        ctx.add_init_script(cap._script_de_semente(
+            nome, "pergaminho", cap.HISTORICO, limpar_memoria_de_telas=False))
+        pg = ctx.new_page()
+        pg.goto(f"{url}/game.html", wait_until="networkidle")
+        cap._sanear(pg)
+        pg.wait_for_selector("#shop-overlay:not(.hidden)", timeout=10000)
+        pg.click(".shp-close")
+        pg.wait_for_selector("#shp-reopen:not(.hidden)", timeout=5000)
+        pg.wait_for_timeout(300)
+        yield pg
+        nav.close()
+
+
+def test_pilula_no_mobile_fica_acima_do_bloco_de_entrada(loja_mobile):
+    pg = loja_mobile
+    pilula = _retangulo(pg, "#shp-reopen")
+    entrada = _retangulo(pg, "#input-area")
+    assert pilula["bottom"] <= entrada["top"], \
+        f"pílula {pilula} invade o bloco de entrada {entrada}"
+
+
+def test_pilula_sobe_quando_a_bandeja_de_dados_abre(loja_mobile):
+    """O bloco de entrada cresce para cima com a bandeja: valor fixo no CSS a cobriria."""
+    pg = loja_mobile
+    antes = _retangulo(pg, "#shp-reopen")
+    pg.evaluate("toggleDiceTray()")
+    pg.wait_for_timeout(500)
+
+    pilula = _retangulo(pg, "#shp-reopen")
+    entrada = _retangulo(pg, "#input-area")
+    assert pilula["bottom"] <= entrada["top"], "pílula por cima da bandeja de dados"
+    assert pilula["top"] < antes["top"], "a pílula não acompanhou o bloco"
+
+
+def test_pilula_sobe_acima_do_menu_de_comandos(loja_mobile):
+    """
+    O menu de comandos é position:absolute e flutua ACIMA do bloco de entrada,
+    fora da altura dele. Sem considerá-lo, levantar a pílula só trocaria o que
+    ela cobre.
+    """
+    pg = loja_mobile
+    pg.fill("#chat-input", "/")
+    pg.wait_for_selector("#cmd-menu:not(.hidden)", timeout=3000)
+    pg.wait_for_timeout(500)
+
+    pilula = _retangulo(pg, "#shp-reopen")
+    menu = _retangulo(pg, "#cmd-menu")
+    assert pilula["bottom"] <= menu["top"], f"pílula {pilula} por cima do menu {menu}"
+
+
+def test_pilula_no_desktop_continua_no_canto(pagina):
+    pg, _ = pagina
+    pg.click(".shp-close")
+    pg.wait_for_selector("#shp-reopen:not(.hidden)", timeout=5000)
+    distancia = pg.evaluate(
+        "() => window.innerHeight - document.querySelector('#shp-reopen').getBoundingClientRect().bottom")
+    assert abs(distancia - 20) <= 1, f"desktop mudou: {distancia}px da borda"

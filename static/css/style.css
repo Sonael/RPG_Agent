@@ -1972,8 +1972,15 @@ body.combat-on { overflow: hidden; }
 
 /* Pílula flutuante para retomar o combate (fica fora de #combat-overlay,
    então usa cores literais — as variáveis --cbt-* são escopadas). */
+/* Pílulas de "voltar à tela" (combate, loja, nível) — todas no mesmo canto.
+   A altura vem de --pilula-base. No desktop é 20px da borda. No mobile o
+   game.js mede o topo do #input-area e põe a pílula logo ACIMA dele: o
+   espaço abaixo do campo de mensagem é reservado de propósito para a barra
+   do sistema (gestos, 3 botões, home indicator), e antes a pílula ficava
+   por cima da dica "Digite / para ver os comandos". Medir em vez de fixar
+   no CSS porque o bloco de entrada cresce quando a bandeja de dados abre. */
 #cbt-reopen {
-  position: fixed; bottom: 20px; right: 20px; z-index: 8999;
+  position: fixed; bottom: var(--pilula-base, 20px); right: 20px; z-index: 8999;
   background: #8b2315; color: #fff;
   border: 2px solid #b89947; border-radius: 30px;
   font-family: 'Lora', serif; font-weight: 700; font-size: 0.95rem;
@@ -2502,7 +2509,7 @@ body.shop-on { overflow: hidden; }
 .shp-sair:hover { background: #6b1a0f; }
 
 #shp-reopen {
-  position: fixed; bottom: 20px; right: 20px; z-index: 8999;
+  position: fixed; bottom: var(--pilula-base, 20px); right: 20px; z-index: 8999;
   background: #6e5c1f; color: #fff;
   border: 2px solid #b89947; border-radius: 30px;
   font-family: 'Lora', serif; font-weight: 700; font-size: 0.95rem;
@@ -2514,7 +2521,7 @@ body.shop-on { overflow: hidden; }
 #shp-reopen.hidden { display: none; }
 /* Quando a pílula de combate também está na tela, a da loja sobe: são o
    mesmo canto, e sobrepostas uma esconderia a outra. */
-#cbt-reopen:not(.hidden) ~ #shp-reopen:not(.hidden) { bottom: 76px; }
+#cbt-reopen:not(.hidden) ~ #shp-reopen:not(.hidden) { bottom: calc(var(--pilula-base, 20px) + 56px); }
 
 @media (max-width: 760px) {
   #shop-overlay { padding: 0; align-items: stretch; }
@@ -2849,7 +2856,7 @@ body.levelup-on { overflow: hidden; }
 }
 
 #lvl-reopen {
-  position: fixed; bottom: 20px; right: 20px; z-index: 8999;
+  position: fixed; bottom: var(--pilula-base, 20px); right: 20px; z-index: 8999;
   background: #8a6d1f; color: #fff;
   border: 2px solid #b89947; border-radius: 30px;
   font-family: 'Lora', serif; font-weight: 700; font-size: 0.95rem;
@@ -2861,9 +2868,9 @@ body.levelup-on { overflow: hidden; }
 #lvl-reopen.hidden { display: none; }
 /* Três pílulas podem coexistir no mesmo canto. Empilham na ordem em que o
    DOM as cria: combate, loja, nível. */
-#cbt-reopen:not(.hidden) ~ #lvl-reopen:not(.hidden) { bottom: 76px; }
-#shp-reopen:not(.hidden) ~ #lvl-reopen:not(.hidden) { bottom: 76px; }
-#cbt-reopen:not(.hidden) ~ #shp-reopen:not(.hidden) ~ #lvl-reopen:not(.hidden) { bottom: 132px; }
+#cbt-reopen:not(.hidden) ~ #lvl-reopen:not(.hidden) { bottom: calc(var(--pilula-base, 20px) + 56px); }
+#shp-reopen:not(.hidden) ~ #lvl-reopen:not(.hidden) { bottom: calc(var(--pilula-base, 20px) + 56px); }
+#cbt-reopen:not(.hidden) ~ #shp-reopen:not(.hidden) ~ #lvl-reopen:not(.hidden) { bottom: calc(var(--pilula-base, 20px) + 112px); }
 
 @media (max-width: 760px) {
   #levelup-overlay { padding: 0; align-items: stretch; }

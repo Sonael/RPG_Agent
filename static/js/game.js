@@ -1186,6 +1186,50 @@ function sincronizarTelas() {
 window.sincronizarTelas = sincronizarTelas;
 window.addEventListener('rpg:tela-fechou', () => { sincronizarTelas(); });
 
+// ── Altura das pílulas no mobile ────────────────────────────────────────────
+// As pílulas de "voltar à tela" (combate, loja, nível) ficam no canto de baixo.
+// No mobile o espaço abaixo do campo de mensagem é da barra do sistema — o
+// #input-area tem padding-bottom largo de propósito para ela —, e a pílula
+// caía por cima da dica "Digite / para ver os comandos".
+//
+// A posição é MEDIDA, não fixada no CSS: o bloco de entrada cresce para cima
+// quando a bandeja de dados abre, e um valor fixo deixaria a pílula por cima
+// dos dados. No desktop a variável some e vale o padrão do CSS (20px).
+const _MOBILE_PILULAS = window.matchMedia('(max-width: 900px)');
+function posicionarPilulas() {
+  const raiz = document.documentElement;
+  const area = document.getElementById('input-area');
+  if (!_MOBILE_PILULAS.matches || !area) {
+    raiz.style.removeProperty('--pilula-base');
+    return;
+  }
+  let topo = area.getBoundingClientRect().top;
+  // O menu de comandos (ao digitar "/") é position:absolute e flutua ACIMA do
+  // bloco de entrada, então não entra na altura dele. Aberto, a pílula sobe
+  // acima do menu — senão, levantá-la só trocaria qual coisa ela cobre.
+  const menu = document.getElementById('cmd-menu');
+  if (menu && !menu.classList.contains('hidden') && menu.offsetHeight > 0) {
+    topo = Math.min(topo, menu.getBoundingClientRect().top);
+  }
+  // 12px de folga acima do que estiver mais alto.
+  const base = Math.max(20, Math.round(window.innerHeight - topo + 12));
+  raiz.style.setProperty('--pilula-base', `${base}px`);
+}
+window.posicionarPilulas = posicionarPilulas;
+window.addEventListener('resize', posicionarPilulas);
+if (_MOBILE_PILULAS.addEventListener) _MOBILE_PILULAS.addEventListener('change', posicionarPilulas);
+document.addEventListener('DOMContentLoaded', () => {
+  posicionarPilulas();
+  if (!('ResizeObserver' in window)) return;
+  // Bandeja de dados abrindo/fechando, textarea crescendo e o menu de comandos
+  // aparecendo mudam alturas sem mudar a janela: só um observador de tamanho vê.
+  const obs = new ResizeObserver(posicionarPilulas);
+  ['input-area', 'cmd-menu'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) obs.observe(el);
+  });
+});
+
 // Editor do estado do mundo: capítulo, LOCAL atual, CENA atual e resumo.
 // Permite corrigir manualmente o local/cena caso o agente esqueça de chamar
 // update_world_state numa transição (ex.: floresta → praia).
