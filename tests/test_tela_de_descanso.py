@@ -138,10 +138,38 @@ def test_dado_de_vida_com_reserva_vazia_recusa(aria):
     assert td.use_hit_die("Aria").startswith("Erro:")
 
 
-def test_descanso_longo_devolve_a_reserva(aria):
+def test_descanso_longo_devolve_so_metade_da_reserva(aria):
+    """PHB: até metade do total de dados. Nível 5 → 2, não os 5."""
     aria["sheet"]["hit_dice_remaining"] = 0
+    saida = td.long_rest("Aria")
+    assert _reserva(aria) == 2
+    assert "Dados de vida: 0 → 2/5" in saida
+
+
+def test_descanso_longo_nao_passa_do_maximo(aria):
+    """Com 4 de 5, metade seria 2 — mas só falta 1."""
+    aria["sheet"]["hit_dice_remaining"] = 4
     td.long_rest("Aria")
     assert _reserva(aria) == 5
+
+
+def test_descanso_longo_devolve_pelo_menos_um_dado(campanha, povoar):
+    """Nível 1: metade de 1 arredonda para 0, e o mínimo é 1."""
+    povoar(criar_ficha("Novato", grupo=True, vida=3, vida_max=12, nivel=1))
+    ch = memory.campaign["characters"]["novato"]
+    ch["sheet"]["hit_dice_remaining"] = 0
+    td.long_rest("Novato")
+    assert _reserva(ch) == 1
+
+
+def test_duas_noites_para_encher_a_reserva(aria):
+    """O custo de torrar a reserva aparece no dia seguinte."""
+    aria["sheet"]["hit_dice_remaining"] = 0
+    td.long_rest("Aria")
+    assert _reserva(aria) == 2
+    td.advance_time(24, "um dia de estrada")
+    td.long_rest("Aria")
+    assert _reserva(aria) == 4
 
 
 def test_subir_de_nivel_da_um_dado_a_mais(aria):
@@ -357,6 +385,15 @@ def test_snapshot_explica_por_que_o_dado_esta_travado(grupo):
     snap = {p["nome"]: p for p in td.rest_snapshot()["grupo"]}
     assert snap["Aria"]["bloqueio_dado"] == "sem dados na reserva"
     assert snap["Bram"]["bloqueio_dado"] == "vida no máximo"
+
+
+def test_snapshot_diz_quantos_dados_o_longo_devolve(aria):
+    """A conta da metade fica no motor; o cartão só mostra."""
+    aria["sheet"]["hit_dice_remaining"] = 1
+    p = td.rest_snapshot()["grupo"][0]
+    assert p["dados_no_longo"] == 2
+    aria["sheet"]["hit_dice_remaining"] = 5
+    assert td.rest_snapshot()["grupo"][0]["dados_no_longo"] == 0
 
 
 def test_snapshot_usa_o_teto_da_exaustao(aria):

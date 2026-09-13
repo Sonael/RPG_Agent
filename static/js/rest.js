@@ -177,7 +177,12 @@
       efeito = `<div class="rst-longo-nao">Descansou há menos de 24 horas.
                   Faltam <b>${p.faltam_horas}h</b>.</div>`;
     } else {
-      const itens = [`Dados de vida: todos de volta (${p.dados_max})`];
+      // Quantos voltam vem do motor (metade da reserva, no máximo o que foi
+      // gasto): dizer "todos" aqui prometeria uma noite que não acontece.
+      const depois = p.dados_restantes + p.dados_no_longo;
+      const itens = [p.dados_no_longo
+        ? `Dados de vida: +${p.dados_no_longo} (${depois} / ${p.dados_max})`
+        : `Dados de vida: reserva já cheia (${p.dados_max})`];
       if (p.mana_max > 0) itens.unshift(`Mana volta a ${p.mana_max}`);
       itens.unshift('Vida volta ao máximo');
       if (p.exaustao > 0) itens.push(`Exaustão ${p.exaustao} → ${p.exaustao - 1}`);

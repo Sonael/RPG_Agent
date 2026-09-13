@@ -223,6 +223,8 @@ def test_longo_mostra_quem_nao_pode_dormir(navegador):
     assert "Faltam 9h" in stelar
     assert "rst-card-fora" in pg.get_attribute(_cartao("Stelar"), "class")
     assert "Exaustão 2 → 1" in pg.inner_text(_cartao("Helena"))
+    # Reserva vazia de nível 3: o cartão promete +1, não "todos de volta".
+    assert "Dados de vida: +1 (1 / 3)" in pg.inner_text(_cartao("Helena"))
     assert pg.locator(".rst-dado").count() == 0, "botão de dado no descanso longo"
     assert not pg.is_disabled("#rst-concluir")
 
@@ -247,7 +249,8 @@ def test_dormir_restaura_quem_pode(navegador):
     helena = _pessoa(pg, "Helena")
     stelar = _pessoa(pg, "Stelar")
     assert helena["vida_atual"] == helena["vida_max"]
-    assert helena["dados_restantes"] == helena["dados_max"]
+    # Nível 3 com a reserva vazia: metade de 3 é 1. Não os 3.
+    assert helena["dados_restantes"] == 1
     assert stelar["vida_atual"] == 25, "Stelar dormiu sem poder"
 
 

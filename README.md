@@ -665,7 +665,7 @@ o próximo passo pendente, e aparecem na barra lateral do jogo.
 ### Descanso, relógio e exaustão
 
 - `short_rest` (1 hora; gasta dados de vida **da reserva**), `use_hit_die`,
-  `long_rest` (full HP/MP + reserva de dados + condições; bloqueado em
+  `long_rest` (full HP/MP + metade da reserva de dados + condições; bloqueado em
   combate), `offer_rest` (abre a [tela de descanso](#tela-de-descanso-a-fogueira)
   para o jogador decidir).
 - **Uma reserva de dados de vida, um caminho de gasto.** `short_rest` rolava
@@ -683,7 +683,10 @@ o próximo passo pendente, e aparecem na barra lateral do jogo.
   Hoje as duas ferramentas passam por `_gastar_dados_de_vida`: um dado de cada
   vez, parando quando a vida enche (dado rolado com vida cheia é dado jogado
   fora). Esvaziou a reserva, o descanso curto ainda passa a hora, mas não cura
-  — e só o descanso longo, que é um por dia, devolve os dados. Subir de nível
+  — e só o descanso longo, que é um por dia, devolve dados: **até metade da
+  reserva** (mínimo 1), como no PHB. Devolver a reserva inteira fazia um dia
+  ruim sumir numa noite de sono; com metade, quem torrou os dados numa
+  masmorra sente o custo no dia seguinte. Subir de nível
   soma um dado à reserva; morto não descansa; em combate nenhum dos dois roda.
 - **Um descanso longo por 24 horas do relógio**, e ele consome 8 delas. Antes
   disso `long_rest` era um botão de vida cheia: bastava chamá-lo depois de
@@ -1334,7 +1337,8 @@ mais nenhum dado.
 ### Descanso longo
 
 Não há decisão por personagem, então o cartão mostra o que a noite vai fazer
-(vida e mana cheias, reserva de volta, exaustão menos um) e, principalmente,
+(vida e mana cheias, quantos dados de vida voltam — metade da reserva, conta
+feita no motor —, exaustão menos um) e, principalmente,
 **quem não pode dormir ainda e quanto falta** para as 24 horas. Quem pode dormir
 é decidido *antes* de alguém dormir: o primeiro `long_rest` avança o relógio 8
 horas, e decidir dentro do laço fazia o resultado depender da ordem do grupo —

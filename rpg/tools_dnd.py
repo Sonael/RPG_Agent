@@ -7422,7 +7422,7 @@ def remove_exhaustion(char_name: str, levels: int = 1) -> str:
 # Agora há UMA reserva e UM caminho de gasto (_gastar_dados_de_vida), que as
 # duas ferramentas e a tela de descanso usam. A reserva é o que limita a cura:
 # esvaziou, o descanso curto ainda passa a hora, mas não cura — só o descanso
-# longo, que é um por dia, devolve os dados.
+# longo, que é um por dia, devolve dados — e só metade da reserva.
 
 def _dado_de_vida(sheet: dict) -> int:
     """Faces do dado de vida: da classe; da ficha para NPC/monstro; senão d8."""
@@ -7444,6 +7444,19 @@ def _reserva_de_dados(sheet: dict) -> tuple[int, int]:
     except (TypeError, ValueError):
         restantes = maximo
     return max(0, min(restantes, maximo)), maximo
+
+
+def _dados_devolvidos_no_longo(sheet: dict) -> int:
+    """
+    Quantos dados o descanso longo devolve AGORA: os gastos, até metade do
+    total (mínimo 1), como no PHB.
+
+    Devolver a reserva inteira fazia um dia ruim sumir numa noite de sono. Com
+    metade, quem torrou os dados numa masmorra acorda com parte deles e sente
+    o custo no dia seguinte — é o que dá peso a guardar dado.
+    """
+    restantes, maximo = _reserva_de_dados(sheet)
+    return min(maximo - restantes, max(1, maximo // 2))
 
 
 def _gastar_dados_de_vida(char: dict, quantos: int) -> dict:
@@ -7509,7 +7522,8 @@ def _passar_hora_do_descanso_curto(sheet: dict) -> None:
 def short_rest(char_name: str, hit_dice: int = -1) -> str:
     """
     Descanso curto (1 hora): o personagem gasta dados de vida da RESERVA para
-    curar. Não restaura mana. A reserva só volta no descanso longo — é ela
+    curar. Não restaura mana. A reserva só volta no descanso longo, e pela
+    metade — é ela
     que impede descanso curto em série de curar o grupo inteiro de graça.
 
     Se a tela de descanso estiver disponível, prefira offer_rest("curto"):
@@ -7547,7 +7561,7 @@ def short_rest(char_name: str, hit_dice: int = -1) -> str:
         linhas.append(f"   Rola {_linha_de_rolagem(g)}")
     elif quantos > 0 and restantes == 0:
         linhas.append("   Sem dados de vida na reserva: a hora passa, mas não cura. "
-                      "O descanso longo devolve os dados.")
+                      "O descanso longo devolve até metade dos dados.")
     elif quantos > 0:
         linhas.append("   Vida já estava no máximo: nenhum dado gasto.")
     linhas.append(f"   Vida: {g['antes']} → {g['depois']}/{s['vida_max']}{_nota_teto(s)}")
@@ -7558,7 +7572,8 @@ def short_rest(char_name: str, hit_dice: int = -1) -> str:
 def use_hit_die(char_name: str, count: int = 1) -> str:
     """
     Gasta dados de vida da reserva para curar (1d[dado] + CON por dado).
-    A reserva tem tantos dados quanto o nível e só volta no descanso longo.
+    A reserva tem tantos dados quanto o nível; o descanso longo devolve
+    até metade dela.
     Para de rolar quando a vida enche — não desperdiça dado.
 
     Use quando o jogador escolhe gastar dados de vida específicos.
@@ -7580,7 +7595,7 @@ def use_hit_die(char_name: str, count: int = 1) -> str:
     if restantes <= 0:
         return (
             f"Erro: {char['name']} não tem dados de vida disponíveis (0/{maximo}).\n"
-            f"   O descanso longo devolve os dados."
+            f"   O descanso longo devolve até metade dos dados."
         )
     if int(s.get("vida_atual", 0) or 0) >= _hp_max_efetivo(s):
         return (f"Nota: {char['name']} já está com a vida no máximo"
@@ -7664,7 +7679,8 @@ def long_rest(char_name: str) -> str:
 
     s["vida_atual"] = _hp_max_efetivo(s)
     s["mana_atual"] = s["mana_max"]
-    s["hit_dice_remaining"] = s.get("nivel", 1)  # Renova dados de vida no descanso longo
+    dados_antes, dados_max = _reserva_de_dados(s)
+    s["hit_dice_remaining"] = dados_antes + _dados_devolvidos_no_longo(s)
     s["death_saves_sucessos"] = 0
     s["death_saves_falhas"]   = 0
     # PV temporários expiram no descanso longo; a concentração também cai.
@@ -7691,7 +7707,9 @@ def long_rest(char_name: str) -> str:
     return (
         f"{char['name']} faz um descanso longo.\n"
         f"   Vida restaurada: {s['vida_atual']}/{s['vida_max']}{_nota_teto(s)}\n"
-        f"   Mana restaurada: {s['mana_max']}/{s['mana_max']}"
+        f"   Mana restaurada: {s['mana_max']}/{s['mana_max']}\n"
+        f"   Dados de vida: {dados_antes} → {s['hit_dice_remaining']}/{dados_max}"
+        f" (o descanso longo devolve até metade)"
         f"{cond_msg}"
         + (f"\n   {temp_perdidos} PV temporários expiraram." if temp_perdidos else "")
         + (f"\n   {conc_msg}" if conc_msg else "")
@@ -7834,6 +7852,9 @@ def rest_snapshot() -> dict:
             "con_mod":         _modifier(int(s.get("constituicao", 10) or 10)),
             "dados_restantes": restantes,
             "dados_max":       maximo,
+            # O cartão do descanso longo mostra quantos voltam; a conta fica
+            # aqui para a regra da metade não ir parar no navegador.
+            "dados_no_longo":  _dados_devolvidos_no_longo(s),
             "gastos_agora":    int(((proposta or {}).get("gastos") or {}).get(c.get("name", ""), 0)),
             "bloqueio_dado":   bloqueio,
             "exaustao":        exa,
