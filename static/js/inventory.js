@@ -124,6 +124,8 @@
     const marcas = [
       i.equipado_em.length ? `<span class="inv-marca inv-marca-equip">${i.equipado_em.map(esc).join(', ')}</span>` : '',
       i.custom ? '<span class="inv-marca" title="Fora do SRD — item próprio da campanha">próprio da campanha</span>' : '',
+      i.nome_srd && i.nome_srd.toLowerCase() !== i.nome.toLowerCase()
+        ? `<span class="inv-marca inv-marca-srd" title="Nome deste item no SRD de D&amp;D 5e">SRD: ${esc(i.nome_srd)}</span>` : '',
       i.a_identificar ? '<span class="inv-marca inv-marca-identificar">a identificar</span>' : '',
     ].join('');
     const botoes = i.opcoes_de_equipar.map(o => {
@@ -147,7 +149,8 @@
         <div class="inv-item-acoes">
           ${botoes}
           ${i.a_identificar ? `<button class="inv-btn inv-btn-identificar"
-                                       onclick="window.Inventory._identificar('${aspas(i.nome)}')">Identificar</button>` : ''}
+                                       title="Confere o item no SRD de D&amp;D 5e"
+                                       onclick="window.Inventory._identificar('${aspas(i.nome)}', this)">Identificar</button>` : ''}
           <button class="inv-btn inv-btn-largar" title="Largar uma unidade"
                   onclick="window.Inventory._largar('${aspas(i.nome)}')">Largar 1</button>
         </div>
@@ -181,6 +184,9 @@
     q('inv-itens').innerHTML = p.itens.length
       ? p.itens.map(i => item(i, p.ca)).join('')
       : '<div class="inv-vazio">Mochila vazia.</div>';
+    // Um redesenho vindo da fila (o mestre mexeu no inventário) no meio de
+    // uma ação não pode reabilitar os botões antes da resposta chegar.
+    ocupar(_busy);
   }
 
   // ---- Sincronia ---------------------------------------------------
@@ -209,34 +215,99 @@
     window.dispatchEvent(new Event('rpg:tela-fechou'));
   }
 
-  function mensagem(txt, ok) {
+  function mensagem(txt, ok, carregando) {
     const el = q('inv-msg');
     if (!el) return;
     el.textContent = txt || '';
     el.classList.toggle('inv-msg-erro', !ok);
+    el.classList.toggle('inv-msg-carregando', !!carregando);
   }
 
-  async function agir(payload) {
+  // Enquanto uma ação está no ar, a tela inteira espera. Antes o clique extra
+  // era só ignorado em silêncio (_busy), e na identificação — que vai ao
+  // Open5e e pode levar segundos — o botão parecia não fazer nada.
+  function ocupar(ligado) {
+    const frame = q('inv-frame');
+    if (!frame) return;
+    frame.classList.toggle('inv-ocupado', ligado);
+    frame.setAttribute('aria-busy', ligado ? 'true' : 'false');
+    frame.querySelectorAll('.inv-btn, .inv-quem-sel').forEach(b => { b.disabled = ligado; });
+  }
+
+  function destacarItem(nome) {
+    const el = [...document.querySelectorAll('#inv-itens .inv-item')]
+      .find(x => x.dataset.nome === nome);
+    if (!el) return;
+    el.classList.add('inv-item-destaque');
+    try { el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (_) { el.scrollIntoView(false); }
+    setTimeout(() => el.classList.remove('inv-item-destaque'), 2600);
+  }
+
+  // A frase do resultado sai dos dados (`resultado`), não do texto do mestre.
+  function fraseDaIdentificacao(r) {
+    if (!r.encontrado) {
+      return `${r.item} não está no SRD de D&D 5e: ficou marcado como item próprio da campanha.`;
+    }
+    const detalhes = [r.tipo, r.raridade, r.sintonizacao ? 'requer sintonização' : '']
+      .filter(Boolean).join(', ');
+    const nome = r.nome_srd && r.nome_srd.toLowerCase() !== r.item.toLowerCase()
+      ? `${r.item} é ${r.nome_srd} no SRD` : `${r.item} está no SRD`;
+    return `${nome}${detalhes ? ` (${detalhes})` : ''}. A descrição foi atualizada.`;
+  }
+
+  async function agir(payload, opts) {
     if (_busy) return;
     const p = _last.personagem || {};
     if (!p.nome) return;
+    opts = opts || {};
     _busy = true;
+    ocupar(true);
+    if (opts.aoComecar) opts.aoComecar();
     try {
       const res = await doAction({ char: p.nome, ...payload });
       _busy = false;
-      if (!res) return;
+      if (!res) { ocupar(false); return; }
       const texto = (res.message || '').replace(/\*\*/g, '').split('\n').filter(Boolean);
-      // A primeira linha diz o que aconteceu; a da CA, quando houver, é a
-      // que o jogador quer ver.
-      const linhaCa = texto.find(l => /CA:?\s*\d+\s*→/.test(l));
-      mensagem([texto[0], linhaCa && linhaCa !== texto[0] ? linhaCa.trim() : ''].filter(Boolean).join(' '),
-               res.ok !== false);
-      if (res.snapshot) render(res.snapshot);
+      if (res.resultado && res.ok !== false) {
+        mensagem(fraseDaIdentificacao(res.resultado), true);
+      } else {
+        // A primeira linha diz o que aconteceu; a da CA, quando houver, é a
+        // que o jogador quer ver.
+        const linhaCa = texto.find(l => /CA:?\s*\d+\s*→/.test(l));
+        mensagem([texto[0], linhaCa && linhaCa !== texto[0] ? linhaCa.trim() : ''].filter(Boolean).join(' '),
+                 res.ok !== false);
+      }
+      if (res.snapshot) render(res.snapshot); else ocupar(false);
+      if (payload.item && payload.action === 'identificar') destacarItem(payload.item);
       if (res.ok !== false && typeof window.refreshMemory === 'function') window.refreshMemory();
     } catch (_) {
       _busy = false;
+      ocupar(false);
+      if (opts.aoFalhar) opts.aoFalhar();
       mensagem('Falha de conexão.', false);
     }
+  }
+
+  function identificar(item, botao) {
+    agir({ action: 'identificar', item }, {
+      aoComecar: () => {
+        if (botao) {
+          botao.dataset.rotulo = botao.textContent;
+          botao.textContent = 'Consultando…';
+          botao.classList.add('inv-btn-consultando');
+          const card = botao.closest('.inv-item');
+          if (card) card.classList.add('inv-item-consultando');
+        }
+        mensagem(`Consultando o SRD de D&D 5e para ${item}…`, true, true);
+      },
+      aoFalhar: () => {
+        if (!botao) return;
+        botao.textContent = botao.dataset.rotulo || 'Identificar';
+        botao.classList.remove('inv-btn-consultando');
+        const card = botao.closest('.inv-item');
+        if (card) card.classList.remove('inv-item-consultando');
+      },
+    });
   }
 
   window.Inventory = {
@@ -247,7 +318,7 @@
     _equipar: (item, slot) => agir({ action: 'equipar', item, slot }),
     _desequipar: (slot) => agir({ action: 'desequipar', slot }),
     _largar: (item) => agir({ action: 'largar', item }),
-    _identificar: (item) => agir({ action: 'identificar', item }),
+    _identificar: identificar,
   };
 
   document.addEventListener('DOMContentLoaded', () => { ensureDom(); });

@@ -3096,6 +3096,26 @@ body.inventory-on { overflow: hidden; }
 .inv-btn-equipar:hover { background: var(--inv-dark); }
 .inv-previa { font-weight: 400; opacity: .9; margin-left: 2px; font-variant-numeric: tabular-nums; }
 .inv-btn-identificar { border-color: #7b5ea7; color: #5b3f8a; }
+.inv-marca-srd { border-color: var(--inv-gold); color: var(--inv-dark); }
+/* Ação no ar: a tela espera. Sem isto o Identificar (que vai ao Open5e e pode
+   levar segundos) parecia um botão morto. */
+.inv-btn:disabled, .inv-quem-sel:disabled { opacity: .5; cursor: progress; }
+.inv-btn-consultando:disabled { opacity: 1; background: #efe8f6; }
+.inv-btn-consultando::before {
+  content: ''; display: inline-block; width: .8em; height: .8em;
+  margin-right: var(--esp-1); vertical-align: -1px;
+  border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%;
+  animation: inv-gira .8s linear infinite;
+}
+@keyframes inv-gira { to { transform: rotate(360deg); } }
+.inv-item-consultando { border-color: #7b5ea7; }
+.inv-item { transition: box-shadow .3s, background-color .3s; }
+.inv-item-destaque { box-shadow: 0 0 0 2px var(--inv-gold); background: var(--inv-bg); }
+.inv-msg-carregando { font-style: italic; color: #5b3f8a; }
+@media (prefers-reduced-motion: reduce) {
+  .inv-btn-consultando::before { animation: none; border-right-color: currentColor; }
+  .inv-item { transition: none; }
+}
 .inv-btn-largar { color: var(--inv-muted); border-color: var(--inv-line); }
 .inv-vazio { color: var(--inv-muted); font-style: italic; text-align: center; padding: var(--esp-8) var(--esp-4); }
 

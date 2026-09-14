@@ -1425,9 +1425,45 @@ equip_item de item que não existe          "'Espada Inexistente' não está..."
 - `identify_item` marca o item como conferido (`identificado`, e `custom`
   quando não está no SRD), para a Mochila não oferecer "Identificar" de novo.
 
-Limitação conhecida: a busca de item mágico no Open5e é **em inglês**. Um
-"Manto Élfico" não é achado ("Cloak of Elvenkind" seria) e sai como item da
-campanha; um mapa de nomes em português para itens mágicos resolveria.
+### Identificar: nome em português, casamento exato e retorno na tela
+
+Três defeitos no botão, e mais um na conferência que vinha junto:
+
+- **O SRD é em inglês.** "Manto Élfico" não achava "Cloak of Elvenkind" e saía
+  como item da campanha. `_candidatos_srd` gera os nomes em inglês a tentar:
+  - nomes inteiros para o que não se compõe (`_ITEM_MAGICO_PT_TO_EN`: Bolsa
+    Devoradora, Língua de Fogo, Pedra da Sorte...);
+  - "cabeça de complemento" para o grosso do SRD (`_ITEM_CABECA_PT_TO_EN` ×
+    `_ITEM_COMPLEMENTO_PT_TO_EN`: Anel de Proteção → Ring of Protection);
+  - arma com bônus ("Espada Longa +1") → "Weapon, +1, +2, or +3";
+  - e o próprio nome, para quem já escreve em inglês.
+
+  Todos os nomes em inglês dos dois dicionários foram conferidos contra os 237
+  itens do SRD no Open5e.
+- **A busca aceitava qualquer resultado.** A busca textual do Open5e procura
+  também nas descrições ("longsword" devolvia a Excalibur's Scabbard). O
+  código ficava com o resultado de mais palavras em comum mesmo quando
+  nenhuma coincidia, e gravava a descrição de outro item. Agora
+  `_consultar_item_srd` só aceita o item do SRD oficial (`wotc-srd`, a busca
+  vai filtrada por documento) cujo nome confere **exatamente** com um
+  candidato (`_mesmo_item`, que também aceita o parêntese de "Stone of Good
+  Luck (Luckstone)"). Uma tradução errada só deixa de achar; nunca troca o
+  item por outro.
+- **Sem conexão não é homebrew.** Com o Open5e fora do ar, o item era marcado
+  como "próprio da campanha" e o botão sumia para sempre. Agora
+  `identify_item` responde `Erro:` com "tente de novo" e não marca nada. Só um
+  "não existe" de verdade marca.
+- **O clique não dava sinal.** A consulta leva de meio a um segundo e pouco,
+  e nesse tempo a tela não mudava. Agora o botão vira "Consultando…" com um
+  indicador girando, o rodapé diz "Consultando o SRD de D&D 5e para Manto
+  Élfico…", e os outros botões ficam desabilitados até a resposta. No fim, o
+  rodapé diz o resultado em português ("Manto Élfico é Cloak of Elvenkind no
+  SRD (item maravilhoso, incomum, requer sintonização)"), o item ganha a
+  marca "SRD: Cloak of Elvenkind" e fica destacado por um instante.
+
+A tela continua passando por `identify_item`. O resultado em dados
+(`resultado` na resposta de `inventory_action`) sai do item gravado (`nome_srd`
+e `srd`, com tipo e raridade em português), não do texto do mestre.
 
 ## Tela de loja ("O Balcão")
 

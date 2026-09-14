@@ -186,13 +186,74 @@ def test_largar_uma_tocha_de_cinco(pagina):
     assert "×4" in pg.inner_text(f"{_item('Tocha')} .inv-item-nome")
 
 
-def test_identificar_some_com_o_botao(pagina):
+def _open5e_falso(monkeypatch, itens, atraso=0.0):
+    """O servidor roda neste processo: simular o Open5e aqui vale para a tela."""
+    import time
+    from rpg import open5e
+
+    def falso(url, params=None, timeout=5.0):
+        if atraso:
+            time.sleep(atraso)
+        if params and "search" in params:
+            return open5e.Response(True, {"results": []}, 200)
+        dados = itens.get(url.rstrip("/").rsplit("/", 1)[-1])
+        return open5e.Response(bool(dados), dados, 200 if dados else 404)
+
+    monkeypatch.setattr(open5e, "get", falso)
+
+
+_CLOAK = {"name": "Cloak of Elvenkind", "type": "Wondrous item", "rarity": "uncommon",
+          "requires_attunement": "requires attunement", "document__slug": "wotc-srd",
+          "desc": "While you wear this cloak with its hood up..."}
+
+
+def test_identificar_mostra_que_esta_consultando(pagina, monkeypatch):
+    """O defeito relatado: o clique não dava sinal nenhum até a resposta."""
+    _open5e_falso(monkeypatch, {"cloak-of-elvenkind": _CLOAK}, atraso=0.6)
     pg, _ = pagina
-    assert pg.is_visible(f"{_item('Manto Élfico')} .inv-btn-identificar")
+    botao = f"{_item('Manto Élfico')} .inv-btn-identificar"
+
+    pg.click(botao)
+
+    pg.wait_for_selector(f"{botao}.inv-btn-consultando", timeout=2000)
+    assert "Consultando" in pg.inner_text(botao)
+    assert "Consultando o SRD" in pg.inner_text("#inv-msg")
+    assert pg.is_disabled(f"{_item('Tocha')} .inv-btn-largar"), "os outros botões seguiam clicáveis"
+    pg.wait_for_selector(f"{_item('Manto Élfico')} .inv-marca-srd", timeout=15000)
+    assert pg.is_enabled(f"{_item('Tocha')} .inv-btn-largar")
+
+
+def test_identificar_diz_o_que_achou(pagina, monkeypatch):
+    _open5e_falso(monkeypatch, {"cloak-of-elvenkind": _CLOAK})
+    pg, _ = pagina
+
+    _clicar(pg, f"{_item('Manto Élfico')} .inv-btn-identificar", 1200)
+
+    assert pg.locator(f"{_item('Manto Élfico')} .inv-btn-identificar").count() == 0
+    assert "SRD: Cloak of Elvenkind" in pg.inner_text(_item("Manto Élfico"))
+    msg = pg.inner_text("#inv-msg")
+    assert "Manto Élfico é Cloak of Elvenkind no SRD" in msg
+    assert "item maravilhoso, incomum, requer sintonização" in msg
+    assert "inv-msg-erro" not in (pg.get_attribute("#inv-msg", "class") or "")
+
+
+def test_identificar_fora_do_srd_marca_como_proprio(pagina, monkeypatch):
+    _open5e_falso(monkeypatch, {})
+    pg, _ = pagina
     _clicar(pg, f"{_item('Manto Élfico')} .inv-btn-identificar", 1200)
     assert pg.locator(f"{_item('Manto Élfico')} .inv-btn-identificar").count() == 0
     assert "próprio da campanha" in pg.inner_text(_item("Manto Élfico"))
-    assert "inv-msg-erro" not in (pg.get_attribute("#inv-msg", "class") or "")
+    assert "não está no SRD" in pg.inner_text("#inv-msg")
+
+
+def test_identificar_sem_conexao_mantem_o_botao(pagina):
+    """Sem Open5e (padrão dos testes): erro visível, e o botão continua lá."""
+    pg, _ = pagina
+    _clicar(pg, f"{_item('Manto Élfico')} .inv-btn-identificar", 1200)
+    assert pg.is_visible(f"{_item('Manto Élfico')} .inv-btn-identificar")
+    assert "Identificar" == pg.inner_text(f"{_item('Manto Élfico')} .inv-btn-identificar").strip()
+    assert "inv-msg-erro" in (pg.get_attribute("#inv-msg", "class") or "")
+    assert "tente de novo" in pg.inner_text("#inv-msg")
 
 
 def test_item_comum_nao_tem_identificar(pagina):

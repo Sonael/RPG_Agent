@@ -5927,45 +5927,276 @@ def _precisa_de_conferencia(item_name: str, description: str = "") -> bool:
             or _tem_efeito_mecanico(item_name, description))
 
 
-def _search_open5e_item(item_name: str) -> dict | None:
+# ── Nomes de item mágico: português → SRD ───────────────────────────────────
+#
+# O SRD é em inglês. "Manto Élfico" não achava "Cloak of Elvenkind" e virava
+# homebrew. A tradução gera CANDIDATOS; nenhum é aceito sem que o SRD confirme
+# o nome exato (_consultar_item_srd), então uma tradução errada só deixa de
+# achar — nunca troca o item por outro.
+#
+# Nomes inteiros, para o que não se compõe palavra a palavra. Chaves já
+# normalizadas (sem acento, minúsculas).
+_ITEM_MAGICO_PT_TO_EN: dict[str, str] = {
+    "manto elfico": "Cloak of Elvenkind", "capa elfica": "Cloak of Elvenkind",
+    "manto dos elfos": "Cloak of Elvenkind", "botas elficas": "Boots of Elvenkind",
+    "botas dos elfos": "Boots of Elvenkind", "cota elfica": "Elven Chain",
+    "cota de malha elfica": "Elven Chain", "cinto anao": "Belt of Dwarvenkind",
+    "cinto dos anoes": "Belt of Dwarvenkind", "placas anas": "Dwarven Plate",
+    "armadura de placas ana": "Dwarven Plate", "arremessador anao": "Dwarven Thrower",
+    "martelo arremessador anao": "Dwarven Thrower",
+    "bolsa devoradora": "Bag of Devouring", "bolsa de contencao": "Bag of Holding",
+    "bolsa sem fundo": "Bag of Holding", "bolsa de truques": "Bag of Tricks",
+    "bolsa de feijoes": "Bag of Beans", "mochila pratica": "Handy Haversack",
+    "mochila util": "Handy Haversack", "aljava eficiente": "Efficient Quiver",
+    "buraco portatil": "Portable Hole", "tapete voador": "Carpet of Flying",
+    "vassoura voadora": "Broom of Flying", "bola de cristal": "Crystal Ball",
+    "pergaminho de magia": "Spell Scroll", "barco dobravel": "Folding Boat",
+    "fortaleza instantanea": "Instant Fortress", "bastao imovel": "Immovable Rod",
+    "haste imovel": "Immovable Rod", "cola soberana": "Sovereign Glue",
+    "solvente universal": "Universal Solvent", "unguento restaurador": "Restorative Ointment",
+    "pomada restauradora": "Restorative Ointment", "pedra da sorte": "Stone of Good Luck (Luckstone)",
+    "pedra ioun": "Ioun Stone", "gema elemental": "Elemental Gem",
+    "garrafa de efreeti": "Efreeti Bottle", "garrafa fumegante": "Eversmoking Bottle",
+    "frasco de ferro": "Iron Flask", "espelho aprisionador": "Mirror of Life Trapping",
+    "baralho das ilusoes": "Deck of Illusions", "baralho do destino": "Deck of Many Things",
+    "baralho das muitas coisas": "Deck of Many Things", "esfera da anulacao": "Sphere of Annihilation",
+    "esfera de anulacao": "Sphere of Annihilation", "portao cubico": "Cubic Gate",
+    "cubo de forca": "Cube of Force", "conta de forca": "Bead of Force",
+    "figura de poder maravilhoso": "Figurine of Wondrous Power", "pigmentos maravilhosos": "Marvelous Pigments",
+    "pena magica": "Feather Token", "leque do vento": "Wind Fan", "botas aladas": "Winged Boots",
+    "asas de voo": "Wings of Flying", "vinho do amor": "Philter of Love", "filtro do amor": "Philter of Love",
+    "armadura de mithral": "Mithral Armor", "armadura de mitral": "Mithral Armor",
+    "armadura de adamantina": "Adamantine Armor", "armadura demoniaca": "Demon Armor",
+    "cota de escamas de dragao": "Dragon Scale Mail", "armadura de escamas de dragao": "Dragon Scale Mail",
+    "couro batido encantado": "Glamoured Studded Leather", "escudo animado": "Animated Shield",
+    "escudo apanha flechas": "Arrow-Catching Shield", "escudo guardiao de magia": "Spellguard Shield",
+    "machado berserker": "Berserker Axe", "machado do berserker": "Berserker Axe",
+    "lingua de fogo": "Flame Tongue", "lingua flamejante": "Flame Tongue", "marca gelida": "Frost Brand",
+    "marca de gelo": "Frost Brand", "espada dancante": "Dancing Sword", "defensora": "Defender",
+    "espada defensora": "Defender", "matadora de dragoes": "Dragon Slayer", "matador de dragoes": "Dragon Slayer",
+    "matadora de gigantes": "Giant Slayer", "matador de gigantes": "Giant Slayer",
+    "vingador sagrado": "Holy Avenger", "lamina da sorte": "Luck Blade", "lamina solar": "Sun Blade",
+    "lamina do sol": "Sun Blade", "espada vorpal": "Vorpal Sword", "roubadora de nove vidas": "Nine Lives Stealer",
+    "arco do juramento": "Oathbow", "arma cruel": "Vicious Weapon", "arma viciosa": "Vicious Weapon",
+    "adaga venenosa": "Dagger of Venom", "flecha assassina": "Arrow of Slaying",
+    "flecha da morte": "Arrow of Slaying", "azagaia do relampago": "Javelin of Lightning",
+    "dardo do relampago": "Javelin of Lightning", "tridente de comando de peixes": "Trident of Fish Command",
+    "martelo dos raios": "Hammer of Thunderbolts", "orbe dos dragoes": "Orb of Dragonkind",
+    "pedra de controlar elementais da terra": "Stone of Controlling Earth Elementals",
+    "grilhoes dimensionais": "Dimensional Shackles", "algemas dimensionais": "Dimensional Shackles",
+    "faixas de ferro da prisao": "Iron Bands of Binding", "aparato do caranguejo": "Apparatus of the Crab",
+    "vela da invocacao": "Candle of Invocation", "sino da abertura": "Chime of Opening",
+    "decantador de agua infinita": "Decanter of Endless Water", "jarro de agua infinita": "Decanter of Endless Water",
+    "poco dos muitos mundos": "Well of Many Worlds", "robe dos itens uteis": "Robe of Useful Items",
+    "tunica dos itens uteis": "Robe of Useful Items", "tunica das cores cintilantes": "Robe of Scintillating Colors",
+    "colar de contas de oracao": "Necklace of Prayer Beads", "rosario": "Necklace of Prayer Beads",
+    "varinha do mago de guerra": "Wand of the War Mage, +1, +2, or +3",
+    "cajado do mago": "Staff of the Magi", "cajado dos magos": "Staff of the Magi",
+    "tunica do arquimago": "Robe of the Archmagi", "robe do arquimago": "Robe of the Archmagi",
+    "manto do arquimago": "Robe of the Archmagi",
+}
+
+# "Cabeça de complemento": o grosso do SRD é "Ring of X", "Wand of X"...
+_ITEM_CABECA_PT_TO_EN: dict[str, tuple[str, ...]] = {
+    "anel": ("Ring",), "varinha": ("Wand",), "cajado": ("Staff",), "bastao": ("Rod", "Staff"),
+    "cetro": ("Rod",), "haste": ("Rod",), "pocao": ("Potion",), "amuleto": ("Amulet",),
+    "manto": ("Cloak", "Mantle", "Robe"), "capa": ("Cloak", "Cape"), "botas": ("Boots",),
+    "elmo": ("Helm",), "capacete": ("Helm",), "luvas": ("Gloves",), "manoplas": ("Gauntlets",),
+    "bracadeiras": ("Bracers",), "braceletes": ("Bracers",), "cinto": ("Belt",),
+    "tunica": ("Robe",), "robe": ("Robe",), "tomo": ("Tome",), "manual": ("Manual",),
+    "colar": ("Necklace",), "broche": ("Brooch",), "espada": ("Sword",), "maca": ("Mace",),
+    "escudo": ("Shield",), "armadura": ("Armor",), "oleo": ("Oil",), "po": ("Dust",),
+    "corda": ("Rope",), "pedra": ("Stone",), "gema": ("Gem",), "olhos": ("Eyes",),
+    "talisma": ("Talisman",), "periapto": ("Periapt",), "trompa": ("Horn",), "chifre": ("Horn",),
+    "flauta": ("Pipes",), "gaita": ("Pipes",), "ferraduras": ("Horseshoes",),
+    "chinelos": ("Slippers",), "sapatilhas": ("Slippers",), "diadema": ("Circlet",),
+    "tiara": ("Circlet",), "faixa": ("Headband",), "oculos": ("Goggles",), "chapeu": ("Hat",),
+    "lanterna": ("Lantern",), "medalhao": ("Medallion",), "perola": ("Pearl",),
+    "incensario": ("Censer",), "braseiro": ("Brazier",), "tigela": ("Bowl",),
+    "sino": ("Chime",), "carrilhao": ("Chime",),
+}
+
+_ITEM_COMPLEMENTO_PT_TO_EN: dict[str, str] = {
+    "protecao": "Protection", "invisibilidade": "Invisibility", "cura": "Healing",
+    "velocidade": "Speed", "rapidez": "Speed", "levitacao": "Levitation", "saude": "Health",
+    "voo": "Flying", "forca de gigante": "Giant Strength", "forca do gigante": "Giant Strength",
+    "forca gigante": "Giant Strength", "forca de ogro": "Ogre Power", "forca do ogro": "Ogre Power",
+    "poder de ogro": "Ogre Power", "bolas de fogo": "Fireballs", "misseis magicos": "Magic Missiles",
+    "relampagos": "Lightning Bolts", "raios": "Lightning Bolts", "teia": "Web", "teias": "Web",
+    "medo": "Fear", "paralisia": "Paralysis", "polimorfia": "Polymorph", "metamorfose": "Polymorph",
+    "segredos": "Secrets", "prodigios": "Wonder", "maravilhas": "Wonder",
+    "deteccao de magia": "Magic Detection", "deteccao de inimigos": "Enemy Detection",
+    "amarracao": "Binding", "prisao": "Binding", "resistencia": "Resistance", "evasao": "Evasion",
+    "queda suave": "Feather Falling", "queda de pena": "Feather Falling", "acao livre": "Free Action",
+    "salto": "Jumping", "saltos": "Jumping", "regeneracao": "Regeneration", "natacao": "Swimming",
+    "telecinesia": "Telekinesis", "tres desejos": "Three Wishes", "calor": "Warmth",
+    "andar sobre as aguas": "Water Walking", "caminhar sobre as aguas": "Water Walking",
+    "visao de raio x": "X-ray Vision", "estrelas": "Stars", "arquimago": "the Archmagi",
+    "fogo": "Fire", "gelo": "Frost", "frio": "Frost", "poder": "Power", "golpe": "Striking",
+    "golpes": "Striking", "mago": "the Magi", "magos": "the Magi", "encantamento": "Charming",
+    "arquearia": "Archery", "defesa": "Defense", "disfarce": "Disguise", "intelecto": "Intellect",
+    "telepatia": "Telepathy", "teletransporte": "Teleportation",
+    "compreensao de idiomas": "Comprehending Languages", "compreender idiomas": "Comprehending Languages",
+    "brilho": "Brilliance", "respiracao aquatica": "Water Breathing", "respirar na agua": "Water Breathing",
+    "escalada": "Climbing", "crescimento": "Growth", "diminuicao": "Diminution", "heroismo": "Heroism",
+    "forma gasosa": "Gaseous Form", "clarividencia": "Clairvoyance", "leitura da mente": "Mind Reading",
+    "ler mentes": "Mind Reading", "veneno": "Poison", "amizade animal": "Animal Friendship",
+    "amizade com animais": "Animal Friendship", "influencia animal": "Animal Influence",
+    "comando elemental": "Elemental Command", "armazenar magia": "Spell Storing",
+    "armazenamento de magia": "Spell Storing", "reflexao de magia": "Spell Turning",
+    "estrelas cadentes": "Shooting Stars", "carneiro": "the Ram", "blindagem mental": "Mind Shielding",
+    "escudo mental": "Mind Shielding", "convocacao de djinni": "Djinni Summoning",
+    "ruptura": "Disruption", "punicao": "Smiting", "terror": "Terror", "ferimento": "Wounding",
+    "ferimentos": "Wounding", "roubo de vida": "Life Stealing", "afiada": "Sharpness", "corte": "Sharpness",
+    "invulnerabilidade": "Invulnerability", "vulnerabilidade": "Vulnerability",
+    "resistencia a magia": "Spell Resistance", "arrebatamento": "Blasting", "explosao": "Blasting",
+    "explosoes": "Blasting", "etereo": "Etherealness", "eterealidade": "Etherealness",
+    "afiacao": "Sharpness", "escorregadio": "Slipperiness", "desaparecimento": "Disappearance",
+    "secura": "Dryness", "adaptacao": "Adaptation", "pensamentos": "Thoughts",
+    "encantar": "Charming", "visao minuciosa": "Minute Seeing", "aguia": "the Eagle",
+    "visao noturna": "Night", "noite": "Night", "morcego": "the Bat", "arraia": "the Manta Ray",
+    "aranha": "Arachnida", "deslocamento": "Displacement", "alerta": "Alertness", "seguranca": "Security",
+    "absorcao": "Absorption", "dominio": "Rulership", "poder senhorial": "Lordly Might",
+    "escalar": "Climbing", "enredar": "Entanglement", "enredamento": "Entanglement",
+    "fechamento de feridas": "Wound Closure", "fechar feridas": "Wound Closure",
+    "imunidade a veneno": "Proof against Poison", "lideranca e influencia": "Leadership and Influence",
+    "pensamento claro": "Clear Thought", "compreensao": "Understanding", "exercicio": "Gainful Exercise",
+    "golens": "Golems", "saude corporal": "Bodily Health", "rapidez de acao": "Quickness of Action",
+    "revelacao": "Revealing", "insetos": "Swarming Insects", "trovao e relampago": "Thunder and Lightning",
+    "definhamento": "Withering", "piton": "the Python", "floresta": "the Woodlands", "bosques": "the Woodlands",
+    "planos": "the Planes", "valhalla": "Valhalla", "bolas": "Fireballs", "luz": "Brightness",
+    "visao": "Seeing", "encanto": "Charming", "comandar elementais da agua": "Commanding Water Elementals",
+    "invernia": "the Winterlands", "terras invernais": "the Winterlands",
+    "passos largos e saltos": "Striding and Springing", "natacao e escalada": "Swimming and Climbing",
+    "apanhar projeteis": "Missile Snaring", "atracao de projeteis": "Missile Attraction",
+    "escudo": "Shielding", "blindagem": "Shielding", "abertura": "Opening", "zefir": "a Zephyr",
+}
+
+_SRD_ITEMS_URL = "https://api.open5e.com/v1/magicitems/"
+
+
+def _candidatos_srd(item_name: str) -> list[str]:
+    """Nomes em inglês a tentar no SRD, do mais provável ao menos."""
+    bruto = (item_name or "").strip()
+    alvo = _norm_txt(bruto)
+    candidatos: list[str] = []
+
+    def _add(nome: str) -> None:
+        if nome and nome not in candidatos:
+            candidatos.append(nome)
+
+    # "Espada Longa +1": o SRD tem uma entrada só para arma com bônus.
+    sem_bonus = re.sub(r"\s*\+\s*[1-3]\b", "", bruto).strip()
+    if sem_bonus != bruto:
+        if _arma_conhecida(sem_bonus) or _norm_txt(sem_bonus) in ("arma", "weapon"):
+            _add("Weapon, +1, +2, or +3")
+        alvo_sem = _norm_txt(sem_bonus)
+        if alvo_sem in _ITEM_MAGICO_PT_TO_EN:
+            _add(_ITEM_MAGICO_PT_TO_EN[alvo_sem])
+
+    if alvo in _ITEM_MAGICO_PT_TO_EN:
+        _add(_ITEM_MAGICO_PT_TO_EN[alvo])
+
+    m = re.match(r"^(\S+)\s+(?:de|da|do|das|dos)\s+(.+)$", alvo)
+    if m:
+        cabecas = _ITEM_CABECA_PT_TO_EN.get(m.group(1), ())
+        resto = re.sub(r"^(?:o|a|os|as)\s+", "", m.group(2))
+        complemento = _ITEM_COMPLEMENTO_PT_TO_EN.get(resto)
+        if cabecas and complemento:
+            for cabeca in cabecas:
+                _add(f"{cabeca} of {complemento}")
+
+    # Quem já escreveu em inglês continua funcionando.
+    _add(bruto)
+    return candidatos
+
+
+def _slug_srd(nome: str) -> str:
+    s = _norm_txt(nome).replace("'", "")
+    s = re.sub(r"[^a-z0-9]+", "-", s)
+    return s.strip("-")
+
+
+def _mesmo_item(nome_srd: str, candidato: str) -> bool:
     """
-    Busca o item mágico no Open5e. Tenta slug exato primeiro, depois search.
-    Retorna o dict do item ou None se não encontrado / API offline.
+    O nome do SRD é o candidato? Casamento EXATO (sem caixa, acento e
+    pontuação), aceitando o parêntese: "Stone of Good Luck (Luckstone)" casa
+    com "Stone of Good Luck" e com "Luckstone". Nunca por palavras em comum:
+    a busca do Open5e procura também nas descrições, e "longsword" devolvia a
+    Excalibur.
+    """
+    def limpo(t: str) -> str:
+        return re.sub(r"[^a-z0-9]+", " ", _norm_txt(t)).strip()
+    a, b = limpo(nome_srd), limpo(candidato)
+    if not a or not b:
+        return False
+    if a == b:
+        return True
+    m = re.match(r"^(.*)\((.*)\)\s*$", _norm_txt(nome_srd))
+    return bool(m) and b in (limpo(m.group(1)), limpo(m.group(2)))
+
+
+def _consultar_item_srd(item_name: str) -> tuple[dict | None, bool]:
+    """
+    Procura o item no SRD oficial (wotc-srd). Devolve (dados, consultou):
+      dados     — o item, só quando o nome confere exatamente;
+      consultou — False quando nenhuma requisição teve resposta (offline, rede
+                  caída). "Não achei" e "não consegui perguntar" são coisas
+                  diferentes, e só a primeira pode marcar o item como homebrew.
     """
     from rpg.open5e import http as _req   # SRD com cache, sessão e retry
 
-    slug = item_name.lower().strip().replace(" ", "-").replace("'", "")
     _edbg(f"  [OPEN5E] Buscando item mágico '{item_name}' na base SRD (grounding)…")
+    candidatos = _candidatos_srd(item_name)
+    consultou = False
 
-    try:
-        # Tentativa 1: slug exato
-        r = _req.get(f"https://api.open5e.com/v1/magicitems/{slug}/", timeout=5)
-        if r.ok and r.json().get("name"):
-            _edbg(f"  [OPEN5E] Item encontrado por slug exato: {r.json().get('name')}")
-            return r.json()
-    except Exception:
-        pass
-
-    try:
-        # Tentativa 2: busca textual
-        r = _req.get(
-            "https://api.open5e.com/v1/magicitems/",
-            params={"search": item_name, "limit": 5},
-            timeout=5,
-        )
+    for cand in candidatos:
+        r = _req.get(f"{_SRD_ITEMS_URL}{_slug_srd(cand)}/", timeout=5)
+        consultou = consultou or bool(r.status_code)
         if r.ok:
-            results = r.json().get("results", [])
-            if results:
-                # Prioriza resultado com nome mais próximo
-                item_words = set(item_name.lower().split())
-                best = max(results, key=lambda x: len(item_words & set(x.get("name","").lower().split())))
-                _edbg(f"  [OPEN5E] Item encontrado por busca textual: {best.get('name')}")
-                return best
-    except Exception:
-        pass
+            d = r.json() or {}
+            if (d.get("document__slug") or "wotc-srd") == "wotc-srd" and _mesmo_item(d.get("name", ""), cand):
+                _edbg(f"  [OPEN5E] '{item_name}' é '{d.get('name')}' no SRD")
+                return d, True
 
-    _edbg(f"  [OPEN5E] '{item_name}' não encontrado no SRD → tratado como item customizado/homebrew")
-    return None
+    # O slug nem sempre é o nome ("Stone of Good Luck (Luckstone)"). A busca
+    # fica restrita ao SRD e só aceita nome exato.
+    for cand in candidatos[:3]:
+        r = _req.get(_SRD_ITEMS_URL, params={"search": cand, "limit": 10,
+                                             "document__slug": "wotc-srd"}, timeout=5)
+        consultou = consultou or bool(r.status_code)
+        if r.ok:
+            for d in (r.json() or {}).get("results", []) or []:
+                if _mesmo_item(d.get("name", ""), cand):
+                    _edbg(f"  [OPEN5E] '{item_name}' é '{d.get('name')}' no SRD")
+                    return d, True
+
+    _edbg(f"  [OPEN5E] '{item_name}' não encontrado no SRD"
+          + ("" if consultou else " (sem resposta do Open5e)"))
+    return None, consultou
+
+
+def _search_open5e_item(item_name: str) -> dict | None:
+    """O item do SRD cujo nome confere com `item_name`, ou None."""
+    return _consultar_item_srd(item_name)[0]
+
+
+_RARIDADE_PT = {"common": "comum", "uncommon": "incomum", "rare": "raro",
+                "very rare": "muito raro", "legendary": "lendário", "artifact": "artefato"}
+_TIPO_ITEM_PT = (("wondrous", "item maravilhoso"), ("armor", "armadura"), ("weapon", "arma"),
+                 ("ring", "anel"), ("rod", "bastão"), ("staff", "cajado"), ("wand", "varinha"),
+                 ("potion", "poção"), ("scroll", "pergaminho"))
+
+
+def _tipo_item_pt(tipo: str) -> str:
+    t = (tipo or "").lower()
+    return next((pt for en, pt in _TIPO_ITEM_PT if t.startswith(en)), tipo or "")
+
+
+def _raridade_pt(raridade: str) -> str:
+    r = (raridade or "").lower().strip()
+    return next((pt for en, pt in sorted(_RARIDADE_PT.items(), key=lambda x: -len(x[0]))
+                 if r.startswith(en)), raridade or "")
 
 
 def identify_item(char_name: str, item_name: str) -> str:
@@ -5984,9 +6215,7 @@ def identify_item(char_name: str, item_name: str) -> str:
     if not char:
         return err
 
-    result = _search_open5e_item(item_name)
-    # O item conferido fica marcado, seja qual for o resultado: a Mochila só
-    # oferece "Identificar" para o que ainda não passou pelo SRD.
+    result, consultou = _consultar_item_srd(item_name)
     inv = char.get("inventario", [])
     alvo = next((i for i in inv if isinstance(i, dict)
                  and _norm_txt(i.get("nome", "")) == _norm_txt(item_name)), None)
@@ -5998,36 +6227,50 @@ def identify_item(char_name: str, item_name: str) -> str:
         attune   = result.get("requires_attunement", "")
         desc_raw = result.get("desc", "Sem descrição disponível.")
         desc     = " ".join(desc_raw.split())[:400]
+        sintoniza = bool(attune) and attune not in ("", "no", "false", False)
+        attune_str = " · Requer sintonização" if sintoniza else ""
 
-        attune_str = ""
-        if attune and attune not in ("", "no", "false", False):
-            attune_str = " · Requer sintonização"
-
-        # Atualiza a descrição do item no inventário se já existir
+        # O item conferido fica marcado: a Mochila só oferece "Identificar"
+        # para o que ainda não passou pelo SRD.
         if alvo:
             alvo["descricao"] = f"[{rarity}] {desc[:200]}"
             alvo["custom"] = False          # conferido e canônico
             alvo["identificado"] = True
+            alvo["nome_srd"] = name
+            # Em português, para a Mochila dizer o que foi achado.
+            alvo["srd"] = {"tipo": _tipo_item_pt(type_), "raridade": _raridade_pt(rarity),
+                           "sintonizacao": sintoniza}
             memory.save_campaign()
 
+        cabeca = (f"**{item_name}** é **{name}** no SRD" if not _mesmo_item(name, item_name)
+                  else f"**{name}**")
         return (
-            f"**{name}**\n"
+            f"{cabeca}\n"
             f"   Tipo: {type_} · Raridade: {rarity}{attune_str}\n"
             f"   {desc}"
         )
-    else:
-        if alvo:
-            # Fora do SRD: a mesma marca que add_item dá, e conferido.
-            alvo["custom"] = True
-            alvo["identificado"] = True
-            memory.save_campaign()
-        nivel = char.get("sheet", {}).get("nivel", 1)
+
+    if not consultou:
+        # Sem resposta do Open5e não se sabe se o item existe. Marcar como
+        # homebrew aqui escondia o botão para sempre por causa de uma queda
+        # de rede.
         return (
-            f"Aviso: '{item_name}' não encontrado no banco D&D 5e (SRD).\n"
-            f"   Este parece ser um item customizado/homebrew.\n"
-            f"   Certifique-se de que seus efeitos são balanceados para "
-            f"um grupo nível {nivel}. Ajuste a descrição se necessário."
+            f"Erro: não foi possível consultar o SRD agora (sem resposta do "
+            f"Open5e). '{item_name}' continua a identificar; tente de novo."
         )
+
+    if alvo:
+        # Fora do SRD: a mesma marca que add_item dá, e conferido.
+        alvo["custom"] = True
+        alvo["identificado"] = True
+        memory.save_campaign()
+    nivel = char.get("sheet", {}).get("nivel", 1)
+    return (
+        f"Aviso: '{item_name}' não encontrado no banco D&D 5e (SRD).\n"
+        f"   Este parece ser um item customizado/homebrew.\n"
+        f"   Certifique-se de que seus efeitos são balanceados para "
+        f"um grupo nível {nivel}. Ajuste a descrição se necessário."
+    )
 
 
 def add_item(char_name: str, item_name: str, quantity: int = 1, description: str = "") -> str:
@@ -7044,6 +7287,7 @@ def inventory_snapshot(char_name: str = "") -> dict:
             "nome": nome, "qtd": qtd, "descricao": it.get("descricao", ""),
             "peso": round(peso, 2), "peso_total": round(peso * qtd, 2),
             "custom": bool(it.get("custom")),
+            "nome_srd": it.get("nome_srd", ""),
             "equipado_em": [_ROTULO_DO_SLOT[x] for x in em if x in _ROTULO_DO_SLOT],
             "opcoes_de_equipar": opcoes,
             "a_identificar": _a_identificar(it),
@@ -7081,15 +7325,27 @@ def inventory_action(action: str, char: str = "", item: str = "", slot: str = ""
         msg = remove_item(char, item, 1)
     elif a == "identificar":
         msg = identify_item(char, item)
+        # "Aviso: não está no SRD" é resultado da conferência, não recusa.
+        ok = not msg.lstrip().startswith("Erro:")
+        # O que foi achado vem do item gravado, não do texto do mestre: a tela
+        # monta a mensagem em português sem interpretar markdown.
+        dono = next((c for c in _grupo_com_ficha()
+                     if _norm_txt(c.get("name", "")) == _norm_txt(char)), None)
+        gravado = next((i for i in ((dono or {}).get("inventario") or [])
+                        if isinstance(i, dict) and _norm_txt(i.get("nome", "")) == _norm_txt(item)),
+                       {})
+        resultado = {"item": item, "consultou": ok,
+                     "encontrado": ok and bool(gravado.get("nome_srd")),
+                     "nome_srd": gravado.get("nome_srd", "") if ok else "",
+                     **({"tipo": "", "raridade": "", "sintonizacao": False}
+                        | (gravado.get("srd") or {} if ok else {}))}
+        return {"ok": ok, "message": msg, "resultado": resultado,
+                "snapshot": inventory_snapshot(char)}
     else:
         return {"ok": False, "message": f"Erro: Ação '{action}' desconhecida.",
                 "snapshot": inventory_snapshot(char)}
 
-    if a == "identificar":
-        # "Aviso: não está no SRD" é resultado da conferência, não recusa.
-        ok = not msg.lstrip().startswith("Erro:")
-    else:
-        ok = not msg.lstrip().startswith(("Aviso:", "Erro:", "Nota:"))
+    ok = not msg.lstrip().startswith(("Aviso:", "Erro:", "Nota:"))
     return {"ok": ok, "message": msg, "snapshot": inventory_snapshot(char)}
 
 
