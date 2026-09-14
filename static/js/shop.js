@@ -306,6 +306,12 @@
         if (visitaVista()) marcarVisita('');
         marcarDesde(null);
       } else if (snap.local_chave && snap.local_chave !== visitaVista()
+                 && (snap.filhos_chaves || []).includes(visitaVista())) {
+        // Voltou de dentro da loja para a rua da cidade: é a mesma visita.
+        // Troca a marca para a cidade sem reabrir — entrar de novo numa loja
+        // daqui é que é chegada nova.
+        marcarVisita(snap.local_chave);
+      } else if (snap.local_chave && snap.local_chave !== visitaVista()
                  && !_open && !outraTelaAberta()) {
         // Abre SOZINHA na chegada. Loja é estado que persiste; o gatilho é a
         // VISITA a um local que tem loja, uma vez. Se outra tela estiver

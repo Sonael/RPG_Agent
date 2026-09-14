@@ -1922,7 +1922,7 @@ def chat():
     MAX_RETRIES = 3
 
     WRITE_TOOLS = {
-        "save_character", "save_location", "save_event", "set_flag",
+        "save_character", "set_character_location", "save_location", "save_event", "set_flag",
         "add_diary_entry", "update_character_status", "update_story_summary",
         "update_world_state", "add_party_member", "remove_party_member", "clear_flag",
     }
@@ -2515,7 +2515,14 @@ def update_character(name):
     import copy as _copy
     from rpg.tools_dnd import normalize_edited_character
     novo = _copy.deepcopy(ch)
-    novo.update({k: v for k, v in data.items() if k in ch})
+    # "local" entra mesmo em personagem que ainda não tinha paradeiro.
+    novo.update({k: v for k, v in data.items() if k in ch or k == "local"})
+    if "local" in data:
+        from rpg import locais
+        if (data.get("local") or "").strip():
+            novo["local"] = locais.nome_canonico(data["local"])
+        else:
+            novo.pop("local", None)
     mantidos = normalize_edited_character(novo, ch, bool(data.get("correcao_manual")))
     ch.clear()
     ch.update(novo)
@@ -2555,13 +2562,47 @@ def update_location(name):
     if key not in memory.campaign["locations"]:
         return jsonify({"error": "Não encontrado"}), 404
     loc = memory.campaign["locations"][key]
-    loc.update({k: v for k, v in data.items() if k in loc})
+    loc.update({k: v for k, v in data.items() if k in loc and k != "dentro_de"})
+    if "dentro_de" in data:
+        from rpg import locais
+        pai = (data.get("dentro_de") or "").strip()
+        nome = (data.get("name") or loc.get("name", "")).strip()
+        if not pai:
+            loc.pop("dentro_de", None)
+        elif locais.norm(pai) == locais.norm(nome) or locais.esta_dentro(pai, nome):
+            return jsonify({"error": f"'{nome}' não pode ficar dentro de '{pai}': "
+                                     f"'{pai}' já fica dentro de '{nome}'."}), 400
+        else:
+            loc["dentro_de"] = locais.nome_canonico(pai)
     new_name = data.get("name", "").strip()
     if new_name and new_name.lower() != key:
         memory.campaign["locations"][new_name.lower()] = loc
         del memory.campaign["locations"][key]
+        _renomear_referencias_de_local(name, new_name)
     memory.save_campaign()
     return jsonify({"ok": True})
+
+
+def _renomear_referencias_de_local(antigo: str, novo: str) -> None:
+    """
+    Renomear um local não pode soltar quem aponta para ele: os lugares de
+    dentro (dentro_de), os personagens que estão lá (local), as lojas e o
+    local atual do grupo.
+    """
+    from rpg import locais
+    alvo = locais.norm(antigo)
+    c = memory.campaign
+    for loc in (c.get("locations") or {}).values():
+        if isinstance(loc, dict) and locais.norm(loc.get("dentro_de", "")) == alvo:
+            loc["dentro_de"] = novo
+    for ch in (c.get("characters") or {}).values():
+        if isinstance(ch, dict) and locais.norm(ch.get("local", "")) == alvo:
+            ch["local"] = novo
+    for loja in (c.get("lojas") or {}).values():
+        if isinstance(loja, dict) and locais.norm(loja.get("local", "")) == alvo:
+            loja["local"] = novo
+    if locais.norm(c.get("current_location", "")) == alvo:
+        c["current_location"] = novo
 
 
 @app.route("/api/memory/locations/<name>", methods=["DELETE"])
@@ -2753,6 +2794,14 @@ def inventory_action_route():
         item=(d.get("item") or "").strip(),
         slot=(d.get("slot") or "").strip(),
     ))
+
+
+@app.route("/api/locations/state", methods=["GET"])
+@require_auth
+def location_state_route():
+    """Ficha do local: o que fica dentro, quem está lá e o alcance de cada um."""
+    from rpg import locais
+    return jsonify(locais.ficha((request.args.get("local") or "").strip()))
 
 
 @app.route("/api/grimoire/state", methods=["GET"])

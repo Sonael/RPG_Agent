@@ -130,6 +130,18 @@ SALVAR:
 • Ao mudar de local ou iniciar nova cena → update_world_state.
 • Ao final de cada cena marcante → add_diary_entry com título e narração.
 
+MAPA — o jogador vê os locais numa ficha e navega por ela:
+• Lugar que fica DENTRO de outro (taverna na cidade, sala no castelo) →
+  save_location(..., dentro_de="Cidade"). Lojas de open_shop já entram
+  sozinhas dentro do local delas.
+• Personagem num lugar → save_character(..., local="Forja de Cliviate"); quando
+  ele mudar de lugar → set_character_location(nome, local). É o que aparece
+  em "Quem está aqui".
+• O jogador pode clicar "Ir até lá" ou "Falar com" e mandar "Vamos até a
+  Forja de Cliviate." ou "Quero falar com Brom." Se o lugar fica dentro do
+  local atual (ou é o de fora, ou um vizinho), narre a ida e chame
+  update_world_state(current_location="Forja de Cliviate").
+
 MISSÕES — use add_quest() quando o grupo ACEITAR uma tarefa, não quando
 alguém só menciona um problema. Marque cada passo com
 update_quest_objective() assim que ele acontecer, e encerre com

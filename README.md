@@ -91,18 +91,19 @@ abre o loop **percepção → deliberação → ação → verificação** em de
 8. [Tela de nível ("A Ascensão")](#tela-de-nível-a-ascensão)
 9. [Tela de magias ("O Grimório")](#tela-de-magias-o-grimório)
 10. [Tela de equipamento ("A Mochila")](#tela-de-equipamento-a-mochila)
-11. [Tela de loja ("O Balcão")](#tela-de-loja-o-balcão)
-12. [Tela de descanso ("A Fogueira")](#tela-de-descanso-a-fogueira)
-13. [Wizard e editores de ficha](#wizard-e-editores-de-ficha)
-14. [Tela de combate tática (Pergaminho Épico)](#tela-de-combate-tática-pergaminho-épico)
-15. [Tools, o catálogo do agente](#tools-o-catálogo-do-agente)
-16. [Endpoints HTTP](#endpoints-http)
-17. [Frontend](#frontend)
-18. [PWA e instalação](#pwa-e-instalação)
-19. [Testes e garantias](#testes-e-garantias)
-20. [Estrutura de arquivos](#estrutura-de-arquivos)
-21. [Configuração e execução](#configuração-e-execução)
-22. [Limitações conhecidas](#limitações-conhecidas)
+11. [Ficha do local](#ficha-do-local)
+12. [Tela de loja ("O Balcão")](#tela-de-loja-o-balcão)
+13. [Tela de descanso ("A Fogueira")](#tela-de-descanso-a-fogueira)
+14. [Wizard e editores de ficha](#wizard-e-editores-de-ficha)
+15. [Tela de combate tática (Pergaminho Épico)](#tela-de-combate-tática-pergaminho-épico)
+16. [Tools, o catálogo do agente](#tools-o-catálogo-do-agente)
+17. [Endpoints HTTP](#endpoints-http)
+18. [Frontend](#frontend)
+19. [PWA e instalação](#pwa-e-instalação)
+20. [Testes e garantias](#testes-e-garantias)
+21. [Estrutura de arquivos](#estrutura-de-arquivos)
+22. [Configuração e execução](#configuração-e-execução)
+23. [Limitações conhecidas](#limitações-conhecidas)
 
 ---
 
@@ -1498,6 +1499,96 @@ A tela continua passando por `identify_item`. O resultado em dados
 (`resultado` na resposta de `inventory_action`) sai do item gravado (`nome_srd`
 e `srd`, com tipo e raridade em português), não do texto do mestre.
 
+## Ficha do local
+
+Os locais eram uma lista plana: Cliviate, a Forja de Cliviate e o Boticário
+não se conheciam, e personagem nenhum tinha paradeiro. Só o grupo tinha
+(`current_location`). O jogador sabia que estava numa cidade, mas não tinha
+como ver o que havia nela nem quem encontrar.
+
+### Dados
+
+- **Local dentro de local.** `save_location(..., dentro_de="Cliviate")` grava
+  onde o lugar fica. Chamar de novo sem `dentro_de` mantém o que estava, e um
+  local não pode ficar dentro de si nem de um lugar que já fica dentro dele.
+- **Lojas entram sozinhas.** `open_shop` já grava a cidade da loja
+  (`lojas[...]["local"]`); `rpg/locais.py` trata a loja como um lugar dentro
+  dela, sem registro duplicado.
+- **Onde o personagem está.** `save_character(..., local="Forja de Cliviate")`
+  e a ferramenta nova `set_character_location(nome, local)`, para quando o
+  NPC muda de lugar. O grupo não tem `local`: ele está no local atual.
+- `save_character` agora parte do que já existia. Antes o personagem era
+  recriado só com os campos da ferramenta, e perdia o resto (a atitude, por
+  exemplo).
+- Nomes casam sem caixa nem acento e são gravados como o lugar está salvo.
+  Renomear um local no editor leva junto os lugares de dentro, os
+  personagens, as lojas e o local atual (`_renomear_referencias_de_local`).
+
+### Alcance
+
+`locais.alcance(destino)` responde se dá para ir até lá **com um passo** a
+partir de onde o grupo está:
+
+| alcance | quando |
+|---|---|
+| `aqui` | é o local atual |
+| `dentro` | fica dentro do local atual (a forja, estando na cidade) |
+| `acima` | é onde o local atual fica (a cidade, estando na forja) |
+| `vizinho` | fica dentro do mesmo lugar (o boticário, estando na forja) |
+| vazio | longe: viagem continua sendo com o mestre |
+
+### A tela
+
+Abre ao clicar num local da Enciclopédia, no "Local:" da barra lateral, ou no
+"Em Forja de Cliviate" do cartão de um personagem (`static/js/locais.js`,
+`GET /api/locations/state?local=`). Mostra:
+
+- o caminho até o lugar ("Cliviate ›"), com cada trecho clicável;
+- se o grupo está ali, ao lado ou longe;
+- **Quem está aqui**: o grupo em destaque, quando é o local atual, e os
+  personagens com `local` ali;
+- **Aqui dentro**: os lugares e as lojas, com quantas pessoas há em cada um.
+
+"Ir até lá" (lugar ao alcance) e "Falar com" (personagem ao alcance e vivo)
+mandam ao mestre uma fala comum do jogador: "Vamos até Forja de Cliviate." ou
+"Quero falar com Brom.". A fala aparece no chat como se o jogador a tivesse
+digitado, e quem narra a ida e muda o local atual é o mestre. Com o mestre
+ainda respondendo, a tela avisa e não manda nada. "Editar local" abre o editor
+de sempre, que ganhou "Fica dentro de"; o de personagem ganhou "Onde está".
+
+### O mestre vê o mesmo mapa
+
+O bloco de cena (`get_scene_context`) ganhou "Mapa do local atual": onde o
+local fica, o que há dentro e quem está ali. O "onde está" gravado também
+passa a contar para escolher os personagens relevantes da cena. A instrução
+ganhou a seção MAPA: `dentro_de` para lugar dentro de lugar, `local` e
+`set_character_location` para personagens, e `update_world_state` ao narrar
+um "Vamos até ..." para um lugar ao alcance.
+
+### A loja com hierarquia
+
+- Dentro da própria loja (o grupo foi "até a Forja de Cliviate"), ela é a loja
+  daqui; na cidade, as duas lojas são.
+- `open_shop(..., location="Cliviate")` com o grupo dentro da forja não o
+  tira da loja: estar dentro do local informado é estar lá.
+- Voltar da forja para a rua da cidade não é visita nova: `shop_snapshot`
+  manda `filhos_chaves`, e a tela troca a marca da visita para a cidade sem
+  reabrir. Entrar de novo numa loja é chegada nova.
+
+### Testes
+
+`test_locais.py` cobre dados, ciclo, preservação no `save_character`, alcance
+a partir da cidade e da forja, a ficha, o bloco do mestre, a loja com
+hierarquia e a renomeação. `test_locais_navegador.py` abre a ficha pela
+Enciclopédia, pela barra lateral e pelo cartão do personagem; "Ir até lá" e
+"Falar com" mandam a fala; lugar longe não tem botão; mestre ocupado não
+manda nada. Capturas: `local-cidade`, `local-onde-o-grupo-esta` e
+`local-loja`.
+
+A fixture `campanha` dos testes passou a zerar também `locations`,
+`current_location` e `negocios`: um local salvo num teste aparecia como lugar
+"dentro" de outro no teste seguinte.
+
 ## Tela de loja ("O Balcão")
 
 A segunda tela do jogo, e a primeira construída depois de perguntar **por que**
@@ -2026,11 +2117,12 @@ ou uma fração — e portanto se vale a pena mexer em mais alguma coisa. Com
 
 | Função | Função no jogo |
 |---|---|
-| `save_character` | Cria/atualiza NPC ou personagem do grupo |
+| `save_character` | Cria/atualiza NPC ou personagem do grupo (com `local` opcional) |
+| `set_character_location` | Onde um NPC está agora (aparece na ficha do local) |
 | `get_character` / `list_characters` | Lê personagem(ns) |
 | `update_character_status` | Muda status (vivo, ferido, morto, aliado…) |
 | `add_party_member` / `remove_party_member` / `list_party` | Gerencia o grupo |
-| `save_location` / `get_location` / `list_locations` | Locais |
+| `save_location` / `get_location` / `list_locations` | Locais (com `dentro_de` opcional) |
 | `save_event` / `get_recent_events` | Eventos importantes |
 | `update_world_state` / `update_story_summary` | Estado do mundo, resumo |
 | `set_flag` / `get_flag` / `list_flags` / `clear_flag` | Variáveis de quest |
@@ -2125,6 +2217,9 @@ acessam memória):
 - `PUT/DELETE /api/memory/characters/<name>`,
   `/locations/<name>`, `/flags/<name>`, `/party/<name>`,
   `/events/<index>`, `/diary/<index>`, `/world`.
+- `GET /api/locations/state?local=` → ficha do local (caminho, alcance, o que
+  fica dentro, quem está lá). O `PUT` de local aceita `dentro_de` (e recusa
+  ciclo); o de personagem aceita `local`. Veja [Ficha do local](#ficha-do-local).
 - O `PUT` de personagem (e o `PUT /api/campaigns/<name>`) passa por
   `normalize_edited_character`; aceita `correcao_manual` e devolve `mantidos`.
   Veja [Wizard e editores de ficha](#wizard-e-editores-de-ficha).
@@ -2229,6 +2324,8 @@ ferramentas do mestre.
   **Zero regra de jogo no cliente**, só renderiza snapshot e envia intents.
 - **`levelup.js`**, **`grimoire.js`**, **`inventory.js`**, **`shop.js`** e
   **`rest.js`**, as telas de nível, magias, equipamento, loja e descanso.
+- **`locais.js`**, a ficha do local (o que fica dentro, quem está lá, "Ir até
+  lá" e "Falar com").
   Mesma regra: renderizam o snapshot do motor e despacham intenções. A fila
   que decide qual abre primeiro (combate, nível, grimório, descanso, loja; a
   Mochila só abre pelo atalho) e o empilhamento das pílulas ficam em
@@ -2508,6 +2605,7 @@ o nome do pacote. Também não há variável de ambiente nova.
 │   ├── __init__.py        Vazio de imports de propósito + registrar_duble()
 │   ├── agent.py           Instruções de estilo + create_agent
 │   ├── tools.py           Tools narrativas + ALL_TOOLS
+│   ├── locais.py          Hierarquia de locais, paradeiro e ficha do local
 │   ├── tools_dnd.py       Motor D&D 5e + combate (~7900 linhas, 38 tools)
 │   ├── memory.py          Estado por sessão, proxy, persistência
 │   ├── database.py        Camada Supabase

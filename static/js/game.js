@@ -646,6 +646,7 @@ const TOOL_LABEL = {
   get_diary: 'lendo diário', list_characters: 'listando personagens', list_locations: 'listando locais',
   list_party: 'listando grupo', list_flags: 'listando flags', save_character: 'salvando personagem',
   save_location: 'salvando local', save_event: 'salvando evento', set_flag: 'definindo flag',
+  set_character_location: 'situando personagem',
   add_diary_entry: 'escrevendo no diário', update_character_status: 'atualizando personagem',
   update_story_summary: 'atualizando resumo', update_world_state: 'atualizando mundo',
   add_party_member: 'adicionando ao grupo', remove_party_member: 'removendo do grupo', clear_flag: 'removendo flag',
@@ -1008,8 +1009,19 @@ function buildDndCharCard(c, idx, type) {
     const desc = c.notes || c.description || '';
     if (desc) html += `<div class="char-desc">${escapeHtml(desc.substring(0, 90))}${desc.length > 90 ? '…' : ''}</div>`;
   }
+  if (type !== 'party') html += linhaDoLocalDoPersonagem(c);
   html += `</div>`;
   return html;
+}
+
+// "Em Forja de Cliviate" no cartão do personagem, e o nome abre a ficha do
+// local. stopPropagation porque o cartão inteiro abre o modal de edição.
+function linhaDoLocalDoPersonagem(c) {
+  if (!c || !c.local) return '';
+  const alvo = String(c.local).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  return `<div class="char-local">Em <span class="local-clicavel" role="button" tabindex="0"`
+    + ` onclick="event.stopPropagation(); window.Locais && window.Locais._abrir('${escapeHtml(alvo)}')"`
+    + ` title="Ver o local">${escapeHtml(c.local)}</span></div>`;
 }
 
 function renderTurnTracker(cs) {
@@ -1154,7 +1166,7 @@ function renderMemory(mem) {
     if (isDnd) return buildDndCharCard(c, i, 'character');
     const st = c.status?.toLowerCase() || 'vivo';
     const cls = st.includes('mort') ? 'dead' : st.includes('desapar') ? 'missing' : '';
-    return `<div class="char-card editable" onclick="openEditModal('character','${c.name.toLowerCase().replace(/'/g, "\\'")}',window._lastMem.characters[${i}])"><div class="char-name">${c.name}<span class="char-status ${cls}">${c.status}</span></div><div class="char-desc">${(c.description || '').substring(0, 100)}${(c.description || '').length > 100 ? '…' : ''}</div></div>`;
+    return `<div class="char-card editable" onclick="openEditModal('character','${c.name.toLowerCase().replace(/'/g, "\\'")}',window._lastMem.characters[${i}])"><div class="char-name">${c.name}<span class="char-status ${cls}">${c.status}</span></div><div class="char-desc">${(c.description || '').substring(0, 100)}${(c.description || '').length > 100 ? '…' : ''}</div>${linhaDoLocalDoPersonagem(c)}</div>`;
   }).join('');
 
   const dEl = document.getElementById('sb-diary');
@@ -1166,7 +1178,14 @@ function renderMemory(mem) {
   const lEl = document.getElementById('sb-locs');
   if (lEl) {
     const locs = mem.locations || [];
-    lEl.innerHTML = !locs.length ? '<span class="empty-state">Nenhum local ainda.</span>' : locs.map((l, i) => `<div class="char-card editable" onclick="openEditModal('location','${l.name.toLowerCase().replace(/'/g, "\\'")}',window._lastMem.locations[${i}])"><div class="char-name">${l.name}</div><div class="char-desc">${(l.description || '').substring(0, 100)}${(l.description || '').length > 100 ? '…' : ''}</div></div>`).join('');
+    // O cartão abre a ficha do local (o que fica dentro, quem está lá); a
+    // edição continua pelo botão "Editar local" dentro da ficha.
+    lEl.innerHTML = !locs.length ? '<span class="empty-state">Nenhum local ainda.</span>' : locs.map((l, i) => {
+      const nomeJs = escapeHtml(String(l.name || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
+      const pai = l.dentro_de ? `<div class="char-local">Em ${escapeHtml(l.dentro_de)}</div>` : '';
+      const aberta = `window.Locais ? window.Locais._abrir('${nomeJs}') : openEditModal('location','${nomeJs.toLowerCase()}',window._lastMem.locations[${i}])`;
+      return `<div class="char-card editable local-card" data-local="${escapeHtml(l.name || '')}" onclick="${aberta}"><div class="char-name">${escapeHtml(l.name || '')}</div>${pai}<div class="char-desc">${escapeHtml((l.description || '').substring(0, 100))}${(l.description || '').length > 100 ? '…' : ''}</div></div>`;
+    }).join('');
   }
 
   // As telas (combate, nível, loja) decidem sozinhas se aparecem — mas pela
@@ -2003,6 +2022,19 @@ function field(id, label, value, type = 'input', opts = {}) {
   return `<div class="field-group"><label>${label}</label><input id="ef-${id}" type="text" value="${v}"></div>`;
 }
 
+// Campo de lugar com sugestões dos locais conhecidos. Texto livre: o lugar
+// pode ainda não ter sido salvo (o motor usa o nome gravado quando existe).
+function lugarField(id, label, value, excluir) {
+  const v = (value || '').toString().replace(/"/g, '&quot;');
+  const nomes = ((window._lastMem || {}).locations || [])
+    .map(l => l.name || '')
+    .filter(n => n && n.toLowerCase() !== String(excluir || '').toLowerCase());
+  const opcoes = nomes.map(n => `<option value="${escapeHtml(n)}"></option>`).join('');
+  return `<div class="field-group"><label>${label}</label>`
+    + `<input id="ef-${id}" type="text" list="ef-${id}-lugares" value="${v}" placeholder="(nenhum)">`
+    + `<datalist id="ef-${id}-lugares">${opcoes}</datalist></div>`;
+}
+
 // Select com entries {value, label} ou strings simples
 function selField(id, label, value, entries, opts = {}) {
   const style    = opts.style    || '';
@@ -2062,6 +2094,10 @@ function buildEditFields(type, data) {
         + field('traits', 'Traços', data.traits, 'textarea', { rows: 2 })
         + field('status', 'Status', data.status, 'select', { options: ['vivo', 'morto', 'ferido', 'desaparecido', 'preso', 'aliado', 'inimigo', 'exilado'] })
         + field('notes', 'Notas', data.notes, 'textarea', { rows: 2 });
+      // O grupo está sempre no local atual; "onde está" é para os demais.
+      const doGrupo = ((window._lastMem || {}).party || [])
+        .some(p => (p.name || '').toLowerCase() === (data.name || '').toLowerCase());
+      if (!doGrupo) html += lugarField('local', 'Onde está', data.local);
       if (data.sheet) {
         const s = data.sheet;
         const classeVal = (s.classe || 'guerreiro').toLowerCase().trim();
@@ -2184,7 +2220,7 @@ function buildEditFields(type, data) {
       return html;
     }
     case 'party': return field('name', 'Nome', data.name) + field('role', 'Função', data.role) + field('notes', 'Notas', data.notes, 'textarea', { rows: 2 });
-    case 'location': return field('name', 'Nome', data.name) + field('description', 'Descrição', data.description, 'textarea') + field('details', 'Detalhes', data.details, 'textarea', { rows: 2 }) + field('notes', 'Notas', data.notes, 'textarea', { rows: 2 });
+    case 'location': return field('name', 'Nome', data.name) + lugarField('dentro_de', 'Fica dentro de', data.dentro_de, data.name) + field('description', 'Descrição', data.description, 'textarea') + field('details', 'Detalhes', data.details, 'textarea', { rows: 2 }) + field('notes', 'Notas', data.notes, 'textarea', { rows: 2 });
     case 'flag': return field('flag_key', 'Nome da Observação', data.key) + field('flag_value', 'Valor', data.value);
     case 'event': return field('summary', 'Resumo', data.summary, 'textarea', { rows: 2 }) + field('characters_involved', 'Personagens', data.characters_involved) + field('location', 'Local', data.location) + field('consequence', 'Consequência', data.consequence, 'textarea', { rows: 2 });
     case 'diary': return field('title', 'Título', data.title) + field('chapter', 'Capítulo', data.chapter) + field('content', 'Conteúdo', data.content, 'textarea', { rows: 5 });
@@ -2198,6 +2234,7 @@ function getEditValues() {
   switch (_editCtx.type) {
     case 'character': {
       const base = { name: v('name'), description: v('description'), traits: v('traits'), status: v('status'), notes: v('notes') };
+      if (document.getElementById('ef-local')) base.local = v('local');
       if (_editCtx.data.role !== undefined) base.role = v('role');
       if (_editCtx.data.sheet) {
         const orig = _editCtx.data.sheet;
@@ -2216,7 +2253,7 @@ function getEditValues() {
       return base;
     }
     case 'party': return { name: v('name'), role: v('role'), notes: v('notes') };
-    case 'location': return { name: v('name'), description: v('description'), details: v('details'), notes: v('notes') };
+    case 'location': return { name: v('name'), dentro_de: v('dentro_de'), description: v('description'), details: v('details'), notes: v('notes') };
     case 'flag': return { key: v('flag_key'), value: v('flag_value') };
     case 'event': return { summary: v('summary'), characters_involved: v('characters_involved'), location: v('location'), consequence: v('consequence') };
     case 'diary': return { title: v('title'), chapter: parseInt(v('chapter')) || 1, content: v('content') };

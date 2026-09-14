@@ -557,6 +557,46 @@ MOCHILA_PESADA = copy.deepcopy(MOCHILA)
 MOCHILA_PESADA["characters"]["stelar"]["sheet"]["forca"] = 8
 
 
+# CIDADE. O grupo está na Praça de Cliviate, que fica dentro da cidade; a Forja
+# e o Boticário (lojas de Cliviate) ficam ao lado. O grupo NÃO está no local
+# das lojas de propósito: senão a tela de loja abriria sozinha por cima da
+# ficha do local. A Floresta é longe — sem "Ir até lá".
+def _npc(nome, descricao, local, status="vivo"):
+    return {"name": nome, "description": descricao, "traits": "", "status": status,
+            "notes": "", "local": local, "sheet": None, "inventario": [], "habilidades": []}
+
+
+CIDADE = {
+    "current_location": "Praça de Cliviate",
+    "locations": {
+        "cliviate": {"name": "Cliviate", "details": "", "notes": "",
+                     "description": "Cidade de muralhas baixas de pedra na borda da floresta. "
+                                    "Cheira a fumaça de chaminé e pão assado."},
+        "praça de cliviate": {"name": "Praça de Cliviate", "dentro_de": "Cliviate",
+                              "details": "", "notes": "",
+                              "description": "Uma praça de pedras irregulares em volta de um poço antigo."},
+        "taverna do caldeirão": {"name": "Taverna do Caldeirão", "dentro_de": "Cliviate",
+                                 "details": "", "notes": "",
+                                 "description": "Mesas compridas, um caldeirão de ensopado sempre no fogo."},
+        "floresta das brumas": {"name": "Floresta das Brumas", "details": "", "notes": "",
+                                "description": "Neblina que não se desfaz nem ao meio-dia."},
+    },
+    "lojas": {
+        "forja de cliviate": {"nome": "Forja de Cliviate", "local": "Cliviate",
+                              "estoque": [{"nome": "Espada Longa", "preco": 15, "qtd": 99, "descricao": ""}]},
+        "boticario da mira": {"nome": "Boticário da Mira", "local": "Cliviate",
+                              "estoque": [{"nome": "Poção de Cura", "preco": 50, "qtd": 3, "descricao": ""}]},
+    },
+    "characters": {
+        "brom": _npc("Brom", "Ferreiro corpulento, braços cobertos de fuligem.", "Forja de Cliviate"),
+        "mira": _npc("Mira", "Boticária de óculos redondos e mãos manchadas de ervas.", "Boticário da Mira"),
+        "tiel": _npc("Guarda Tiel", "Guarda da praça, entediado e atento a forasteiros.", "Praça de Cliviate"),
+        "velha nana": _npc("Velha Nana", "Vende maçãs e segredos por uma moeda de cobre.", "Praça de Cliviate"),
+        "eremita": _npc("Eremita", "Vive na neblina e não gosta de visitas.", "Floresta das Brumas"),
+    },
+}
+
+
 # DESCANSO CURTO depois de uma emboscada. Cada um do grupo retrata um estado do
 # botão de dado, porque é isso que a tela comunica:
 #   • Helena, muito ferida e com a reserva cheia — o caso de gastar;
@@ -924,6 +964,24 @@ TELAS = [
      "estado": DESCANSO_CURTO, "espera": 700,
      "js": "window.Rest._close()",
      "exigir": "#rst-reopen:not(.hidden)"},
+
+    # ── Ficha do local ───────────────────────────────────────────────
+    # Abre pelo clique no local (Enciclopédia ou "Local:" da barra lateral).
+    # A cidade vista da praça: lojas e taverna ao lado, com "Ir até lá".
+    {"nome": "local-cidade", "pagina": "/game.html",
+     "estado": CIDADE, "espera": 800,
+     "js": "window.Locais._abrir('Cliviate')",
+     "exigir": "#local-overlay:not(.hidden) .lcl-item"},
+    # Onde o grupo está: o grupo em destaque e quem mais está na praça.
+    {"nome": "local-onde-o-grupo-esta", "pagina": "/game.html",
+     "estado": CIDADE, "espera": 800,
+     "js": "window.Locais._abrir('')",
+     "exigir": "#local-overlay:not(.hidden) .lcl-grupo-nome"},
+    # A forja: quem trabalha lá, com "Falar com".
+    {"nome": "local-loja", "pagina": "/game.html",
+     "estado": CIDADE, "espera": 800,
+     "js": "window.Locais._abrir('Forja de Cliviate')",
+     "exigir": "#local-overlay:not(.hidden) .lcl-item"},
 
     # ── Combate ──────────────────────────────────────────────────────
     {"nome": "combate-regua-de-turnos", "pagina": "/game.html",

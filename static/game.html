@@ -35,7 +35,7 @@
        Sem isso, a narração da IA (ou texto injetado) poderia conter
        <script>/<img onerror> e executar — XSS. -->
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.7/dist/purify.min.js"></script>
-  <link rel="stylesheet" href="/static/css/style.css?v=53">
+  <link rel="stylesheet" href="/static/css/style.css?v=54">
 </head>
 
 <body class="game-page">
@@ -65,7 +65,7 @@
             <div class="world-state">
               <div class="linha-info">
                 <span style="color:var(--text-main); font-weight: 600;">Local:</span>
-                <span id="sb-location" style="color:var(--text-muted); text-align:right;">—</span>
+                <span id="sb-location" class="local-clicavel" title="Ver o local" onclick="window.Locais && window.Locais._abrir('')" style="color:var(--text-muted); text-align:right;">—</span>
               </div>
               <!-- Relógio de mundo. Some quando a campanha nunca chamou
                    advance_time() — nem toda mesa quer contar as horas. -->
@@ -109,7 +109,7 @@
               </div>
               <div style="display:flex;justify-content:space-between;font-family: 'Lora', serif; font-size:13px;">
                 <span style="color:var(--text-muted);">Local</span>
-                <span id="ws-location" style="font-weight:600; text-align:right;">—</span>
+                <span id="ws-location" class="local-clicavel" title="Ver o local" onclick="window.Locais && window.Locais._abrir('')" style="font-weight:600; text-align:right;">—</span>
               </div>
             </div>
 
@@ -358,13 +358,14 @@
   </div>
 
   <script src="/static/js/utils.js?v=12"></script>
-  <script src="/static/js/game.js?v=33"></script>
+  <script src="/static/js/game.js?v=34"></script>
   <script src="/static/js/combat.js?v=17"></script>
-  <script src="/static/js/shop.js?v=6"></script>
+  <script src="/static/js/shop.js?v=7"></script>
   <script src="/static/js/levelup.js?v=5"></script>
   <script src="/static/js/rest.js?v=5"></script>
   <script src="/static/js/grimoire.js?v=3"></script>
   <script src="/static/js/inventory.js?v=2"></script>
+  <script src="/static/js/locais.js?v=2"></script>
 
   <script>
     (function() {

@@ -126,6 +126,11 @@ def campanha():
     # aparecia no seguinte — e a falha saía no teste errado, longe da causa.
     memory.campaign["quests"] = {}
     memory.campaign["lojas"]  = {}
+    # Locais e local atual também: um local salvo num teste aparecia como
+    # lugar "dentro" de outro no teste seguinte.
+    memory.campaign["locations"] = {}
+    memory.campaign["current_location"] = ""
+    memory.campaign.pop("negocios", None)
     memory.campaign.pop("relogio", None)
     memory.campaign.pop("descanso_proposto", None)
     memory.campaign.pop("descansos_oferecidos", None)

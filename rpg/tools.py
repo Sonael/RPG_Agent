@@ -4,7 +4,7 @@ Todas as ferramentas expostas ao agente de RPG.
 Inclui as ferramentas base de narrativa e as ferramentas D&D (tools_dnd.py).
 """
 
-from rpg import memory
+from rpg import locais, memory
 from rpg.tools_dnd import DND_TOOLS
 
 
@@ -18,6 +18,7 @@ def save_character(
     traits: str = "",
     status: str = "vivo",
     notes: str = "",
+    local: str = "",
 ) -> str:
     """
     Salva ou atualiza um personagem (NPC ou membro do grupo) na memória.
@@ -28,10 +29,16 @@ def save_character(
         traits:      Personalidade, maneirismos, falas típicas.
         status:      Estado atual (ex: vivo, morto, desaparecido, aliado, inimigo).
         notes:       Qualquer detalhe adicional relevante para a narrativa.
+        local:       Onde o personagem está (ex: 'Forja de Cliviate'). Vazio
+                     mantém o que já estava gravado.
     """
     key = memory.char_key(name)
     existing = memory.campaign["characters"].get(key, {})
-    memory.campaign["characters"][key] = {
+    # Parte do que já existia. Antes o personagem era recriado só com os
+    # campos daqui e perdia o resto — a atitude (set_npc_attitude), a marca
+    # de grupo e agora o "onde está".
+    novo = dict(existing)
+    novo.update({
         "name":        existing.get("name", name),  # preserva capitalização original
         "description": description,
         "traits":      traits,
@@ -41,9 +48,38 @@ def save_character(
         "sheet":       existing.get("sheet"),
         "inventario":  existing.get("inventario", []),
         "habilidades": existing.get("habilidades", []),
-    }
+    })
+    if local:
+        novo["local"] = locais.nome_canonico(local)
+    memory.campaign["characters"][key] = novo
     memory.save_campaign()
     return f"Personagem '{name}' salvo na memória."
+
+
+def set_character_location(name: str, local: str) -> str:
+    """
+    Diz onde um personagem está agora — o ferreiro na Forja de Cliviate, a
+    capitã no Quartel. Chame quando um NPC aparecer num lugar ou mudar de
+    lugar. É o que a ficha do local mostra em "Quem está aqui".
+
+    Args:
+        name:  Nome do personagem (já salvo com save_character).
+        local: Nome do lugar. Vazio apaga o paradeiro (ninguém sabe onde está).
+    """
+    ch = memory.campaign["characters"].get(memory.char_key(name))
+    if not ch:
+        return f"Erro: Personagem '{name}' não encontrado. Use save_character primeiro."
+    if memory.is_party_member(ch):
+        return (f"Aviso: {ch.get('name', name)} é do grupo — o grupo está no local "
+                f"atual. Mude com update_world_state(current_location=...).")
+    if local:
+        ch["local"] = locais.nome_canonico(local)
+        msg = f"{ch.get('name', name)} está em {ch['local']}."
+    else:
+        ch.pop("local", None)
+        msg = f"Paradeiro de {ch.get('name', name)} apagado."
+    memory.save_campaign()
+    return msg
 
 
 def get_character(name: str) -> str:
@@ -183,6 +219,7 @@ def save_location(
     description: str,
     details: str = "",
     notes: str = "",
+    dentro_de: str = "",
 ) -> str:
     """
     Salva ou atualiza um local na memória da campanha.
@@ -192,6 +229,8 @@ def save_location(
         description: Descrição sensorial e atmosférica do ambiente.
         details:     Detalhes: NPCs presentes, objetos notáveis, saídas.
         notes:       Eventos passados ou segredos ligados ao local.
+        dentro_de:   Lugar maior onde este fica (a taverna dentro da cidade,
+                     a sala dentro do castelo). Vazio mantém o que já estava.
     """
     # O modelo às vezes copia o texto de ajuda da própria ferramenta para o
     # campo: a Enciclopédia mostrava "Cliviate — Salva ou atualiza um local
@@ -203,14 +242,23 @@ def save_location(
             return (f"Erro: a descrição de '{name}' é o texto de ajuda da ferramenta, "
                     f"não o local. Chame save_location de novo com description "
                     f"descrevendo o ambiente de {name}.")
-    memory.campaign["locations"][name.lower()] = {
+    existing = memory.campaign["locations"].get(name.lower(), {})
+    pai = (existing.get("dentro_de", "") or "") if not dentro_de else locais.nome_canonico(dentro_de)
+    if pai and (locais.norm(pai) == locais.norm(name) or locais.esta_dentro(pai, name)):
+        return (f"Erro: '{name}' não pode ficar dentro de '{pai}' — "
+                f"'{pai}' já fica dentro de '{name}'.")
+    novo = dict(existing)
+    novo.update({
         "name":        name,
         "description": description,
         "details":     details,
         "notes":       notes,
-    }
+    })
+    if pai:
+        novo["dentro_de"] = pai
+    memory.campaign["locations"][name.lower()] = novo
     memory.save_campaign()
-    return f"Local '{name}' salvo na memória."
+    return f"Local '{name}' salvo na memória." + (f" Fica em {pai}." if pai else "")
 
 
 def _copia_da_ajuda(texto: str, funcao) -> bool:
@@ -862,7 +910,11 @@ def get_scene_context(extra_characters: str = "", extra_locations: str = "") -> 
     no_grupo = set()
     relevant_chars = []
     for key, ch in c["characters"].items():
-        in_location = current_loc_norm and current_loc_norm in (ch.get("notes", "") + ch.get("description", "")).lower()
+        # O "onde está" gravado é indício forte; o local citado no texto do
+        # personagem continua valendo para campanhas sem ele.
+        in_location = current_loc_norm and (
+            locais.norm(ch.get("local", "")) == locais.norm(current_loc_norm)
+            or current_loc_norm in (ch.get("notes", "") + ch.get("description", "")).lower())
         explicitly_requested = key in extra_names or ch["name"].lower() in extra_names
         in_party = any(m["name"].lower().strip() == key for m in c["party"])
         if in_location or explicitly_requested or in_party:
@@ -913,6 +965,24 @@ def get_scene_context(extra_characters: str = "", extra_locations: str = "") -> 
             if loc.get("details"):
                 lines.append(f"  Detalhes: {loc['details'][:80]}")
         parts.append("Locais:\n" + "\n".join(lines))
+
+    # O que fica em volta do local atual: o jogador vê isto na ficha do local
+    # e pode clicar em "Ir até lá" — o mestre precisa enxergar o mesmo mapa.
+    if c.get("current_location"):
+        atual = c["current_location"]
+        mapa = []
+        trilha = locais.caminho(atual)
+        if len(trilha) > 1:
+            mapa.append("Fica em: " + " › ".join(trilha[:-1]))
+        dentro = locais.filhos(atual)
+        if dentro:
+            mapa.append("Dentro daqui: " + ", ".join(
+                f"{f['nome']}{' (loja)' if f['tipo'] == 'loja' else ''}" for f in dentro))
+        gente = locais.pessoas_em(atual)
+        if gente:
+            mapa.append("Estão aqui: " + ", ".join(p.get("name", "") for p in gente))
+        if mapa:
+            parts.append("Mapa do local atual:\n" + "\n".join(f"• {m}" for m in mapa))
 
     # Missões ativas — o jogador pergunta "o que a gente tinha que fazer?" e a
     # resposta não pode depender de o agente lembrar de vinte cenas atrás.
@@ -1102,6 +1172,7 @@ def get_full_context() -> str:
 ALL_TOOLS = [
     # Personagens
     save_character,
+    set_character_location,
     get_character,
     list_characters,
     update_character_status,

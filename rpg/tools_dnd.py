@@ -7535,7 +7535,11 @@ def open_shop(shop_name: str, items: str, location: str = "") -> str:
     # (que só mostra lojas do local atual) nem abria nem mostrava a pílula.
     aviso_local = ""
     local_atual = memory.campaign.get("current_location", "") or ""
-    if location and _norm_txt(location) != _norm_txt(local_atual):
+    from rpg import locais as _locais
+    # Já estar DENTRO do local informado (na própria forja, que fica em
+    # Cliviate) é estar lá: não tira o grupo da loja para pô-lo na rua.
+    if (location and _norm_txt(location) != _norm_txt(local_atual)
+            and not _locais.esta_dentro(local_atual, location)):
         salvo = (memory.campaign.get("locations") or {}).get(location.strip().lower()) or {}
         novo_local = salvo.get("name") or location.strip()
         memory.campaign["current_location"] = novo_local
@@ -7635,14 +7639,18 @@ def _linha_de_venda(char: dict, item: dict, loja: dict) -> dict | None:
 
 def shop_snapshot(shop_name: str = "", buyer: str = "") -> dict:
     """Estado completo da loja para a tela (JSON-serializável)."""
+    from rpg import locais as _locais
     lojas = _lojas()
     local = memory.campaign.get("current_location", "")
 
     # A loja DAQUI é a que o grupo acabou de entrar. Sem ela a tela não se
     # abre sozinha: loja é estado que persiste, e reabrir a tela em toda cena
     # só porque existe uma ferraria em outra cidade seria intromissão.
+    # Dentro da própria loja (o grupo foi "até a Forja de Cliviate") ela
+    # também é daqui.
     aqui = [l for l in lojas.values()
-            if _norm_txt(l.get("local", "")) == _norm_txt(local) and local]
+            if local and _norm_txt(local) in (_norm_txt(l.get("local", "")),
+                                              _norm_txt(l.get("nome", "")))]
 
     escolhida = None
     if shop_name:
@@ -7708,6 +7716,9 @@ def shop_snapshot(shop_name: str = "", buyer: str = "") -> dict:
         # A tela abre sozinha UMA vez por visita a um local. Ela precisa de uma
         # chave estável do local para lembrar disso entre recargas da página.
         "local_chave": _norm_txt(local),
+        # Lugares que ficam dentro do local atual. Voltar da forja para a rua
+        # da cidade não é visita nova: a tela não reabre por isso.
+        "filhos_chaves": [_norm_txt(f["nome"]) for f in _locais.filhos(local)],
         "loja": {
             "nome":  escolhida.get("nome", "") if escolhida else "",
             "local": escolhida.get("local", "") if escolhida else "",
