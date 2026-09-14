@@ -327,12 +327,26 @@
     const titulo = kind === 'attack'
       ? `Alvo de ${esc(_pick.weapon || 'ataque')}:`
       : (kind === 'ability' ? `Alvo de ${esc(_pick.ability || 'habilidade')}:` : 'Alvo:');
+    // Alcance de cada alvo para a arma escolhida, calculado pelo motor. Sem
+    // isto a tela oferecia o inimigo de outra zona à espada, o motor recusava
+    // e o jogador ficava sem entender o que tinha acontecido.
+    const alcance = kind === 'attack'
+      ? ((snap.alcance || {})[_pick.weapon || 'Ataque desarmado'] || {})
+      : {};
     tgtEl.innerHTML =
       `<div class="cbt-tgt-title">${titulo}</div>`
       + `<div class="cbt-picker-btns">`
-      + live.map(c =>
-          `<button class="cbt-btn" onclick="window.Combat._target('${esc(c.name).replace(/'/g,"\\'")}')">${esc(c.name)}</button>`
-        ).join('')
+      + live.map(c => {
+          const estado = alcance[c.name];
+          const fora   = estado === 'fora';
+          const nota   = fora ? ' <small>· fora de alcance</small>'
+                       : (estado === 'desvantagem' ? ' <small>· desvantagem</small>' : '');
+          const dica   = fora
+            ? ` title="${esc(c.name)} está em ${esc(c.zona || 'outra zona')}: corpo-a-corpo só na mesma zona. Mova-se ou use uma arma à distância."`
+            : '';
+          return `<button class="cbt-btn${fora ? ' cbt-fora' : ''}" ${fora ? 'disabled' : ''}${dica} `
+            + `onclick="window.Combat._target('${esc(c.name).replace(/'/g,"\\'")}')">${esc(c.name)}${nota}</button>`;
+        }).join('')
       + `<button class="cbt-btn cbt-cancel" onclick="window.Combat._cancel()">✕ Cancelar</button>`
       + `</div>`;
     tgtEl.classList.remove('hidden');
@@ -476,7 +490,8 @@
       renderActionBar(_last || {});
       const res = await doAction(payload);
       if (res && !res.ok && res.message) {
-        const first = String(res.message).split('\n')[0].slice(0, 110);
+        // O motor escreve em markdown para o chat; no aviso os ** apareceriam.
+        const first = String(res.message).split('\n')[0].replace(/\*\*/g, '').slice(0, 160);
         if (window.showToast) window.showToast(first);
       }
       _busy = false;

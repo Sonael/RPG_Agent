@@ -10524,6 +10524,35 @@ def _npc_recuar_para_atirar(npc: dict, npc_name: str) -> str:
     return ""
 
 
+def _npc_aproximar(npc_name: str, alvo: str) -> tuple[str, bool]:
+    """
+    NPC só de corpo-a-corpo, longe do alvo, anda até ele.
+
+    A uma zona é movimento comum e ainda sobra a Ação para o golpe. A duas ou
+    mais só a Disparada chega (duas zonas), e ela gasta a Ação: o golpe fica
+    para o próximo turno. Devolve (texto, pode_atacar_agora).
+
+    Antes disto o NPC chamava attack_roll de onde estava, o motor recusava
+    por alcance e o turno não andava — a tela tática ficava presa em "Turno
+    do Inimigo".
+    """
+    zonas = _zonas()
+    za, zb = _zona_de(npc_name), _zona_de(alvo)
+    if za not in zonas or zb not in zonas or za == zb:
+        return "", True
+    i, j = zonas.index(za), zonas.index(zb)
+    dist = abs(j - i)
+    passo = 1 if j > i else -1
+    if dist == 1:
+        texto = move_combatant(npc_name, zb)
+    else:
+        texto = move_combatant(npc_name, zonas[i + 2 * passo], dash=True)
+
+    npc = memory.campaign["characters"].get(memory.char_key(npc_name)) or {}
+    de_pe = int((npc.get("sheet") or {}).get("vida_atual", 0) or 0) > 0
+    return texto, (dist == 1 and de_pe and _zona_de(npc_name) == zb)
+
+
 def execute_npc_turn(npc_name: str = "") -> str:
     """
     Executa o turno do NPC atual (ou do NPC especificado) de forma totalmente
@@ -10532,10 +10561,32 @@ def execute_npc_turn(npc_name: str = "") -> str:
 
     Se nenhuma estratégia foi configurada, usa 'agressivo' por padrão.
     Se o NPC for covarde e estiver com HP < 25%, foge do combate.
+    Com zonas, o NPC de corpo-a-corpo anda até o alvo antes de golpear.
 
     Args:
         npc_name: Nome do NPC (opcional — se omitido, usa o NPC do turno atual).
     """
+    cs = memory.campaign.get("combat_state", {}) or {}
+    token = cs.get("turn_token", 0)
+    vez   = _combat_current_actor()
+    saida = _executar_turno_npc(npc_name)
+
+    # O turno de um NPC SEMPRE termina. Se algo sobrou recusado (um alvo que
+    # ninguém alcança, um golpe que o motor não aceitou), passar a vez é
+    # melhor que prender a luta: a tela tática chamaria de novo até desistir.
+    cs = memory.campaign.get("combat_state", {}) or {}
+    ainda_ele = (vez and cs.get("is_active")
+                 and cs.get("turn_token", 0) == token
+                 and _combat_current_actor() == vez)
+    if ainda_ele:
+        ch = memory.campaign["characters"].get(memory.char_key(vez)) or {}
+        if ch and not memory.is_party_member(ch):
+            _log_combat_event("pass", vez, "", msg=f"{vez} não conseguiu agir e passou a vez")
+            saida += f"\n{vez} não consegue agir e passa a vez." + _auto_advance_turn(vez)
+    return saida
+
+
+def _executar_turno_npc(npc_name: str = "") -> str:
     cs = memory.campaign.get("combat_state", {})
     if not cs.get("is_active"):
         return "Nenhum combate ativo."
@@ -10619,6 +10670,28 @@ def execute_npc_turn(npc_name: str = "") -> str:
     if not targets:
         return f"{npc_name} não encontra alvos válidos. Verifique se o combate deve encerrar com end_combat()."
 
+    # Golpes do turno. O Ataque Múltiplo do urso-coruja é "um com o bico e um
+    # com as garras" — então alternamos entre os ataques do stat block em vez
+    # de repetir o mesmo, que erraria o dado (1d10 vs 2d8) e a narrativa.
+    npc_equip = npc_sheet.get("equipamentos", {}) or {}
+    repertorio = [a for a in (npc_sheet.get("ataques") or [])
+                  if isinstance(a, dict) and a.get("nome")]
+    if not repertorio:
+        repertorio = [{"nome": npc_equip.get("arma_principal") or "shortsword",
+                       "ranged": False}]
+    # Mesmo critério de _checar_alcance: é o nome da arma que o motor julga.
+    golpes_de_tiro = [a for a in repertorio if _weapon_is_ranged(a["nome"])]
+
+    # Com zonas, quem só luta corpo-a-corpo vai no mais próximo: atravessar o
+    # campo atrás do de mais PV, passando por quem está do lado, seria perder
+    # turnos e levar ataque de oportunidade à toa.
+    if _zonas_ativas() and not golpes_de_tiro:
+        dists = {t["name"]: _distancia(npc_name, t["name"]) for t in targets}
+        conhecidas = [d for d in dists.values() if d is not None]
+        if conhecidas:
+            menor = min(conhecidas)
+            targets = [t for t in targets if dists[t["name"]] == menor]
+
     # Seleção de alvo por estratégia
     if strategy == "agressivo":
         target = max(targets, key=lambda t: t["hp"])
@@ -10655,16 +10728,6 @@ def execute_npc_turn(npc_name: str = "") -> str:
     if strategy == "atirador":
         aviso_recuo = _npc_recuar_para_atirar(npc, npc_name)
 
-    # Golpes do turno. O Ataque Múltiplo do urso-coruja é "um com o bico e um
-    # com as garras" — então alternamos entre os ataques do stat block em vez
-    # de repetir o mesmo, que erraria o dado (1d10 vs 2d8) e a narrativa.
-    npc_equip = npc_sheet.get("equipamentos", {}) or {}
-    repertorio = [a for a in (npc_sheet.get("ataques") or [])
-                  if isinstance(a, dict) and a.get("nome")]
-    if not repertorio:
-        repertorio = [{"nome": npc_equip.get("arma_principal") or "shortsword",
-                       "ranged": False}]
-
     _RANGED_PT = ("arco", "besta", "dardo", "funda")
 
     def _atributo(atk: dict) -> str:
@@ -10691,6 +10754,20 @@ def execute_npc_turn(npc_name: str = "") -> str:
     if aviso_recuo:
         partes.append(aviso_recuo)
     alvo_nome = target["name"]
+
+    # Alcance. Longe do alvo: quem tem golpe de tiro atira de onde está (com
+    # a desvantagem que o motor aplicar); quem não tem, anda até lá.
+    if _zonas_ativas() and _distancia(npc_name, alvo_nome):
+        if golpes_de_tiro:
+            repertorio = golpes_de_tiro
+        else:
+            aproximacao, pode_atacar = _npc_aproximar(npc_name, alvo_nome)
+            if aproximacao:
+                partes.append(aproximacao)
+            if not pode_atacar:
+                partes.append(_auto_advance_turn(npc_name))
+                return "\n".join(partes)
+
     if n_ataques > 1:
         partes.append(f"{npc_name} usa Ataque Múltiplo ({n_ataques} ataques):")
 
@@ -10698,8 +10775,12 @@ def execute_npc_turn(npc_name: str = "") -> str:
         # O alvo pode ter caído no golpe anterior — 5e manda redirecionar os
         # ataques restantes, não desperdiçá-los num corpo no chão.
         if not _alvo_valido(alvo_nome):
+            # Só redireciona para quem o golpe alcança: outro alvo em outra
+            # zona seria uma recusa, não um ataque.
+            golpe_nome = repertorio[i % len(repertorio)]["nome"]
             restantes = [t["name"] for t in targets
-                         if t["name"] != alvo_nome and _alvo_valido(t["name"])]
+                         if t["name"] != alvo_nome and _alvo_valido(t["name"])
+                         and not _checar_alcance(npc_name, t["name"], golpe_nome)[0]]
             if not restantes:
                 partes.append(f"   Sem alvos de pé — {npc_name} interrompe a investida.")
                 partes.append(_auto_advance_turn(npc_name))
@@ -11210,7 +11291,37 @@ def combat_snapshot() -> dict:
         "turn_economy": dict(cs.get("turn_economy") or
                              {"acao_usada": False, "bonus_usada": False,
                               "movimento_usado": False}),
+        "alcance":     _alcance_do_turno(current) if cs.get("is_active") else {},
     }
+
+
+def _alcance_do_turno(nome: str) -> dict:
+    """
+    Para o combatente do grupo que está na vez: cada arma dele contra cada
+    outro combatente, "ok" | "desvantagem" | "fora". A tela usa isto para não
+    oferecer como alvo quem a arma não alcança — a regra continua sendo a de
+    _checar_alcance, a tela só lê. Vazio sem zonas ou na vez de um NPC.
+    """
+    if not nome or not _zonas_ativas():
+        return {}
+    chars = memory.campaign.get("characters", {})
+    ch = chars.get(memory.char_key(nome))
+    if not ch or not memory.is_party_member(ch):
+        return {}
+    cs = memory.campaign.get("combat_state") or {}
+    outros = []
+    for n in cs.get("initiative_order", []) or []:
+        o = chars.get(memory.char_key(n))
+        if o and o is not ch:
+            outros.append(o.get("name", n))
+    tabela = {}
+    for arma in _combatant_weapons(ch):
+        linha = {}
+        for alvo in outros:
+            recusa, desv = _checar_alcance(nome, alvo, arma["nome"])
+            linha[alvo] = "fora" if recusa else ("desvantagem" if desv else "ok")
+        tabela[arma["nome"]] = linha
+    return tabela
 
 
 def combat_action(action: str, actor: str = "", target: str = "",
@@ -11282,7 +11393,22 @@ def combat_action(action: str, actor: str = "", target: str = "",
                 ch = memory.campaign["characters"].get(memory.char_key(actor), {})
                 weapon = ((ch.get("sheet", {}) or {}).get("equipamentos", {}) or {}
                           ).get("arma_principal") or "ataque desarmado"
+            # Mesma checagem que attack_roll faz, antes de gastar: recusa de
+            # alcance não é ataque, e a Ação tem de continuar disponível.
+            recusa, _ = _checar_alcance(actor, target, weapon)
+            if recusa:
+                eco["acao_usada"] = False
+                zona_alvo = _zona_de(target) or "outra zona"
+                return {"ok": False,
+                        "message": (f"Fora de alcance: {target} está em {zona_alvo}. "
+                                    f"Corpo-a-corpo só na mesma zona; mova-se ou use "
+                                    f"uma arma à distância. A Ação não foi gasta."),
+                        "snapshot": combat_snapshot()}
             msg = attack_roll(actor, target, weapon, 6, end_turn=False)
+            if msg.startswith(("Erro:", "Aviso:")):
+                eco["acao_usada"] = False
+                return {"ok": False, "message": msg + "\nA Ação não foi gasta.",
+                        "snapshot": combat_snapshot()}
 
         elif a == "ability":
             if not ability:
@@ -11321,6 +11447,9 @@ def combat_action(action: str, actor: str = "", target: str = "",
             if err:
                 return {"ok": False, "message": err, "snapshot": combat_snapshot()}
             msg = use_ability(actor, ability, target, end_turn=False)
+            if msg.startswith(("Erro:", "Aviso:")):
+                eco[slot + "_usada"] = False
+                return {"ok": False, "message": msg, "snapshot": combat_snapshot()}
 
         elif a == "item":
             item_name = (item or weapon or "").strip()

@@ -988,6 +988,39 @@ Três decisões que valem registro:
   e o combate se comporta como na onda 2. Campanhas em andamento não mudam de
   regra no meio do caminho.
 
+#### Dois defeitos que as zonas criaram na tela tática
+
+**O inimigo de corpo-a-corpo travava a luta.** `set_battlefield` põe os
+inimigos na última zona, e `execute_npc_turn` atacava de onde estava. O motor
+recusava por alcance, o turno não avançava, e a tela tática ficava presa em
+"Turno do Inimigo" depois de repetir a chamada 80 vezes. Agora:
+
+- o NPC que só luta corpo a corpo escolhe entre os alvos mais próximos e
+  anda até o alvo (`_npc_aproximar`). A uma zona de distância, move e ataca no
+  mesmo turno; a duas ou mais, usa a Disparada, que gasta a Ação, e o golpe
+  fica para o turno seguinte;
+- o NPC que tem golpe à distância atira de onde está;
+- no Ataque Múltiplo, o golpe só é redirecionado para um alvo que ele
+  alcança;
+- `execute_npc_turn` envolve o turno com uma garantia: se, ao final, a vez
+  ainda é do mesmo NPC e o turno não andou, ele passa a vez e isso vai para o
+  log. Uma recusa que sobrar nunca mais prende a luta.
+
+**O jogador perdia a Ação num ataque recusado.** `combat_action` marcava a
+Ação como gasta antes de chamar `attack_roll`, e a recusa de alcance voltava
+com `ok: true`. O jogador não via aviso nenhum e só podia encerrar o turno.
+Agora o alcance é checado antes de gastar a Ação, e qualquer recusa de
+`attack_roll` ou `use_ability` devolve a Ação e responde com `ok: false` e uma
+mensagem que a tela mostra ("A Ação não foi gasta").
+
+O snapshot ganhou `alcance`: para o combatente do grupo que está na vez, cada
+arma contra cada outro combatente, `ok`, `desvantagem` ou `fora`, calculado
+por `_checar_alcance`. O seletor de alvo da tela desabilita quem está `fora` e
+marca a desvantagem, sem ter regra própria.
+`test_combate_alcance_na_tela.py` cobre o motor e
+`test_combate_alcance_navegador.py` abre a tela com o inimigo duas zonas
+longe na vez dele.
+
 ### Chefes: recarga e ações lendárias
 
 Duas coisas que separam um chefe de um saco de PV.
@@ -1990,7 +2023,8 @@ acessam memória):
 
 ### Combate em tela
 
-- `GET /api/combat/state` → snapshot completo.
+- `GET /api/combat/state` → snapshot completo (inclui `alcance` por arma e
+  alvo quando o combate tem zonas).
 - `POST /api/combat/action` `{action, actor, target, weapon, ability, item}`
   → executa intenção, retorna `{ok, message, snapshot}`.
 - `GET /api/combat/recap` → texto para a IA narrar a luta + limpa

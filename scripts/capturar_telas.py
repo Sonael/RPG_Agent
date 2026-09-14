@@ -936,6 +936,13 @@ TELAS = [
     {"nome": "combate-zonas", "pagina": "/game.html",
      "estado": COMBATE_ZONAS, "espera": 700,
      "exigir": "#cbt-zonas:not(.hidden)"},
+    # Stelar no Pátio escolhe a arma de corpo-a-corpo: Victoria, na Sacada,
+    # aparece desabilitada e marcada "fora de alcance".
+    {"nome": "combate-alvo-fora-de-alcance", "pagina": "/game.html",
+     "estado": COMBATE_ZONAS, "espera": 700,
+     "js": "window.Combat._sel('attack');"
+           "setTimeout(() => document.querySelector('#cbt-targets .cbt-btn').click(), 50)",
+     "exigir": "#cbt-targets .cbt-fora"},
     {"nome": "combate-escolher-zona", "pagina": "/game.html",
      "estado": COMBATE_ZONAS, "espera": 700,
      "js": "window.Combat._sel('move')", "exigir": "#cbt-targets:not(.hidden)"},
