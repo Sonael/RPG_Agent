@@ -1107,6 +1107,27 @@ def update_campaign(name):
                     mantidos_por_personagem[_ch.get("name", _key)] = mantidos
                 reconcile_character_archetypes(_ch)
 
+    # Lugares: chave pelo nome, campos que o editor não manda preservados,
+    # "fica dentro de" e "onde está" com o nome gravado, e sem ciclo.
+    from rpg import locais as _locais
+    locations_editadas, erro_de_lugar = _locais.normalizar_campanha_editada(
+        campaign_data.get("locations", existing.get("locations", {})),
+        existing.get("locations", {}),
+        edited_chars if isinstance(edited_chars, dict) else {},
+        antigos,
+        existing.get("lojas", {}),
+    )
+    if erro_de_lugar:
+        return jsonify({"error": erro_de_lugar}), 400
+    # A marca antiga de grupo não pode sobreviver a um "membro do grupo"
+    # desmarcado no editor: quem manda é a lista `party` que ele envia.
+    if isinstance(edited_chars, dict) and "party" in campaign_data:
+        do_grupo = {str(p.get("name", "")).lower().strip()
+                    for p in (campaign_data.get("party") or []) if isinstance(p, dict)}
+        for _ch in edited_chars.values():
+            if isinstance(_ch, dict) and "party_member" in _ch:
+                _ch["party_member"] = str(_ch.get("name", "")).lower().strip() in do_grupo
+
     # Preserve fields that should not be overwritten by the editor
     payload = dict(existing)
     payload.update({
@@ -1118,7 +1139,7 @@ def update_campaign(name):
         "current_scene":    campaign_data.get("current_scene", existing.get("current_scene", "")),
         "current_location": campaign_data.get("current_location", existing.get("current_location", "")),
         "characters":       edited_chars,
-        "locations":        campaign_data.get("locations", existing.get("locations", {})),
+        "locations":        locations_editadas,
         "events":           campaign_data.get("events", existing.get("events", [])),
         "party":            campaign_data.get("party", existing.get("party", [])),
     })

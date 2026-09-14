@@ -141,6 +141,78 @@ def pessoas_em(nome: str) -> list[dict]:
     return saida
 
 
+def normalizar_campanha_editada(novos_locais: dict, antigos_locais: dict,
+                                novos_chars: dict, antigos_chars: dict,
+                                lojas: dict) -> tuple[dict, str]:
+    """
+    Aplica ao que o editor da campanha (menu) mandou as regras de lugar, sem
+    depender da campanha carregada em memória. Devolve (locais, erro).
+
+    - Chave do local = nome em minúsculas, como save_location grava. O editor
+      gravava "praça_de_cliviate" e o mestre depois criava "praça de cliviate"
+      ao lado: o mesmo lugar duas vezes.
+    - Campo que o editor não manda fica como estava gravado (no local e no
+      personagem): atitude, marca de XP por derrota, "onde está" antigo.
+    - dentro_de e local gravados com o nome como o lugar está salvo;
+      dentro_de vazio apaga; ciclo é erro.
+    """
+    antigos_locais = antigos_locais or {}
+    antigos_por_nome = {norm((l or {}).get("name", k)): l for k, l in antigos_locais.items()
+                        if isinstance(l, dict)}
+
+    locais_saida = {}
+    for chave, loc in (novos_locais or {}).items():
+        if not isinstance(loc, dict) or not (loc.get("name") or "").strip():
+            continue
+        nome = loc["name"].strip()
+        antigo = antigos_locais.get(chave) or antigos_por_nome.get(norm(nome)) or {}
+        junto = {**antigo, **loc, "name": nome}
+        if "dentro_de" in loc and not (loc.get("dentro_de") or "").strip():
+            junto.pop("dentro_de", None)
+        locais_saida[nome.lower()] = junto
+
+    nomes = {norm(l["name"]): l["name"] for l in locais_saida.values()}
+    for loja in (lojas or {}).values():
+        if isinstance(loja, dict) and loja.get("nome"):
+            nomes.setdefault(norm(loja["nome"]), loja["nome"])
+
+    def canonico(texto: str) -> str:
+        return nomes.get(norm(texto), (texto or "").strip())
+
+    for loc in locais_saida.values():
+        if loc.get("dentro_de"):
+            loc["dentro_de"] = canonico(loc["dentro_de"])
+
+    # Ciclo: subir pelo dentro_de a partir de cada local não pode voltar nele.
+    pai_de_nome = {norm(l["name"]): norm(l.get("dentro_de", "")) for l in locais_saida.values()}
+    for loc in locais_saida.values():
+        vistos, atual = {norm(loc["name"])}, pai_de_nome.get(norm(loc["name"]), "")
+        while atual:
+            if atual in vistos:
+                return locais_saida, (f"'{loc['name']}' não pode ficar dentro de "
+                                      f"'{loc['dentro_de']}': um dos dois já fica dentro do outro.")
+            vistos.add(atual)
+            atual = pai_de_nome.get(atual, "")
+
+    antigos_chars = antigos_chars or {}
+    for chave, ch in (novos_chars or {}).items():
+        if not isinstance(ch, dict):
+            continue
+        antigo = (antigos_chars.get(chave)
+                  or antigos_chars.get((ch.get("name") or "").lower().strip())
+                  or next((a for a in antigos_chars.values()
+                           if isinstance(a, dict) and norm(a.get("name", "")) == norm(ch.get("name", ""))), None)
+                  or {})
+        for campo, valor in antigo.items():
+            ch.setdefault(campo, valor)
+        if "local" in ch:
+            if (ch.get("local") or "").strip():
+                ch["local"] = canonico(ch["local"])
+            else:
+                ch.pop("local", None)
+    return locais_saida, ""
+
+
 _FORA_DE_ALCANCE = ("morto", "desaparecido", "preso", "exilado", "fugiu")
 
 

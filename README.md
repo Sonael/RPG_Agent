@@ -1565,6 +1565,33 @@ ganhou a seção MAPA: `dentro_de` para lugar dentro de lugar, `local` e
 `set_character_location` para personagens, e `update_world_state` ao narrar
 um "Vamos até ..." para um lugar ao alcance.
 
+### No editor da campanha (menu)
+
+O personagem ganhou "Onde está" e o local ganhou "Fica dentro de", com as
+mesmas sugestões que servem ao "Local Atual" do passo 1: os locais do passo
+3 e as lojas da campanha.
+
+O salvamento desse editor apagava o que ele não conhecia. O
+`PUT /api/campaigns/<nome>` recebia personagens e locais remontados só com os
+campos do editor, e salvar pelo menu apagava a atitude, a marca de XP por
+derrota, o "onde está" e o "fica dentro de". Além disso, a chave do local ia
+com sublinhado ("praça_de_cliviate"), e o mestre depois criava
+"praça de cliviate" ao lado. Agora `locais.normalizar_campanha_editada`, no
+servidor:
+
+- grava a chave do local pelo nome em minúsculas, como `save_location`;
+- preserva, no local e no personagem, todo campo que o editor não mandou;
+- grava `dentro_de` e `local` com o nome do lugar salvo (loja inclusive), e
+  vazio apaga;
+- recusa ciclo com 400 e a mensagem aparece no editor.
+
+A marca `party_member` antiga não sobrevive a um "membro do grupo" desmarcado:
+quem manda é a lista `party` enviada. `test_editor_campanha_lugares.py` cobre
+a normalização e a rota; `test_editor_campanha_lugares_navegador.py` abre o
+editor, confere os campos e as sugestões, muda o paradeiro de um personagem e
+o "fica dentro de" de um local, salva e confere o que chegou ao servidor
+(inclusive a atitude preservada).
+
 ### A loja com hierarquia
 
 - Dentro da própria loja (o grupo foi "até a Forja de Cliviate"), ela é a loja

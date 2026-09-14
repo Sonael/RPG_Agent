@@ -357,7 +357,10 @@
           </div>
           <div class="field-group">
             <label>Local Atual</label>
-            <input type="text" id="ed-location" placeholder="Ex: Pântano dos Sussurros">
+            <input type="text" id="ed-location" list="ed-lugares" placeholder="Ex: Pântano dos Sussurros">
+            <!-- Sugestões para Local Atual, "Fica dentro de" e "Onde está":
+                 os locais do passo 3 e as lojas da campanha. -->
+            <datalist id="ed-lugares"></datalist>
           </div>
           <div class="field-group">
             <label>Protagonista</label>
@@ -428,7 +431,7 @@
   </div>
 
   <script src="/static/js/utils.js?v=12"></script>
-  <script src="/static/js/menu.js?v=45"></script>
+  <script src="/static/js/menu.js?v=46"></script>
   <script>
     // Animação de volta para a capa quando carregado da cache
     window.addEventListener('pageshow', function(event) {

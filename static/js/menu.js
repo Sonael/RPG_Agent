@@ -3230,6 +3230,7 @@ let edStep = 1;
 let edOriginalName = '';
 let edChars = [];
 let edLocs  = [];
+let edLojasNomes = [];
 let edEvts  = [];
 
 function edIsDnd() { return document.getElementById('ed-type')?.value === 'dnd'; }
@@ -3632,6 +3633,7 @@ async function openEditCampaign(e, name) {
       status:      ch.status      || 'vivo',
       notes:       ch.notes       || '',
       role:        ch.role        || '',
+      local:       ch.local       || '',
       isParty:     (c.party||[]).some(p => p.name?.toLowerCase() === (ch.name||key).toLowerCase()),
       sheet:       ch.sheet ? Object.assign(edBlankSheet(), ch.sheet) : edBlankSheet(),
       inventario:  Array.isArray(ch.inventario)  ? ch.inventario.map(it => ({...it}))  : [],
@@ -3647,10 +3649,13 @@ async function openEditCampaign(e, name) {
     edLocs = Object.entries(c.locations || {}).map(([key, loc]) => ({
       key,
       name:        loc.name        || key,
+      dentro_de:   loc.dentro_de   || '',
       description: loc.description || '',
       details:     loc.details     || '',
       notes:       loc.notes       || '',
     }));
+    // Lojas também são lugares: dá para pôr alguém "na Forja de Cliviate".
+    edLojasNomes = Object.values(c.lojas || {}).map(l => l && l.nome).filter(Boolean);
     edRenderLocs();
 
     // Eventos
@@ -4392,9 +4397,16 @@ function edRenderChars() {
             </select>
           </div>
         </div>
-        <div>
-          <span class="cwc-label">${meta.role}</span>
-          <input value="${escHtml(ch.role)}" onchange="edChars[${i}].role=this.value" placeholder="${meta.hint}">
+        <div class="cwc-row2">
+          <div>
+            <span class="cwc-label">${meta.role}</span>
+            <input value="${escHtml(ch.role)}" onchange="edChars[${i}].role=this.value" placeholder="${meta.hint}">
+          </div>
+          <div>
+            <span class="cwc-label">Onde está</span>
+            <input class="ed-onde-esta" value="${escHtml(ch.local || '')}" list="ed-lugares"
+              onchange="edChars[${i}].local=this.value" placeholder="${ch.isParty ? 'o grupo fica no Local Atual' : 'Ex: Forja de Cliviate'}">
+          </div>
         </div>
         <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
           <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text-muted);">
@@ -4422,13 +4434,24 @@ function edRenderChars() {
 
 // ── Locais ─────────────────────────────────────────────────────────
 function addEditLoc() {
-  edLocs.push({ key:'', name:'', description:'', details:'', notes:'' });
+  edLocs.push({ key:'', name:'', dentro_de:'', description:'', details:'', notes:'' });
   edRenderLocs();
 }
 function removeEditLoc(i) { edLocs.splice(i,1); edRenderLocs(); }
 
+// Sugestões de lugar (datalist compartilhado): os locais do passo 3, com o
+// nome como está digitado agora, e as lojas da campanha.
+function edAtualizarLugares() {
+  const dl = document.getElementById('ed-lugares');
+  if (!dl) return;
+  const nomes = [...edLocs.map(l => (l.name || '').trim()), ...edLojasNomes]
+    .filter((n, i, todos) => n && todos.findIndex(o => o.toLowerCase() === n.toLowerCase()) === i);
+  dl.innerHTML = nomes.map(n => `<option value="${escHtml(n)}"></option>`).join('');
+}
+
 function edRenderLocs() {
   const container = document.getElementById('ed-locs-list');
+  edAtualizarLugares();
   if (!edLocs.length) {
     container.innerHTML = '<div style="font-size:13px;color:var(--text-muted);font-style:italic;padding:8px 0;">Nenhum local. Clique em + Local para adicionar.</div>';
     return;
@@ -4438,11 +4461,15 @@ function edRenderLocs() {
       <button onclick="removeEditLoc(${i})" style="position:absolute;top:8px;right:8px;background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:14px;">✕</button>
       <div class="cwc-row2" style="margin-bottom:8px;">
         <div><span class="cwc-label">Nome</span>
-          <input value="${escHtml(loc.name)}" onchange="edLocs[${i}].name=this.value" placeholder="Nome do local">
+          <input value="${escHtml(loc.name)}" onchange="edLocs[${i}].name=this.value;edAtualizarLugares()" placeholder="Nome do local">
         </div>
-        <div><span class="cwc-label">Detalhes</span>
-          <input value="${escHtml(loc.details)}" onchange="edLocs[${i}].details=this.value" placeholder="Pontos específicos...">
+        <div><span class="cwc-label">Fica dentro de</span>
+          <input class="ed-dentro-de" value="${escHtml(loc.dentro_de || '')}" list="ed-lugares"
+            onchange="edLocs[${i}].dentro_de=this.value" placeholder="Ex: Cliviate (vazio se não fica em outro lugar)">
         </div>
+      </div>
+      <div style="margin-bottom:8px;"><span class="cwc-label">Detalhes</span>
+        <input value="${escHtml(loc.details)}" onchange="edLocs[${i}].details=this.value" placeholder="Pontos específicos...">
       </div>
       <span class="cwc-label">Descrição</span>
       <textarea rows="2" onchange="edLocs[${i}].description=this.value" placeholder="Descrição sensorial...">${escHtml(loc.description)}</textarea>
@@ -4505,6 +4532,8 @@ async function saveEditedCampaign() {
       status:      ch.status || 'vivo',
       notes:       ch.notes,
       role:        ch.role,
+      // Vazio apaga o paradeiro; o servidor grava com o nome do lugar salvo.
+      local:       (ch.local || '').trim(),
       sheet:       isDnd && ch.sheet ? ch.sheet : null,
       inventario:  isDnd ? (ch.inventario || []) : [],
       habilidades: isDnd ? (ch.habilidades || []) : [],
@@ -4520,8 +4549,11 @@ async function saveEditedCampaign() {
   const locations = {};
   for (const loc of edLocs) {
     if (!loc.name.trim()) continue;
-    const key = loc.name.toLowerCase().trim().replace(/ /g, '_');
-    locations[key] = { name:loc.name, description:loc.description, details:loc.details, notes:loc.notes };
+    // Mesma chave que save_location usa (nome em minúsculas, com espaço). Com
+    // sublinhado, o mestre depois criava o mesmo lugar de novo ao lado.
+    const key = loc.name.toLowerCase().trim();
+    locations[key] = { name:loc.name.trim(), dentro_de:(loc.dentro_de || '').trim(),
+                       description:loc.description, details:loc.details, notes:loc.notes };
   }
 
   // Eventos com índice
