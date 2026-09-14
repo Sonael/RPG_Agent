@@ -7471,7 +7471,10 @@ def open_shop(shop_name: str, items: str, location: str = "") -> str:
                    Descreva SEMPRE o que não for item do SRD — a descrição
                    vai junto para o inventário de quem comprar, e é por ela
                    que o motor confere se o item desequilibra a mesa.
-        location:  Onde fica (padrão: o local atual do grupo).
+        location:  Onde o GRUPO está agora, dentro da loja (padrão: o local
+                   atual). Se for outro local, ele passa a ser o local atual
+                   do grupo — é o que faz a tela de loja abrir. Para
+                   reabastecer uma loja de outro lugar, não informe.
     """
     nome_loja = (shop_name or "").strip()
     if not nome_loja:
@@ -7526,6 +7529,23 @@ def open_shop(shop_name: str, items: str, location: str = "") -> str:
     if location or not loja.get("local"):
         loja["local"] = location or memory.campaign.get("current_location", "")
 
+    # `location` é, pelo contrato, ONDE O GRUPO ESTÁ. Se ele difere do local
+    # atual, o grupo chegou lá e o mestre não chamou update_world_state: a
+    # loja ficava em "Cliviate", o grupo continuava "na Clareira", e a tela
+    # (que só mostra lojas do local atual) nem abria nem mostrava a pílula.
+    aviso_local = ""
+    local_atual = memory.campaign.get("current_location", "") or ""
+    if location and _norm_txt(location) != _norm_txt(local_atual):
+        salvo = (memory.campaign.get("locations") or {}).get(location.strip().lower()) or {}
+        novo_local = salvo.get("name") or location.strip()
+        memory.campaign["current_location"] = novo_local
+        loja["local"] = novo_local
+        memory.marcar_upkeep("mundo")
+        aviso_local = (f"\n   Nota: o local atual do grupo passou de "
+                       f"'{local_atual or '—'}' para '{novo_local}'. Para "
+                       f"reabastecer uma loja de outro lugar sem mover o grupo, "
+                       f"não informe location.")
+
     novos, repostos = [], []
     for item in estoque:
         antigo = next((i for i in loja["estoque"]
@@ -7553,7 +7573,7 @@ def open_shop(shop_name: str, items: str, location: str = "") -> str:
     if sem_preco:
         linhas.append("   Sem preço (fora do SRD, não entraram): "
                       + ", ".join(sem_preco))
-    return "\n".join(linhas)
+    return "\n".join(linhas) + aviso_local
 
 
 def list_shop(shop_name: str) -> str:

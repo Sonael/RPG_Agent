@@ -530,7 +530,9 @@ SAQUE E COMPRA — o peso faz o saque virar escolha:
   substituir: use isso para o ferreiro receber mercadoria nova sem apagar o
   resto.
   Informe `location` com o local ONDE o grupo está: é o que faz a TELA DE
-  LOJA abrir sozinha para o jogador. Com a tela aberta, quem compra é ele,
+  LOJA abrir sozinha para o jogador. Se o grupo acabou de chegar a outra
+  cidade, esse location também muda o local atual dele (o mesmo que
+  update_world_state); para reabastecer uma loja de outro lugar, omita. Com a tela aberta, quem compra é ele,
   no botão — você não precisa chamar buy_item por ele nem narrar a compra
   antes que ela aconteça. Quando ele encerrar, chega um aviso
   [COMPRAS RESOLVIDAS NA TELA] e aí sim você narra a saída da loja. buy_item() cobra da bolsa trocando ouro/prata/cobre sozinho, e

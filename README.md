@@ -1523,6 +1523,24 @@ por campanha: é conveniência de quem joga naquele navegador, não estado do
 mundo. Antes ela vivia numa variável, e um F5 bastava para a loja pular na
 cara de novo.
 
+**Chegar a outra cidade e entrar na loja.** O grupo seguiu da Clareira das
+Brumas Eternas para Cliviate e entrou na forja. O mestre salvou o local e
+abriu a loja com `location="Cliviate"`, mas não chamou `update_world_state`.
+O local atual do grupo continuou na Clareira; como a tela só mostra lojas do
+local atual, ela não abriu e nem a pílula apareceu. A instrução do mestre já
+dizia que `location` é **onde o grupo está**, e agora o motor honra isso: se
+difere do local atual, `open_shop` passa a ser o local atual do grupo (com o
+nome do local salvo, se houver) e avisa com `Nota:`. Para reabastecer uma
+loja de outro lugar sem mover o grupo, omite-se `location`.
+`test_loja_ao_chegar.py` cobre a chegada, o mesmo local escrito diferente e
+o reabastecimento.
+
+Junto veio o cartão de Cliviate na Enciclopédia, que mostrava "Salva ou
+atualiza um local na memória da campanha.": o modelo copiou o texto de ajuda
+da ferramenta para `description`. `save_location` agora reconhece a cópia
+(`_copia_da_ajuda`). Se `details` for texto de verdade, ele vira a descrição;
+senão, a resposta é `Erro:` pedindo a descrição do ambiente.
+
 Com mais de uma loja no mesmo local, o cabeçalho ganha um seletor e a pílula
 diz "2 lojas em Oakhaven". Antes a tela só conhecia a primeira loja do
 local — o boticário ao lado da forja era inalcançável. Fechada, fica a pílula

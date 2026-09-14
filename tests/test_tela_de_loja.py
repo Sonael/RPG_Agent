@@ -238,7 +238,12 @@ def test_snapshot_lista_todas_as_lojas_do_local(forja):
     pílula.
     """
     td.open_shop("Boticário da Mira", "Corda:1", location="Oakhaven")
-    td.open_shop("Taverna de Luminas", "Corda:1", location="Luminas")
+    # Loja de outra cidade, de quando o grupo passou por lá. Direto no estado:
+    # open_shop com location de outro lugar agora leva o grupo até ele
+    # (test_loja_ao_chegar.py).
+    memory.campaign["lojas"]["taverna de luminas"] = {
+        "nome": "Taverna de Luminas", "local": "Luminas",
+        "estoque": [{"nome": "Corda", "preco": 1, "qtd": 99, "descricao": ""}]}
 
     snap = td.shop_snapshot()
     nomes = [l["nome"] for l in snap["lojas_aqui"]]

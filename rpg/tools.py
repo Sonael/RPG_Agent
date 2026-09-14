@@ -193,6 +193,16 @@ def save_location(
         details:     Detalhes: NPCs presentes, objetos notáveis, saídas.
         notes:       Eventos passados ou segredos ligados ao local.
     """
+    # O modelo às vezes copia o texto de ajuda da própria ferramenta para o
+    # campo: a Enciclopédia mostrava "Cliviate — Salva ou atualiza um local
+    # na memória da campanha.". Descrição assim não é descrição.
+    if _copia_da_ajuda(description, save_location):
+        if details and not _copia_da_ajuda(details, save_location):
+            description, details = details, ""
+        else:
+            return (f"Erro: a descrição de '{name}' é o texto de ajuda da ferramenta, "
+                    f"não o local. Chame save_location de novo com description "
+                    f"descrevendo o ambiente de {name}.")
     memory.campaign["locations"][name.lower()] = {
         "name":        name,
         "description": description,
@@ -201,6 +211,25 @@ def save_location(
     }
     memory.save_campaign()
     return f"Local '{name}' salvo na memória."
+
+
+def _copia_da_ajuda(texto: str, funcao) -> bool:
+    """O texto é uma linha (ou a ajuda de um argumento) da docstring da ferramenta?"""
+    import unicodedata
+
+    def norm(t: str) -> str:
+        t = unicodedata.normalize("NFD", (t or "").lower())
+        t = "".join(c for c in t if unicodedata.category(c) != "Mn")
+        return " ".join(t.replace(".", " ").split())
+
+    alvo = norm(texto)
+    if len(alvo) < 12:
+        return False
+    for linha in (funcao.__doc__ or "").splitlines():
+        ajuda = norm(linha.split(":", 1)[1] if ":" in linha else linha)
+        if ajuda and alvo == ajuda:
+            return True
+    return False
 
 
 def get_location(name: str) -> str:
