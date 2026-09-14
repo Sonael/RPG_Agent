@@ -2303,6 +2303,39 @@ def export_diary():
     )
 
 
+def _extrair_json_da_ia(raw: str) -> dict:
+    """
+    O objeto JSON de uma resposta de modelo, mesmo com texto em volta.
+
+    Só tirar as cercas do começo e do fim não bastava: "Aqui está o mundo da
+    sua campanha:" antes do JSON, comum em modelo que conversa, virava erro
+    500 e a geração inteira se perdia. Tenta, nesta ordem: o texto inteiro, o
+    bloco entre cercas de markdown, e do primeiro "{" ao último "}".
+    Levanta ValueError com uma mensagem para o jogador quando nada serve.
+    """
+    texto = (raw or "").strip()
+    candidatos = [texto]
+    cerca = re.search(r"```(?:json)?\s*(.*?)```", texto, re.S)
+    if cerca:
+        candidatos.append(cerca.group(1).strip())
+    ini, fim = texto.find("{"), texto.rfind("}")
+    if ini != -1 and fim > ini:
+        candidatos.append(texto[ini:fim + 1])
+    for c in candidatos:
+        try:
+            dados = json.loads(c)
+        except (json.JSONDecodeError, ValueError):
+            continue
+        if isinstance(dados, dict):
+            return dados
+    cortada = ini != -1 and (fim == -1 or texto.count("{") > texto.count("}"))
+    raise ValueError(
+        "A IA devolveu uma resposta incompleta (cortada antes do fim). Tente gerar de novo."
+        if cortada else
+        "A IA não devolveu o mundo no formato esperado. Tente gerar de novo."
+    )
+
+
 @app.route("/api/campaigns/generate-lore", methods=["POST"])
 @require_auth
 def generate_lore():
@@ -2457,7 +2490,10 @@ def generate_lore():
             resp = _req.post(
                 "https://api.deepseek.com/chat/completions",
                 headers={"Authorization": f"Bearer {ds_key}", "Content-Type": "application/json"},
-                json={"model": model_id, "messages": [{"role": "user", "content": full_prompt}], "max_tokens": 1500},
+                # 1500 cortava o JSON: locais, eventos e até 4 personagens
+                # passam disso, e no deepseek-reasoner o raciocínio conta no
+                # mesmo limite.
+                json={"model": model_id, "messages": [{"role": "user", "content": full_prompt}], "max_tokens": 8000},
                 timeout=30,
             )
             raw = resp.json()["choices"][0]["message"]["content"].strip()
@@ -2479,13 +2515,12 @@ def generate_lore():
             response = client.models.generate_content(model=model, contents=full_prompt)
             raw      = response.text.strip()
 
-        raw  = re.sub(r'^```(?:json)?\s*', '', raw)
-        raw  = re.sub(r'\s*```$', '', raw)
-        lore = json.loads(raw)
+        lore = _extrair_json_da_ia(raw)
         return jsonify({"ok": True, "lore": lore})
 
-    except json.JSONDecodeError as e:
-        return jsonify({"error": f"IA retornou JSON inválido: {e}"}), 500
+    except ValueError as e:
+        _dbg(f"[MENU/LORE] Resposta não aproveitável: {_short(raw, 300)}")
+        return jsonify({"error": str(e)}), 502
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

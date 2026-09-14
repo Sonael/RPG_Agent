@@ -1671,6 +1671,9 @@ async function generateLore() {
       wzEvts = lore.events.map(e => ({
         summary:     e.summary     || '',
         location:    e.location    || '',
+        // Quem a IA disse que estava lá. Antes era descartado, e a criação
+        // gravava o grupo inteiro em todos os eventos.
+        characters_involved: e.characters_involved || '',
         consequence: e.consequence || '',
       }));
       wzRenderEvts();
@@ -1755,7 +1758,7 @@ async function generateLore() {
 
       const n = wzChars.length;
       status.style.color = 'var(--green)';
-      status.textContent = `✓ Lore gerado com ${n} personagem${n > 1 ? 's' : ''}! Revise os campos.`;
+      status.textContent = `✓ Lore gerado com ${n} ${n > 1 ? 'personagens' : 'personagem'}! Revise os campos.`;
     } else {
       status.style.color = 'var(--green)';
       status.textContent = '✓ Lore gerado! Revise os campos.';
@@ -1805,9 +1808,17 @@ function wzRenderLocs() {
             onchange="wzLocs[${i}].dentro_de=this.value" placeholder="Ex: Cliviate (vazio se não fica em outro lugar)">
         </div>
       </div>
-      <div style="margin-bottom:8px;">
-        <span class="cwc-label">Detalhes geográficos</span>
-        <input value="${escHtml(loc.details)}" onchange="wzLocs[${i}].details=this.value" placeholder="Pontos específicos...">
+      <div class="cwc-row2" style="margin-bottom:8px;">
+        <div>
+          <span class="cwc-label">Detalhes geográficos</span>
+          <input value="${escHtml(loc.details)}" onchange="wzLocs[${i}].details=this.value" placeholder="Pontos específicos...">
+        </div>
+        <div>
+          <span class="cwc-label">Notas</span>
+          <!-- A IA gera notas (segredos, história do lugar) e elas iam para a
+               campanha sem aparecer em lugar nenhum para revisar. -->
+          <input class="wz-loc-notas" value="${escHtml(loc.notes || '')}" onchange="wzLocs[${i}].notes=this.value" placeholder="Segredos, história do lugar...">
+        </div>
       </div>
       <span class="cwc-label">Descrição</span>
       <textarea rows="2" onchange="wzLocs[${i}].description=this.value" placeholder="Descrição sensorial...">${escHtml(loc.description)}</textarea>
@@ -1816,7 +1827,7 @@ function wzRenderLocs() {
 
 // ── Eventos ────────────────────────────────────────────────
 function addWzEvent() {
-  wzEvts.push({ summary:'', location:'', consequence:'' });
+  wzEvts.push({ summary:'', location:'', characters_involved:'', consequence:'' });
   wzRenderEvts();
 }
 function removeWzEvent(i) {
@@ -1834,12 +1845,17 @@ function wzRenderEvts() {
       <div class="cwc-row2" style="margin-top:8px;">
         <div>
           <span class="cwc-label">Local</span>
-          <input value="${escHtml(ev.location)}" onchange="wzEvts[${i}].location=this.value" placeholder="Onde ocorreu?">
+          <input value="${escHtml(ev.location)}" list="wz-lugares" onchange="wzEvts[${i}].location=this.value" placeholder="Onde ocorreu?">
         </div>
         <div>
-          <span class="cwc-label">Consequência</span>
-          <input value="${escHtml(ev.consequence)}" onchange="wzEvts[${i}].consequence=this.value" placeholder="O que mudou?">
+          <span class="cwc-label">Personagens envolvidos</span>
+          <input class="wz-evt-envolvidos" value="${escHtml(ev.characters_involved || '')}"
+            onchange="wzEvts[${i}].characters_involved=this.value" placeholder="Vazio: o grupo">
         </div>
+      </div>
+      <div style="margin-top:8px;">
+        <span class="cwc-label">Consequência</span>
+        <input value="${escHtml(ev.consequence)}" onchange="wzEvts[${i}].consequence=this.value" placeholder="O que mudou?">
       </div>
     </div>`).join('');
 }
@@ -3169,7 +3185,8 @@ async function createCampaignFromWizard() {
   const events = wzEvts.filter(e => e.summary.trim()).map((e, i) => ({
     index:                i + 1,
     summary:              e.summary,
-    characters_involved:  party.map(p => p.name).join(', '),
+    // Quem foi informado (pela IA ou à mão); vazio continua sendo o grupo.
+    characters_involved:  (e.characters_involved || '').trim() || party.map(p => p.name).join(', '),
     location:             e.location,
     consequence:          e.consequence,
   }));

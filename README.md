@@ -1608,6 +1608,45 @@ exato desse outro") e `local` em cada NPC ("o nome exato do local gerado onde
 ele está"). A campanha gerada já nasce com o mapa, e o wizard mostra esses
 valores para revisão.
 
+#### O que "Gerar com IA" preenche, conferido
+
+Uma verificação do botão, com a resposta de IA no formato exato que o prompt
+pede, encontrou:
+
+- **Resposta com texto em volta falhava.** A rota só tirava as cercas de
+  markdown do começo e do fim. Uma frase antes do JSON ("Aqui está o mundo da
+  sua campanha:"), comum em modelo que conversa, virava erro 500.
+  `_extrair_json_da_ia` tenta o texto inteiro, o bloco entre cercas e do
+  primeiro "{" ao último "}".
+- **Resposta cortada chegava crua ao jogador** ("Unterminated string starting
+  at: line 1 column 111"). Agora a rota responde 502 com "A IA devolveu uma
+  resposta incompleta (cortada antes do fim). Tente gerar de novo." (ou "não
+  devolveu o mundo no formato esperado"), e o texto recebido fica no log de
+  depuração.
+- **O DeepSeek limitava a resposta a 1500 tokens.** Locais, eventos e até 4
+  personagens passam disso, e no deepseek-reasoner o raciocínio conta no mesmo
+  limite. Subiu para 8000.
+- **"Personagens envolvidos" dos eventos era descartado.** A criação gravava
+  o grupo inteiro em todos os eventos. O cartão de evento do wizard ganhou o
+  campo, a IA o preenche, e vazio continua sendo o grupo.
+- **As notas dos locais não apareciam.** A IA gera notas (segredos, história
+  do lugar) e elas iam para a campanha sem ter onde revisar. O cartão de local
+  ganhou o campo.
+- "4 personagems" virou "4 personagens".
+
+O resto já estava ligado: resumo, cena, local atual, os locais (com "fica
+dentro de" e detalhes), os eventos (local e consequência) e os personagens
+(função, grupo, descrição, traços, notas, "onde está", classe e raça). Com o
+SRD no ar, os NPCs recebem a ficha do monstro (um `commoner` com CR 0 e 4 PV,
+um `dire-wolf` com CR 1 e 37 PV).
+
+`test_gerar_lore.py` simula o cliente do Gemini e o DeepSeek (os testes não
+têm chave de API): texto em volta, cortada, sem JSON, os campos pedidos no
+prompt e o limite do DeepSeek. `test_gerar_lore_navegador.py` clica em
+"Gerar com IA" no wizard com a rota interceptada, confere cada campo dos dois
+passos e o que segue para a criação, e confere que um erro da IA aparece sem
+apagar o que o jogador já tinha escrito.
+
 `test_wizard_lugares.py` cobre a criação, o ciclo, a importação, o prompt e o
 que o wizard monta; `test_wizard_lugares_navegador.py` preenche locais e um
 personagem, confere as sugestões e intercepta o POST de criação para conferir
