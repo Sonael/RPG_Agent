@@ -194,7 +194,11 @@ async function sendMessage() {
   await sendToAgent(text, true);
 }
 
-async function sendToAgent(text, registrar) {
+// `interno` ('tela' | 'dado' | 'comando'): a mensagem é do jogo para o mestre,
+// não fala do jogador. Fica no histórico como contexto, mas renderHistory não
+// a mostra ao reabrir a campanha — antes o log inteiro do combate aparecia no
+// chat como se o jogador o tivesse escrito.
+async function sendToAgent(text, registrar, interno) {
   if (waiting) return;
 
   waiting = true;
@@ -207,7 +211,7 @@ async function sendToAgent(text, registrar) {
     const res = await authFetch(`${API}/api/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: text, registrar })
+      body: JSON.stringify({ message: text, registrar, interno: interno || '' })
     });
 
     const reader = res.body.getReader();
@@ -625,9 +629,9 @@ async function handleSlash(raw) {
   const mPerson = raw.match(/^\/salvar\s+personagem\s+(.+)/i);
   const mEvento = raw.match(/^\/salvar\s+evento\s+(.+)/i);
 
-  if (mLocal) { appendSystem(`<p>Registrando local "${mLocal[1]}"...</p>`); await sendToAgent(`Salve o local "${mLocal[1]}" usando save_location com todos os detalhes mencionados. Confirme o que foi registrado.`, true); return true; }
-  if (mPerson) { appendSystem(`<p>Registrando "${mPerson[1]}"...</p>`); await sendToAgent(`Salve o personagem "${mPerson[1]}" usando save_character com todos os detalhes. Confirme o que foi registrado.`, true); return true; }
-  if (mEvento) { appendSystem(`<p>Registrando evento...</p>`); await sendToAgent(`Salve o evento "${mEvento[1]}" usando save_event. Confirme o que foi registrado.`, true); return true; }
+  if (mLocal) { appendSystem(`<p>Registrando local "${mLocal[1]}"...</p>`); await sendToAgent(`Salve o local "${mLocal[1]}" usando save_location com todos os detalhes mencionados. Confirme o que foi registrado.`, true, 'comando'); return true; }
+  if (mPerson) { appendSystem(`<p>Registrando "${mPerson[1]}"...</p>`); await sendToAgent(`Salve o personagem "${mPerson[1]}" usando save_character com todos os detalhes. Confirme o que foi registrado.`, true, 'comando'); return true; }
+  if (mEvento) { appendSystem(`<p>Registrando evento...</p>`); await sendToAgent(`Salve o evento "${mEvento[1]}" usando save_event. Confirme o que foi registrado.`, true, 'comando'); return true; }
 
   return false;
 }
@@ -789,11 +793,20 @@ function rollPlayerDie(sides) {
   document.getElementById('chat-history').appendChild(row); scrollDown();
 
   const msg = `[DADO DO JOGADOR — rolado pelo sistema, não editável] 1d${sides}${modStr}: rolei ${rawRoll}, total ${total}`;
-  sendToAgent(msg, true);
+  sendToAgent(msg, true, 'dado');
 }
 
 function renderHistory(history) {
   history.forEach(e => {
+    if (e.role === 'user' && e.interno) {
+      // A rolagem é do jogador e ele a viu como cartão; volta como uma linha.
+      // Fechamento de tela e pedido de comando não voltam: não foram ditos.
+      if (e.interno === 'dado') {
+        const m = /\]\s*(.+)$/.exec(e.text || '');
+        appendSystem(`<p>Sua rolagem: ${escapeHtml(m ? m[1] : e.text || '')}</p>`);
+      }
+      return;
+    }
     if (e.role === 'user') appendUser(e.text);
     else if (e.role === 'assistant') {
       const row = document.createElement('div'); row.className = 'msg-row master';

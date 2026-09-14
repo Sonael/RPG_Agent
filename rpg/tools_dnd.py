@@ -3844,6 +3844,16 @@ _CLASS_SLUG_MAP = {
 }
 
 
+def _classe_en(classe: str) -> str:
+    """
+    Classe no nome do Open5e, ignorando caixa e ACENTO. Com `.get(classe)`,
+    "clerigo" (sem acento, como vem de ficha antiga e do editor) não achava
+    nada, o filtro por classe caía e a lista trazia magias de todas as classes.
+    """
+    alvo = _norm_txt(classe or "")
+    return next((en for pt, en in _CLASS_SLUG_MAP.items() if _norm_txt(pt) == alvo), "")
+
+
 def _fetch_class_spells(classe: str, max_spell_level: int = 1) -> list[dict]:
     """
     Busca as magias de nível 0 e 1 da classe no Open5e (/v1/spells/).
@@ -3852,7 +3862,7 @@ def _fetch_class_spells(classe: str, max_spell_level: int = 1) -> list[dict]:
     """
     from rpg.open5e import http as _req   # SRD com cache, sessão e retry
 
-    en_class = _CLASS_SLUG_MAP.get(classe.lower(), "")
+    en_class = _classe_en(classe)
     if not en_class:
         return DEFAULT_SPELLS_BY_CLASS.get(classe.lower(), [])
 
@@ -6506,6 +6516,34 @@ def list_inventory(char_name: str) -> str:
 # 12. XP e nível
 # ---------------------------------------------------------------------------
 
+def _derrotados_citados(reason: str) -> list[dict]:
+    """
+    Inimigos fora de combate (DEFEATED_STATUSES) citados no motivo do XP, pelo
+    nome inteiro ou pela primeira palavra do nome ("Derrota do Espreitador"
+    cita "Espreitador das Sombras"). Motivo sem inimigo citado (missão, marco
+    narrativo) devolve lista vazia e não tem trava.
+    """
+    motivo = _norm_txt(reason or "")
+    if not motivo:
+        return []
+    palavras = set(re.findall(r"[a-z0-9]+", motivo))
+    achados = []
+    for ch in memory.campaign.get("characters", {}).values():
+        if not isinstance(ch, dict) or memory.is_party_member(ch):
+            continue
+        if (ch.get("status", "") or "").lower() not in DEFEATED_STATUSES:
+            continue
+        nome = _norm_txt(ch.get("name", ""))
+        if not nome:
+            continue
+        primeira = re.findall(r"[a-z]+", nome)
+        cita = nome in motivo or (primeira and len(primeira[0]) >= 4 and
+                                  (primeira[0] in palavras or primeira[0] + "s" in palavras))
+        if cita:
+            achados.append(ch)
+    return achados
+
+
 def grant_xp(char_name: str, amount: int, reason: str = "") -> str:
     """
     Concede XP ao personagem e verifica automaticamente se houve aumento de nível.
@@ -6526,6 +6564,20 @@ def grant_xp(char_name: str, amount: int, reason: str = "") -> str:
     char, err = _get_char(char_name, allow_dead=True)
     if not char:
         return err
+
+    # XP pela derrota de um inimigo é uma vez por personagem. Ao retomar a
+    # campanha o mestre relia o recap da tela tática ("conceda XP a cada
+    # membro do grupo") e concedia de novo o XP do mesmo monstro.
+    derrotados = _derrotados_citados(reason)
+    if derrotados:
+        chave = memory.char_key(char.get("name", char_name))
+        novos = [d for d in derrotados if chave not in (d.get("xp_concedido_a") or [])]
+        if not novos:
+            nomes = ", ".join(d.get("name", "") for d in derrotados)
+            return (f"Aviso: {char['name']} já recebeu XP pela derrota de {nomes}. "
+                    f"Nada foi concedido de novo.")
+        for d in novos:
+            d.setdefault("xp_concedido_a", []).append(chave)
 
     s            = char["sheet"]
     # Ancora o contador de ASI no que ele JÁ tinha, antes de qualquer
@@ -9414,7 +9466,7 @@ def _magia_conhecida_localmente(spell_name: str, en_query: str) -> dict | None:
         for sp in pool:
             if _nomes_srd(sp.get("nome", "")) & alvo:
                 entrada = entrada or sp
-                slug = _CLASS_SLUG_MAP.get(classe, "")
+                slug = _classe_en(classe)
                 if slug and slug not in classes:
                     classes.append(slug)
     nivel = next((SPELL_LEVEL_OVERRIDE[n] for n in alvo if n in SPELL_LEVEL_OVERRIDE), None)
@@ -9446,7 +9498,8 @@ def _resumir(texto: str, limite: int) -> str:
 
 
 def class_spell_catalog(classe: str, max_level: int = 9, query: str = "",
-                        spell_level: int | None = None) -> list[dict]:
+                        spell_level: int | None = None,
+                        _status: dict | None = None) -> list[dict]:
     """
     Magias da lista de uma classe até um nível — do Open5e, com as magias
     padrão da classe como reserva quando o SRD não responde.
@@ -9454,6 +9507,9 @@ def class_spell_catalog(classe: str, max_level: int = 9, query: str = "",
     Era o corpo da rota /api/dnd/class-spells. Veio para o motor porque agora
     tem dois clientes (o modal de edição e o Grimório) e a tela precisa das
     marcas "já conhece" e "limite", que são regra.
+
+    `_status`, quando passado, recebe {"respondeu": bool}: lista vazia com o
+    SRD respondendo é regra (nada a aprender), sem resposta é falha de rede.
     """
     import re
     from rpg.open5e import http as _req
@@ -9461,8 +9517,10 @@ def class_spell_catalog(classe: str, max_level: int = 9, query: str = "",
     classe   = (classe or "").lower().strip()
     max_level = max(0, min(int(max_level if max_level is not None else 9), 9))
     query    = (query or "").strip().lower()
-    en_class = _CLASS_SLUG_MAP.get(classe, "")
+    en_class = _classe_en(classe)
     spells: list[dict] = []
+    if _status is not None:
+        _status["respondeu"] = False
 
     # document__slug: o Open5e junta o SRD com livros de terceiros (Deep Magic
     # e outros), e a lista da classe vinha com "Black Goat's Blessing" ao lado
@@ -9482,8 +9540,15 @@ def class_spell_catalog(classe: str, max_level: int = 9, query: str = "",
         except (TypeError, ValueError):
             pass
 
-    r = _req.get("https://api.open5e.com/v1/spells/", params=params, timeout=6)
-    if r.ok:
+    # Classe informada e desconhecida: sem o filtro, a consulta traria a lista
+    # de todas as classes. Fica só com a reserva local.
+    if classe and not en_class:
+        r = None
+    else:
+        r = _req.get("https://api.open5e.com/v1/spells/", params=params, timeout=6)
+    if _status is not None and r is not None:
+        _status["respondeu"] = bool(r.status_code)
+    if r is not None and r.ok:
         vistos = set()
         for s in r.json().get("results", []):
             nome = s.get("name", "")
@@ -9526,7 +9591,8 @@ def class_spell_catalog(classe: str, max_level: int = 9, query: str = "",
             spells.sort(key=lambda sp: 0 if query in sp["nome"].lower() else 1)
 
     if not spells and classe:
-        for sp in DEFAULT_SPELLS_BY_CLASS.get(classe, []):
+        chave_local = next((k for k in DEFAULT_SPELLS_BY_CLASS if _norm_txt(k) == _norm_txt(classe)), classe)
+        for sp in DEFAULT_SPELLS_BY_CLASS.get(chave_local, []):
             lvl = _nivel_da_magia(sp)
             texto = sp.get("descricao", "")
             if lvl > max_level and spell_level is None:
@@ -9611,9 +9677,15 @@ def grimoire_snapshot(char_name: str = "", query: str = "",
          for h in _magias_da_ficha(alvo)),
         key=lambda m: (m["nivel"], m["nome"].lower()))
 
+    # Por que a lista pode vir vazia. A tela dizia "A lista da classe não
+    # respondeu" para qualquer lista vazia — inclusive a de um patrulheiro de
+    # nível 1, que ainda não tem truque nem magia e cuja lista vem vazia por
+    # regra, com o SRD respondendo normalmente.
+    sem_nada_a_aprender = not (vagas["truques_max"] or vagas["magias_max"])
+    status = {}
     catalogo = []
-    fonte = (class_spell_catalog(s.get("classe", ""), nivel_max, query, spell_level)
-             if com_catalogo else [])
+    fonte = (class_spell_catalog(s.get("classe", ""), nivel_max, query, spell_level, _status=status)
+             if com_catalogo and not sem_nada_a_aprender else [])
     for sp in fonte:
         if _ja_conhece_magia(alvo, sp["nome"]):
             bloqueio = "já conhece"
@@ -9624,6 +9696,24 @@ def grimoire_snapshot(char_name: str = "", query: str = "",
         else:
             bloqueio = ""
         catalogo.append({**sp, "bloqueio": bloqueio})
+
+    motivo = ""
+    if com_catalogo and not catalogo:
+        classe_rotulo = (s.get("classe", "") or "A classe").capitalize()
+        if sem_nada_a_aprender:
+            primeiro = _primeiro_nivel_com_magia(s.get("classe", ""))
+            motivo = (f"{classe_rotulo} ainda não aprende magias no nível "
+                      f"{int(s.get('nivel', 1) or 1)}."
+                      + (f" As primeiras chegam no nível {primeiro}." if primeiro else ""))
+        elif query:
+            motivo = "Nenhuma magia da lista da classe com esse nome."
+        elif spell_level is not None:
+            motivo = ("Nenhum truque na lista da classe." if int(spell_level) == 0
+                      else f"Nenhuma magia de {int(spell_level)}º círculo na lista da classe.")
+        elif not status.get("respondeu"):
+            motivo = "A lista da classe não respondeu. Tente de novo em instantes."
+        else:
+            motivo = "A lista da classe está vazia até este círculo."
 
     base.update({
         "personagem": {
@@ -9636,8 +9726,18 @@ def grimoire_snapshot(char_name: str = "", query: str = "",
             "conhecidas": conhecidas,
         },
         "catalogo": catalogo,
+        "catalogo_motivo": motivo,
     })
     return base
+
+
+def _primeiro_nivel_com_magia(classe: str) -> int | None:
+    """Nível em que a classe aprende o primeiro truque ou magia (None se nunca)."""
+    for n in range(1, 21):
+        limite = _limite_de_magias({"classe": classe, "nivel": n}) or {}
+        if limite.get("truques") or limite.get("magias"):
+            return n
+    return None
 
 
 def grimoire_action(action: str, char: str = "", spell: str = "", query: str = "",

@@ -246,11 +246,16 @@
     const busca = q('grm-busca');
     if (busca && document.activeElement !== busca) busca.value = _q;
 
+    // O motivo da lista vazia vem do motor: "não respondeu" só quando o SRD de
+    // fato não respondeu. Um patrulheiro de nível 1 via essa mensagem para
+    // sempre, e a lista dele está vazia por regra.
     const cat = _last.catalogo || [];
+    const motivo = _last.catalogo_motivo
+      || (_q ? 'Nenhuma magia da lista da classe com esse nome.'
+             : 'A lista da classe não respondeu. Tente de novo em instantes.');
     q('grm-lista').innerHTML = cat.length
       ? cat.map(cartao).join('')
-      : `<div class="grm-vazio">${_q ? 'Nenhuma magia da lista da classe com esse nome.'
-                                     : 'A lista da classe não respondeu. Tente de novo em instantes.'}</div>`;
+      : `<div class="grm-vazio">${esc(motivo)}</div>`;
     q('grm-conhecidas-lista').innerHTML = conhecidas(p);
 
     // Mesmo desenho do rodapé da tela de nível: se outro do grupo ainda tem
@@ -389,7 +394,7 @@
               + 'Narre em uma ou duas frases como elas chegaram ao repertório, sem '
               + 'chamar learn_spell de novo e sem inventar efeito que não esteja na ficha.';
     try {
-      if (typeof window.sendToAgent === 'function') await window.sendToAgent(txt, true);
+      if (typeof window.sendToAgent === 'function') await window.sendToAgent(txt, true, 'tela');
     } catch (_) { /* fechar já é o essencial */ }
   }
 

@@ -531,7 +531,7 @@
       const r = await api('/api/combat/recap');
       const txt = (r && r.text) ? r.text : '[COMBATE RESOLVIDO NA TELA TÁTICA] Narre a luta e o saque.';
       if (typeof window.sendToAgent === 'function') {
-        await window.sendToAgent(txt, true);
+        await window.sendToAgent(txt, true, 'tela');
       }
     } catch (_) {
       if (window.showToast) window.showToast('Combate encerrado.');

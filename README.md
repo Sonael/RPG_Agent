@@ -664,6 +664,17 @@ o próximo passo pendente, e aparecem na barra lateral do jogo.
   consumir todo o XP excedente.
 - Safety net (`_check_all_level_ups`) roda no servidor, se a IA esqueceu de
   conceder XP, aplica o level up de qualquer forma.
+- **XP por derrota é uma vez por personagem.** Ao reabrir uma campanha, o
+  grupo ganhava de novo o XP de um monstro já derrotado e já pago: o mestre
+  relia o recap da tela tática ("conceda XP a cada membro do grupo") e
+  obedecia. `grant_xp` agora procura no motivo os inimigos fora de combate
+  que ele cita (`_derrotados_citados`: nome inteiro ou a primeira palavra do
+  nome, então "vitória sobre o espreitador" cita o Espreitador das Sombras).
+  Cada inimigo guarda em `xp_concedido_a` quem já recebeu por ele. Se todos
+  os citados já pagaram aquele personagem, a resposta é `Aviso:` e nada é
+  somado. Motivo sem inimigo citado (missão, marco narrativo) não tem trava.
+  A outra metade da correção está na retomada: veja "O recap não é fala do
+  jogador".
 
 ### Descanso, relógio e exaustão
 
@@ -1362,6 +1373,28 @@ As duas telas agora marcam como vista a assinatura que está na tela enquanto
 ela está aberta. `test_escolher_e_fechar_nao_reabre_sozinha` falha com o
 `levelup.js` anterior e passa com o corrigido.
 
+### Lista vazia não é falha de rede
+
+A tela dizia "A lista da classe não respondeu. Tente de novo em instantes."
+para qualquer lista vazia. Um patrulheiro ou paladino de nível 1 ainda não
+tem truque nem magia: a lista dele vem vazia por regra, com o SRD respondendo,
+e a mensagem ficava lá para sempre.
+
+`grimoire_snapshot` agora devolve `catalogo_motivo`, e a tela só o exibe:
+
+- quem ainda não aprende magias nem consulta o SRD: "Patrulheiro ainda não
+  aprende magias no nível 1. As primeiras chegam no nível 2."
+  (`_primeiro_nivel_com_magia`);
+- busca sem resultado e filtro de círculo vazio têm mensagens próprias;
+- "não respondeu" só quando `class_spell_catalog` informa que o SRD não
+  respondeu (`_status`).
+
+Junto, um defeito de classe: `_CLASS_SLUG_MAP.get(classe)` casava só com o
+acento. "clerigo" (ficha antiga, editor) não achava a classe, o filtro caía e
+a lista trazia magias de todas as classes (73 contra 31 no nível 1). As três
+consultas passam por `_classe_en`, que ignora caixa e acento, e uma classe
+informada que não conjura não consulta o SRD sem filtro.
+
 ## Tela de equipamento ("A Mochila")
 
 A sexta tela junta o que estava espalhado em três ferramentas e no editor
@@ -1839,6 +1872,30 @@ modo tela tem instrução específica pra reconhecer esse marcador e narrar a
 luta inteira de uma vez. O texto do recap é **ciente do desfecho**: numa
 vitória instrui saque (`add_item`/`modify_currency`) + `grant_xp()`; numa
 derrota instrui explicitamente **não** gerar saque nem XP.
+
+#### O recap não é fala do jogador
+
+O recap vai ao mestre pelo mesmo `/api/chat` do jogador, com `registrar` ligado
+(a narração precisa entrar no histórico e o turno precisa contar). Por isso
+ele era gravado no histórico como mensagem do jogador, e ao reabrir a campanha
+o chat mostrava o log inteiro, instruções ao mestre incluídas. O mesmo valia
+para o fechamento das outras telas (loja, descanso, nível, Grimório), para a
+rolagem de dado e para os pedidos que /local, /personagem e /evento mandam.
+
+Agora essas mensagens vão marcadas: `sendToAgent(texto, true, interno)`, com
+`interno` sendo `tela`, `dado` ou `comando`. O servidor grava a marca na
+entrada do histórico e continua guardando o texto, que o mestre usa como
+contexto. No resumo de retomada (`_build_recap`) elas entram só como registro
+(`_linha_do_recap`): "[Sistema]: [COMBATE RESOLVIDO NA TELA TÁTICA] Desfecho:
+VITÓRIA. (já resolvido e narrado)", sem o corpo. Com o corpo inteiro, o
+mestre relia "conceda XP a cada membro do grupo com grant_xp()" ao retomar e
+dava o XP do mesmo monstro de novo. O resumo também diz que as linhas
+`[Sistema]` já foram resolvidas e que XP, saque, itens e moedas não devem ser
+concedidos de novo por causa delas. As campanhas gravadas antes da marca são
+reconhecidas pelo prefixo (`_tipo_de_mensagem_interna`), e as rotas que
+entregam o histórico passam por `_historico_para_a_tela`. Ao reabrir,
+`renderHistory` não desenha fechamento de tela nem pedido de comando, e a
+rolagem volta como uma linha curta ("Sua rolagem: 1d20: rolei 14, total 14").
 
 ---
 

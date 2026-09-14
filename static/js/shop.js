@@ -375,7 +375,7 @@
               + `${loja}. Narre a saída da loja em uma ou duas frases, sem `
               + `repetir preços nem inventar itens que não foram comprados.`;
     try {
-      if (typeof window.sendToAgent === 'function') await window.sendToAgent(txt, true);
+      if (typeof window.sendToAgent === 'function') await window.sendToAgent(txt, true, 'tela');
     } catch (_) { /* fechar a tela já é o essencial */ }
   }
 

@@ -442,7 +442,7 @@
               + `virada em uma ou duas frases, usando o que está na ficha — não `
               + `invente habilidade nem atributo que não esteja lá.`;
     try {
-      if (typeof window.sendToAgent === 'function') await window.sendToAgent(txt, true);
+      if (typeof window.sendToAgent === 'function') await window.sendToAgent(txt, true, 'tela');
     } catch (_) { /* fechar já é o essencial */ }
   }
 

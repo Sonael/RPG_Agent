@@ -334,7 +334,7 @@
 
   async function avisarMestre(txt) {
     try {
-      if (typeof window.sendToAgent === 'function') await window.sendToAgent(txt, true);
+      if (typeof window.sendToAgent === 'function') await window.sendToAgent(txt, true, 'tela');
     } catch (_) { /* fechar já é o essencial */ }
   }
 

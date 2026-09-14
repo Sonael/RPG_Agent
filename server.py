@@ -1696,7 +1696,8 @@ def start_session():
         "campaign_type":        campaign_type,
         "campaign_config":      get_campaign_config(campaign_type),
         "model_limits": limits,
-        "conversation_history": memory.campaign.get("conversation_history", []),
+        "conversation_history": _historico_para_a_tela(
+            memory.campaign.get("conversation_history", [])),
     })
 
 
@@ -1752,14 +1753,47 @@ def _build_fresh_start_opening() -> str:
     )
 
 
+# Mensagens que o jogo manda ao mestre no lugar do jogador: o fechamento de
+# uma tela ("[COMBATE RESOLVIDO NA TELA TÁTICA]" com o log inteiro), a
+# rolagem de dado e os pedidos dos comandos /local, /personagem e /evento.
+# Ficam no histórico — o mestre precisa delas como contexto —, mas não são
+# fala do jogador: ao reabrir a campanha, o chat não pode mostrá-las.
+_TIPOS_INTERNOS = ("tela", "dado", "comando")
+_PREFIXOS_INTERNOS = (
+    ("[COMBATE RESOLVIDO NA TELA", "tela"), ("[COMPRAS RESOLVIDAS NA TELA", "tela"),
+    ("[DESCANSO RESOLVIDO NA TELA", "tela"), ("[NÍVEL RESOLVIDO NA TELA", "tela"),
+    ("[GRIMÓRIO RESOLVIDO NA TELA", "tela"), ("[DADO DO JOGADOR", "dado"),
+)
+
+
+def _tipo_de_mensagem_interna(texto: str, declarado=None) -> str:
+    """
+    "tela" | "dado" | "comando" | "". O cliente declara o tipo; o prefixo
+    cobre cliente antigo em cache e as campanhas gravadas antes da marca.
+    """
+    if declarado in _TIPOS_INTERNOS:
+        return declarado
+    inicio = (texto or "").lstrip()
+    return next((tipo for prefixo, tipo in _PREFIXOS_INTERNOS if inicio.startswith(prefixo)), "")
+
+
+def _historico_para_a_tela(historico: list) -> list:
+    """O histórico com as mensagens internas marcadas, inclusive as antigas."""
+    saida = []
+    for e in historico or []:
+        if isinstance(e, dict) and e.get("role") == "user" and not e.get("interno"):
+            tipo = _tipo_de_mensagem_interna(e.get("text", ""))
+            if tipo:
+                e = {**e, "interno": tipo}
+        saida.append(e)
+    return saida
+
+
 def _build_recap() -> str:
     from rpg.tools import get_full_context
     contexto = get_full_context()
-    hist = memory.campaign["conversation_history"][-40:]
-    lines = [
-        f"[{'Jogador' if e['role']=='user' else 'Mestre'}]: {e['text']}"
-        for e in hist
-    ]
+    hist = _historico_para_a_tela(memory.campaign["conversation_history"][-40:])
+    lines = [_linha_do_recap(e) for e in hist]
 
     # Injeta estado de combate explicitamente para evitar que o agente
     # re-execute turnos já processados ao retomar a sessão.
@@ -1791,8 +1825,37 @@ def _build_recap() -> str:
         f"{combat_block}\n\n"
         "Faça um breve recap ao jogador do ponto em que estávamos "
         "e aguarde a próxima ação dele para continuar a narrativa. "
-        "NÃO tome nenhuma ação de combate por conta própria ao retomar."
+        "NÃO tome nenhuma ação de combate por conta própria ao retomar. "
+        "As linhas [Sistema] são registros do que JÁ foi resolvido: NÃO conceda "
+        "XP, saque, itens ou moedas de novo por causa delas — a ficha acima já "
+        "tem o resultado."
     )
+
+
+def _linha_do_recap(e: dict) -> str:
+    """
+    Uma entrada do histórico no resumo de retomada.
+
+    Mensagem interna vai só como registro, sem o corpo. O recap da tela
+    tática traz "conceda XP a cada membro do grupo com grant_xp()"; repassado
+    inteiro ao retomar, o mestre obedecia de novo e o grupo ganhava o XP do
+    mesmo monstro duas vezes.
+    """
+    texto = e.get("text", "") or ""
+    tipo = e.get("interno")
+    if tipo:
+        primeira = texto.strip().split("\n", 1)[0][:160]
+        if tipo == "tela":
+            desfecho = next((l.strip() for l in texto.split("\n")
+                             if l.strip().lower().startswith("desfecho:")), "")
+            desfecho = desfecho.split(".")[0] if desfecho else ""
+            primeira = primeira.split("]")[0] + "]" if "]" in primeira else primeira
+            corpo = f"{primeira}{' ' + desfecho + '.' if desfecho else ''} (já resolvido e narrado)"
+        else:
+            corpo = f"{primeira} (já resolvido)"
+        return f"[Sistema]: {corpo}"
+    quem = "Jogador" if e.get("role") == "user" else "Mestre"
+    return f"[{quem}]: {texto}"
 
 
 def _is_npc(name: str) -> bool:
@@ -1828,6 +1891,7 @@ def chat():
 
     texto     = request.json.get("message", "").strip()
     registrar = request.json.get("registrar", True)
+    interno   = _tipo_de_mensagem_interna(texto, request.json.get("interno"))
     if not texto:
         return jsonify({"error": "Mensagem vazia"}), 400
 
@@ -1849,7 +1913,10 @@ def chat():
         )
         
     if registrar:
-        memory.campaign["conversation_history"].append({"role": "user", "text": texto})
+        entrada = {"role": "user", "text": texto}
+        if interno:
+            entrada["interno"] = interno
+        memory.campaign["conversation_history"].append(entrada)
 
     result_q = queue.Queue()
     MAX_RETRIES = 3
@@ -2182,7 +2249,7 @@ def get_memory_state():
             "current_turn_index": 0,
             "round":              1,
         }),
-        "conversation_history": c.get("conversation_history", []),
+        "conversation_history": _historico_para_a_tela(c.get("conversation_history", [])),
         # Onda 4 — o que a tela precisa para mostrar mundo e missões.
         # Campanha antiga não tem essas chaves; o default mantém o front
         # funcionando sem migração nenhuma.
