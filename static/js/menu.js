@@ -1555,6 +1555,7 @@ function openWizard() {
   document.getElementById('wz-locations-list').innerHTML = '';
   document.getElementById('wz-events-list').innerHTML = '';
   document.getElementById('wz-chars-list').innerHTML = '';
+  wzAtualizarLugares();
   wzRenderStep();
   document.getElementById('wizard-overlay').classList.remove('hidden');
   document.getElementById('wizard-scroll').scrollTop = 0;
@@ -1661,7 +1662,8 @@ async function generateLore() {
     if (lore.current_location) document.getElementById('wz-location').value = lore.current_location;
     if (Array.isArray(lore.locations)) {
       wzLocs = lore.locations.map(l => ({
-        name: l.name || '', description: l.description || '', details: l.details || '', notes: l.notes || '',
+        name: l.name || '', dentro_de: l.dentro_de || '',
+        description: l.description || '', details: l.details || '', notes: l.notes || '',
       }));
       wzRenderLocs();
     }
@@ -1701,6 +1703,7 @@ async function generateLore() {
           status:      'vivo',
           notes:       c.notes       || '',
           role:        c.role        || '',
+          local:       isParty ? '' : (c.local || ''),
           isParty,
           classe,
           raca,
@@ -1768,15 +1771,25 @@ async function generateLore() {
 
 // ── Locais ─────────────────────────────────────────────────
 function addWzLocation() {
-  wzLocs.push({ name:'', description:'', details:'', notes:'' });
+  wzLocs.push({ name:'', dentro_de:'', description:'', details:'', notes:'' });
   wzRenderLocs();
 }
 function removeWzLocation(i) {
   wzLocs.splice(i, 1);
   wzRenderLocs();
 }
+// Sugestões de lugar do wizard: os locais digitados até agora. Servem ao
+// "Local Atual", ao "Fica dentro de" e ao "Onde está".
+function wzAtualizarLugares() {
+  const dl = document.getElementById('wz-lugares');
+  if (!dl) return;
+  const nomes = wzLocs.map(l => (l.name || '').trim())
+    .filter((n, i, todos) => n && todos.findIndex(o => o.toLowerCase() === n.toLowerCase()) === i);
+  dl.innerHTML = nomes.map(n => `<option value="${escHtml(n)}"></option>`).join('');
+}
 function wzRenderLocs() {
   const container = document.getElementById('wz-locations-list');
+  wzAtualizarLugares();
   if (!wzLocs.length) { container.innerHTML = ''; return; }
   container.innerHTML = wzLocs.map((loc, i) => `
     <div class="wz-loc-card">
@@ -1784,12 +1797,17 @@ function wzRenderLocs() {
       <div class="cwc-row2" style="margin-bottom:8px;">
         <div>
           <span class="cwc-label">Nome</span>
-          <input value="${escHtml(loc.name)}" onchange="wzLocs[${i}].name=this.value" placeholder="Nome do local">
+          <input value="${escHtml(loc.name)}" onchange="wzLocs[${i}].name=this.value;wzAtualizarLugares()" placeholder="Nome do local">
         </div>
         <div>
-          <span class="cwc-label">Detalhes geográficos</span>
-          <input value="${escHtml(loc.details)}" onchange="wzLocs[${i}].details=this.value" placeholder="Pontos específicos...">
+          <span class="cwc-label">Fica dentro de</span>
+          <input class="wz-dentro-de" value="${escHtml(loc.dentro_de || '')}" list="wz-lugares"
+            onchange="wzLocs[${i}].dentro_de=this.value" placeholder="Ex: Cliviate (vazio se não fica em outro lugar)">
         </div>
+      </div>
+      <div style="margin-bottom:8px;">
+        <span class="cwc-label">Detalhes geográficos</span>
+        <input value="${escHtml(loc.details)}" onchange="wzLocs[${i}].details=this.value" placeholder="Pontos específicos...">
       </div>
       <span class="cwc-label">Descrição</span>
       <textarea rows="2" onchange="wzLocs[${i}].description=this.value" placeholder="Descrição sensorial...">${escHtml(loc.description)}</textarea>
@@ -2815,6 +2833,12 @@ function wzRenderChars() {
           </div>
         </div>
         <div>
+          <span class="cwc-label">Onde está</span>
+          <input class="wz-onde-esta" value="${escHtml(char.local || '')}" list="wz-lugares"
+            onchange="wzChars[${i}].local=this.value"
+            placeholder="${char.isParty ? 'o grupo fica no Local Atual' : 'Ex: Forja de Cliviate (um dos locais do passo 1)'}">
+        </div>
+        <div>
           <span class="cwc-label">Descrição</span>
           <textarea rows="2" onchange="wzChars[${i}].description=this.value" placeholder="Aparência física, voz, forma de se vestir...">${escHtml(char.description)}</textarea>
         </div>
@@ -2946,6 +2970,7 @@ async function createCampaignFromWizard() {
       traits:      char.traits,
       status:      char.status || 'vivo',
       notes:       char.notes,
+      local:       (char.local || '').trim(),
       sheet:       null,
       inventario:  [],
       habilidades: [],
@@ -3134,8 +3159,10 @@ async function createCampaignFromWizard() {
   const locations = {};
   for (const loc of wzLocs) {
     if (!loc.name.trim()) continue;
-    const key = loc.name.toLowerCase().trim().replace(/\s+/g, '_');
-    locations[key] = { name: loc.name, description: loc.description, details: loc.details, notes: loc.notes };
+    // Mesma chave que save_location usa (nome em minúsculas, com espaço).
+    const key = loc.name.toLowerCase().trim();
+    locations[key] = { name: loc.name.trim(), dentro_de: (loc.dentro_de || '').trim(),
+                       description: loc.description, details: loc.details, notes: loc.notes };
   }
 
   // Monta events array

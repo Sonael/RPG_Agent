@@ -260,7 +260,10 @@
 
           <div class="field-group">
             <label>Local Atual</label>
-            <input type="text" id="wz-location" placeholder="Ex: Pântano dos Sussurros">
+            <input type="text" id="wz-location" list="wz-lugares" placeholder="Ex: Pântano dos Sussurros">
+            <!-- Sugestões para Local Atual, "Fica dentro de" e "Onde está":
+                 os locais digitados neste wizard. -->
+            <datalist id="wz-lugares"></datalist>
           </div>
 
           <div class="field-group">
@@ -431,7 +434,7 @@
   </div>
 
   <script src="/static/js/utils.js?v=12"></script>
-  <script src="/static/js/menu.js?v=46"></script>
+  <script src="/static/js/menu.js?v=47"></script>
   <script>
     // Animação de volta para a capa quando carregado da cache
     window.addEventListener('pageshow', function(event) {

@@ -264,6 +264,13 @@ def _subir_servidor(campanha: dict, nome_campanha: str):
         return _SERVIDOR[0], _soltar_servidor
 
     if not _ROTA_REGISTRADA:
+        # Um teste com app.test_client() rodando ANTES (na mesma sessão do
+        # pytest) já fez o Flask atender a primeira requisição, e daí ele
+        # recusa registrar rota nova. Isto é só o harness de captura: a rota
+        # /__estado não existe no app de verdade, então liberar o registro
+        # aqui não esconde nada do servidor real.
+        if getattr(server.app, "_got_first_request", False):
+            server.app._got_first_request = False
         @server.app.route("/__estado", methods=["POST"])
         def __estado():  # noqa: ANN202
             patch = request.get_json(silent=True) or {}

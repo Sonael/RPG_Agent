@@ -232,7 +232,9 @@ def test_atalho_abre_a_mochila(navegador):
     pg.click("text=Abrir Mochila")
     pg.wait_for_selector("#inventory-overlay:not(.hidden)", timeout=5000)
     assert not pg.is_visible("#edit-overlay")
-    assert "Helena" in pg.inner_text(".inv-title")
+    # O overlay aparece antes de o estado chegar: o nome entra no título depois.
+    pg.wait_for_function("() => document.querySelector('.inv-title').textContent.includes('Helena')",
+                         timeout=5000)
 
 
 # ---- mesma moldura das telas -----------------------------------------------

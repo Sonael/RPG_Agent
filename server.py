@@ -981,7 +981,16 @@ def _payload_de_campanha(name: str, dados: dict, personagens: dict) -> dict:
 
     A lista de chaves espelha memory._defaults() — se você acrescentar uma
     coisa lá, acrescente aqui também, ou ela não sobrevive à importação.
+
+    Lugares passam pelas mesmas regras do editor da campanha: chave do local
+    pelo nome, "fica dentro de" e "onde está" com o nome do lugar. Ciclo em
+    "fica dentro de" levanta ValueError, que as rotas devolvem como 400.
     """
+    from rpg import locais as _locais
+    locations, erro = _locais.normalizar_campanha_editada(
+        dados.get("locations", {}), {}, personagens, {}, dados.get("lojas", {}))
+    if erro:
+        raise ValueError(erro)
     return {
         "name":                 name,
         "campaign_type":        dados.get("campaign_type", "fantasia"),
@@ -998,7 +1007,7 @@ def _payload_de_campanha(name: str, dados: dict, personagens: dict) -> dict:
         "quest_flags":          dados.get("quest_flags", {}),
         "party":                dados.get("party", []),
         "characters":           personagens,
-        "locations":            dados.get("locations", {}),
+        "locations":            locations,
         "events":               dados.get("events", []),
         "diary":                dados.get("diary", []),
         "conversation_history": [],
@@ -1052,7 +1061,10 @@ def create_campaign():
         reconcile_character_archetypes(char)
         normalized_chars[k.lower().strip().replace("_", " ")] = char
 
-    payload = _payload_de_campanha(name, campaign_data, normalized_chars)
+    try:
+        payload = _payload_de_campanha(name, campaign_data, normalized_chars)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
 
     try:
         database.save_campaign(g.user_id, name, payload)
@@ -2373,9 +2385,11 @@ def generate_lore():
         '"tipo":"<jogador|aliado|inimigo>",'
         '"classe":"<bárbaro|guerreiro|paladino|patrulheiro|bardo|clérigo|druida|monge|ladino|mago|feiticeiro|bruxo|npc>",'
         '"raca":"<PC: humano|elfo|anão|halfling|draconato|gnomo|meio-elfo|meio-orc|tiferino · '
-                'NPC: slug SRD em INGLÊS da lista fornecida no texto>"}'
+                'NPC: slug SRD em INGLÊS da lista fornecida no texto>",'
+        '"local":"<nome de um dos locais gerados, ou vazio>"}'
         if is_dnd else
-        '{"name":"","description":"","traits":"","notes":"","role":"","tipo":"<jogador|aliado|inimigo>"}'
+        '{"name":"","description":"","traits":"","notes":"","role":"","tipo":"<jogador|aliado|inimigo>",'
+        '"local":"<nome de um dos locais gerados, ou vazio>"}'
     )
     char_tip = (
         'Para D&D use o campo "tipo" para classificar cada personagem: '
@@ -2408,10 +2422,14 @@ def generate_lore():
         "Você é um Mestre de RPG criativo. Dado uma ideia básica, gere um JSON com EXATAMENTE esta estrutura:\n"
         '{"story_summary":"<resumo de 5-8 linhas>","current_scene":"<cena inicial vívida>",'
         '"current_location":"<nome do local inicial>",'
-        '"locations":[{"name":"","description":"","details":"","notes":""}],'
+        '"locations":[{"name":"","description":"","details":"","notes":"","dentro_de":""}],'
         '"events":[{"summary":"","location":"","characters_involved":"","consequence":""}],'
         f'"characters":[' + char_schema + ']}' + '}\n'
         "Gere 2-3 locais relevantes. "
+        "Se um local fica DENTRO de outro gerado (a taverna dentro da cidade), preencha "
+        "'dentro_de' com o nome exato desse outro; senão deixe vazio. "
+        "Para NPCs (aliado ou inimigo), preencha 'local' com o nome exato do local gerado "
+        "onde ele está; jogadores ficam com 'local' vazio. "
         "Gere 2-3 eventos iniciais importantes na array 'events'. "
         "Gere TODOS os personagens mencionados na ideia (máximo 4), um por pessoa citada. "
         "Preencha obrigatoriamente o campo 'notes' dos personagens com o seu histórico ou motivação. "
@@ -2499,7 +2517,10 @@ def import_campaign():
             char["sheet"]["classe"] = char["sheet"]["classe"].lower()
         normalized_chars[k.lower().strip().replace("_", " ")] = char
 
-    payload = _payload_de_campanha(name, campaign_data, normalized_chars)
+    try:
+        payload = _payload_de_campanha(name, campaign_data, normalized_chars)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
 
     database.save_campaign(g.user_id, name, payload)
     return jsonify({"ok": True, "name": name})

@@ -1592,6 +1592,32 @@ editor, confere os campos e as sugestões, muda o paradeiro de um personagem e
 o "fica dentro de" de um local, salva e confere o que chegou ao servidor
 (inclusive a atitude preservada).
 
+### No wizard de criação
+
+Os mesmos dois campos, com sugestões dos locais digitados no próprio wizard
+(também no "Local Atual"). O wizard gravava a chave do local com sublinhado,
+como o editor; agora usa o nome em minúsculas.
+
+A criação (`POST /api/campaigns`) e a importação de arquivo
+(`POST /api/campaigns/import`) passam por `_payload_de_campanha`, que agora
+aplica `normalizar_campanha_editada` antes de gravar: chave pelo nome, nomes
+canônicos em `dentro_de` e `local`, e ciclo devolvido como 400.
+
+"Gerar com IA" pede ao modelo `dentro_de` em cada local ("preencha com o nome
+exato desse outro") e `local` em cada NPC ("o nome exato do local gerado onde
+ele está"). A campanha gerada já nasce com o mapa, e o wizard mostra esses
+valores para revisão.
+
+`test_wizard_lugares.py` cobre a criação, o ciclo, a importação, o prompt e o
+que o wizard monta; `test_wizard_lugares_navegador.py` preenche locais e um
+personagem, confere as sugestões e intercepta o POST de criação para conferir
+o que foi enviado.
+
+O harness de captura (`_subir_servidor`) passou a registrar a rota
+`/__estado` mesmo depois de um teste com `app.test_client()` ter feito o
+Flask atender a primeira requisição. Sem isso, rodar os testes de rota antes
+dos de navegador na mesma sessão quebrava a subida do servidor.
+
 ### A loja com hierarquia
 
 - Dentro da própria loja (o grupo foi "até a Forja de Cliviate"), ela é a loja
