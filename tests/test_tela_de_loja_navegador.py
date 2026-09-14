@@ -164,6 +164,47 @@ def test_item_fora_do_alcance_fica_mesmo_desabilitado(pagina):
     assert _bolsa(pg) == antes
 
 
+def _encerrar_e_capturar_o_texto(pg):
+    """Encerra as compras e devolve o que a tela mandaria ao mestre."""
+    pg.evaluate("() => { window.__enviado = null;"
+                " window.sendToAgent = async (t) => { window.__enviado = t; }; }")
+    pg.click(".shp-sair")
+    pg.wait_for_function("() => window.__enviado !== null", timeout=5000)
+    return pg.evaluate("() => window.__enviado")
+
+
+def test_encerrar_sem_comprar_nao_inventa_compra(pagina):
+    """O caso do boticário: nada comprado, e o mestre narrava 'novos suprimentos'."""
+    pg, _ = pagina
+    texto = _encerrar_e_capturar_o_texto(pg)
+    assert "SEM comprar nem vender nada" in texto
+    assert "Negócios feitos" not in texto
+
+
+def test_encerrar_depois_de_comprar_lista_a_compra(pagina):
+    pg, _ = pagina
+    pg.click(_botao(pg, "Escudo"))
+    pg.wait_for_timeout(700)
+
+    texto = _encerrar_e_capturar_o_texto(pg)
+
+    assert "comprou 1x Escudo" in texto
+    assert "SEM comprar" not in texto
+
+
+def test_fechar_no_x_e_reabrir_e_a_mesma_visita(pagina):
+    """A compra feita antes de fechar no ✕ continua no resumo ao encerrar."""
+    pg, _ = pagina
+    pg.click(_botao(pg, "Escudo"))
+    pg.wait_for_timeout(700)
+    pg.click(".shp-close")
+    pg.click("#shp-reopen")
+    pg.wait_for_selector("#shop-overlay:not(.hidden)")
+    pg.wait_for_timeout(500)
+
+    assert "comprou 1x Escudo" in _encerrar_e_capturar_o_texto(pg)
+
+
 def test_fechar_deixa_a_pilula_de_voltar(pagina):
     pg, _ = pagina
     pg.click(".shp-close")

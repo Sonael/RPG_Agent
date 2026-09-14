@@ -1558,6 +1558,19 @@ desktop a variável não é definida e vale o padrão de 20px da borda. "Encerra
 `[COMPRAS RESOLVIDAS NA TELA]` para a IA narrar a saída — o mesmo desenho do
 recap de combate: a tela resolve os números, a narração continua sendo dela.
 
+**O resumo diz o que foi negociado.** O texto ao encerrar era sempre "O grupo
+terminou de negociar em X. Narre a saída da loja". O grupo saiu do boticário
+sem comprar nada, e o mestre narrou "guardam os novos suprimentos em suas
+mochilas". Agora `buy_item` e `sell_item` (da tela ou do mestre) registram
+cada negócio com um número de sequência (`campaign["negocios"]`, os últimos
+50). A tela guarda o número de quando a visita começou (`negocios_seq` do
+snapshot, no `localStorage`, então vale também depois de fechar no ✕,
+reabrir pela pílula ou recarregar a página). Ao encerrar, pede o texto a
+`GET /api/shop/recap?desde=N` (`shop_recap_payload`), que lista "Alden
+comprou 2x Poção de Cura; Lyra vendeu 1x Adaga" e avisa que os itens já
+estão nas fichas. Sem negócio, diz que o grupo saiu SEM comprar nem vender
+nada. Compra recusada não conta.
+
 ### Um cliente novo do motor, sem regra nova
 
 `shop_action` é **só despacho**: ela chama `buy_item`/`sell_item`, as mesmas
@@ -2150,7 +2163,8 @@ ferramentas do mestre.
 - `GET /api/levelup/state?personagem=` / `POST /api/levelup/action`
   `{action: variante|asi|asi_lote|talento|subir, char, feature, choice, points, distribution}`.
 - `GET /api/shop/state?loja=&comprador=` / `POST /api/shop/action`
-  `{action: buy|sell, shop, char, item, quantity}`.
+  `{action: buy|sell, shop, char, item, quantity}` /
+  `GET /api/shop/recap?desde=&loja=` → `{text}` com o que foi negociado na visita.
 - `GET /api/rest/state` / `POST /api/rest/action`
   `{action: dado|concluir|cancelar, char}`.
 - `GET /api/inventory/state?personagem=` / `POST /api/inventory/action`

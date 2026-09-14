@@ -2822,6 +2822,16 @@ def shop_state_route():
     ))
 
 
+@app.route("/api/shop/recap", methods=["GET"])
+@require_auth
+def shop_recap_route():
+    from rpg import tools_dnd
+    return jsonify({"text": tools_dnd.shop_recap_payload(
+        request.args.get("desde", 0),
+        (request.args.get("loja") or "").strip(),
+    )})
+
+
 @app.route("/api/shop/action", methods=["POST"])
 @require_auth
 def shop_action_route():

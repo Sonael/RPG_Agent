@@ -7720,6 +7720,9 @@ def shop_snapshot(shop_name: str = "", buyer: str = "") -> dict:
         "estoque":   estoque,
         "inventario": inventario,
         "local_atual": local,
+        # A tela guarda este número ao abrir e, ao encerrar, pede o resumo do
+        # que foi negociado depois dele (shop_recap_payload).
+        "negocios_seq": _seq_de_negocios(),
     }
 
 
@@ -7752,6 +7755,58 @@ def shop_action(action: str, shop: str = "", char: str = "",
     # o mesmo, só que em texto — legível no log e para a IA.
     ok = not msg.lstrip().startswith(("Aviso:", "Erro:"))
     return {"ok": ok, "message": msg, "snapshot": shop_snapshot(shop, char)}
+
+
+# ── Negócios da visita ──────────────────────────────────────────────────────
+# Ao encerrar, a tela mandava sempre "O grupo terminou de negociar em X" —
+# sem dizer se houve negócio. O grupo saía do boticário sem comprar nada e o
+# mestre narrava "guardam os novos suprimentos nas mochilas". Cada compra e
+# venda (da tela ou do mestre) entra aqui com um número de sequência; a tela
+# guarda o número de quando abriu e pede o resumo do que veio depois.
+
+def _registrar_negocio(tipo: str, quem: str, loja: str, item: str, qtd: int) -> None:
+    neg = memory.campaign.setdefault("negocios", {"seq": 0, "lista": []})
+    neg["seq"] = int(neg.get("seq", 0) or 0) + 1
+    lista = neg.setdefault("lista", [])
+    lista.append({"seq": neg["seq"], "tipo": tipo, "quem": quem,
+                  "loja": loja, "item": item, "qtd": int(qtd)})
+    neg["lista"] = lista[-50:]
+
+
+def _seq_de_negocios() -> int:
+    return int((memory.campaign.get("negocios") or {}).get("seq", 0) or 0)
+
+
+def shop_recap_payload(desde_seq: int = 0, loja: str = "") -> str:
+    """
+    O texto que a tela manda ao mestre ao encerrar as compras: o que foi
+    comprado e vendido desde `desde_seq` (o número de quando a tela abriu),
+    ou que nada foi negociado.
+    """
+    try:
+        desde = int(desde_seq)
+    except (TypeError, ValueError):
+        desde = 0
+    feitos = [n for n in (memory.campaign.get("negocios") or {}).get("lista", []) or []
+              if int(n.get("seq", 0) or 0) > desde]
+    onde = loja or (feitos[-1]["loja"] if feitos else "a loja")
+
+    if not feitos:
+        return (f"[COMPRAS RESOLVIDAS NA TELA] O grupo olhou o estoque de {onde} e saiu "
+                f"SEM comprar nem vender nada. Narre a saída em uma ou duas frases, "
+                f"sem mencionar compras, frascos ou itens novos.")
+
+    lojas = {n["loja"] for n in feitos}
+    partes = []
+    for n in feitos:
+        verbo = "comprou" if n["tipo"] == "compra" else "vendeu"
+        em = f" em {n['loja']}" if len(lojas) > 1 else ""
+        partes.append(f"{n['quem']} {verbo} {n['qtd']}x {n['item']}{em}")
+    return (f"[COMPRAS RESOLVIDAS NA TELA] O grupo terminou de negociar em {onde}. "
+            f"Negócios feitos: {'; '.join(partes)}. Os itens e as moedas já estão nas "
+            f"fichas — não chame buy_item, sell_item nem add_item por eles. Narre a "
+            f"saída da loja em uma ou duas frases, sem repetir preços nem citar item "
+            f"que não está nesta lista.")
 
 
 def _cobre_total(sheet: dict) -> int:
@@ -7814,6 +7869,7 @@ def buy_item(char_name: str, shop_name: str, item_name: str, quantity: int = 1) 
     linha["qtd"] -= qtd
     if linha["qtd"] <= 0:
         loja["estoque"].remove(linha)
+    _registrar_negocio("compra", char["name"], loja["nome"], linha["nome"], qtd)
     # A descrição VAI JUNTO. Sem ela o add_item não tem o que auditar, e a
     # loja virava desvio da conferência de item inventado: uma "Lâmina Rúnica
     # de Vhar" comprada ficava marcada como custom mas sem efeito declarado,
@@ -7880,6 +7936,7 @@ def sell_item(char_name: str, shop_name: str, item_name: str, quantity: int = 1)
     nota_equip = _desequipar_o_que_saiu(char, item["nome"])
     if na_loja:
         na_loja["qtd"] = min(99, na_loja["qtd"] + qtd)
+    _registrar_negocio("venda", char["name"], loja["nome"], item["nome"], qtd)
     memory.save_campaign()
 
     return (f"{char['name']} vendeu {qtd}x {item_name} por {ganho} po "

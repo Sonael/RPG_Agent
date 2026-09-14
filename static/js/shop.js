@@ -45,6 +45,27 @@
     } catch (_) { /* sem storage, a tela só perde a memória entre recargas */ }
   }
 
+  // Número do último negócio registrado quando a visita começou. Ao encerrar,
+  // o motor resume só o que veio depois dele — ou diz que nada foi negociado.
+  // Sobrevive a fechar no ✕ e reabrir pela pílula (é a mesma visita) e a
+  // recarregar a página; some ao encerrar ou ao sair do local.
+  const CHAVE_DESDE = () => `rpg_telas::${campanhaAtual()}::loja_desde`;
+  let _desde = null;          // cópia em memória, para quando não há storage
+  function desdeDaVisita() {
+    try {
+      const v = localStorage.getItem(CHAVE_DESDE());
+      if (v !== null) return parseInt(v, 10) || 0;
+    } catch (_) { /* cai na cópia em memória */ }
+    return _desde;
+  }
+  function marcarDesde(seq) {
+    _desde = seq;
+    try {
+      if (seq === null) localStorage.removeItem(CHAVE_DESDE());
+      else localStorage.setItem(CHAVE_DESDE(), String(seq));
+    } catch (_) { /* sem storage, vale a cópia em memória */ }
+  }
+
   // Nenhuma tela abre sozinha por cima de outra. A fila em game.js já roda
   // combate → nível → grimório → descanso → loja nessa ordem; esta checagem é o que faz
   // a loja ESPERAR em vez de se empilhar sobre as outras.
@@ -283,6 +304,7 @@
       if (!snap.loja_aqui) {
         // Saiu do local: a próxima chegada é uma visita nova.
         if (visitaVista()) marcarVisita('');
+        marcarDesde(null);
       } else if (snap.local_chave && snap.local_chave !== visitaVista()
                  && !_open && !outraTelaAberta()) {
         // Abre SOZINHA na chegada. Loja é estado que persiste; o gatilho é a
@@ -322,7 +344,10 @@
     const pill = document.getElementById('shp-reopen');
     if (pill) pill.classList.add('hidden');
     _open = true;
-    getState().then(render).catch(() => {});
+    getState().then(snap => {
+      if (snap && desdeDaVisita() === null) marcarDesde(snap.negocios_seq || 0);
+      render(snap);
+    }).catch(() => {});
   }
 
   function fechar() {
@@ -368,12 +393,23 @@
   // Encerrar manda o resumo para a LLM narrar a cena da compra — o mesmo
   // desenho do recap de combate: a tela resolve os números, a narração
   // continua sendo da IA.
+  // O texto vem do motor (shop_recap_payload), com o que foi de fato comprado
+  // e vendido nesta visita. Antes era sempre "terminou de negociar", e o
+  // mestre narrava compras que não aconteceram.
   async function sair() {
-    const loja = (_last.loja || {}).nome || 'a loja';
+    const loja = (_last.loja || {}).nome || '';
+    const desde = desdeDaVisita();
     fechar();
-    const txt = `[COMPRAS RESOLVIDAS NA TELA] O grupo terminou de negociar em `
-              + `${loja}. Narre a saída da loja em uma ou duas frases, sem `
-              + `repetir preços nem inventar itens que não foram comprados.`;
+    marcarDesde(null);
+    let txt = '';
+    try {
+      // Sem marcador nenhum (não deveria acontecer: abrir() sempre marca),
+      // resume desde o começo em vez de afirmar que nada foi comprado.
+      const r = await api(`/api/shop/recap?desde=${desde === null ? 0 : desde}`
+                          + `&loja=${encodeURIComponent(loja)}`);
+      txt = (r && r.text) || '';
+    } catch (_) { /* sem o resumo, não se manda nada que possa inventar compra */ }
+    if (!txt) return;
     try {
       if (typeof window.sendToAgent === 'function') await window.sendToAgent(txt, true, 'tela');
     } catch (_) { /* fechar a tela já é o essencial */ }
