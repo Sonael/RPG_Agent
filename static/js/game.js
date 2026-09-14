@@ -2080,8 +2080,8 @@ function buildEditFields(type, data) {
              </div>`
           : selField('sheet_raca', 'Raça', racaVal || 'humano', racaOpts);
 
-        html += `<div style="border-top:1px solid var(--page-edge);margin:12px 0 8px;padding-top:14px;">
-          <div style="font-family:'Playfair Display',serif;font-size:14px;color:var(--text-main);margin-bottom:12px;font-weight:700;">FICHA D&D</div>
+        html += `<div class="ed-ficha">
+          <div class="ed-ficha-titulo">Ficha D&D</div>
           ${!isNpc && _editCtx?.key !== '__novo__' ? `
           <label class="ed-correcao-toggle" style="margin-bottom:8px;">
             <input type="checkbox" class="ed-correcao" ${_editCtx?.correcao ? 'checked' : ''} onchange="gameAlternarCorrecao(this.checked)">
@@ -2118,7 +2118,7 @@ function buildEditFields(type, data) {
               </div>`)
           }
 
-          <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">Pontos de Vida & Defesa</div>
+          <div class="ed-dnd-section-title">Pontos de Vida & Defesa</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
             ${numField('sheet_vida_atual','HP Atual', s.vida_atual??0, 0, 999)}
             ${numField('sheet_mana_atual','Mana Atual', s.mana_atual??0, 0, 999)}
@@ -2137,8 +2137,8 @@ function buildEditFields(type, data) {
             </div>
           </div>
 
-          <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">Atributos</div>
-          ${gameTrava(travado, `<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-bottom:12px;">
+          <div class="ed-dnd-section-title">Atributos</div>
+          ${gameTrava(travado, `<div class="ed-atributos-grade">
             ${numField('sheet_forca','FOR', s.forca??10, 1, 30)}
             ${numField('sheet_destreza','DES', s.destreza??10, 1, 30)}
             ${numField('sheet_constituicao','CON', s.constituicao??10, 1, 30)}
@@ -2147,14 +2147,14 @@ function buildEditFields(type, data) {
             ${numField('sheet_carisma','CAR', s.carisma??10, 1, 30)}
           </div>`)}
 
-          <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">Moedas</div>
+          <div class="ed-dnd-section-title">Moedas</div>
           <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;">
             ${numField('sheet_ouro','Ouro', s.ouro??0, 0, 999999)}
             ${numField('sheet_prata','Prata', s.prata??0, 0, 999999)}
             ${numField('sheet_cobre','Cobre', s.cobre??0, 0, 999999)}
           </div>
 
-          <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">Equipamentos</div>
+          <div class="ed-dnd-section-title">Equipamentos</div>
           ${travado ? `<div style="margin-bottom:6px;"><button type="button" class="clean-button" style="width:auto;padding:4px 12px;margin:0;font-size:12px;" onclick="gameAbrirTela('mochila','${nomeJs}')">Abrir Mochila</button></div>` : ''}
           ${gameTrava(travado, `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
             ${field('sheet_eq_armadura','Armadura', s.equipamentos?.armadura??'')}

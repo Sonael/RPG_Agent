@@ -2780,12 +2780,12 @@ function wzRenderChars() {
     <div class="cwc" id="cwc-${i}">
       <div class="cwc-header" onclick="toggleWzChar(${i})">
         <div style="display:flex;align-items:center;gap:10px;">
-          <span id="cwc-arrow-${i}" style="color:var(--gold-dim);font-size:12px;">${open?'▾':'▸'}</span>
-          <span style="font-family:'Cinzel',serif;font-size:13px;color:var(--text);">
+          <span id="cwc-arrow-${i}" class="cwc-seta">${open?'▾':'▸'}</span>
+          <span class="cwc-nome">
             ${char.name || `Personagem ${i+1}`}
           </span>
-          ${char.isParty ? `<span style="font-family:'JetBrains Mono',monospace;font-size:9px;background:rgba(200,168,75,0.15);border:1px solid var(--gold-dim);border-radius:3px;padding:2px 6px;color:var(--gold-dim);">${meta.badge}</span>` : ''}
-          ${isDnd && char.classe ? `<span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);">${CLASS_DATA_WZ[char.classe]?.label||''}${char.nivel>1?` Nv.${char.nivel}`:''}</span>` : wzExtraBadge(char, document.getElementById('wz-type').value)}
+          ${char.isParty ? `<span class="cwc-selo">${meta.badge}</span>` : ''}
+          ${isDnd && char.classe ? `<span class="cwc-classe">${CLASS_DATA_WZ[char.classe]?.label||''}${char.nivel>1?` Nv.${char.nivel}`:''}</span>` : wzExtraBadge(char, document.getElementById('wz-type').value)}
         </div>
         <button onclick="event.stopPropagation();removeWzChar(${i})" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:16px;padding:2px 6px;">✕</button>
       </div>
@@ -4131,8 +4131,7 @@ function edBuildDndSections(i) {
           ${ED_STATS.map(stat => `
             <div class="stat-cell">
               <span class="stat-cell-name">${ED_STAT_ABBR[stat]}</span>
-              <input type="number" value="${s[stat]||10}" readonly
-                style="width:100%;text-align:center;font-size:18px;font-weight:700;padding:4px;border:1px solid var(--page-edge);border-radius:3px;background:transparent;">
+              <span class="stat-val">${s[stat]||10}</span>
               <span class="stat-cell-mod">${statMod(s[stat]||10)}</span>
             </div>`).join('')}
         </div>
@@ -4372,10 +4371,10 @@ function edRenderChars() {
     <div class="cwc" id="ed-cc-${i}">
       <div class="cwc-header" onclick="toggleEditChar(${i})">
         <div style="display:flex;align-items:center;gap:10px;">
-          <span id="ed-ca-${i}" style="color:var(--text-muted);font-size:12px;">${ch._open?'▾':'▸'}</span>
-          <span style="font-family:'Playfair Display',serif;font-size:14px;" id="ed-cname-${i}">${escHtml(ch.name) || `Personagem ${i+1}`}</span>
-          ${classeLabel ? `<span style="font-family:monospace;font-size:10px;color:var(--text-muted);">${classeLabel}</span>` : ''}
-          ${ch.isParty ? `<span style="font-family:monospace;font-size:9px;background:rgba(38,75,130,0.08);border:1px solid rgba(38,75,130,0.25);border-radius:3px;padding:2px 6px;color:var(--ink-user);">${meta.badge}</span>` : ''}
+          <span id="ed-ca-${i}" class="cwc-seta">${ch._open?'▾':'▸'}</span>
+          <span class="cwc-nome" id="ed-cname-${i}">${escHtml(ch.name) || `Personagem ${i+1}`}</span>
+          ${classeLabel ? `<span class="cwc-classe">${classeLabel}</span>` : ''}
+          ${ch.isParty ? `<span class="cwc-selo">${meta.badge}</span>` : ''}
         </div>
         <button onclick="event.stopPropagation();removeEditChar(${i})" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:16px;padding:2px 6px;">✕</button>
       </div>

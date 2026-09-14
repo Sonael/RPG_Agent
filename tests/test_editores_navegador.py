@@ -235,6 +235,44 @@ def test_atalho_abre_a_mochila(navegador):
     assert "Helena" in pg.inner_text(".inv-title")
 
 
+# ---- mesma moldura das telas -----------------------------------------------
+
+_PAPEL = "rgb(255, 251, 240)"      # --tl-paper, o mesmo #fffbf0 das telas
+_VERMELHO = "rgb(139, 35, 21)"     # --tl-red, o do botão Concluir da Ascensão
+
+
+def _estilo(pg, seletor, *props):
+    return pg.evaluate(
+        """([s, props]) => { const cs = getComputedStyle(document.querySelector(s));
+                             return props.map(p => cs.getPropertyValue(p)); }""",
+        [seletor, list(props)])
+
+
+def test_wizard_usa_a_moldura_das_telas_mesmo_com_tema_escuro(navegador):
+    pg, erros = navegador("/menu.html")
+    pg.evaluate("() => { document.documentElement.setAttribute('data-theme', 'noite-tinta'); openWizard(); }")
+    pg.wait_for_selector("#wizard-overlay:not(.hidden)", timeout=5000)
+    fundo, borda = _estilo(pg, "#wizard-box", "background-color", "border-top-color")
+    assert fundo == _PAPEL, "o wizard seguiu o tema em vez da paleta das telas"
+    assert borda == "rgb(184, 153, 71)"
+    assert _estilo(pg, "#wz-next-btn", "background-color") == [_VERMELHO]
+    assert "Caveat" not in _estilo(pg, "#wz-name", "font-family")[0]
+    assert not erros, erros[:3]
+
+
+def test_editor_da_campanha_e_do_jogo_usam_a_moldura(navegador):
+    pg, _ = navegador("/menu.html")
+    _abrir_editor_da_campanha(pg)
+    assert _estilo(pg, ".edit-campaign-box", "background-color") == [_PAPEL]
+    assert _estilo(pg, "#ed-save-btn, #ed-next-btn", "background-color") == [_VERMELHO]
+
+    pg, _ = navegador("/game.html")
+    _abrir_ficha_no_jogo(pg)
+    assert _estilo(pg, "#edit-overlay .edit-box", "background-color") == [_PAPEL]
+    assert _estilo(pg, "#edit-overlay .btn-salvar-item", "background-color") == [_VERMELHO]
+    assert _estilo(pg, "#edit-name", "color") == [_VERMELHO]
+
+
 def test_npc_continua_editavel(navegador):
     pg, _ = navegador("/game.html")
     pg.evaluate("""async () => {

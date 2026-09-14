@@ -1603,6 +1603,23 @@ criação:
   pelo mestre (Armadura Arcana, anel);
 - a flag `correcao_manual` não é gravada na ficha.
 
+### A mesma moldura das telas
+
+Os três modais (wizard, editor da campanha e editor de registro do jogo)
+tinham a caixa branca genérica, com letra cursiva e botão preto, e pareciam
+de outro aplicativo ao lado da Ascensão e da Mochila. A classe `.moldura-tela`
+no overlay traz a moldura das telas: papel creme, borda dourada, título
+vermelho centrado, faixa de rodapé, botão principal vermelho, campos em Lora
+e atributos nas células da régua da Ascensão. No mobile os três viram tela
+cheia, como as outras.
+
+As telas não seguem o tema das configurações, e a moldura também não: ela
+redefine as variáveis de tema (`--page-edge`, `--ink-user`, `--text-main`...)
+dentro do overlay. Assim os estilos inline que o `menu.js` e o `game.js` já
+usavam passam a desenhar na paleta das telas sem precisarem ser reescritos.
+`test_wizard_usa_a_moldura_das_telas_mesmo_com_tema_escuro` liga o tema
+"noite-tinta" e mede as cores calculadas.
+
 `test_regras_e_editores.py` cobre o catálogo e a normalização;
 `test_editores_navegador.py` (Playwright) abre os dois editores, confirma a
 trava, força o nível por JS e verifica que ele não é gravado enquanto a vida
