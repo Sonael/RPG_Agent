@@ -94,20 +94,21 @@ abre o loop **percepção → deliberação → ação → verificação** em de
 11. [Ficha do local](#ficha-do-local)
 12. [Ficha do personagem](#ficha-do-personagem)
 13. [Ficha do herói](#ficha-do-herói)
-14. [Tela de loja ("O Balcão")](#tela-de-loja-o-balcão)
-15. [Tela de missões ("O Livro de Missões")](#tela-de-missões-o-livro-de-missões)
-16. [Tela de saque ("O Espólio")](#tela-de-saque-o-espólio)
-17. [Tela de descanso ("A Fogueira")](#tela-de-descanso-a-fogueira)
-18. [Wizard e editores de ficha](#wizard-e-editores-de-ficha)
-19. [Tela de combate tática (Pergaminho Épico)](#tela-de-combate-tática-pergaminho-épico)
-20. [Tools, o catálogo do agente](#tools-o-catálogo-do-agente)
-21. [Endpoints HTTP](#endpoints-http)
-22. [Frontend](#frontend)
-23. [PWA e instalação](#pwa-e-instalação)
-24. [Testes e garantias](#testes-e-garantias)
-25. [Estrutura de arquivos](#estrutura-de-arquivos)
-26. [Configuração e execução](#configuração-e-execução)
-27. [Limitações conhecidas](#limitações-conhecidas)
+14. [Mapa do mundo](#mapa-do-mundo)
+15. [Tela de loja ("O Balcão")](#tela-de-loja-o-balcão)
+16. [Tela de missões ("O Livro de Missões")](#tela-de-missões-o-livro-de-missões)
+17. [Tela de saque ("O Espólio")](#tela-de-saque-o-espólio)
+18. [Tela de descanso ("A Fogueira")](#tela-de-descanso-a-fogueira)
+19. [Wizard e editores de ficha](#wizard-e-editores-de-ficha)
+20. [Tela de combate tática (Pergaminho Épico)](#tela-de-combate-tática-pergaminho-épico)
+21. [Tools, o catálogo do agente](#tools-o-catálogo-do-agente)
+22. [Endpoints HTTP](#endpoints-http)
+23. [Frontend](#frontend)
+24. [PWA e instalação](#pwa-e-instalação)
+25. [Testes e garantias](#testes-e-garantias)
+26. [Estrutura de arquivos](#estrutura-de-arquivos)
+27. [Configuração e execução](#configuração-e-execução)
+28. [Limitações conhecidas](#limitações-conhecidas)
 
 ---
 
@@ -1886,6 +1887,65 @@ os números da tela contra o motor, condições e habilidades, troca de herói,
 os botões para Mochila e tela de nível, "Corrigir ficha" e o redesenho.
 Capturas: `heroi-ficha` e `heroi-conjuradora`.
 
+## Mapa do mundo
+
+A hierarquia de locais ("dentro de") e o paradeiro de cada personagem já
+existiam, mas só se viam um lugar por vez, na ficha do local. O mapa mostra o
+mundo inteiro de uma vez: onde o grupo está, o que está a um passo e quem está
+em cada lugar.
+
+Não é um mapa desenhado. O motor não tem distância nem direção, e pôr os
+lugares num plano inventaria uma geografia que a campanha não tem. É uma
+árvore.
+
+### Motor (`rpg/mapa.py`)
+
+`mapa_snapshot()` devolve:
+
+- `local_atual`, `caminho_atual` (da raiz até onde o grupo está) e `grupo`.
+- `arvore`: cada nó com `nome`, `tipo` (`local`, `loja` ou `sem_registro`),
+  `descricao`, `alcance` (o mesmo de `rpg/locais.py`: aqui, dentro, vizinho,
+  acima), `grupo_aqui`, `no_caminho_do_grupo`, `pessoas` (com `fora` para
+  mortos e desaparecidos), `pessoas_total` (o ramo inteiro), `filhos` e
+  `profundidade`. As lojas entram dentro do local delas.
+- Lugar **citado mas nunca registrado** (o local atual ou o `local` de um
+  personagem) entra como `sem_registro`, em vez de sumir com quem está lá.
+- A raiz de onde o grupo está vem primeiro. Um "dentro de" circular não trava
+  a árvore: o que sobra vira raiz.
+- `ao_alcance`: os lugares a um passo, na ordem dentro, ao lado e saída.
+- `sem_paradeiro`: personagens sem local.
+
+### A tela (`static/js/mapa.js`, `GET /api/map/state`)
+
+- Abre pelo **Ver o mapa** da barra lateral (abaixo do "Local:") e pelo **Ver
+  no mapa** da ficha do local, que abre a árvore até aquele lugar e o destaca.
+- Mesma moldura das fichas. À esquerda, a árvore: o caminho até o grupo
+  começa aberto, o resto abre e fecha pela seta; cada lugar mostra as marcas
+  (grupo aqui, aqui dentro, ao lado, saída, loja, sem registro), quantas
+  pessoas há no ramo e **Ir até lá** quando está a um passo. À direita, **A um
+  passo** e **Paradeiro desconhecido**.
+- **Busca** por lugar ou pessoa, sem caixa nem acento: fica só o que casa (e
+  os ramos até lá), aberto e destacado.
+- O nome do lugar abre a ficha do local; o nome da pessoa, a ficha do
+  personagem. **Ir até lá** manda ao mestre a fala do jogador "Vamos até X.",
+  como na ficha do local; com o mestre respondendo, avisa e não manda.
+- As telas que abrem sozinhas (nível, grimório, saque, descanso, loja) esperam
+  o mapa fechar.
+
+### Testes
+
+`test_mapa.py` (9) cobre a árvore com as lojas dentro da cidade, o caminho do
+grupo, a ordem do que está a um passo, pessoas e o total do ramo, sem paradeiro
+e sem registro, local atual não registrado, ciclo, campanha vazia e a rota.
+`test_mapa_navegador.py` (8) confere o Ver o mapa com o caminho aberto, abrir e
+fechar um ramo, a busca por pessoa e por lugar sem acento, Ir até lá, o mestre
+ocupado, lugar e pessoa levando às fichas (e o Ver no mapa voltando com foco),
+o foco num lugar fora do caminho e o saque esperando o mapa fechar. Regressões
+injetadas (caminho fechado, saque por cima, mestre ocupado ignorado, busca com
+acento, foco sem abrir os ancestrais, Ver no mapa sem foco, fala errada, tudo
+aberto) foram todas pegas. Capturas novas (ainda não geradas): `mapa-mundo` e
+`mapa-busca`.
+
 ## Tela de loja ("O Balcão")
 
 A segunda tela do jogo, e a primeira construída depois de perguntar **por que**
@@ -2749,6 +2809,8 @@ ferramentas do mestre.
   `GET /api/shop/recap?desde=&loja=` → `{text}` com o que foi negociado na visita.
 - `GET /api/rest/state` / `POST /api/rest/action`
   `{action: dado|concluir|cancelar, char}`.
+- `GET /api/map/state` → a árvore de lugares, onde o grupo está, o que está a
+  um passo e quem está onde. Veja [Mapa do mundo](#mapa-do-mundo).
 - `GET /api/quests/state` / `POST /api/quests/action`
   `{action: marcar|desmarcar|abandonar|fechar, quest, objective}`; `fechar`
   devolve `recap`. Veja [Tela de missões](#tela-de-missões-o-livro-de-missões).
@@ -2826,9 +2888,11 @@ ferramentas do mestre.
 - **`loot.js`**, a tela de saque (quem leva o quê, com a carga prevista).
 - **`missoes.js`**, o livro de missões (abas por situação, objetivos marcáveis,
   quem deu e desfecho).
+- **`mapa.js`**, o mapa do mundo (árvore de lugares, quem está onde, o que está
+  a um passo e busca).
   Mesma regra: renderizam o snapshot do motor e despacham intenções. A fila
   que decide qual abre primeiro (combate, nível, grimório, saque, descanso,
-  loja; a Mochila, as fichas e as missões só abrem pelo clique) e o empilhamento das
+  loja; a Mochila, as fichas, as missões e o mapa só abrem pelo clique) e o empilhamento das
   pílulas ficam em `game.js`.
 
 ### Tema
@@ -3109,6 +3173,7 @@ o nome do pacote. Também não há variável de ambiente nova.
 │   ├── personagens.py     Ficha do personagem: relação, o que o grupo sabe, ligações
 │   ├── saque.py           Tela de saque: offer_loot, divisão e carga prevista
 │   ├── missoes.py         Tela de missões: snapshot, marcar, abandonar, aviso ao mestre
+│   ├── mapa.py            Mapa do mundo: árvore de lugares, alcance e paradeiro
 │   ├── tools_dnd.py       Motor D&D 5e + combate (~7900 linhas, 38 tools)
 │   ├── memory.py          Estado por sessão, proxy, persistência
 │   ├── database.py        Camada Supabase

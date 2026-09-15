@@ -65,6 +65,8 @@
                   onclick="window.Locais._abrir('')">Onde o grupo está</button>
           <button id="lcl-editar" class="lcl-btn lcl-btn-sec hidden"
                   onclick="window.Locais._editar()">Editar local</button>
+          <button id="lcl-mapa" class="lcl-btn lcl-btn-sec"
+                  onclick="window.Locais._verNoMapa()">Ver no mapa</button>
           <button class="lcl-fechar" onclick="window.Locais._fechar()">Fechar</button>
         </div>
       </div>`;
@@ -229,6 +231,7 @@
     _falar: (nome) => enviar(`Quero falar com ${nome}.`),
     _editar: editar,
     _verPessoa: (nome) => { fechar(); if (window.Personagens) window.Personagens._abrir(nome); },
+    _verNoMapa: () => { const nome = _last.nome || ''; fechar(); if (window.Mapa) window.Mapa._abrir(nome); },
     _estado: () => _last,
   };
 

@@ -35,7 +35,7 @@
        Sem isso, a narração da IA (ou texto injetado) poderia conter
        <script>/<img onerror> e executar — XSS. -->
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.7/dist/purify.min.js"></script>
-  <link rel="stylesheet" href="/static/css/style.css?v=61">
+  <link rel="stylesheet" href="/static/css/style.css?v=62">
 </head>
 
 <body class="game-page">
@@ -66,6 +66,11 @@
               <div class="linha-info">
                 <span style="color:var(--text-main); font-weight: 600;">Local:</span>
                 <span id="sb-location" class="local-clicavel" title="Ver o local" onclick="window.Locais && window.Locais._abrir('')" style="color:var(--text-muted); text-align:right;">—</span>
+              </div>
+              <!-- O mundo inteiro de uma vez: a árvore de lugares, quem está onde. -->
+              <div class="linha-info linha-mapa">
+                <button id="sb-mapa" class="clean-button btn-texto btn-texto-mini"
+                        onclick="window.Mapa && window.Mapa._abrir('')" title="Ver o mapa do mundo">Ver o mapa</button>
               </div>
               <!-- Relógio de mundo. Some quando a campanha nunca chamou
                    advance_time() — nem toda mesa quer contar as horas. -->
@@ -364,16 +369,17 @@
   <script src="/static/js/utils.js?v=12"></script>
   <script src="/static/js/game.js?v=38"></script>
   <script src="/static/js/combat.js?v=20"></script>
-  <script src="/static/js/shop.js?v=9"></script>
-  <script src="/static/js/levelup.js?v=7"></script>
-  <script src="/static/js/rest.js?v=7"></script>
-  <script src="/static/js/grimoire.js?v=5"></script>
+  <script src="/static/js/shop.js?v=10"></script>
+  <script src="/static/js/levelup.js?v=8"></script>
+  <script src="/static/js/rest.js?v=8"></script>
+  <script src="/static/js/grimoire.js?v=6"></script>
   <script src="/static/js/inventory.js?v=3"></script>
-  <script src="/static/js/locais.js?v=3"></script>
+  <script src="/static/js/locais.js?v=4"></script>
   <script src="/static/js/personagens.js?v=1"></script>
   <script src="/static/js/herois.js?v=3"></script>
-  <script src="/static/js/loot.js?v=2"></script>
+  <script src="/static/js/loot.js?v=3"></script>
   <script src="/static/js/missoes.js?v=1"></script>
+  <script src="/static/js/mapa.js?v=1"></script>
 
   <script>
     (function() {

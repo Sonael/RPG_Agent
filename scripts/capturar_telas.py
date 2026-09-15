@@ -655,6 +655,18 @@ CIDADE = {
 }
 
 
+# MAPA DO MUNDO. A cidade de CIDADE com um nível a mais (o porão dentro da
+# taverna), alguém sem paradeiro e um porto citado mas nunca registrado.
+MAPA = copy.deepcopy(CIDADE)
+MAPA["locations"]["porão da taverna"] = {
+    "name": "Porão da Taverna", "dentro_de": "Taverna do Caldeirão", "details": "", "notes": "",
+    "description": "Barris, teias e uma porta trancada no fundo."}
+MAPA["characters"].update({
+    "velho osric": _npc("Velho Osric", "Contrabandista aposentado.", "Porão da Taverna", status="morto"),
+    "andarilho": _npc("Andarilho", "Aparece e some sem aviso.", ""),
+    "pescador": _npc("Pescador Ivo", "Diz que viu luzes no mar.", "Porto de Vhar"),
+})
+
 # SAQUE depois da emboscada. A cota de malha é a escolha: pesa 25 kg, e com
 # ela a Helena (FOR 10) passa da metade da capacidade.
 SAQUE = {
@@ -1110,6 +1122,20 @@ TELAS = [
      "estado": CIDADE, "espera": 800,
      "js": "window.Personagens._abrir('Eremita')",
      "exigir": "#pessoa-overlay:not(.hidden) .psn-atitude"},
+
+    # ── Mapa do mundo ────────────────────────────────────────────────
+    # Abre pelo "Ver o mapa" da barra lateral. O caminho até a praça aberto,
+    # o que está a um passo e quem está em cada lugar.
+    {"nome": "mapa-mundo", "pagina": "/game.html",
+     "estado": MAPA, "espera": 800,
+     "js": "window.Mapa._abrir('')",
+     "exigir": "#mapa-overlay:not(.hidden) .map-no-grupo"},
+    # Busca por pessoa: só o ramo onde o Brom está, aberto e destacado.
+    {"nome": "mapa-busca", "pagina": "/game.html",
+     "estado": MAPA, "espera": 800,
+     "js": "window.Mapa._abrir('').then(() => { document.getElementById('map-busca').value = 'Brom';"
+           " window.Mapa._buscar('Brom'); })",
+     "exigir": "#mapa-overlay:not(.hidden) .map-pessoa.map-casou"},
 
     # ── Missões ──────────────────────────────────────────────────────
     # Abre pelo "Ver todas" das missões na barra lateral.

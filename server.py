@@ -2949,6 +2949,13 @@ def grimoire_action_route():
     ))
 
 
+@app.route("/api/map/state", methods=["GET"])
+@require_auth
+def map_state_route():
+    from rpg import mapa
+    return jsonify(mapa.mapa_snapshot())
+
+
 @app.route("/api/quests/state", methods=["GET"])
 @require_auth
 def quests_state_route():

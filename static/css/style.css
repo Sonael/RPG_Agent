@@ -4023,7 +4023,7 @@ body.rest-on { overflow: hidden; }
    fica dentro dele. O caminho até o lugar ("Cliviate › Forja de Cliviate")
    fica no topo e cada trecho abre a ficha daquele lugar.
    ═══════════════════════════════════════════════════════════════════ */
-#local-overlay, #pessoa-overlay, #heroi-overlay, #missoes-overlay {
+#local-overlay, #pessoa-overlay, #heroi-overlay, #missoes-overlay, #mapa-overlay {
   --lcl-paper: #fffbf0;
   --lcl-bg:    #f4ebd8;
   --lcl-dark:  #3d2a14;
@@ -4041,10 +4041,10 @@ body.rest-on { overflow: hidden; }
   padding: var(--esp-5); box-sizing: border-box;
   font-family: 'Lora', serif;
 }
-#local-overlay.hidden, #pessoa-overlay.hidden, #heroi-overlay.hidden, #missoes-overlay.hidden { display: none; }
-body.local-on, body.pessoa-on, body.heroi-on, body.missoes-on { overflow: hidden; }
+#local-overlay.hidden, #pessoa-overlay.hidden, #heroi-overlay.hidden, #missoes-overlay.hidden, #mapa-overlay.hidden { display: none; }
+body.local-on, body.pessoa-on, body.heroi-on, body.missoes-on, body.mapa-on { overflow: hidden; }
 
-#lcl-frame, #psn-frame, #hro-frame, #msn-frame {
+#lcl-frame, #psn-frame, #hro-frame, #msn-frame, #map-frame {
   width: 100%; max-width: 940px;
   height: min(90vh, 820px);
   background: var(--lcl-paper); color: var(--lcl-text);
@@ -4172,8 +4172,8 @@ body.local-on, body.pessoa-on, body.heroi-on, body.missoes-on { overflow: hidden
 .char-local { font-family: 'Lora', serif; font-size: 11px; color: var(--text-muted); margin-top: 2px; }
 
 @media (max-width: 760px) {
-  #local-overlay, #pessoa-overlay, #heroi-overlay, #missoes-overlay { padding: 0; align-items: stretch; }
-  #lcl-frame, #psn-frame, #hro-frame, #msn-frame { max-width: none; border-radius: 0; border: none; height: 100vh; }
+  #local-overlay, #pessoa-overlay, #heroi-overlay, #missoes-overlay, #mapa-overlay { padding: 0; align-items: stretch; }
+  #lcl-frame, #psn-frame, #hro-frame, #msn-frame, #map-frame { max-width: none; border-radius: 0; border: none; height: 100vh; }
   .lcl-header { padding: var(--esp-4) var(--esp-10) var(--esp-3); max-height: none; overflow: visible; }
   .lcl-title { font-size: 1.3rem; }
   .lcl-corpo { display: block; overflow-y: auto; }
@@ -4542,4 +4542,69 @@ body.loot-on { overflow: hidden; }
 .msn-vazio { padding: var(--esp-8) 0; }
 @media (max-width: 760px) {
   .msn-lista { padding: var(--esp-3) var(--esp-4); }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   MAPA DO MUNDO ("O Mapa") — static/js/mapa.js
+
+   Moldura e cartões das fichas (lcl-*). O que é só dele: a árvore com as
+   linhas-guia de cada nível, a seta de abrir e fechar, o lugar do grupo em
+   destaque e o caminho até ele marcado, as pessoas como botões pequenos e a
+   busca.
+   ═══════════════════════════════════════════════════════════════════ */
+.linha-mapa { justify-content: flex-end; margin-top: 2px; }
+#map-frame { max-width: 1040px; }
+.map-onde { margin-top: var(--esp-2); font-size: 0.9rem; color: var(--lcl-text); }
+.map-onde-rotulo { color: var(--lcl-muted); margin-right: var(--esp-1); }
+.map-busca {
+  display: block; width: min(420px, 100%); margin: var(--esp-3) auto 0; box-sizing: border-box;
+  font: inherit; font-size: 0.9rem; padding: var(--esp-2) var(--esp-3);
+  border: 1px solid var(--lcl-line); border-radius: 8px; background: var(--lcl-paper); color: var(--lcl-text);
+}
+.map-busca:focus { outline: 2px solid var(--lcl-gold); outline-offset: 1px; }
+.map-arvore-secao { overflow-y: auto; }
+.map-arvore { display: flex; flex-direction: column; gap: 2px; }
+.map-filhos { margin-left: 11px; padding-left: var(--esp-3); border-left: 1px dashed var(--lcl-line); }
+.map-no-caminho > .map-filhos { border-left-color: var(--lcl-gold); }
+.map-linha { display: flex; align-items: center; flex-wrap: wrap; gap: var(--esp-1) var(--esp-2); padding: 3px 0; }
+.map-seta, .map-seta-vazia { flex: 0 0 22px; width: 22px; height: 22px; }
+.map-seta {
+  border: none; background: none; cursor: pointer; border-radius: 4px; position: relative;
+}
+.map-seta::before {
+  content: ""; position: absolute; left: 8px; top: 6px;
+  border-style: solid; border-width: 5px 0 5px 7px;
+  border-color: transparent transparent transparent var(--lcl-muted);
+  transition: transform .15s;
+}
+.map-seta-aberta::before { transform: rotate(90deg); }
+.map-seta:hover { background: var(--lcl-bg); }
+.map-nome {
+  border: none; background: none; cursor: pointer; padding: 0;
+  font-family: 'Lora', serif; font-size: 0.95rem; color: var(--lcl-dark); text-align: left;
+  text-decoration: underline dotted; text-underline-offset: 3px;
+}
+.map-nome:hover { color: var(--lcl-text); text-decoration-style: solid; }
+.map-no-grupo > .map-linha .map-nome { font-weight: 700; color: var(--lcl-green); }
+.map-marcas { display: inline-flex; flex-wrap: wrap; gap: var(--esp-1); }
+.map-marca-alcance { border-color: var(--lcl-green); color: var(--lcl-green); }
+.map-marca-sem { border-style: dashed; color: var(--lcl-muted); }
+.map-contagem { font-size: 0.74rem; color: var(--lcl-muted); }
+.map-ir { margin-left: auto; padding: 2px var(--esp-2); font-size: 0.76rem; }
+.map-pessoas { display: flex; flex-wrap: wrap; gap: var(--esp-1); margin: 2px 0 var(--esp-1) 30px; }
+.map-sem-bloco, #map-sem-bloco { margin-top: var(--esp-4); }
+#map-sem-bloco.hidden { display: none; }
+#map-sem-bloco .map-pessoas { margin-left: 0; }
+.map-pessoa {
+  font-family: 'Lora', serif; font-size: 0.78rem; cursor: pointer;
+  padding: 1px var(--esp-2); border-radius: 999px;
+  border: 1px solid var(--lcl-line); background: var(--lcl-paper); color: var(--lcl-text);
+}
+.map-pessoa:hover { border-color: var(--lcl-gold); }
+.map-pessoa-fora { color: var(--lcl-muted); text-decoration: line-through; }
+.map-pessoa small { font-size: 0.68rem; }
+.map-casou { background: rgba(184,153,71,0.25); border-radius: 4px; }
+.map-foco > .map-linha { background: rgba(184,153,71,0.15); border-radius: 6px; }
+@media (max-width: 760px) {
+  .map-ir { margin-left: 30px; }
 }
