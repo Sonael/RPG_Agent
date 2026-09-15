@@ -225,3 +225,45 @@ def test_saque_nao_abre_por_cima_do_diario(pagina):
     assert pg.is_hidden("#loot-overlay"), "o saque abriu por cima do diário"
     pg.evaluate("() => window.Diario._fechar()")
     pg.wait_for_selector("#loot-overlay:not(.hidden)", timeout=5000)
+
+
+def _visivel_no_indice(pg, numero):
+    return pg.evaluate(
+        """(numero) => {
+             const nav = document.getElementById('dia-indice');
+             const item = nav.querySelector(`.dia-cap-item[data-numero="${numero}"]`);
+             const n = nav.getBoundingClientRect(), a = item.getBoundingClientRect();
+             return a.left >= n.left - 1 && a.right <= n.right + 1
+                 && a.top >= n.top - 1 && a.bottom <= n.bottom + 1;
+           }""", str(numero))
+
+
+def test_celular_indice_rola_ate_a_pagina_aberta(pagina):
+    """No celular o índice é uma faixa horizontal: "Sem capítulo", a última,
+    abria com o próprio botão fora da tela."""
+    pg, _, _ = pagina
+    pg.set_viewport_size({"width": 390, "height": 844})
+    pg.evaluate("() => window.Diario._abrir('sem')")
+    _esperar_pagina(pg, "Eventos de antes do registro de capítulos")
+    assert pg.evaluate("() => { const n = document.getElementById('dia-indice');"
+                       " return n.scrollWidth > n.clientWidth; }"), "a faixa precisa rolar neste cenário"
+    assert _visivel_no_indice(pg, "sem")
+
+    pg.click("#dia-anterior")
+    _esperar_pagina(pg, "Capítulo 2")
+    assert _visivel_no_indice(pg, 2)
+    pg.click("#dia-anterior")
+    _esperar_pagina(pg, "Capítulo 1")
+    assert _visivel_no_indice(pg, 1)
+
+
+def test_muitos_capitulos_a_coluna_rola_ate_o_aberto(pagina):
+    import requests
+    pg, _, url = pagina
+    diario = [{"chapter": n, "title": f"Entrada do capítulo {n}", "content": "Texto."} for n in range(1, 21)]
+    requests.post(f"{url}/__estado", json={"diary": diario, "chapter": 20}, timeout=10)
+    pg.evaluate("() => window.Diario._abrir()")
+    _esperar_pagina(pg, "Capítulo 20")
+    assert pg.evaluate("() => { const n = document.getElementById('dia-indice');"
+                       " return n.scrollHeight > n.clientHeight; }"), "a coluna precisa rolar neste cenário"
+    assert _visivel_no_indice(pg, 20)

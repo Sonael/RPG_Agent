@@ -167,6 +167,7 @@
 
     q('dia-campanha').textContent = _last.campanha || '';
     q('dia-indice').innerHTML = indice();
+    mostrarNoIndice();
     const c = _pagina === 'sem' ? null : capitulo(_pagina);
     q('dia-pagina').innerHTML = c ? paginaDoCapitulo(c) : paginaSemCapitulo();
 
@@ -180,6 +181,26 @@
       if (el) try { el.scrollIntoView({ block: 'start' }); } catch (_) { /* sem rolagem */ }
     } else {
       q('dia-pagina').scrollTop = 0;
+    }
+  }
+
+  // Rola o índice até o capítulo aberto. No celular o índice é uma faixa
+  // horizontal, e a página "Sem capítulo" (a última) abria com o próprio botão
+  // fora da tela, sem nada indicando que a faixa rola; no desktop, com muitos
+  // capítulos, o mesmo acontecia na coluna. Só o índice rola, nunca a página.
+  function mostrarNoIndice() {
+    const nav = q('dia-indice');
+    const ativo = nav && nav.querySelector('.dia-cap-aberto');
+    if (!ativo) return;
+    const n = nav.getBoundingClientRect();
+    const a = ativo.getBoundingClientRect();
+    if (nav.scrollWidth > nav.clientWidth) {
+      if (a.left < n.left) nav.scrollLeft -= n.left - a.left + 8;
+      else if (a.right > n.right) nav.scrollLeft += a.right - n.right + 8;
+    }
+    if (nav.scrollHeight > nav.clientHeight) {
+      if (a.top < n.top) nav.scrollTop -= n.top - a.top + 8;
+      else if (a.bottom > n.bottom) nav.scrollTop += a.bottom - n.bottom + 8;
     }
   }
 
