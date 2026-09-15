@@ -608,7 +608,7 @@
                         && c.is_party !== (cur && cur.is_party))
               .map(c => c.name);
             const risco = ocupada.length ? ` <small>· ${esc(ocupada.join(', '))}</small>` : '';
-            return `<button class="cbt-btn" onclick="window.Combat._mover('${esc(o.z).replace(/'/g,"\'")}',${dash})">`
+            return `<button class="cbt-btn" onclick="window.Combat._mover('${esc(o.z).replace(/'/g,"\\'")}',${dash})">`
                  + `${esc(o.z)}${risco}`
                  + (dash ? ` <em class="cbt-eco-tag eco-acao">Disparada</em>` : '')
                  + `</button>`;
@@ -782,7 +782,9 @@
     _cancel();
     // O "dash" viaja em `weapon` porque esse campo ja e o qualificador da
     // intencao no dispatcher (e ele que leva a arma no ataque).
-    _act({ action: 'move', actor: cur.name, target: zona,
+    // `act` é o nome interno; `_act` só existe em window.Combat. Chamar
+    // `_act` daqui lançava ReferenceError e o clique na zona não fazia nada.
+    act({ action: 'move', actor: cur.name, target: zona,
            weapon: dash ? 'dash' : '' });
   }
 
