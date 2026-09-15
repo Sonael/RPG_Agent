@@ -708,6 +708,26 @@ HEROI = {
 }
 
 
+# VISÃO GERAL DO GRUPO. O que a tela ajuda a decidir, um de cada:
+#   • Helena ferida, envenenada e sem dado de vida: só o descanso longo a cura;
+#   • Stelar ferido com dados sobrando (o curto ajuda), XP para subir de nível
+#     e sem poder dormir de novo (descansou há 10 horas);
+#   • Natasha com a vida cheia e a mochila perto do limite de carga.
+GRUPO = {
+    "relogio": {"dia": 4, "hora": 20},
+    "characters": {
+        "helena":  {"sheet": {"vida_atual": 9, "mana_atual": 6, "hit_dice_remaining": 0,
+                              "condicoes": [{"nome": "envenenado", "duracao": 2}]}},
+        "stelar":  {"sheet": {"vida_atual": 18, "xp": 2700, "hit_dice_remaining": 2,
+                              "ultimo_descanso_longo": 4 * 24 + 10}},
+        "natasha": {"sheet": {"vida_atual": 21},
+                    "inventario": [
+                        {"nome": "Baú de Ferramentas", "qtd": 1, "descricao": "", "peso": 28},
+                        {"nome": "Adaga", "qtd": 2, "descricao": ""},
+                    ]},
+    },
+}
+
 # DESCANSO CURTO depois de uma emboscada. Cada um do grupo retrata um estado do
 # botão de dado, porque é isso que a tela comunica:
 #   • Helena, muito ferida e com a reserva cheia — o caso de gastar;
@@ -1136,6 +1156,13 @@ TELAS = [
      "js": "window.Mapa._abrir('').then(() => { document.getElementById('map-busca').value = 'Brom';"
            " window.Mapa._buscar('Brom'); })",
      "exigir": "#mapa-overlay:not(.hidden) .map-pessoa.map-casou"},
+
+    # ── Visão geral do grupo ─────────────────────────────────────────
+    # Abre pelo "Visão geral" do título do grupo na barra lateral.
+    {"nome": "grupo-visao-geral", "pagina": "/game.html",
+     "estado": GRUPO, "espera": 800,
+     "js": "window.Grupo._abrir()",
+     "exigir": "#grupo-overlay:not(.hidden) .grp-cartao"},
 
     # ── Missões ──────────────────────────────────────────────────────
     # Abre pelo "Ver todas" das missões na barra lateral.

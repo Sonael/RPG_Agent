@@ -95,20 +95,21 @@ abre o loop **percepção → deliberação → ação → verificação** em de
 12. [Ficha do personagem](#ficha-do-personagem)
 13. [Ficha do herói](#ficha-do-herói)
 14. [Mapa do mundo](#mapa-do-mundo)
-15. [Tela de loja ("O Balcão")](#tela-de-loja-o-balcão)
-16. [Tela de missões ("O Livro de Missões")](#tela-de-missões-o-livro-de-missões)
-17. [Tela de saque ("O Espólio")](#tela-de-saque-o-espólio)
-18. [Tela de descanso ("A Fogueira")](#tela-de-descanso-a-fogueira)
-19. [Wizard e editores de ficha](#wizard-e-editores-de-ficha)
-20. [Tela de combate tática (Pergaminho Épico)](#tela-de-combate-tática-pergaminho-épico)
-21. [Tools, o catálogo do agente](#tools-o-catálogo-do-agente)
-22. [Endpoints HTTP](#endpoints-http)
-23. [Frontend](#frontend)
-24. [PWA e instalação](#pwa-e-instalação)
-25. [Testes e garantias](#testes-e-garantias)
-26. [Estrutura de arquivos](#estrutura-de-arquivos)
-27. [Configuração e execução](#configuração-e-execução)
-28. [Limitações conhecidas](#limitações-conhecidas)
+15. [Visão geral do grupo](#visão-geral-do-grupo)
+16. [Tela de loja ("O Balcão")](#tela-de-loja-o-balcão)
+17. [Tela de missões ("O Livro de Missões")](#tela-de-missões-o-livro-de-missões)
+18. [Tela de saque ("O Espólio")](#tela-de-saque-o-espólio)
+19. [Tela de descanso ("A Fogueira")](#tela-de-descanso-a-fogueira)
+20. [Wizard e editores de ficha](#wizard-e-editores-de-ficha)
+21. [Tela de combate tática (Pergaminho Épico)](#tela-de-combate-tática-pergaminho-épico)
+22. [Tools, o catálogo do agente](#tools-o-catálogo-do-agente)
+23. [Endpoints HTTP](#endpoints-http)
+24. [Frontend](#frontend)
+25. [PWA e instalação](#pwa-e-instalação)
+26. [Testes e garantias](#testes-e-garantias)
+27. [Estrutura de arquivos](#estrutura-de-arquivos)
+28. [Configuração e execução](#configuração-e-execução)
+29. [Limitações conhecidas](#limitações-conhecidas)
 
 ---
 
@@ -1995,6 +1996,66 @@ acento, foco sem abrir os ancestrais, Ver no mapa sem foco, fala errada, tudo
 aberto) foram todas pegas. Capturas novas (ainda não geradas): `mapa-mundo` e
 `mapa-busca`.
 
+## Visão geral do grupo
+
+Para decidir descanso e divisão de itens o jogador abria a ficha de cada
+herói, uma por vez, e fazia a conta de cabeça: quem está ferido, quem ainda
+tem dado de vida, quem já pode dormir, quem aguenta carregar a cota de malha.
+
+### Motor (`rpg/grupo.py`, `GET /api/party/overview`)
+
+Nenhuma regra nova: cada número sai da mesma conta do resto do jogo (a ficha
+do herói, a tela de descanso e a carga). `group_snapshot()` devolve:
+
+- `herois`: um por membro do grupo com ficha, com vida (e o teto da
+  exaustão), mana, CA, dados de vida (e quantos o descanso longo devolve),
+  exaustão, testes de morte, concentração, condições, efeitos, moedas, itens,
+  nível pendente (`pode_subir` ou escolhas por fazer) e se conjura.
+- Por herói, `descanso`: `pode_longo` e `faltam_horas` (as 24 horas do
+  `long_rest`) e `curto_ajuda`, que só é verdade para quem está ferido e ainda
+  tem dado de vida. Vida no teto da exaustão conta como cheia.
+- Por herói, `carga`: kg, capacidade, `limite_sobrecarga` (metade da
+  capacidade), `folga_kg` antes de ficar sobrecarregado e `perto_do_limite`
+  (80% dessa metade).
+- `precisa`: o que falta a ele (caído, vida, mana, exaustão).
+- `resumo`: a frase do descanso ("O descanso curto ajuda Stelar. Helena sem
+  dado de vida: só o longo cura. Descanso longo: Helena e Natasha já podem;
+  Stelar só daqui a 14h."), a da carga ("Mais folga para carregar: ...
+  Perto do limite: Natasha."), quem tem nível pendente e o que os botões
+  precisam saber. Morto aparece no cartão e fica fora das contas.
+
+### A tela (`static/js/grupo.js`)
+
+- Abre pelo **Visão geral** no título do grupo, na Enciclopédia. Mesma
+  moldura das fichas.
+- No alto, o resumo e **Pedir descanso curto** / **Pedir descanso longo**, que
+  mandam ao mestre a fala do jogador ("Vamos fazer um descanso curto."); ele
+  decide se a ficção permite e abre a tela de descanso. Os botões travam em
+  combate, sem ninguém ferido, ou quando ninguém ganha com aquele descanso;
+  com o mestre respondendo, avisam e não mandam.
+- Um cartão por herói: nome (abre a ficha), classe, nível e CA, selo **Subir
+  de nível** / **Escolha de nível** (abre a tela de nível), marcas de estado,
+  barras de vida e mana, dados de vida, situação do descanso, barra de carga
+  com o traço onde começa a sobrecarga, itens e moedas, o que precisa, e os
+  atalhos para a Mochila e o Grimório.
+- Aberta, a fila de telas a redesenha: dano ou item dado pelo mestre aparece
+  na hora. As telas que abrem sozinhas esperam ela fechar.
+
+### Testes
+
+`test_grupo.py` (13) cobre o cartão por membro com ficha, vida, mana e dados
+de vida, o teto da exaustão, o descanso de cada um e o resumo, sem feridos e
+em combate, a carga com folga e perto do limite, sobrecarregado, nível
+pendente, condições e caído, morto fora das contas, grupo vazio e a rota.
+`test_grupo_navegador.py` (9) confere a abertura pela barra lateral, os
+números do motor nos cartões, o resumo, pedir descanso, o mestre ocupado, os
+botões travados sem ferido, os atalhos para ficha, Mochila e nível, o
+redesenho com a tela aberta e o saque esperando ela fechar. Regressões
+injetadas (saque por cima, mestre ocupado, sem redesenho, botão livre sem
+ferido, nível abrindo a ficha, curto sem dado de vida, sem aviso de limite,
+morto nas contas, teto da exaustão ignorado) foram todas pegas. Captura nova
+(ainda não gerada): `grupo-visao-geral`.
+
 ## Tela de loja ("O Balcão")
 
 A segunda tela do jogo, e a primeira construída depois de perguntar **por que**
@@ -2896,6 +2957,8 @@ ferramentas do mestre.
   `GET /api/shop/recap?desde=&loja=` → `{text}` com o que foi negociado na visita.
 - `GET /api/rest/state` / `POST /api/rest/action`
   `{action: dado|concluir|cancelar, char}`.
+- `GET /api/party/overview` → os heróis lado a lado com o resumo de descanso e
+  carga. Veja [Visão geral do grupo](#visão-geral-do-grupo).
 - `GET /api/map/state` → a árvore de lugares, onde o grupo está, o que está a
   um passo e quem está onde. Veja [Mapa do mundo](#mapa-do-mundo).
 - `GET /api/quests/state` / `POST /api/quests/action`
@@ -2975,11 +3038,13 @@ ferramentas do mestre.
 - **`loot.js`**, a tela de saque (quem leva o quê, com a carga prevista).
 - **`missoes.js`**, o livro de missões (abas por situação, objetivos marcáveis,
   quem deu e desfecho).
+- **`grupo.js`**, a visão geral do grupo (heróis lado a lado, resumo de
+  descanso e carga, pedir descanso).
 - **`mapa.js`**, o mapa do mundo (árvore de lugares, quem está onde, o que está
   a um passo e busca).
   Mesma regra: renderizam o snapshot do motor e despacham intenções. A fila
   que decide qual abre primeiro (combate, nível, grimório, saque, descanso,
-  loja; a Mochila, as fichas, as missões e o mapa só abrem pelo clique) e o empilhamento das
+  loja; a Mochila, as fichas, as missões, o mapa e a visão geral do grupo só abrem pelo clique) e o empilhamento das
   pílulas ficam em `game.js`.
 
 ### Tema
@@ -3261,6 +3326,7 @@ o nome do pacote. Também não há variável de ambiente nova.
 │   ├── saque.py           Tela de saque: offer_loot, divisão e carga prevista
 │   ├── missoes.py         Tela de missões: snapshot, marcar, abandonar, aviso ao mestre
 │   ├── mapa.py            Mapa do mundo: árvore de lugares, alcance e paradeiro
+│   ├── grupo.py           Visão geral do grupo: descanso, carga e nível lado a lado
 │   ├── tools_dnd.py       Motor D&D 5e + combate (~7900 linhas, 38 tools)
 │   ├── memory.py          Estado por sessão, proxy, persistência
 │   ├── database.py        Camada Supabase

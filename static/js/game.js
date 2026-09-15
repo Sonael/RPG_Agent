@@ -1259,6 +1259,8 @@ function sincronizarTelas() {
     try { if (window.Inventory) await window.Inventory.sync(); } catch (_) {}
     // A ficha do herói também: aberta, mostra o dano, o XP e o item na hora.
     try { if (window.Herois) await window.Herois.sync(); } catch (_) {}
+    // E a visão geral do grupo, pelo mesmo motivo.
+    try { if (window.Grupo)  await window.Grupo.sync();  } catch (_) {}
   };
   _filaTelas = _filaTelas.then(rodada, rodada);
   return _filaTelas;

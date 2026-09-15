@@ -2894,6 +2894,14 @@ def levelup_action_route():
     ))
 
 
+@app.route("/api/party/overview", methods=["GET"])
+@require_auth
+def party_overview_route():
+    """Os heróis lado a lado, com o resumo de descanso e carga (ver rpg/grupo.py)."""
+    from rpg import grupo
+    return jsonify(grupo.group_snapshot())
+
+
 @app.route("/api/heroes/sheet", methods=["GET"])
 @require_auth
 def hero_sheet_route():

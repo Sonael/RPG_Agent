@@ -4023,7 +4023,7 @@ body.rest-on { overflow: hidden; }
    fica dentro dele. O caminho até o lugar ("Cliviate › Forja de Cliviate")
    fica no topo e cada trecho abre a ficha daquele lugar.
    ═══════════════════════════════════════════════════════════════════ */
-#local-overlay, #pessoa-overlay, #heroi-overlay, #missoes-overlay, #mapa-overlay {
+#local-overlay, #pessoa-overlay, #heroi-overlay, #missoes-overlay, #mapa-overlay, #grupo-overlay {
   --lcl-paper: #fffbf0;
   --lcl-bg:    #f4ebd8;
   --lcl-dark:  #3d2a14;
@@ -4041,10 +4041,10 @@ body.rest-on { overflow: hidden; }
   padding: var(--esp-5); box-sizing: border-box;
   font-family: 'Lora', serif;
 }
-#local-overlay.hidden, #pessoa-overlay.hidden, #heroi-overlay.hidden, #missoes-overlay.hidden, #mapa-overlay.hidden { display: none; }
-body.local-on, body.pessoa-on, body.heroi-on, body.missoes-on, body.mapa-on { overflow: hidden; }
+#local-overlay.hidden, #pessoa-overlay.hidden, #heroi-overlay.hidden, #missoes-overlay.hidden, #mapa-overlay.hidden, #grupo-overlay.hidden { display: none; }
+body.local-on, body.pessoa-on, body.heroi-on, body.missoes-on, body.mapa-on, body.grupo-on { overflow: hidden; }
 
-#lcl-frame, #psn-frame, #hro-frame, #msn-frame, #map-frame {
+#lcl-frame, #psn-frame, #hro-frame, #msn-frame, #map-frame, #grp-frame {
   width: 100%; max-width: 940px;
   height: min(90vh, 820px);
   background: var(--lcl-paper); color: var(--lcl-text);
@@ -4172,8 +4172,8 @@ body.local-on, body.pessoa-on, body.heroi-on, body.missoes-on, body.mapa-on { ov
 .char-local { font-family: 'Lora', serif; font-size: 11px; color: var(--text-muted); margin-top: 2px; }
 
 @media (max-width: 760px) {
-  #local-overlay, #pessoa-overlay, #heroi-overlay, #missoes-overlay, #mapa-overlay { padding: 0; align-items: stretch; }
-  #lcl-frame, #psn-frame, #hro-frame, #msn-frame, #map-frame { max-width: none; border-radius: 0; border: none; height: 100vh; }
+  #local-overlay, #pessoa-overlay, #heroi-overlay, #missoes-overlay, #mapa-overlay, #grupo-overlay { padding: 0; align-items: stretch; }
+  #lcl-frame, #psn-frame, #hro-frame, #msn-frame, #map-frame, #grp-frame { max-width: none; border-radius: 0; border: none; height: 100vh; }
   .lcl-header { padding: var(--esp-4) var(--esp-10) var(--esp-3); max-height: none; overflow: visible; }
   .lcl-title { font-size: 1.3rem; }
   .lcl-corpo { display: block; overflow-y: auto; }
@@ -4607,4 +4607,69 @@ body.loot-on { overflow: hidden; }
 .map-foco > .map-linha { background: rgba(184,153,71,0.15); border-radius: 6px; }
 @media (max-width: 760px) {
   .map-ir { margin-left: 30px; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   VISÃO GERAL DO GRUPO ("O Grupo") — static/js/grupo.js
+
+   Moldura das fichas (lcl-*) e marcas da ficha do herói (hro-marca). O que é
+   só dela: o resumo do grupo no alto, os cartões lado a lado e as barras de
+   vida, mana e carga (com o traço onde começa a sobrecarga).
+   ═══════════════════════════════════════════════════════════════════ */
+.sb-titulo-acoes { display: inline-flex; gap: var(--esp-2); align-items: center; }
+#grp-frame { max-width: 1180px; }
+.grp-hora { margin-top: var(--esp-1); font-size: 0.85rem; color: var(--lcl-muted); }
+.grp-resumo {
+  padding: var(--esp-3) var(--esp-5); border-bottom: 1px solid var(--lcl-line);
+  background: var(--lcl-bg); display: flex; flex-direction: column; gap: var(--esp-1);
+}
+.grp-resumo:empty { display: none; }
+.grp-resumo-linha { margin: 0; font-size: 0.9rem; color: var(--lcl-text); line-height: 1.45; }
+.grp-resumo-linha b { color: var(--lcl-ink); }
+.grp-resumo-acoes { display: flex; flex-wrap: wrap; gap: var(--esp-2); margin-top: var(--esp-1); }
+.grp-corpo { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: var(--esp-4) var(--esp-5); }
+.grp-cartoes { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--esp-3); }
+.grp-cartao {
+  display: flex; flex-direction: column; gap: var(--esp-2);
+  background: var(--lcl-paper); border: 1px solid var(--lcl-line); border-radius: 10px;
+  padding: var(--esp-3);
+}
+.grp-cartao-precisa { border-color: var(--lcl-gold); }
+.grp-cartao-morto { opacity: 0.6; }
+.grp-cartao-cabeca { display: flex; flex-direction: column; gap: 2px; }
+.grp-nome {
+  border: none; background: none; padding: 0; cursor: pointer; text-align: left;
+  font-family: 'Playfair Display', serif; font-size: 1.15rem; color: var(--lcl-ink);
+  text-decoration: underline dotted; text-underline-offset: 3px;
+}
+.grp-nome:hover { color: var(--lcl-dark); text-decoration-style: solid; }
+.grp-sub { font-size: 0.8rem; color: var(--lcl-muted); }
+.grp-nivel {
+  align-self: flex-start; margin-top: var(--esp-1); cursor: pointer; font-family: inherit;
+  font-size: 0.74rem; font-weight: 700; padding: 2px 10px; border-radius: 999px;
+  border: 1px solid var(--lcl-gold); background: rgba(184,153,71,0.18); color: var(--lcl-dark);
+}
+.grp-nivel:hover { background: rgba(184,153,71,0.32); }
+.grp-marcas { display: flex; flex-wrap: wrap; gap: var(--esp-1); }
+.grp-marcas:empty { display: none; }
+.grp-barra-rotulo { display: flex; justify-content: space-between; font-size: 0.78rem; color: var(--lcl-muted); }
+.grp-barra-rotulo span:last-child { color: var(--lcl-text); font-variant-numeric: tabular-nums; }
+.grp-barra-trilho { position: relative; height: 8px; border-radius: 999px; background: var(--lcl-bg); overflow: hidden; }
+.grp-barra-fill { height: 100%; border-radius: 999px; background: var(--lcl-green); }
+.grp-barra-mana .grp-barra-fill { background: #3b5b9a; }
+.grp-barra-carga .grp-barra-fill { background: var(--lcl-muted); }
+.grp-barra-alerta .grp-barra-fill { background: var(--lcl-gold); }
+.grp-barra-perigo .grp-barra-fill { background: var(--lcl-red); }
+.grp-barra-marca { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--lcl-dark); opacity: 0.55; }
+.grp-linha { margin: 0; display: flex; justify-content: space-between; gap: var(--esp-2); font-size: 0.8rem; color: var(--lcl-muted); }
+.grp-linha b { color: var(--lcl-text); }
+.grp-carga-estado { justify-content: flex-end; margin-top: -4px; }
+.grp-descanso { justify-content: flex-start; }
+.grp-ok { color: var(--lcl-green); }
+.grp-espera { color: var(--lcl-muted); }
+.grp-precisa { margin: 0; font-size: 0.8rem; color: var(--lcl-red); }
+.grp-acoes { display: flex; flex-wrap: wrap; gap: var(--esp-1); margin-top: auto; padding-top: var(--esp-1); }
+@media (max-width: 760px) {
+  .grp-corpo, .grp-resumo { padding-left: var(--esp-3); padding-right: var(--esp-3); }
+  .grp-cartoes { grid-template-columns: minmax(0, 1fr); }
 }
