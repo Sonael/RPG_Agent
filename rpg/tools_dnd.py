@@ -6431,7 +6431,23 @@ def add_item(char_name: str, item_name: str, quantity: int = 1, description: str
         return f"{char['name']} agora tem {existing['qtd']}x {item_name}."
 
     # Novo item — verifica se parece mágico
-    item_dict: dict = {"nome": item_name, "qtd": quantity, "descricao": description}
+    nivel = char.get("sheet", {}).get("nivel", 1)
+    item_dict, warning = _conferir_item_novo(item_name, description, nivel)
+    item_dict["qtd"] = quantity
+    inv.append(item_dict)
+    memory.save_campaign()
+    return f"{item_name} (×{quantity}) adicionado ao inventário de {char['name']}.{warning}"
+
+
+def _conferir_item_novo(item_name: str, description: str = "", nivel: int = 1) -> tuple[dict, str]:
+    """
+    A conferência de item que add_item faz na entrada, separada para o saque
+    (rpg/saque.py) cobrar o mestre no momento em que ele põe o item no chão.
+
+    Devolve (item sem quantidade, aviso). O aviso começa com quebra de linha,
+    como add_item sempre anexou.
+    """
+    item_dict: dict = {"nome": item_name, "descricao": description}
     warning = ""
 
     # A conferência dispara pelo NOME mágico OU pelo EFEITO descrito. Só o
@@ -6452,7 +6468,6 @@ def add_item(char_name: str, item_name: str, quantity: int = 1, description: str
             # Fora do SRD: fica marcado. A marca é FATO, não julgamento — vale
             # tanto para um item de sabor quanto para um que mexe na regra.
             item_dict["custom"] = True
-            nivel = char.get("sheet", {}).get("nivel", 1)
             if _tem_efeito_mecanico(item_name, description):
                 # Este o motor vai cobrar: item inventado COM regra é o que
                 # desequilibra a mesa sem ninguém perceber.
@@ -6484,10 +6499,7 @@ def add_item(char_name: str, item_name: str, quantity: int = 1, description: str
                     f"item próprio da sua campanha. Sem efeito mecânico "
                     f"declarado, então é sabor: nada a balancear."
                 )
-
-    inv.append(item_dict)
-    memory.save_campaign()
-    return f"{item_name} (×{quantity}) adicionado ao inventário de {char['name']}.{warning}"
+    return item_dict, warning
 
 
 def justify_custom_item(char_name: str, item_name: str, reason: str) -> str:
@@ -6519,6 +6531,14 @@ def justify_custom_item(char_name: str, item_name: str, reason: str) -> str:
             it["balanco_justificado"] = reason.strip()
             memory.save_campaign()
             return (f"Balanço de '{it.get('nome')}' registrado: "
+                    f"{reason.strip()}")
+    # O item ainda pode estar no chão, no saque aberto (offer_loot).
+    from rpg.saque import pile_items_with_flags
+    for it in pile_items_with_flags():
+        if _norm_txt(it.get("nome", "")) == _norm_txt(item_name) and it.get("custom"):
+            it["balanco_justificado"] = reason.strip()
+            memory.save_campaign()
+            return (f"Balanço de '{it.get('nome')}' (no saque) registrado: "
                     f"{reason.strip()}")
     return f"Aviso: '{item_name}' não está no inventário de {char.get('name', char_name)}."
 
@@ -12835,9 +12855,11 @@ def combat_recap_payload() -> str:
     else:
         instrucao = (
             "Desfecho: VITÓRIA. Narre a luta INTEIRA de forma cinematográfica e "
-            "contínua (não turno a turno), com base no log abaixo. Gere o SAQUE "
-            "dos inimigos derrotados (use add_item/modify_currency se houver) e "
-            "conceda XP a cada membro do grupo com grant_xp(). Depois siga a história."
+            "contínua (não turno a turno), com base no log abaixo. Ponha o SAQUE "
+            "dos inimigos derrotados no chão com offer_loot(itens, gold=...): quem "
+            "decide quem leva o quê é o jogador, na tela de saque; NÃO use "
+            "add_item/modify_currency para o saque. Conceda XP a cada membro do "
+            "grupo com grant_xp(). Depois siga a história."
         )
     payload = (
         "[COMBATE RESOLVIDO NA TELA TÁTICA]\n"
@@ -12919,3 +12941,9 @@ DND_TOOLS = [
     # Macro-tools (v4)
     resolve_saving_throw,
 ]
+
+# Tela de saque: offer_loot mora em rpg/saque.py, que importa este módulo.
+# O import vem depois de tudo definido, então não há ciclo pela metade.
+from rpg.saque import offer_loot  # noqa: E402
+
+DND_TOOLS.append(offer_loot)

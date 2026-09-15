@@ -654,7 +654,7 @@ const TOOL_LABEL = {
   use_ability: 'usando habilidade', roll_death_save: 'teste de morte',
   modify_hp: 'atualizando vida', modify_mana: 'atualizando mana', grant_xp: 'concedendo XP',
   short_rest: 'descanso curto', long_rest: 'descanso longo',
-  offer_rest: 'preparando o descanso', use_hit_die: 'gastando dado de vida',
+  offer_rest: 'preparando o descanso', offer_loot: 'pondo o saque no chão', use_hit_die: 'gastando dado de vida',
   create_character_sheet: 'criando ficha', get_character_sheet: 'lendo ficha',
   get_combat_status: 'status de combate', add_item: 'adicionando item',
   remove_item: 'removendo item', list_inventory: 'listando inventário',
@@ -1238,6 +1238,10 @@ function sincronizarTelas() {
     try { if (window.Combat)  await window.Combat.sync();  } catch (_) {}
     try { if (window.LevelUp) await window.LevelUp.sync(); } catch (_) {}
     try { if (window.Grimoire) await window.Grimoire.sync(); } catch (_) {}
+    // O saque vem logo depois do nível e do grimório (a Força nova muda a
+    // carga que cabe) e antes do descanso (o espólio se recolhe antes de
+    // acampar).
+    try { if (window.Loot)    await window.Loot.sync();    } catch (_) {}
     try { if (window.Rest)    await window.Rest.sync();    } catch (_) {}
     try { if (window.Shop)    await window.Shop.sync();    } catch (_) {}
     // A Mochila não abre sozinha: aberta, só redesenha com o que mudou.
@@ -1290,7 +1294,7 @@ if (_MOBILE_PILULAS.addEventListener) _MOBILE_PILULAS.addEventListener('change',
 // uma regra por combinação: com três pílulas eram três regras, com a quarta
 // (descanso) seriam sete. Aqui cada pílula visível recebe a sua posição na
 // pilha e o CSS só multiplica — a ordem é esta lista, não a ordem do DOM.
-const _PILULAS = ['cbt-reopen', 'shp-reopen', 'lvl-reopen', 'grm-reopen', 'rst-reopen'];
+const _PILULAS = ['cbt-reopen', 'shp-reopen', 'lvl-reopen', 'grm-reopen', 'lot-reopen', 'rst-reopen'];
 function empilharPilulas() {
   let ordem = 0;
   for (const id of _PILULAS) {

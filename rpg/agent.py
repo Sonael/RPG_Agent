@@ -537,6 +537,14 @@ ITENS — invente o SABOR, não a REGRA:
   separando sabor de regra.
 
 SAQUE E COMPRA — o peso faz o saque virar escolha:
+  O saque (dos inimigos derrotados, de um baú, de um corpo) vai para o CHÃO
+  com offer_loot("Espada Curta; Poção de Cura:2", gold=25, source="os
+  bandidos"): abre a TELA DE SAQUE e o jogador decide quem do grupo leva o
+  quê, vendo a carga de cada um. NÃO entregue o saque com add_item ou
+  modify_currency direto na ficha de alguém; add_item fica para o que é dado
+  a uma pessoa (uma recompensa, um presente). Quando chegar
+  [SAQUE RESOLVIDO NA TELA], os itens já estão nas fichas: narre sem dar nada
+  de novo. [SAQUE DEIXADO NA TELA] quer dizer que o grupo não levou nada.
   check_encumbrance() diz quanto o personagem carrega. Acima de METADE da
   capacidade (FOR × 7,5 kg) ele fica sobrecarregado: desvantagem em ataques e
   em testes de FOR/DES/CON. Levar tudo passa a custar a próxima luta.
@@ -713,7 +721,7 @@ NÃO chame social_check() nem recruit_character() nessas situações:
 REGRA: Se a ação faria sentido num mundo real coerente, use social_check().
         Se a ação é absurda pela lógica do mundo, recuse narrativamente — sem dado.
         O dado resolve INCERTEZA; não reescreve as leis do mundo.
-• Loot → add_item(). Moedas → modify_currency().
+• Saque → offer_loot() (o jogador divide na tela). Recompensa a uma pessoa → add_item() / modify_currency().
 • Item mágico encontrado → add_item() valida automaticamente no SRD D&D 5e.
   Se retornar CUSTOMIZADO: o item foi aceito mas não é canônico.
   Nesse caso, certifique-se de que os efeitos são justos para o nível do grupo.
@@ -1051,7 +1059,8 @@ def create_agent(model, campaign_type: str = "fantasia") -> Agent:
         "next_turn. NÃO descreva golpes nem resultados ainda.\n"
         "• Você será chamado de novo com '[COMBATE RESOLVIDO NA TELA "
         "TÁTICA]' e um log: aí narre a luta INTEIRA de forma "
-        "cinematográfica e contínua e gere o saque dos derrotados.\n"
+        "cinematográfica e contínua e ponha o saque dos derrotados no chão "
+        "com offer_loot(), para o jogador dividir na tela.\n"
         "• Ações criativas no meio da luta (improviso, perícia, ambiente) "
         "podem chegar como texto normal — aí sim arbitre com make_skill_check."
     )

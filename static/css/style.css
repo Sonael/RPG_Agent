@@ -4322,3 +4322,180 @@ body.local-on, body.pessoa-on, body.heroi-on { overflow: hidden; }
   .hro-atributos { grid-template-columns: repeat(2, 1fr); }
   .hro-pericias, .hro-slots { grid-template-columns: 1fr; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   TELA DE SAQUE ("O Espólio") — static/js/loot.js
+
+   Mesma moldura de pergaminho das outras telas. À esquerda o que está no
+   chão, com um botão por pessoa; à direita cada um do grupo, com a barra de
+   carga mostrando o peso atual e, em cor mais forte, o que o saque acrescenta.
+   A marca da metade é a mesma da Mochila e da loja: passar dela é desvantagem.
+   ═══════════════════════════════════════════════════════════════════ */
+#loot-overlay {
+  --lot-paper: #fffbf0;
+  --lot-bg:    #f4ebd8;
+  --lot-dark:  #4a2511;
+  --lot-gold:  #b89947;
+  --lot-text:  #2c1a0e;
+  --lot-muted: #6e5c4f;
+  --lot-green: #2e7d32;
+  --lot-red:   #8b2315;
+  --lot-amber: #a8741a;
+  --lot-line:  #e0d5c2;
+
+  position: fixed; inset: 0; z-index: 9000;
+  background: rgba(20,12,6,0.82); backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  padding: var(--esp-5); box-sizing: border-box;
+  font-family: 'Lora', serif;
+}
+#loot-overlay.hidden { display: none; }
+body.loot-on { overflow: hidden; }
+
+#lot-frame {
+  width: 100%; max-width: 1000px;
+  max-height: min(92vh, 880px);
+  background: var(--lot-paper); color: var(--lot-text);
+  border: 2px solid var(--lot-gold); border-radius: 12px;
+  box-shadow: 0 15px 35px rgba(74,37,17,0.45), inset 0 0 40px rgba(184,153,71,0.1);
+  display: flex; flex-direction: column; overflow: hidden; position: relative;
+}
+.lot-header {
+  padding: var(--esp-5) var(--esp-6) var(--esp-3);
+  border-bottom: 1px solid var(--lot-gold); text-align: center; flex: 0 0 auto;
+}
+.lot-close {
+  position: absolute; top: var(--esp-3); right: var(--esp-3);
+  background: none; border: none; cursor: pointer;
+  color: var(--lot-muted); font-size: 1.4rem; line-height: 1;
+  padding: var(--esp-1) var(--esp-2); border-radius: 6px;
+}
+.lot-close:hover { color: var(--lot-red); background: var(--lot-bg); }
+.lot-title {
+  font-family: 'Playfair Display', serif; color: var(--lot-dark);
+  font-size: 1.7rem; font-weight: 700; margin: 0;
+}
+.lot-title #lot-origem {
+  color: var(--lot-muted); font-size: 1.05rem;
+  font-style: italic; font-family: 'Lora', serif; font-weight: 400;
+}
+.lot-sub { margin-top: var(--esp-1); color: var(--lot-muted); font-size: 0.88rem; }
+
+.lot-corpo {
+  flex: 1 1 auto; min-height: 0;
+  display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+}
+.lot-chao, .lot-grupo { overflow-y: auto; padding: var(--esp-4) var(--esp-5); }
+.lot-chao { background: var(--lot-bg); border-right: 1px solid var(--lot-line); }
+.lot-secao {
+  font-family: 'Playfair Display', serif; font-size: 1.05rem; color: var(--lot-dark);
+  margin: 0 0 var(--esp-3);
+}
+.lot-itens, .lot-cartoes { display: flex; flex-direction: column; gap: var(--esp-2); }
+
+.lot-item {
+  background: var(--lot-paper); border: 1px solid var(--lot-gold); border-radius: 8px;
+  padding: var(--esp-3) var(--esp-4);
+}
+.lot-item-dado { opacity: 0.6; border-color: var(--lot-line); }
+.lot-item-cabeca { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--esp-1) var(--esp-3); }
+.lot-item-nome { font-weight: 700; color: var(--lot-dark); }
+.lot-item-qtd { font-size: 0.8rem; color: var(--lot-muted); font-variant-numeric: tabular-nums; }
+.lot-item-peso { margin-left: auto; font-size: 0.8rem; color: var(--lot-muted); font-variant-numeric: tabular-nums; }
+.lot-item-desc { margin: var(--esp-1) 0 0; font-size: 0.82rem; color: var(--lot-muted); }
+.lot-marca {
+  display: inline-block; margin-top: var(--esp-1);
+  font-size: 0.7rem; padding: 1px 8px; border-radius: 999px;
+  border: 1px solid var(--lot-gold); color: var(--lot-dark);
+}
+.lot-item-acoes { display: flex; flex-wrap: wrap; align-items: center; gap: var(--esp-1) var(--esp-2); margin-top: var(--esp-2); }
+.lot-para { font-size: 0.78rem; color: var(--lot-muted); }
+.lot-tudo-dado { font-size: 0.78rem; font-style: italic; color: var(--lot-muted); }
+.lot-btn {
+  font-family: 'Lora', serif; font-weight: 700; font-size: 0.8rem;
+  border-radius: 6px; padding: 3px var(--esp-3); cursor: pointer;
+  background: var(--lot-paper); color: var(--lot-dark); border: 1px solid var(--lot-gold);
+}
+.lot-btn:hover:not(:disabled) { background: var(--lot-bg); }
+.lot-btn-dar { background: var(--lot-dark); color: #fff; border-color: var(--lot-dark); }
+.lot-btn-dar:hover:not(:disabled) { background: #2e160a; }
+.lot-btn-devolver { font-size: 0.72rem; color: var(--lot-muted); border-color: var(--lot-line); }
+
+.lot-moedas-linha {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--esp-2);
+  margin-top: var(--esp-3); padding: var(--esp-3) var(--esp-4);
+  background: var(--lot-paper); border: 1px dashed var(--lot-gold); border-radius: 8px;
+}
+.lot-moedas-total { font-variant-numeric: tabular-nums; }
+.lot-moedas-sel {
+  font: inherit; font-size: 0.85rem; padding: 3px 6px;
+  border: 1px solid var(--lot-gold); border-radius: 6px; background: var(--lot-paper); color: var(--lot-text);
+}
+
+.lot-cartao {
+  background: var(--lot-paper); border: 1px solid var(--lot-gold); border-radius: 8px;
+  padding: var(--esp-3) var(--esp-4); display: flex; flex-direction: column; gap: var(--esp-2);
+}
+.lot-cartao-fora { opacity: 0.6; border-color: var(--lot-line); }
+.lot-cartao-cabeca { display: flex; justify-content: space-between; align-items: baseline; gap: var(--esp-2); }
+.lot-nome { font-family: 'Playfair Display', serif; font-weight: 700; color: var(--lot-dark); }
+.lot-classe { font-size: 0.78rem; color: var(--lot-muted); text-transform: capitalize; }
+.lot-fora { font-size: 0.84rem; color: var(--lot-red); }
+.lot-carga-topo { display: flex; justify-content: space-between; font-size: 0.78rem; color: var(--lot-muted); margin-bottom: 3px; }
+.lot-num { font-variant-numeric: tabular-nums; }
+.lot-carga-barra { position: relative; height: 9px; border-radius: 5px; background: #e6ded2; overflow: hidden; }
+.lot-carga-atual { position: absolute; left: 0; top: 0; bottom: 0; background: #9c8f80; }
+.lot-carga-prevista { position: absolute; top: 0; bottom: 0; background: var(--lot-green); transition: width .25s; }
+.lot-carga-prevista.lot-carga-cheia { background: var(--lot-amber); }
+.lot-carga-prevista.lot-carga-imovel { background: var(--lot-red); }
+.lot-carga-meio { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--lot-dark); }
+.lot-estado { font-size: 0.76rem; color: var(--lot-muted); margin-top: 2px; }
+.lot-estado-piora { color: var(--lot-red); font-weight: 700; }
+.lot-recebe { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.lot-recebe li { display: flex; align-items: center; justify-content: space-between; gap: var(--esp-2); font-size: 0.86rem; }
+.lot-nada { font-size: 0.8rem; font-style: italic; color: var(--lot-muted); }
+.lot-moedas-recebe { font-size: 0.82rem; color: var(--lot-dark); font-variant-numeric: tabular-nums; }
+.lot-vazio { color: var(--lot-muted); font-style: italic; text-align: center; padding: var(--esp-8) var(--esp-4); }
+
+.lot-rodape {
+  display: flex; align-items: center; gap: var(--esp-3);
+  padding: var(--esp-3) var(--esp-6);
+  border-top: 1px solid var(--lot-gold); background: var(--lot-bg); flex: 0 0 auto;
+}
+.lot-msg { flex: 1 1 auto; font-size: 0.88rem; color: var(--lot-dark); min-height: 1.2em; }
+.lot-msg-erro { color: var(--lot-red); font-weight: 700; }
+.lot-deixar, .lot-concluir {
+  font-family: 'Lora', serif; font-weight: 700; font-size: 0.9rem;
+  border-radius: 6px; padding: var(--esp-2) var(--esp-5); cursor: pointer; flex: 0 0 auto;
+}
+.lot-deixar { background: var(--lot-paper); color: var(--lot-dark); border: 1px solid var(--lot-gold); }
+.lot-concluir { background: var(--lot-red); color: #fff; border: 1px solid var(--lot-gold); }
+.lot-concluir:hover:not(:disabled) { background: #6b1a0f; }
+.lot-deixar:disabled, .lot-concluir:disabled { opacity: 0.45; cursor: not-allowed; }
+
+#lot-reopen {
+  position: fixed; right: 20px; z-index: 8999;
+  bottom: calc(var(--pilula-base, 20px) + var(--pilula-ordem, 0) * 56px);
+  background: #6b4a12; color: #fff;
+  border: 2px solid #b89947; border-radius: 30px;
+  font-family: 'Lora', serif; font-weight: 700; font-size: 0.95rem;
+  padding: var(--esp-3) var(--esp-6); cursor: pointer;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+  transition: background .15s, transform .15s;
+}
+#lot-reopen:hover { background: #4f360c; transform: translateY(-2px); }
+#lot-reopen.hidden { display: none; }
+
+@media (max-width: 760px) {
+  #loot-overlay { padding: 0; align-items: stretch; }
+  #lot-frame { max-width: none; max-height: none; border-radius: 0; border: none; height: 100vh; }
+  .lot-header { padding: var(--esp-4) var(--esp-10) var(--esp-2); }
+  .lot-title { font-size: 1.3rem; }
+  .lot-corpo { display: block; overflow-y: auto; }
+  .lot-chao, .lot-grupo { overflow: visible; padding: var(--esp-3) var(--esp-4); }
+  .lot-chao { border-right: none; border-bottom: 1px solid var(--lot-line); }
+  .lot-rodape { flex-wrap: wrap; padding: var(--esp-3) var(--esp-4);
+    padding-bottom: calc(var(--esp-3) + env(safe-area-inset-bottom)); }
+  .lot-msg { flex: 1 1 100%; }
+  .lot-deixar, .lot-concluir { flex: 1 1 0; padding: var(--esp-2); }
+}

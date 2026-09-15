@@ -629,6 +629,24 @@ CIDADE = {
 }
 
 
+# SAQUE depois da emboscada. A cota de malha é a escolha: pesa 25 kg, e com
+# ela a Helena (FOR 10) passa da metade da capacidade.
+SAQUE = {
+    "combat_state": {"is_active": False, "initiative_order": []},
+    "saque_proposto": {
+        "id": 7, "origem": "os bandidos da estrada", "moedas_para": "igual",
+        "proximo_item": 4,
+        "moedas": {"ouro": 25, "prata": 8, "cobre": 0},
+        "itens": [
+            {"id": 1, "nome": "Cota de Malha", "qtd": 1, "descricao": "tirada do chefe dos bandidos",
+             "peso": 24.95, "divisao": {}},
+            {"id": 2, "nome": "Poção de Cura", "qtd": 2, "descricao": "", "peso": 0.25, "divisao": {}},
+            {"id": 3, "nome": "Adaga", "qtd": 1, "descricao": "", "peso": 0.45, "divisao": {}},
+        ],
+    },
+}
+
+
 # FICHA DO HERÓI. Stelar é um Campeão de Grande Arma com XP para subir:
 # o ataque mostra as notas do estilo e do crítico, e o botão de nível aparece.
 # Helena está envenenada e concentrada em Bênção, com PV temporários.
@@ -1066,6 +1084,17 @@ TELAS = [
      "estado": CIDADE, "espera": 800,
      "js": "window.Personagens._abrir('Eremita')",
      "exigir": "#pessoa-overlay:not(.hidden) .psn-atitude"},
+
+    # ── Saque ────────────────────────────────────────────────────────
+    # Abre sozinha pela fila, com tudo no chão.
+    {"nome": "saque-no-chao", "pagina": "/game.html",
+     "estado": SAQUE, "espera": 900,
+     "exigir": "#loot-overlay:not(.hidden) .lot-item"},
+    # A cota para a Helena: a barra dela passa da metade, o estado piora.
+    {"nome": "saque-divisao", "pagina": "/game.html",
+     "estado": SAQUE, "espera": 900,
+     "js": "window.Loot._dar('1', 'Helena').then(() => window.Loot._dar('2', 'Stelar'))",
+     "exigir": "#loot-overlay:not(.hidden) .lot-estado-piora"},
 
     # ── Ficha do herói ───────────────────────────────────────────────
     # Abre pelo cartão do grupo. Leitura: todo número vem do motor.

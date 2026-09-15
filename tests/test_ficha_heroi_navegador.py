@@ -159,6 +159,21 @@ def test_corrigir_ficha_abre_o_editor(pagina):
     assert not pg.is_visible("#heroi-overlay")
 
 
+def test_tela_automatica_nao_abre_por_cima_da_ficha(pagina, app_no_ar):
+    """O descanso (e as outras telas que abrem sozinhas) não conheciam as fichas."""
+    import requests
+    pg, _ = pagina
+    url, _, cap = app_no_ar
+    _abrir_pelo_cartao(pg, "Natasha")
+    requests.post(f"{url}/__estado", json=copy.deepcopy(cap.DESCANSO_CURTO), timeout=10)
+    pg.evaluate("() => window.sincronizarTelas()")
+    pg.wait_for_timeout(1000)
+    assert pg.is_hidden("#rest-overlay"), "o descanso abriu por cima da ficha do herói"
+    pg.click("#heroi-overlay .lcl-fechar")
+    pg.wait_for_selector("#rest-overlay:not(.hidden)", timeout=5000)
+    requests.post(f"{url}/__estado", json={"descanso_proposto": None}, timeout=10)
+
+
 def test_redesenha_quando_o_mestre_muda_a_ficha(pagina, app_no_ar):
     import requests
     pg, _ = pagina

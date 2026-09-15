@@ -95,17 +95,18 @@ abre o loop **percepção → deliberação → ação → verificação** em de
 12. [Ficha do personagem](#ficha-do-personagem)
 13. [Ficha do herói](#ficha-do-herói)
 14. [Tela de loja ("O Balcão")](#tela-de-loja-o-balcão)
-15. [Tela de descanso ("A Fogueira")](#tela-de-descanso-a-fogueira)
-16. [Wizard e editores de ficha](#wizard-e-editores-de-ficha)
-17. [Tela de combate tática (Pergaminho Épico)](#tela-de-combate-tática-pergaminho-épico)
-18. [Tools, o catálogo do agente](#tools-o-catálogo-do-agente)
-19. [Endpoints HTTP](#endpoints-http)
-20. [Frontend](#frontend)
-21. [PWA e instalação](#pwa-e-instalação)
-22. [Testes e garantias](#testes-e-garantias)
-23. [Estrutura de arquivos](#estrutura-de-arquivos)
-24. [Configuração e execução](#configuração-e-execução)
-25. [Limitações conhecidas](#limitações-conhecidas)
+15. [Tela de saque ("O Espólio")](#tela-de-saque-o-espólio)
+16. [Tela de descanso ("A Fogueira")](#tela-de-descanso-a-fogueira)
+17. [Wizard e editores de ficha](#wizard-e-editores-de-ficha)
+18. [Tela de combate tática (Pergaminho Épico)](#tela-de-combate-tática-pergaminho-épico)
+19. [Tools, o catálogo do agente](#tools-o-catálogo-do-agente)
+20. [Endpoints HTTP](#endpoints-http)
+21. [Frontend](#frontend)
+22. [PWA e instalação](#pwa-e-instalação)
+23. [Testes e garantias](#testes-e-garantias)
+24. [Estrutura de arquivos](#estrutura-de-arquivos)
+25. [Configuração e execução](#configuração-e-execução)
+26. [Limitações conhecidas](#limitações-conhecidas)
 
 ---
 
@@ -1988,6 +1989,76 @@ Um detalhe que só o navegador pega: `opacity: 0.55` no item caro é
 **cosmética**. O que impede a compra é o atributo `disabled`, e o teste força
 um clique no botão apagado para confirmar que a bolsa não se mexe.
 
+## Tela de saque ("O Espólio")
+
+No fim do combate o mestre chamava `add_item` e `modify_currency` direto na
+ficha de quem ele achasse melhor. O sistema de carga existe para o saque virar
+escolha (levar a cota de malha deixa o guerreiro sobrecarregado na próxima
+luta), e essa escolha era do mestre, não do jogador.
+
+### Motor (`rpg/saque.py`)
+
+- **`offer_loot(items, gold, silver, copper, source)`** põe o saque no chão:
+  `"Espada Curta; Poção de Cura:2; Anel de Osso:1:lembrança, não faz nada"`
+  (quantidade e descrição opcionais). Chamar de novo com o saque aberto
+  acrescenta. Recusa em combate e sem grupo.
+- A **conferência de item inventado** do `add_item` foi extraída para
+  `_conferir_item_novo` e roda no `offer_loot`: o aviso de item fora do SRD com
+  efeito mecânico volta para o mestre na hora de pôr no chão. O verificador do
+  servidor (`_check_itens_inventados`) passou a olhar também o saque aberto, e
+  `justify_custom_item` aceita o item que ainda está no chão.
+- O peso de cada item é gravado no saque (`_peso_do_item`), sem ir à rede de
+  novo a cada redesenho.
+- `loot_snapshot()`: os itens com quanto sobra no chão, e cada um do grupo com
+  o que vai levar, a **carga atual e a prevista** (com o estado: livre,
+  sobrecarregado, imóvel) e as moedas que recebe.
+- `loot_action`:
+  - `dar` / `devolver` (item por id ou nome, uma unidade por vez; morto e
+    quem não é do grupo não levam);
+  - `moedas` (`igual`, com o resto de cada moeda uma unidade para cada um dos
+    primeiros; ou tudo para uma pessoa);
+  - `concluir` (os itens entram nos inventários, empilhando como o
+    `add_item`, e o que ninguém pegou fica para trás);
+  - `deixar` (ninguém leva nada).
+- O resumo do combate vencido (`combat_recap_payload`) e a instrução do mestre
+  mandam usar `offer_loot` para o saque, e não `add_item`/`modify_currency`,
+  que ficam para o que é dado a uma pessoa.
+
+### A tela (`static/js/loot.js`)
+
+- Abre **sozinha pela fila**, depois do nível e do grimório (a Força nova muda
+  a carga) e antes do descanso. Fechada no ✕ vira a pílula "Saque para
+  dividir"; o saque continua no chão.
+- À esquerda o que está **no chão**, com um botão por pessoa ("Dar para:") e as
+  moedas com a escolha de divisão. À direita **quem leva**: a barra de carga
+  com o peso atual, a parte que o saque acrescenta em cor mais forte, a marca
+  da metade e o estado que piora em vermelho ("livre → sobrecarregado"), além
+  do que cada um leva com "Devolver".
+- **Concluir** diz quantos itens ficam para trás, põe tudo nas fichas e manda
+  `[SAQUE RESOLVIDO NA TELA]` com quem ficou com o quê; **Deixar tudo para
+  trás** manda `[SAQUE DEIXADO NA TELA]`. As duas são mensagens internas: não
+  aparecem no chat ao reabrir a campanha.
+
+### Nenhuma tela abre por cima das fichas
+
+As telas que abrem sozinhas (nível, grimório, descanso, loja e saque) só
+conheciam umas às outras e a Mochila. As fichas do local, do personagem e do
+herói ficaram de fora da lista, e o descanso ou a loja podiam abrir por cima
+delas. Agora todas esperam a ficha fechar.
+
+### Testes
+
+`test_saque.py` (13) cobre o saque no chão sem tocar nas fichas, acrescentar,
+recusas, dar e devolver com a carga prevista, unidades divididas, morto e nome
+inválido, moedas por igual com resto e tudo para um, concluir com empilhamento
+e o que fica para trás, deixar, combate, item inventado cobrado no chão (e a
+justificativa), a ferramenta e o resumo do combate, e as rotas.
+`test_saque_navegador.py` (6) confere a abertura sozinha, dar e devolver com a
+carga prevista, moedas para uma pessoa, concluir com a mensagem ao mestre e o
+item na mochila, a pílula, e que o saque espera a ficha do herói fechar.
+`test_ficha_heroi_navegador.py` confere o mesmo para o descanso. Capturas
+novas (ainda não geradas): `saque-no-chao` e `saque-divisao`.
+
 ## Tela de descanso ("A Fogueira")
 
 A quarta tela. Ela não existe por ser um laço (como combate e loja) nem para
@@ -2502,6 +2573,7 @@ atitude são matéria de romance e de mistério tanto quanto de masmorra.
 | `roll_death_save(char, player_roll)` | Teste de morte (PC informa o d20; NPC o sistema rola) |
 | `short_rest` / `use_hit_die` / `long_rest` | Descansos (a reserva de dados de vida é uma só) |
 | `offer_rest` | Abre a tela de descanso para o jogador |
+| `offer_loot` | Põe o saque no chão e abre a tela de saque para o jogador dividir |
 | `grant_xp(char, amount, reason)` | XP + level up automático |
 | `set_stat(char, stat, value)` | ASI manual; recalcula derivados |
 | `choose_feat(char, feat_name)` | Talento via SRD, valida pré-requisitos |
@@ -2610,8 +2682,11 @@ ferramentas do mestre.
   `GET /api/shop/recap?desde=&loja=` → `{text}` com o que foi negociado na visita.
 - `GET /api/rest/state` / `POST /api/rest/action`
   `{action: dado|concluir|cancelar, char}`.
+- `GET /api/loot/state` / `POST /api/loot/action`
+  `{action: dar|devolver|moedas|concluir|deixar, item, char, quantity, coins_to}`.
+  Veja [Tela de saque](#tela-de-saque-o-espólio).
 - `GET /api/inventory/state?personagem=` / `POST /api/inventory/action`
-  `{action: equipar|desequipar|largar|identificar, char, item, slot}`.
+  `{action: equipar|desequipar|largar|identificar|usar, char, item, slot, alvo}`.
 - `GET /api/grimoire/state?personagem=&q=&nivel=&resumo=1` /
   `POST /api/grimoire/action` `{action: aprender, char, spell, q, spell_level}`.
 
@@ -2678,10 +2753,11 @@ ferramentas do mestre.
   o que o grupo sabe, ligações, "Falar com" e "Ir até onde está").
 - **`herois.js`**, a ficha de leitura do herói (atributos, salvaguardas,
   perícias, ataques, estado e os atalhos para as telas que mudam a ficha).
+- **`loot.js`**, a tela de saque (quem leva o quê, com a carga prevista).
   Mesma regra: renderizam o snapshot do motor e despacham intenções. A fila
-  que decide qual abre primeiro (combate, nível, grimório, descanso, loja; a
-  Mochila só abre pelo atalho) e o empilhamento das pílulas ficam em
-  `game.js`.
+  que decide qual abre primeiro (combate, nível, grimório, saque, descanso,
+  loja; a Mochila e as fichas só abrem pelo clique) e o empilhamento das
+  pílulas ficam em `game.js`.
 
 ### Tema
 
@@ -2959,6 +3035,7 @@ o nome do pacote. Também não há variável de ambiente nova.
 │   ├── tools.py           Tools narrativas + ALL_TOOLS
 │   ├── locais.py          Hierarquia de locais, paradeiro e ficha do local
 │   ├── personagens.py     Ficha do personagem: relação, o que o grupo sabe, ligações
+│   ├── saque.py           Tela de saque: offer_loot, divisão e carga prevista
 │   ├── tools_dnd.py       Motor D&D 5e + combate (~7900 linhas, 38 tools)
 │   ├── memory.py          Estado por sessão, proxy, persistência
 │   ├── database.py        Camada Supabase

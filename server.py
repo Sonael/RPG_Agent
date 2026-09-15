@@ -273,7 +273,7 @@ def _check_combatants_offscene(text: str) -> list[str]:
 # buy_item entra porque ele chama add_item por dentro: sem isso, comprar
 # numa loja era desvio da conferência — a marca ia para a ficha e
 # ninguém olhava naquele turno.
-_ITEM_TOOLS = {"add_item", "buy_item"}
+_ITEM_TOOLS = {"add_item", "buy_item", "offer_loot"}
 
 
 def _check_itens_inventados(tools_called: set) -> list[str]:
@@ -293,16 +293,22 @@ def _check_itens_inventados(tools_called: set) -> list[str]:
         return []
 
     achados, sem_descricao = [], []
-    for ch in memory.campaign.get("characters", {}).values():
-        for it in (ch.get("inventario") or []):
+    from rpg.saque import pile_items_with_flags
+    # O saque aberto conta como um dono: o item inventado é cobrado quando o
+    # mestre o põe no chão, não quando o jogador já o pôs na mochila.
+    donos = [(ch.get("name", "?"), ch.get("inventario") or [])
+             for ch in memory.campaign.get("characters", {}).values()]
+    donos.append(("saque", pile_items_with_flags()))
+    for nome_dono, inventario in donos:
+        for it in inventario:
             if not isinstance(it, dict) or not it.get("custom"):
                 continue
             if it.get("balanco_justificado"):
                 continue
             if it.get("efeito_mecanico"):
-                achados.append((ch.get("name", "?"), it))
+                achados.append((nome_dono, it))
             elif it.get("efeito_desconhecido"):
-                sem_descricao.append((ch.get("name", "?"), it))
+                sem_descricao.append((nome_dono, it))
 
     if not achados and not sem_descricao:
         return []
@@ -1796,6 +1802,7 @@ _PREFIXOS_INTERNOS = (
     ("[COMBATE RESOLVIDO NA TELA", "tela"), ("[COMPRAS RESOLVIDAS NA TELA", "tela"),
     ("[DESCANSO RESOLVIDO NA TELA", "tela"), ("[NÍVEL RESOLVIDO NA TELA", "tela"),
     ("[GRIMÓRIO RESOLVIDO NA TELA", "tela"), ("[DADO DO JOGADOR", "dado"),
+    ("[SAQUE RESOLVIDO NA TELA", "tela"), ("[SAQUE DEIXADO NA TELA", "tela"),
 )
 
 
@@ -1955,7 +1962,7 @@ def chat():
     MAX_RETRIES = 3
 
     WRITE_TOOLS = {
-        "save_character", "set_character_location", "add_character_knowledge", "save_location", "save_event", "set_flag",
+        "save_character", "offer_loot", "set_character_location", "add_character_knowledge", "save_location", "save_event", "set_flag",
         "add_diary_entry", "update_character_status", "update_story_summary",
         "update_world_state", "add_party_member", "remove_party_member", "clear_flag",
     }
@@ -2938,6 +2945,34 @@ def grimoire_action_route():
         spell=(d.get("spell") or "").strip(),
         query=(d.get("q") or "").strip(),
         spell_level=nivel,
+    ))
+
+
+@app.route("/api/loot/state", methods=["GET"])
+@require_auth
+def loot_state_route():
+    from rpg import saque
+    return jsonify(saque.loot_snapshot())
+
+
+@app.route("/api/loot/action", methods=["POST"])
+@require_auth
+def loot_action_route():
+    from rpg import saque
+    d = request.json or {}
+    action = (d.get("action") or "").strip()
+    if not action:
+        return jsonify({"ok": False, "message": "Ação ausente."}), 400
+    try:
+        quantidade = int(d.get("quantity") or 1)
+    except (TypeError, ValueError):
+        quantidade = 1
+    return jsonify(saque.loot_action(
+        action,
+        item=str(d.get("item") or "").strip(),
+        char=(d.get("char") or "").strip(),
+        quantity=quantidade,
+        coins_to=(d.get("coins_to") or "").strip(),
     ))
 
 
