@@ -1160,6 +1160,9 @@ def update_campaign(name):
         "locations":        locations_editadas,
         "events":           campaign_data.get("events", existing.get("events", [])),
         "party":            campaign_data.get("party", existing.get("party", [])),
+        # Observações do mestre: editadas no passo 1 do editor. Cliente antigo
+        # que não manda o campo não apaga as que existem.
+        "quest_flags":      campaign_data.get("quest_flags", existing.get("quest_flags", {})),
     })
 
     try:

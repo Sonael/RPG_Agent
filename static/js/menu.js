@@ -3276,6 +3276,7 @@ let edChars = [];
 let edLocs  = [];
 let edLojasNomes = [];
 let edEvts  = [];
+let edFlags = [];
 
 function edIsDnd() { return document.getElementById('ed-type')?.value === 'dnd'; }
 
@@ -3652,6 +3653,8 @@ async function openEditCampaign(e, name) {
   document.getElementById('ed-chars-list').innerHTML = '<div style="padding:10px;font-style:italic;color:var(--text-muted);">Carregando...</div>';
   document.getElementById('ed-locs-list').innerHTML = '';
   document.getElementById('ed-evts-list').innerHTML = '';
+  edFlags = [];
+  edRenderFlags();
   edRenderStep();
 
   try {
@@ -3703,14 +3706,21 @@ async function openEditCampaign(e, name) {
     edLojasNomes = Object.values(c.lojas || {}).map(l => l && l.nome).filter(Boolean);
     edRenderLocs();
 
-    // Eventos
+    // Eventos. O capítulo não aparece no editor, mas vai e volta: sem ele o
+    // salvar apagava o capítulo de cada evento, e o diário os jogava em
+    // "Sem capítulo".
     edEvts = (c.events || []).map(ev => ({
       summary:             ev.summary             || '',
       characters_involved: ev.characters_involved || '',
       location:            ev.location            || '',
       consequence:         ev.consequence         || '',
+      chapter:             ev.chapter,
     }));
     edRenderEvts();
+
+    // Observações do mestre (quest_flags).
+    edFlags = Object.entries(c.quest_flags || {}).map(([chave, valor]) => ({ chave, valor: String(valor ?? '') }));
+    edRenderFlags();
 
   } catch (err) {
     await showAlert('Erro', err.message, 'danger');
@@ -4526,6 +4536,32 @@ function edRenderLocs() {
 }
 
 // ── Eventos ────────────────────────────────────────────────────────
+// ── Observações do mestre ──────────────────────────────────────────
+function addEditFlag() {
+  edFlags.push({ chave: '', valor: '' });
+  edRenderFlags();
+  const campos = document.querySelectorAll('#ed-flags-list .ed-flag-chave');
+  if (campos.length) campos[campos.length - 1].focus();
+}
+function removeEditFlag(i) { edFlags.splice(i, 1); edRenderFlags(); }
+
+function edRenderFlags() {
+  const container = document.getElementById('ed-flags-list');
+  if (!container) return;
+  if (!edFlags.length) {
+    container.innerHTML = '<div class="ed-flags-vazio">Nenhuma observação.</div>';
+    return;
+  }
+  container.innerHTML = edFlags.map((f, i) => `
+    <div class="ed-flag" data-indice="${i}">
+      <input class="ed-flag-chave" value="${escHtml(f.chave)}" placeholder="nome (ex.: ponte_caiu)"
+             aria-label="Nome da observação" onchange="edFlags[${i}].chave=this.value">
+      <input class="ed-flag-valor" value="${escHtml(f.valor)}" placeholder="valor"
+             aria-label="Valor da observação" onchange="edFlags[${i}].valor=this.value">
+      <button class="ed-flag-remover" onclick="removeEditFlag(${i})" aria-label="Remover observação" title="Remover">✕</button>
+    </div>`).join('');
+}
+
 function addEditEvt() {
   edEvts.push({ summary:'', characters_involved:'', location:'', consequence:'' });
   edRenderEvts();
@@ -4615,7 +4651,15 @@ async function saveEditedCampaign() {
       characters_involved: ev.characters_involved,
       location:            ev.location,
       consequence:         ev.consequence,
+      ...(ev.chapter !== undefined && ev.chapter !== null ? { chapter: ev.chapter } : {}),
     }));
+
+  // Observações: chave sem espaço nas pontas; linha sem nome é descartada.
+  const quest_flags = {};
+  for (const f of edFlags) {
+    const chave = (f.chave || '').trim();
+    if (chave) quest_flags[chave] = (f.valor || '').trim();
+  }
 
   const payload = {
     campaign: {
@@ -4630,6 +4674,7 @@ async function saveEditedCampaign() {
       locations,
       events,
       party,
+      quest_flags,
     }
   };
 

@@ -4811,3 +4811,9 @@ body.loot-on { overflow: hidden; }
 .dia-cena > span:first-child { display: block; }
 .dia-ate-aqui-acoes { margin-top: var(--esp-3); display: flex; flex-wrap: wrap; gap: var(--esp-2); }
 
+/* Editor da campanha (menu): observações do mestre, uma por linha. */
+.ed-flag { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto; gap: 6px; margin-top: 6px; align-items: center; }
+.ed-flag input { min-width: 0; }
+.ed-flag-remover { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 14px; padding: 4px; }
+.ed-flag-remover:hover { color: var(--ink-sys); }
+.ed-flags-vazio { font-size: 13px; color: var(--text-muted); font-style: italic; padding: 8px 0; }

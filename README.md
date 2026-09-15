@@ -2566,6 +2566,23 @@ criação:
   pelo mestre (Armadura Arcana, anel);
 - a flag `correcao_manual` não é gravada na ficha.
 
+### Observações do mestre no editor da campanha
+
+As observações (`quest_flags`, fatos do mundo como "ponte_caiu = sim") saíram
+da barra lateral do jogo e ficam no primeiro passo do editor da campanha, no
+menu: uma linha por observação, com nome e valor, **+ Observação** e remover.
+O salvar descarta linha sem nome e tira espaço das pontas. O
+`PUT /api/campaigns/<name>` grava `quest_flags` e, se um cliente antigo não
+mandar o campo, mantém as que existem.
+
+No caminho, o salvar do editor parou de apagar o capítulo de cada evento: os
+eventos eram remontados só com resumo, personagens, local e consequência, e o
+diário mandava todos para "Sem capítulo".
+
+`test_editor_observacoes_navegador.py` (3) confere as observações no primeiro
+passo, adicionar, mudar e remover gravando, e o capítulo dos eventos mantido;
+`test_rota_grava_observacoes_e_cliente_antigo_nao_apaga` cobre a rota.
+
 ### A mesma moldura das telas
 
 Os três modais (wizard, editor da campanha e editor de registro do jogo)

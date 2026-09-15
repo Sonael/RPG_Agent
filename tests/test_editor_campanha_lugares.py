@@ -160,3 +160,19 @@ def test_desmarcar_do_grupo_no_editor_vale(rota):
     editada["characters"]["alden"].pop("party_member")    # o editor não manda esse campo
     put(editada)
     assert gravado["characters"]["alden"]["party_member"] is False
+
+
+def test_rota_grava_observacoes_e_cliente_antigo_nao_apaga(rota):
+    antiga, put, gravado = rota
+    antiga["quest_flags"] = {"ponte_caiu": "sim"}
+
+    editada = copy.deepcopy(antiga)
+    editada["quest_flags"] = {"ponte_caiu": "não", "selo_real": "entregue"}
+    assert put(editada).status_code == 200
+    assert gravado["quest_flags"] == {"ponte_caiu": "não", "selo_real": "entregue"}
+
+    gravado.clear()
+    sem_campo = copy.deepcopy(antiga)
+    sem_campo.pop("quest_flags")
+    assert put(sem_campo).status_code == 200
+    assert gravado["quest_flags"] == {"ponte_caiu": "sim"}
