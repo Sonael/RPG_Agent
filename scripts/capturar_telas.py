@@ -375,6 +375,32 @@ MUNDO_ONDA4 = {
     },
 }
 
+# LIVRO DE MISSÕES. As duas ativas do MUNDO_ONDA4 (a da princesa, dada por
+# Elara, que é uma ficha: o nome vira link), uma pronta para entregar e duas
+# encerradas, para as abas terem o que mostrar.
+MISSOES = copy.deepcopy(MUNDO_ONDA4)
+MISSOES["quests"]["escoltar a princesa elara"]["quem_deu"] = "Elara"
+MISSOES["quests"].update({
+    "o mapa de kaelen": {
+        "titulo": "O mapa de Kaelen", "descricao": "Recuperar o mapa roubado da torre.",
+        "status": "ativa", "quem_deu": "Kaelen", "recompensa": "passagem livre pelo Passo",
+        "cap_inicio": 1,
+        "objetivos": [{"texto": "Entrar na torre", "feito": True},
+                      {"texto": "Pegar o mapa", "feito": True}],
+    },
+    "ratos no porao": {
+        "titulo": "Ratos no porão", "descricao": "O taverneiro ouviu barulho no porão.",
+        "status": "concluida", "quem_deu": "Taverneiro", "recompensa": "uma noite de graça",
+        "cap_inicio": 1, "cap_fim": 1, "desfecho": "Eram só três ratos e um gato.",
+        "objetivos": [{"texto": "Descer ao porão", "feito": True}],
+    },
+    "a vila em chamas": {
+        "titulo": "A vila em chamas", "descricao": "Fumaça no horizonte ao norte.",
+        "status": "falhou", "quem_deu": "", "recompensa": "", "cap_inicio": 2, "cap_fim": 2,
+        "desfecho": "O grupo chegou tarde demais.", "objetivos": [],
+    },
+})
+
 
 # A LOJA. O local do grupo tem que bater com o `local` da loja: é esse
 # casamento que faz a tela abrir sozinha (loja é estado que persiste, e
@@ -1084,6 +1110,17 @@ TELAS = [
      "estado": CIDADE, "espera": 800,
      "js": "window.Personagens._abrir('Eremita')",
      "exigir": "#pessoa-overlay:not(.hidden) .psn-atitude"},
+
+    # ── Missões ──────────────────────────────────────────────────────
+    # Abre pelo "Ver todas" das missões na barra lateral.
+    {"nome": "missoes-ativas", "pagina": "/game.html",
+     "estado": MISSOES, "espera": 900,
+     "js": "window.Missoes._abrir('')",
+     "exigir": "#missoes-overlay:not(.hidden) .msn-cartao"},
+    {"nome": "missoes-encerradas", "pagina": "/game.html",
+     "estado": MISSOES, "espera": 900,
+     "js": "window.Missoes._abrir('Ratos no porão')",
+     "exigir": "#missoes-overlay:not(.hidden) .msn-concluida"},
 
     # ── Saque ────────────────────────────────────────────────────────
     # Abre sozinha pela fila, com tudo no chão.

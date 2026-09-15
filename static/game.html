@@ -35,7 +35,7 @@
        Sem isso, a narração da IA (ou texto injetado) poderia conter
        <script>/<img onerror> e executar — XSS. -->
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.7/dist/purify.min.js"></script>
-  <link rel="stylesheet" href="/static/css/style.css?v=60">
+  <link rel="stylesheet" href="/static/css/style.css?v=61">
 </head>
 
 <body class="game-page">
@@ -131,9 +131,13 @@
 
             <!-- Missões. O painel inteiro some sem missão registrada: a
                  onda 4 é aditiva e campanha antiga não pode ganhar uma seção
-                 vazia do nada. -->
+                 vazia do nada. O título e cada missão abrem a tela de missões. -->
             <div id="sb-missoes-secao" class="sb-section hidden">
-              <h3 class="sb-section-title">MISSÕES</h3>
+              <h3 class="sb-section-title" style="display:flex;align-items:center;justify-content:space-between;">
+                MISSÕES
+                <button id="sb-missoes-abrir" onclick="window.Missoes && window.Missoes._abrir('')"
+                        class="clean-button btn-texto">Ver todas</button>
+              </h3>
               <div id="sb-missoes"></div>
             </div>
 
@@ -358,17 +362,18 @@
   </div>
 
   <script src="/static/js/utils.js?v=12"></script>
-  <script src="/static/js/game.js?v=37"></script>
+  <script src="/static/js/game.js?v=38"></script>
   <script src="/static/js/combat.js?v=20"></script>
-  <script src="/static/js/shop.js?v=8"></script>
-  <script src="/static/js/levelup.js?v=6"></script>
-  <script src="/static/js/rest.js?v=6"></script>
-  <script src="/static/js/grimoire.js?v=4"></script>
+  <script src="/static/js/shop.js?v=9"></script>
+  <script src="/static/js/levelup.js?v=7"></script>
+  <script src="/static/js/rest.js?v=7"></script>
+  <script src="/static/js/grimoire.js?v=5"></script>
   <script src="/static/js/inventory.js?v=3"></script>
   <script src="/static/js/locais.js?v=3"></script>
   <script src="/static/js/personagens.js?v=1"></script>
   <script src="/static/js/herois.js?v=3"></script>
-  <script src="/static/js/loot.js?v=1"></script>
+  <script src="/static/js/loot.js?v=2"></script>
+  <script src="/static/js/missoes.js?v=1"></script>
 
   <script>
     (function() {

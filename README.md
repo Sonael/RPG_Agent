@@ -95,18 +95,19 @@ abre o loop **percepção → deliberação → ação → verificação** em de
 12. [Ficha do personagem](#ficha-do-personagem)
 13. [Ficha do herói](#ficha-do-herói)
 14. [Tela de loja ("O Balcão")](#tela-de-loja-o-balcão)
-15. [Tela de saque ("O Espólio")](#tela-de-saque-o-espólio)
-16. [Tela de descanso ("A Fogueira")](#tela-de-descanso-a-fogueira)
-17. [Wizard e editores de ficha](#wizard-e-editores-de-ficha)
-18. [Tela de combate tática (Pergaminho Épico)](#tela-de-combate-tática-pergaminho-épico)
-19. [Tools, o catálogo do agente](#tools-o-catálogo-do-agente)
-20. [Endpoints HTTP](#endpoints-http)
-21. [Frontend](#frontend)
-22. [PWA e instalação](#pwa-e-instalação)
-23. [Testes e garantias](#testes-e-garantias)
-24. [Estrutura de arquivos](#estrutura-de-arquivos)
-25. [Configuração e execução](#configuração-e-execução)
-26. [Limitações conhecidas](#limitações-conhecidas)
+15. [Tela de missões ("O Livro de Missões")](#tela-de-missões-o-livro-de-missões)
+16. [Tela de saque ("O Espólio")](#tela-de-saque-o-espólio)
+17. [Tela de descanso ("A Fogueira")](#tela-de-descanso-a-fogueira)
+18. [Wizard e editores de ficha](#wizard-e-editores-de-ficha)
+19. [Tela de combate tática (Pergaminho Épico)](#tela-de-combate-tática-pergaminho-épico)
+20. [Tools, o catálogo do agente](#tools-o-catálogo-do-agente)
+21. [Endpoints HTTP](#endpoints-http)
+22. [Frontend](#frontend)
+23. [PWA e instalação](#pwa-e-instalação)
+24. [Testes e garantias](#testes-e-garantias)
+25. [Estrutura de arquivos](#estrutura-de-arquivos)
+26. [Configuração e execução](#configuração-e-execução)
+27. [Limitações conhecidas](#limitações-conhecidas)
 
 ---
 
@@ -1989,6 +1990,72 @@ Um detalhe que só o navegador pega: `opacity: 0.55` no item caro é
 **cosmética**. O que impede a compra é o atributo `disabled`, e o teste força
 um clique no botão apagado para confirmar que a bolsa não se mexe.
 
+## Tela de missões ("O Livro de Missões")
+
+As missões apareciam só na barra lateral, e só as ativas: sem recompensa, sem
+desfecho e sem o histórico do que o grupo já fez ou deixou de fazer.
+
+### Quem decide o quê
+
+O que aconteceu na história continua sendo decisão do mestre:
+
+- **Marcar objetivo** é a lista de tarefas do jogador. Cada marcação fica
+  anotada, marcar e desmarcar o mesmo objetivo se cancelam, e ao **fechar** a
+  tela o mestre recebe **um** aviso `[MISSÕES ATUALIZADAS NA TELA]` com o que
+  mudou. A instrução dele diz para confirmar na narração ou desfazer com
+  `update_quest_objective(..., done=False)`, e para não concluir missão nem
+  entregar recompensa por causa do aviso.
+- **Abandonar** é decisão do grupo e fica na tela (com dois cliques, porque
+  não tem volta por ela). **Concluir** e **falhar** ficam com o mestre, que é
+  quem entrega ou não a recompensa.
+- Com todos os objetivos feitos, a missão aparece como **pronta para
+  entregar** e ganha **Falar com <quem deu>**, que manda ao mestre a fala do
+  jogador ("Quero falar com Kaelen sobre a missão ..."), como a ficha do local.
+  Se havia marcações, o aviso vai antes da fala.
+
+### Motor (`rpg/missoes.py`)
+
+- `quest_snapshot()`: todas as missões ordenadas por situação, com os
+  objetivos, quem deu (e se é uma ficha, para virar link), recompensa,
+  capítulos, desfecho e `pronta_para_entregar`; a contagem por situação e
+  quantas mudanças esperam o aviso.
+- `quest_action`: `marcar` e `desmarcar` pelo **índice** do objetivo (o
+  `update_quest_objective` casa por trecho de texto, e "Chegar" marcaria
+  "Chegar a Luminas" e "Chegar ao porto"), `abandonar` (por `complete_quest`) e
+  `fechar` (devolve o aviso e limpa as anotações).
+- **Chave sem acento.** Missão gravada com a chave `a divida de torbin` e o
+  título "A dívida de Torbin" não era encontrada pela tela nem pelas
+  ferramentas do mestre, que procuravam pela chave exata. `_achar_missao`
+  (`rpg/tools.py`) procura pela chave e, se não bater, pelo título sem caixa
+  nem acento; `update_quest_objective`, `complete_quest`, `get_quest` e a tela
+  usam a mesma busca.
+
+### A tela (`static/js/missoes.js`)
+
+- Abre pelo **Ver todas** no título da seção de missões da barra lateral, e
+  pelo clique em cada missão (aberta na aba dela e destacada). A seção
+  aparece com qualquer missão registrada; sem ativas, mostra "Nenhuma missão
+  ativa" e continua levando às encerradas.
+- Mesma moldura das fichas. Abas: **Ativas**, **Concluídas** e **Falhadas e
+  abandonadas**, com a contagem. Cada missão: título, progresso, capítulos,
+  descrição, **Encomendada por** (link para a ficha do personagem quando ele
+  existe), **Recompensa**, objetivos com caixa de marcar (travadas nas
+  encerradas) e o **Desfecho**.
+- As telas que abrem sozinhas esperam a de missões fechar.
+
+### Testes
+
+`test_missoes.py` (12) cobre o snapshot, marcar pelo índice, pronta para
+entregar sem concluir, o aviso único ao fechar com marcações que se cancelam,
+fechar sem mudanças, abandonar, encerrada que não se mexe, chave sem acento
+(na tela e nas ferramentas do mestre), recusas e rotas.
+`test_missoes_navegador.py` (7) confere Ver todas com as abas, a missão da
+barra lateral abrindo a tela nela, a encerrada na aba certa, marcar com a
+barra lateral acompanhando e o aviso ao fechar (e nenhum aviso sem mudanças),
+Falar com quem deu, o link para a ficha do personagem e o abandono com
+confirmação. Capturas novas (ainda não geradas): `missoes-ativas` e
+`missoes-encerradas`.
+
 ## Tela de saque ("O Espólio")
 
 No fim do combate o mestre chamava `add_item` e `modify_currency` direto na
@@ -2682,6 +2749,9 @@ ferramentas do mestre.
   `GET /api/shop/recap?desde=&loja=` → `{text}` com o que foi negociado na visita.
 - `GET /api/rest/state` / `POST /api/rest/action`
   `{action: dado|concluir|cancelar, char}`.
+- `GET /api/quests/state` / `POST /api/quests/action`
+  `{action: marcar|desmarcar|abandonar|fechar, quest, objective}`; `fechar`
+  devolve `recap`. Veja [Tela de missões](#tela-de-missões-o-livro-de-missões).
 - `GET /api/loot/state` / `POST /api/loot/action`
   `{action: dar|devolver|moedas|concluir|deixar, item, char, quantity, coins_to}`.
   Veja [Tela de saque](#tela-de-saque-o-espólio).
@@ -2754,9 +2824,11 @@ ferramentas do mestre.
 - **`herois.js`**, a ficha de leitura do herói (atributos, salvaguardas,
   perícias, ataques, estado e os atalhos para as telas que mudam a ficha).
 - **`loot.js`**, a tela de saque (quem leva o quê, com a carga prevista).
+- **`missoes.js`**, o livro de missões (abas por situação, objetivos marcáveis,
+  quem deu e desfecho).
   Mesma regra: renderizam o snapshot do motor e despacham intenções. A fila
   que decide qual abre primeiro (combate, nível, grimório, saque, descanso,
-  loja; a Mochila e as fichas só abrem pelo clique) e o empilhamento das
+  loja; a Mochila, as fichas e as missões só abrem pelo clique) e o empilhamento das
   pílulas ficam em `game.js`.
 
 ### Tema
@@ -3036,6 +3108,7 @@ o nome do pacote. Também não há variável de ambiente nova.
 │   ├── locais.py          Hierarquia de locais, paradeiro e ficha do local
 │   ├── personagens.py     Ficha do personagem: relação, o que o grupo sabe, ligações
 │   ├── saque.py           Tela de saque: offer_loot, divisão e carga prevista
+│   ├── missoes.py         Tela de missões: snapshot, marcar, abandonar, aviso ao mestre
 │   ├── tools_dnd.py       Motor D&D 5e + combate (~7900 linhas, 38 tools)
 │   ├── memory.py          Estado por sessão, proxy, persistência
 │   ├── database.py        Camada Supabase

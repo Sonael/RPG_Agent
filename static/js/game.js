@@ -1098,15 +1098,24 @@ function renderTempo(relogio) {
   linha.classList.remove('hidden');
 }
 
-// Missões ativas, com o progresso dos objetivos. As encerradas ficam de fora:
-// a barra lateral é "o que fazer agora", não histórico — para isso há o diário.
+// Missões ativas, com o progresso dos objetivos. As encerradas ficam de fora
+// da lista: a barra lateral é "o que fazer agora". Elas continuam a um clique,
+// na tela de missões ("Ver todas"), que também abre ao clicar numa missão.
 function renderMissoes(quests) {
   const secao = document.getElementById('sb-missoes-secao');
   const alvo  = document.getElementById('sb-missoes');
   if (!secao || !alvo) return;
 
-  const ativas = (quests || []).filter(q => q && q.status === 'ativa');
-  if (!ativas.length) { secao.classList.add('hidden'); alvo.innerHTML = ''; return; }
+  const todas  = (quests || []).filter(Boolean);
+  const ativas = todas.filter(q => q.status === 'ativa');
+  if (!todas.length) { secao.classList.add('hidden'); alvo.innerHTML = ''; return; }
+  const abrirBtn = document.getElementById('sb-missoes-abrir');
+  if (abrirBtn) abrirBtn.textContent = `Ver todas (${todas.length})`;
+  if (!ativas.length) {
+    alvo.innerHTML = '<span class="empty-state">Nenhuma missão ativa.</span>';
+    secao.classList.remove('hidden');
+    return;
+  }
 
   alvo.innerHTML = ativas.map(q => {
     const objs   = q.objetivos || [];
@@ -1116,7 +1125,9 @@ function renderMissoes(quests) {
       + `<span class="missao-marca" aria-hidden="true"></span>${escapeHtml(o.texto || '')}</div>`).join('');
     const contador = objs.length ? `<span class="missao-contagem">${feitos}/${objs.length}</span>` : '';
     const dono = q.quem_deu ? `<div class="missao-dono">de ${escapeHtml(q.quem_deu)}</div>` : '';
-    return `<div class="missao-item"><div class="missao-titulo">`
+    const tituloJs = escapeHtml(String(q.titulo || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
+    return `<div class="missao-item missao-clicavel" role="button" tabindex="0" title="Abrir a missão"`
+         + ` onclick="window.Missoes && window.Missoes._abrir('${tituloJs}')"><div class="missao-titulo">`
          + `${escapeHtml(q.titulo || '')}${contador}</div>${dono}${passos}</div>`;
   }).join('');
   secao.classList.remove('hidden');

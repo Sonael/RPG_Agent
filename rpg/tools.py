@@ -566,6 +566,23 @@ def _chave_missao(titulo: str) -> str:
     return (titulo or "").lower().strip().replace("_", " ")
 
 
+def _achar_missao(titulo: str) -> tuple[str, dict] | tuple[None, None]:
+    """
+    (chave, missão) pela chave e, se não bater, pelo título sem caixa nem
+    acento. Campanha antiga ou editada à mão tem chave "a divida de torbin"
+    para o título "A dívida de Torbin": procurar só pela chave exata fazia
+    update_quest_objective e complete_quest dizerem que a missão não existe.
+    """
+    todas = _missoes()
+    chave = _chave_missao(titulo)
+    if isinstance(todas.get(chave), dict):
+        return chave, todas[chave]
+    alvo = locais.norm(titulo)
+    return next(((k, m) for k, m in todas.items() if isinstance(m, dict)
+                 and (locais.norm(m.get("titulo", "")) == alvo or locais.norm(k) == alvo)),
+                (None, None))
+
+
 def add_quest(title: str, description: str, objectives: str = "",
               giver: str = "", reward: str = "") -> str:
     """
@@ -620,7 +637,7 @@ def update_quest_objective(title: str, objective: str, done: bool = True) -> str
         objective: Texto do objetivo, ou parte dele — casa por trecho.
         done:      True para concluir, False para reabrir.
     """
-    missao = _missoes().get(_chave_missao(title))
+    _, missao = _achar_missao(title)
     if not missao:
         return f"Aviso: Missão '{title}' não encontrada. Veja list_quests()."
 
@@ -659,7 +676,7 @@ def complete_quest(title: str, outcome: str = "concluida", notes: str = "") -> s
         outcome: 'concluida', 'falhou' ou 'abandonada'.
         notes:   Como terminou (uma linha) — fica no registro.
     """
-    missao = _missoes().get(_chave_missao(title))
+    _, missao = _achar_missao(title)
     if not missao:
         return f"Aviso: Missão '{title}' não encontrada. Veja list_quests()."
 
@@ -732,7 +749,7 @@ def get_quest(title: str) -> str:
     Args:
         title: Título da missão.
     """
-    missao = _missoes().get(_chave_missao(title))
+    _, missao = _achar_missao(title)
     if not missao:
         return f"Aviso: Missão '{title}' não encontrada. Veja list_quests()."
     linhas = [f"**{missao['titulo']}** ({missao['status']})",

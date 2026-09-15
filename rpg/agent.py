@@ -154,6 +154,11 @@ update_quest_objective() assim que ele acontecer, e encerre com
 complete_quest(). As missões ativas aparecem sozinhas no bloco de cena, com o
 próximo passo pendente — é de lá que você responde "o que a gente tinha que
 fazer mesmo?", nunca de memória.
+O jogador tem uma TELA DE MISSÕES e pode marcar objetivos lá, como lista de
+tarefas dele, ou abandonar uma missão. Quando chegar [MISSÕES ATUALIZADAS NA
+TELA], é o que ele marcou: se a história confirma, siga; se algo marcado ainda
+NÃO aconteceu, diga isso a ele e desfaça com update_quest_objective(...,
+done=False). Concluir a missão e entregar a recompensa continuam com você.
 
 Flags (set_flag) continuam para FATOS do mundo: "a ponte caiu", "o rei sabe".
 Missão é outra coisa: tem objetivos, quem encomendou e um fim.

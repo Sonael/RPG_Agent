@@ -1619,6 +1619,8 @@ body.combat-on { overflow: hidden; }
 /* Objetivo concluído fica apagado, não riscado: riscar sugere "cancelado",
    e o que aconteceu foi o contrário. */
 .missao-passo.feito { color: var(--text-muted); opacity: 0.7; }
+.missao-clicavel { cursor: pointer; }
+.missao-clicavel:hover .missao-titulo { text-decoration: underline; text-underline-offset: 3px; }
 
 /* ── Faixa de zonas (onda 3) ────────────────────────────────────────────
    O campo é uma TRILHA, não um tabuleiro: as zonas ficam lado a lado na
@@ -4021,7 +4023,7 @@ body.rest-on { overflow: hidden; }
    fica dentro dele. O caminho até o lugar ("Cliviate › Forja de Cliviate")
    fica no topo e cada trecho abre a ficha daquele lugar.
    ═══════════════════════════════════════════════════════════════════ */
-#local-overlay, #pessoa-overlay, #heroi-overlay {
+#local-overlay, #pessoa-overlay, #heroi-overlay, #missoes-overlay {
   --lcl-paper: #fffbf0;
   --lcl-bg:    #f4ebd8;
   --lcl-dark:  #3d2a14;
@@ -4039,10 +4041,10 @@ body.rest-on { overflow: hidden; }
   padding: var(--esp-5); box-sizing: border-box;
   font-family: 'Lora', serif;
 }
-#local-overlay.hidden, #pessoa-overlay.hidden, #heroi-overlay.hidden { display: none; }
-body.local-on, body.pessoa-on, body.heroi-on { overflow: hidden; }
+#local-overlay.hidden, #pessoa-overlay.hidden, #heroi-overlay.hidden, #missoes-overlay.hidden { display: none; }
+body.local-on, body.pessoa-on, body.heroi-on, body.missoes-on { overflow: hidden; }
 
-#lcl-frame, #psn-frame, #hro-frame {
+#lcl-frame, #psn-frame, #hro-frame, #msn-frame {
   width: 100%; max-width: 940px;
   height: min(90vh, 820px);
   background: var(--lcl-paper); color: var(--lcl-text);
@@ -4170,8 +4172,8 @@ body.local-on, body.pessoa-on, body.heroi-on { overflow: hidden; }
 .char-local { font-family: 'Lora', serif; font-size: 11px; color: var(--text-muted); margin-top: 2px; }
 
 @media (max-width: 760px) {
-  #local-overlay, #pessoa-overlay, #heroi-overlay { padding: 0; align-items: stretch; }
-  #lcl-frame, #psn-frame, #hro-frame { max-width: none; border-radius: 0; border: none; height: 100vh; }
+  #local-overlay, #pessoa-overlay, #heroi-overlay, #missoes-overlay { padding: 0; align-items: stretch; }
+  #lcl-frame, #psn-frame, #hro-frame, #msn-frame { max-width: none; border-radius: 0; border: none; height: 100vh; }
   .lcl-header { padding: var(--esp-4) var(--esp-10) var(--esp-3); max-height: none; overflow: visible; }
   .lcl-title { font-size: 1.3rem; }
   .lcl-corpo { display: block; overflow-y: auto; }
@@ -4498,4 +4500,46 @@ body.loot-on { overflow: hidden; }
     padding-bottom: calc(var(--esp-3) + env(safe-area-inset-bottom)); }
   .lot-msg { flex: 1 1 100%; }
   .lot-deixar, .lot-concluir { flex: 1 1 0; padding: var(--esp-2); }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   TELA DE MISSÕES ("O Livro de Missões") — static/js/missoes.js
+
+   A moldura e os cartões são os das fichas (lcl-*). O que é só dela: as
+   abas por situação, a lista de objetivos com caixa de marcar e o destaque
+   da missão aberta pela barra lateral.
+   ═══════════════════════════════════════════════════════════════════ */
+#msn-frame { max-width: 820px; }
+.msn-abas { display: flex; justify-content: center; flex-wrap: wrap; gap: var(--esp-2); margin-top: var(--esp-3); }
+.msn-aba {
+  font-family: 'Lora', serif; font-size: 0.86rem; cursor: pointer;
+  padding: var(--esp-1) var(--esp-4); border-radius: 999px;
+  border: 1px solid var(--lcl-line); background: var(--lcl-paper); color: var(--lcl-muted);
+}
+.msn-aba-on { border-color: var(--lcl-dark); color: var(--lcl-dark); font-weight: 700; background: var(--lcl-bg); }
+.msn-aba-n { font-variant-numeric: tabular-nums; opacity: .8; }
+.msn-lista {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto;
+  padding: var(--esp-4) var(--esp-6);
+  display: flex; flex-direction: column; gap: var(--esp-3);
+}
+.msn-cartao { transition: box-shadow .3s; }
+.msn-destaque { box-shadow: 0 0 0 3px var(--lcl-gold); }
+.msn-nome { font-family: 'Playfair Display', serif; font-size: 1.05rem; }
+.msn-cap { margin-left: auto; font-size: 0.76rem; color: var(--lcl-muted); }
+.msn-linha { font-size: 0.86rem; margin-top: var(--esp-1); }
+.msn-rotulo { font-size: 0.7rem; text-transform: uppercase; letter-spacing: .05em; color: var(--lcl-muted); margin-right: var(--esp-1); }
+.msn-desfecho { font-style: italic; }
+.msn-objetivos { list-style: none; margin: var(--esp-2) 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.msn-objetivo label { display: flex; align-items: flex-start; gap: var(--esp-2); font-size: 0.9rem; cursor: pointer; padding: 3px 0; }
+.msn-objetivo input { margin-top: 3px; accent-color: var(--lcl-green); cursor: pointer; }
+.msn-objetivo input:disabled { cursor: default; }
+.msn-feito span { color: var(--lcl-muted); }
+.msn-falhou .msn-status, .msn-abandonada .msn-status { border-color: var(--lcl-red); color: var(--lcl-red); }
+.msn-concluida .msn-status { border-color: var(--lcl-green); color: var(--lcl-green); }
+.msn-abandonar { color: var(--lcl-muted); }
+.msn-abandonar.msn-confirmar { border-color: var(--lcl-red); color: var(--lcl-red); font-weight: 700; }
+.msn-vazio { padding: var(--esp-8) 0; }
+@media (max-width: 760px) {
+  .msn-lista { padding: var(--esp-3) var(--esp-4); }
 }

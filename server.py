@@ -1803,6 +1803,7 @@ _PREFIXOS_INTERNOS = (
     ("[DESCANSO RESOLVIDO NA TELA", "tela"), ("[NÍVEL RESOLVIDO NA TELA", "tela"),
     ("[GRIMÓRIO RESOLVIDO NA TELA", "tela"), ("[DADO DO JOGADOR", "dado"),
     ("[SAQUE RESOLVIDO NA TELA", "tela"), ("[SAQUE DEIXADO NA TELA", "tela"),
+    ("[MISSÕES ATUALIZADAS NA TELA", "tela"),
 )
 
 
@@ -2946,6 +2947,29 @@ def grimoire_action_route():
         query=(d.get("q") or "").strip(),
         spell_level=nivel,
     ))
+
+
+@app.route("/api/quests/state", methods=["GET"])
+@require_auth
+def quests_state_route():
+    from rpg import missoes
+    return jsonify(missoes.quest_snapshot())
+
+
+@app.route("/api/quests/action", methods=["POST"])
+@require_auth
+def quests_action_route():
+    from rpg import missoes
+    d = request.json or {}
+    action = (d.get("action") or "").strip()
+    if not action:
+        return jsonify({"ok": False, "message": "Ação ausente."}), 400
+    try:
+        objetivo = int(d.get("objective", -1))
+    except (TypeError, ValueError):
+        objetivo = -1
+    return jsonify(missoes.quest_action(action, quest=(d.get("quest") or "").strip(),
+                                        objective=objetivo))
 
 
 @app.route("/api/loot/state", methods=["GET"])
