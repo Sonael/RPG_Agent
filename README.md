@@ -2638,6 +2638,44 @@ Runner**, e portanto sem perder o histórico da conversa. Falha de forma
 segura: sem contexto de campanha, entrega tudo, porque uma ferramenta
 faltando faz a LLM narrar a mecânica sozinha.
 
+### Quando uma chamada de ferramenta falha (`rpg/erros_de_ferramenta.py`)
+
+Numa campanha nova o turno inteiro caía com "O RPG AGENT silenciou" em dois
+casos: a LLM chamou uma ferramenta que não existe (`modify_amount`) e uma
+ferramenta levantou exceção por dentro (`'NoneType' object has no attribute
+'get'`). O ADK trata os dois como fatais e desiste do turno, deixando sem
+narração o que o mestre já tinha feito.
+
+O `Agent` agora tem `on_tool_error_callback`, e a falha vira o **resultado**
+da chamada, que o mestre lê como leria uma recusa do motor:
+
+- **Nome inventado:** `Erro: a ferramenta modify_amount não existe. Talvez
+  você queira: modify_mana, modify_currency, modify_hp.`
+- **Ferramenta que saiu do conjunto:** `attack_roll` no combate da tela diz
+  para esperar o `[COMBATE RESOLVIDO NA TELA TÁTICA]`; ferramenta de D&D numa
+  campanha sem regras diz para resolver pela narração.
+- **Exceção dentro da ferramenta:** `Erro: X falhou por um problema interno
+  (TipoDoErro: ...)`, com a orientação de não repetir a chamada e conferir o
+  estado. O traceback completo vai para o log do servidor.
+
+A causa do `NoneType` era um NPC salvo só com `save_character`, que fica com
+`"sheet": None`: `recruit_character` e `add_item` faziam
+`char.get("sheet", {}).get(...)`, e o `{}` padrão não vale quando a chave
+existe com `None`. Esses pontos passaram a usar `or {}`. Campos gravados como
+`null` numa ficha (inventário, habilidades, equipamentos, condições, recargas)
+quebravam outras 14 ferramentas e agora viram o padrão na carga da campanha e
+quando um editor grava o personagem.
+
+`test_varredura_de_ferramentas.py` chama **todas** as ferramentas em sete
+estados de campanha nova (NPC sem ficha, membro do grupo sem ficha, personagem
+inexistente, campos `null`, com e sem combate), refazendo a campanha antes de
+cada chamada, e exige que nenhuma levante exceção. Refazer importa:
+`roll_initiative` dá ficha padrão a quem não tem e escondia a quebra do
+`recruit_character` que viesse depois. `test_erros_de_ferramenta.py` roda um
+turno de verdade pelo `Runner` do ADK com um modelo de mentira que chama
+`modify_amount` e depois uma ferramenta que levanta, e confere que o turno
+termina.
+
 ### Contador de cache de prompt
 
 `/api/chat` passou a expor `cached_tokens`, `cache_hit_ratio` e
@@ -3181,7 +3219,8 @@ o nome do pacote. Também não há variável de ambiente nova.
 │   ├── session.py         Runner ADK
 │   ├── validator.py       Validador narrativo pós-resposta
 │   ├── open5e.py          Acesso ao SRD: sessão, retry, cache, offline
-│   └── toolsets.py        Conjunto de ferramentas resolvido por turno
+│   ├── toolsets.py        Conjunto de ferramentas resolvido por turno
+│   └── erros_de_ferramenta.py  Falha de ferramenta vira "Erro:" em vez de derrubar o turno
 │
 ├── tests/                 Suíte pytest
 │   ├── conftest.py        Isolamento + fábrica criar_ficha + ponte legada
@@ -3193,6 +3232,8 @@ o nome do pacote. Também não há variável de ambiente nova.
 │   ├── test_concentration.py    Concentração em magias
 │   ├── test_reactions.py        Reação e ataque de oportunidade
 │   ├── test_toolsets.py         Filtro de ferramentas por modo e por estilo
+│   ├── test_varredura_de_ferramentas.py  Nenhuma ferramenta levanta exceção
+│   ├── test_erros_de_ferramenta.py       Turno segue após ferramenta inventada ou quebrada
 │   └── legacy/            Suítes em formato de script (não coletadas)
 │       ├── tests.py             Suíte funcional (13 blocos, 70 checks)
 │       └── tests_combat_fuzz.py Fuzzer de invariantes de combate

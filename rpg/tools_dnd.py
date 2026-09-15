@@ -2023,6 +2023,8 @@ def normalize_edited_character(novo: dict, antigo: dict | None,
     if not isinstance(novo, dict):
         return []
     novo.pop("correcao_manual", None)
+    # Campos gravados como null viram o padrão (a mesma migração da carga).
+    memory._migrate_sheet_fields(novo)
     s = novo.get("sheet")
     if not isinstance(s, dict):
         return []
@@ -3559,7 +3561,7 @@ def _hp_bar(current: int, maximum: int, width: int = 10) -> str:
 
 def _get_conditions(char: dict) -> list[dict]:
     """Retorna a lista de condições ativas do personagem."""
-    return char.get("sheet", {}).get("condicoes", [])
+    return (char.get("sheet") or {}).get("condicoes") or []
 
 
 def _has_condition_effect(char: dict, effect_key: str) -> bool:
@@ -6392,7 +6394,7 @@ def identify_item(char_name: str, item_name: str) -> str:
         alvo["custom"] = True
         alvo["identificado"] = True
         memory.save_campaign()
-    nivel = char.get("sheet", {}).get("nivel", 1)
+    nivel = (char.get("sheet") or {}).get("nivel", 1)
     return (
         f"Aviso: '{item_name}' não encontrado no banco D&D 5e (SRD).\n"
         f"   Este parece ser um item customizado/homebrew.\n"
@@ -6431,7 +6433,7 @@ def add_item(char_name: str, item_name: str, quantity: int = 1, description: str
         return f"{char['name']} agora tem {existing['qtd']}x {item_name}."
 
     # Novo item — verifica se parece mágico
-    nivel = char.get("sheet", {}).get("nivel", 1)
+    nivel = (char.get("sheet") or {}).get("nivel", 1)
     item_dict, warning = _conferir_item_novo(item_name, description, nivel)
     item_dict["qtd"] = quantity
     inv.append(item_dict)
@@ -6619,8 +6621,8 @@ def list_inventory(char_name: str) -> str:
     if not char:
         return f"Personagem '{char_name}' não encontrado."
 
-    s   = char.get("sheet", {})
-    inv = char.get("inventario", [])
+    s   = char.get("sheet") or {}
+    inv = char.get("inventario") or []
 
     lines = [f"Inventário de {char['name']}:"]
 
@@ -9540,7 +9542,7 @@ def recruit_character(npc_name: str, role: str = "aliado") -> str:
         )
 
     # ── Verificação de disparidade de nível ─────────────────────────────────
-    npc_sheet   = char.get("sheet", {})
+    npc_sheet   = char.get("sheet") or {}
     npc_nivel   = npc_sheet.get("nivel", 1)
 
     # Calcula nível médio do grupo usando a definição canônica de grupo
@@ -9553,7 +9555,7 @@ def recruit_character(npc_name: str, role: str = "aliado") -> str:
         and memory.char_key(c["name"]) != key
     ]
     if party_chars:
-        avg_nivel = sum(c.get("sheet", {}).get("nivel", 1) for c in party_chars) / len(party_chars)
+        avg_nivel = sum((c.get("sheet") or {}).get("nivel", 1) for c in party_chars) / len(party_chars)
     else:
         avg_nivel = 1
 
@@ -9595,8 +9597,8 @@ def recruit_character(npc_name: str, role: str = "aliado") -> str:
     # Garante que o personagem apareça na lista do grupo (campo party_member)
     char["party_member"] = True
 
-    sheet  = char.get("sheet", {})
-    classe = sheet.get("classe", "npc")
+    sheet  = char.get("sheet") or {}
+    classe = sheet.get("classe") or "npc"
     nivel  = sheet.get("nivel", 1)
     hp     = sheet.get("vida_atual", "?")
     hp_max = sheet.get("vida_max", "?")

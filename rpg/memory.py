@@ -219,9 +219,22 @@ def _migrate_sheet_fields(char: dict) -> None:
     novos com valores padrão. Chamado automaticamente após load_campaign.
     Nunca sobrescreve valores já existentes.
     """
+    # Listas do personagem gravadas como null (JSON importado, editor antigo)
+    # quebravam toda ferramenta que percorre o inventário ou as habilidades.
+    for campo in ("inventario", "habilidades"):
+        if not isinstance(char.get(campo), list):
+            char[campo] = []
+
     sheet = char.get("sheet")
-    if sheet is None:
+    if not isinstance(sheet, dict):
+        # Sem ficha é um estado válido (NPC salvo só com save_character).
         return
+
+    # Campos opcionais que o motor cria sob demanda com setdefault: null no
+    # lugar de ausente fazia o setdefault devolver None.
+    for campo in ("recargas", "efeitos", "feature_choices", "lendarias"):
+        if campo in sheet and sheet[campo] is None:
+            del sheet[campo]
 
     defaults_v2 = {
         "ouro":                 0,
@@ -240,7 +253,9 @@ def _migrate_sheet_fields(char: dict) -> None:
     }
 
     for key, default_val in defaults_v2.items():
-        if key not in sheet:
+        # null conta como ausente, menos na concentração, onde None é o valor
+        # normal de "não está concentrado".
+        if key not in sheet or (sheet[key] is None and default_val is not None):
             # Copiar para evitar objetos mutáveis compartilhados
             import copy
             sheet[key] = copy.deepcopy(default_val)

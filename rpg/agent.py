@@ -1093,6 +1093,10 @@ def create_agent(model, campaign_type: str = "fantasia") -> Agent:
         # Fallback defensivo: versão de ADK sem BaseToolset → lista simples.
         ferramentas = list(ALL_TOOLS)
 
+    # Ferramenta inexistente ou que levanta exceção vira "Erro: ..." para o
+    # mestre, em vez de derrubar o turno (ver rpg/erros_de_ferramenta.py).
+    from rpg.erros_de_ferramenta import ao_falhar_ferramenta
+
     try:
         # Forma idiomática (ADK >= 1.x): instruction como provider dinâmico.
         return Agent(
@@ -1100,6 +1104,7 @@ def create_agent(model, campaign_type: str = "fantasia") -> Agent:
             model=model,
             instruction=_instruction_provider,
             tools=ferramentas,
+            on_tool_error_callback=ao_falhar_ferramenta,
         )
     except Exception:
         # Fallback defensivo: ADK sem suporte a provider → instrução estática
@@ -1109,6 +1114,7 @@ def create_agent(model, campaign_type: str = "fantasia") -> Agent:
             model=model,
             instruction=_instruction_provider(),
             tools=ferramentas,
+            on_tool_error_callback=ao_falhar_ferramenta,
         )
 
 

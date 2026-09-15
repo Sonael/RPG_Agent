@@ -1969,7 +1969,7 @@ def chat():
     }
 
     # Estado de combate ANTES desta resposta (para comparação na verificação)
-    _combat_was_active = memory.campaign.get("combat_state", {}).get("is_active", False)
+    _combat_was_active = (memory.campaign.get("combat_state") or {}).get("is_active", False)
 
     # Personagens já MORTOS antes deste turno — usado pela trava de coerência.
     # Capturado aqui (antes do agente rodar) para não acusar falso-positivo no
