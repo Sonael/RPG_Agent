@@ -63,6 +63,12 @@
       </div>`;
     document.body.appendChild(o);
 
+    // Sombra sob o título grudado só com o painel rolado (ver CSS).
+    const painel = document.getElementById('cbt-actionbar');
+    painel.addEventListener('scroll', () => {
+      painel.classList.toggle('cbt-rolado', painel.scrollTop > 0);
+    }, { passive: true });
+
     // Pílula flutuante para RETOMAR o combate depois que o usuário fechou
     // a tela. Fica fora do #combat-overlay (que some quando fechado).
     if (!document.getElementById('cbt-reopen')) {

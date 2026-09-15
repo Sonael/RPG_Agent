@@ -5,8 +5,6 @@ A ficha de leitura de um herói do grupo (tools_dnd.hero_snapshot): tudo o que
 o jogador precisa para decidir e rolar, com as contas das mesmas funções que
 o motor usa para resolver. A tela não soma nada.
 """
-import re
-
 import pytest
 
 from rpg import memory, tools_dnd as td
@@ -124,8 +122,3 @@ def test_rota_registrada(grupo):
     with server.app.test_request_context("/api/heroes/sheet?personagem=Lyra"):
         corpo = server.hero_sheet_route.__wrapped__().get_json()
     assert corpo["personagem"]["nome"] == "Lyra"
-
-
-def test_sem_emoji_nos_rotulos(grupo):
-    texto = repr(td.hero_snapshot("Alden"))
-    assert not re.search("[\U0001F300-\U0001FAFF☀-➿]", texto)

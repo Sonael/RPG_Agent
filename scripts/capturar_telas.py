@@ -333,7 +333,7 @@ COMBATE_ATIVO = {
             {"round": 1, "type": "initiative", "actor": "", "target": "",
              "msg": "Iniciativa rolada — Stelar, Victoria, Helena, Natasha"},
             {"round": 1, "type": "attack", "actor": "Stelar", "target": "Victoria",
-             "msg": "Stelar ataca Victoria com Espada Longa: 17 vs CA 16 — acerta, 8 de dano"},
+             "msg": "Stelar ataca Victoria com Montante Rúnico: 17 vs CA 16 — acerta, 8 de dano"},
             {"round": 2, "type": "ability", "actor": "Helena", "target": "Stelar",
              "msg": "Helena conjura Curar Ferimentos em Stelar: +7 PV"},
             {"round": 2, "type": "attack", "actor": "Victoria", "target": "Helena",

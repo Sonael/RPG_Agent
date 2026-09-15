@@ -103,3 +103,46 @@ def test_alvo_de_outra_zona_aparece_fora_de_alcance(abrir_jogo):
     assert victoria.is_disabled()
     assert "fora de alcance" in victoria.inner_text()
     assert not erros, erros[:3]
+
+
+def test_seletor_aberto_nao_corta_o_titulo_do_turno(abrir_jogo):
+    """
+    O seletor de alvo não cabe no painel de ação e ele rola por dentro. O
+    título "O que fará Stelar?" saía de vista cortado ao meio; agora fica
+    grudado no topo do painel, inteiro e por cima dos botões.
+    """
+    abrir, cap = abrir_jogo
+    pg, erros = abrir(copy.deepcopy(cap.COMBATE_ZONAS))
+
+    pg.evaluate("() => window.Combat._sel('attack')")
+    pg.wait_for_selector("#cbt-targets:not(.hidden)")
+    pg.locator("#cbt-targets .cbt-btn").first.click()
+    pg.wait_for_selector("#cbt-targets .cbt-fora")
+    pg.wait_for_timeout(600)          # o scrollIntoView é suave
+
+    medidas = pg.evaluate("""() => {
+        const painel = document.getElementById('cbt-actionbar');
+        const titulo = document.getElementById('cbt-action-title');
+        const p = painel.getBoundingClientRect(), t = titulo.getBoundingClientRect();
+        const noMeio = document.elementFromPoint(t.left + 20, t.top + t.height / 2);
+        return {rolou: painel.scrollTop, painelTopo: p.top, tituloTopo: t.top,
+                tituloBase: t.bottom, painelBase: p.bottom,
+                visivel: titulo.contains(noMeio), sombra: painel.classList.contains('cbt-rolado')};
+    }""")
+    assert medidas["rolou"] > 0, f"o painel não rolou: o teste não exercita o corte ({medidas})"
+    assert medidas["tituloTopo"] >= medidas["painelTopo"] - 1, medidas
+    assert medidas["tituloBase"] <= medidas["painelBase"], medidas
+    assert medidas["visivel"], f"o título ficou coberto ({medidas})"
+    assert medidas["sombra"], medidas
+    assert "O que fará Stelar?" in pg.inner_text("#cbt-action-title")
+    assert not erros, erros[:3]
+
+
+def test_diario_do_estado_de_exemplo_cita_a_arma_equipada():
+    """O diário das capturas dizia "Espada Longa" com o Montante Rúnico na mão."""
+    import capturar_telas as cap
+    campanha = json.loads((RAIZ / "scripts" / "temp.json").read_text(encoding="utf-8"))
+    arma = campanha["characters"]["stelar"]["sheet"]["equipamentos"]["arma_principal"]
+    ataques = [e["msg"] for e in cap.COMBATE_ATIVO["combat_state"]["log"]
+               if e.get("actor") == "Stelar" and e.get("type") == "attack"]
+    assert ataques and all(arma in m for m in ataques), ataques

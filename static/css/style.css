@@ -1820,15 +1820,30 @@ body.combat-on { overflow: hidden; }
   overflow: hidden;
 }
 .cbt-action-panel {
-  flex: 2; padding: var(--esp-6) var(--esp-6);
+  flex: 2;
+  /* Sem padding em cima: o título grudado encosta no topo do painel e o
+     recuo fica dentro dele (ver .cbt-action-title). */
+  padding: 0 var(--esp-6) var(--esp-6);
   border-right: 1px solid #dcd3c6;
   min-width: 0; min-height: 0;
   overflow-y: auto;
 }
+/* Abrir o seletor de arma/alvo faz o painel rolar por dentro, e o título
+   ("O que fará Stelar?") saía de vista cortado ao meio. Grudado no topo ele
+   continua dizendo de quem é o turno; a sombra só aparece com o painel rolado,
+   para os selos e botões serem lidos como "passando por baixo". */
 .cbt-action-title {
   font-family: 'Playfair Display', serif;
   font-size: 1.3rem; color: var(--cbt-dark);
-  margin-bottom: var(--esp-2); font-weight: 700;
+  font-weight: 700;
+  position: sticky; top: 0; z-index: 2;
+  background: #fff;
+  margin: 0 calc(-1 * var(--esp-6)) var(--esp-2);
+  padding: var(--esp-6) var(--esp-6) var(--esp-2);
+  transition: box-shadow .15s ease;
+}
+.cbt-action-panel.cbt-rolado .cbt-action-title {
+  box-shadow: 0 6px 6px -6px rgba(74,37,17,0.30);
 }
 /* Economia do turno: Ação, Bônus e Reação como selos legíveis.
    Antes eram dois "○" de 0.88rem sem legenda, governando o turno inteiro. */
@@ -1901,6 +1916,8 @@ body.combat-on { overflow: hidden; }
   border: 1px dashed var(--cbt-gold);
   border-radius: 6px;
   max-height: 38vh; overflow-y: auto;
+  /* scrollIntoView não pode enfiar o seletor debaixo do título grudado. */
+  scroll-margin-top: var(--esp-16);
 }
 .cbt-picker.hidden { display: none; }
 .cbt-tgt-title {

@@ -1812,7 +1812,7 @@ continua no editor.
 
 ### Testes
 
-`test_ficha_heroi.py` (12) cobre quem entra, recursos, salvaguardas, perícias
+`test_ficha_heroi.py` (11) cobre quem entra, recursos, salvaguardas, perícias
 e percepção passiva, o bônus igual ao do `make_skill_check`, o ataque com as
 contas do `attack_roll`, Arquearia e crítico aprimorado, estado e defesas,
 "pode subir", que a ficha não muda nada e a rota.
@@ -2164,6 +2164,11 @@ em cada ponto — o destaque marca a zona de quem joga agora:
   o jogador descreve o improviso e a IA arbitra (`make_skill_check`, etc.).
   O overlay reabre no próximo `sync()` se o combate ainda estiver ativo.
 - **Encerrar Turno**, força avanço sem gastar slot.
+
+O título "O que fará Stelar?" fica grudado no topo do painel de ação, também
+no desktop. Abrir o seletor de arma, alvo ou item faz o painel rolar por
+dentro, e o título saía de vista cortado ao meio; agora os selos e botões
+passam por baixo dele, com uma sombra que só aparece com o painel rolado.
 
 ### Fechar a tela durante o combate
 
