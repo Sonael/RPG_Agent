@@ -329,6 +329,117 @@ def test_celular_faixa_e_barra_de_baixo(abrir, estado):
     assert not erros, erros[:3]
 
 
+
+# O Playwright não desenha as barras do celular; simulamos as duas coisas que
+# elas fazem com a página. A barra de gestos ou de botões do sistema, quando o
+# navegador desenha por baixo dela, vira uma margem segura (safe-area) que o
+# Chromium deixa emular. A barra de endereço do navegador e a de sistema
+# encolhem a área visível sem mudar o 100vh: aqui, visualViewport.height
+# menor que a janela, que é o que o navegador informa nesse caso.
+
+TELAS_CHEIAS = ["cbt-frame", "shp-frame", "lvl-frame", "inv-frame", "grm-frame", "rst-frame",
+                "lcl-frame", "psn-frame", "hro-frame", "msn-frame", "map-frame", "grp-frame",
+                "dia-frame", "elc-frame", "lot-frame"]
+
+
+def _encolher_area_visivel(pg, altura):
+    pg.evaluate("""(h) => {
+        Object.defineProperty(window.visualViewport, 'height', {get: () => h, configurable: true});
+        window.visualViewport.dispatchEvent(new Event('resize'));
+    }""", altura)
+    pg.wait_for_timeout(200)
+
+
+def test_celular_barra_de_baixo_fora_da_margem_do_sistema(abrir):
+    pg, erros = abrir(**CELULAR)
+    cdp = pg.context.new_cdp_session(pg)
+    cdp.send("Emulation.setSafeAreaInsetsOverride", {"insets": {"bottom": 34}})
+    pg.wait_for_timeout(200)
+    medida = pg.evaluate("""() => {
+        const barra = document.getElementById('barra-inferior');
+        return {fundo: barra.getBoundingClientRect().bottom, altura: innerHeight,
+                botoes: [...barra.querySelectorAll('.bi-botao')].map(b => b.getBoundingClientRect().bottom)};
+    }""")
+    # O fundo da barra vai até a borda, mas os botões ficam acima da margem.
+    assert medida["fundo"] >= medida["altura"] - 1, medida
+    assert max(medida["botoes"]) <= medida["altura"] - 34, medida
+    assert not erros, erros[:3]
+
+
+def test_celular_nada_fica_atras_das_barras_do_navegador_e_do_sistema(abrir, estado):
+    pg, erros = abrir(estado, **CELULAR)
+    visivel = CELULAR["altura"] - 90
+    _encolher_area_visivel(pg, visivel)
+    caixas = pg.evaluate("""() => ({
+        barra: document.getElementById('barra-inferior').getBoundingClientRect(),
+        campo: document.getElementById('chat-input').getBoundingClientRect().bottom})""")
+    assert caixas["barra"]["bottom"] <= visivel + 1, (caixas, visivel)
+    assert caixas["campo"] <= caixas["barra"]["top"] + 1, caixas
+
+    # As telas da barra de baixo: o rodapé com os botões dentro da área visível.
+    for tela, (overlay, fechar) in {"grupo": ("grupo-overlay", "Grupo"), "missoes": ("missoes-overlay", "Missoes"),
+                                    "mapa": ("mapa-overlay", "Mapa"), "diario": ("diario-overlay", "Diario")}.items():
+        pg.click(f"#barra-inferior .bi-botao[data-tela='{tela}']")
+        pg.wait_for_selector(f"#{overlay}:not(.hidden) .lcl-rodape button", timeout=5000)
+        pg.wait_for_timeout(300)
+        fundo = pg.evaluate("""(id) => {
+            const o = document.getElementById(id);
+            const botoes = [...o.querySelectorAll('.lcl-rodape button')].filter(b => b.offsetParent);
+            return Math.max(...botoes.map(b => b.getBoundingClientRect().bottom));
+        }""", overlay)
+        assert fundo <= visivel + 1, f"os botões do rodapé de {tela} ficam atrás da barra ({fundo} > {visivel})"
+        pg.evaluate(f"() => window.{fechar}._fechar()")
+        pg.wait_for_selector(f"#{overlay}.hidden", state="attached", timeout=3000)
+
+    # Todas as telas cheias do celular têm a altura da área visível.
+    alturas = pg.evaluate("""(ids) => ids.map(id => {
+        let el = document.getElementById(id), criado = false;
+        if (!el) { el = document.createElement('div'); el.id = id; document.body.appendChild(el); criado = true; }
+        const h = parseFloat(getComputedStyle(el).height);
+        if (criado) el.remove();
+        return [id, h];
+    })""", TELAS_CHEIAS)
+    altas = [(i, h) for i, h in alturas if h > visivel + 1]
+    assert altas == [], altas
+
+    # A gaveta do "Mais" e a engrenagem, com o Sair alcançável.
+    pg.click("#bi-mais")
+    pg.wait_for_function("() => document.getElementById('sidebar').classList.contains('active')", timeout=3000)
+    pg.wait_for_timeout(400)
+    gaveta = pg.evaluate("() => document.getElementById('sidebar').getBoundingClientRect().bottom")
+    assert gaveta <= visivel + 1, (gaveta, visivel)
+    pg.evaluate("() => window.toggleSidebar(true)")
+    pg.evaluate("() => toggleSettingsPanel()")
+    pg.wait_for_selector("#settings-panel.open #settings-sair", timeout=5000)
+    pg.wait_for_timeout(400)
+    pg.locator("#settings-sair").scroll_into_view_if_needed()
+    sair = pg.evaluate("""() => ({painel: document.getElementById('settings-panel').getBoundingClientRect().bottom,
+                                 sair: document.getElementById('settings-sair').getBoundingClientRect().bottom})""")
+    assert sair["painel"] <= visivel + 1 and sair["sair"] <= visivel + 1, (sair, visivel)
+    assert not erros, erros[:3]
+
+
+def test_celular_teclado_aberto_esconde_a_barra_de_baixo(abrir):
+    pg, erros = abrir(**CELULAR)
+    # O jogo já dá foco ao campo ao abrir; sem teclado, a barra continua.
+    pg.focus("#chat-input")
+    pg.wait_for_timeout(100)
+    assert pg.is_visible("#barra-inferior")
+    # A barra de endereço aparecendo encolhe pouco a área: a barra fica.
+    _encolher_area_visivel(pg, CELULAR["altura"] - 56)
+    assert pg.is_visible("#barra-inferior")
+    # O teclado encolhe muito: a barra sai e o campo fica no fim da área visível.
+    visivel = CELULAR["altura"] - 330
+    _encolher_area_visivel(pg, visivel)
+    assert pg.is_hidden("#barra-inferior")
+    campo = pg.evaluate("() => document.getElementById('input-area').getBoundingClientRect().bottom")
+    assert visivel - 40 <= campo <= visivel + 1, (campo, visivel)
+    # Fechou o teclado (tirou o foco e a área voltou): a barra volta.
+    pg.evaluate("() => document.getElementById('chat-input').blur()")
+    _encolher_area_visivel(pg, CELULAR["altura"])
+    assert pg.is_visible("#barra-inferior")
+    assert not erros, erros[:3]
+
 def test_celular_mais_abre_a_gaveta_com_o_relance_e_os_atalhos(abrir):
     pg, erros = abrir(**CELULAR)
     pg.click("#bi-mais")

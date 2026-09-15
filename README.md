@@ -1273,9 +1273,32 @@ O guia "Como Jogar" descreve a barra nova, e as capturas do jogo ganharam
 `jogo-barra-recolhida`, `jogo-avisos` e `jogo-painel-mobile` no lugar das
 abas antigas.
 
+### Barras do navegador e do sistema
+
+No celular, `100vh` é a altura com as barras do navegador escondidas. Quando
+a barra de endereço aparece (ou a de sistema encolhe a área), tudo que mede
+`100vh` passa do fim da área visível. Por isso a altura do jogo vem de
+`--app-height`, que `utils.js` mantém igual a `visualViewport.height`:
+
+- `body.game-page` usa `--app-height` com `min-height: 0` (o
+  `body { min-height: 100vh }` geral vencia e empurrava o campo de texto e a
+  barra de baixo para trás das barras);
+- as telas cheias do celular (combate, loja, nível, descanso, Mochila,
+  grimório, saque, local, personagem, herói, missões, mapa, grupo, diário,
+  índice) e o painel da engrenagem usam `var(--app-height, 100vh)`;
+- a gaveta do "Mais" é presa pelo topo e mede 85% de `--app-height`;
+- a barra de baixo soma `env(safe-area-inset-bottom)` ao padding, para os
+  botões ficarem acima da barra de gestos quando o navegador desenha por baixo
+  dela.
+
+Com o teclado aberto a barra de baixo sai (classe `teclado-aberto` no
+`<html>`): campo de texto com foco e a área visível mais de 150 px menor que
+a altura cheia nessa largura. A barra de endereço sozinha não passa do limite,
+e o foco que o jogo dá ao campo ao abrir, sem teclado, também não.
+
 ### Testes
 
-`test_barra_navegador.py` (17) confere a linha de onde, capítulo e hora (lado
+`test_barra_navegador.py` (20) confere a linha de onde, capítulo e hora (lado
 a lado, sem sobrepor e sem cortar), cada um abrindo a sua tela; uma linha por
 herói com a vida do motor e as marcas; o nome abrindo a ficha e o selo abrindo
 o aviso de nível; carga pesada como marca; a missão principal e o bloco sumindo
@@ -1284,13 +1307,20 @@ quando há algum; a engrenagem com o modo de combate funcionando; que nada da
 barra antiga ficou na página e que a barra não precisa de rolagem nem corta
 rótulo; recolher e lembrar depois de recarregar; a campanha sem regras; e, no
 celular, a faixa, a barra de baixo, o "Mais" com a gaveta e o toque na faixa.
-Os testes das telas que entravam pelas abas (nível, grimório, Mochila, ficha
+As barras do celular são simuladas, porque o Playwright não as desenha: a margem
+segura de 34 px emulada pelo Chromium (os botões da barra de baixo ficam acima
+dela) e a área visível 90 px menor que a janela (barra de baixo, campo de
+texto, rodapés de Grupo, Missões, Mapa e Diário, a gaveta, o Sair da
+engrenagem e a altura de todas as telas cheias dentro dela), além do teclado
+escondendo a barra de baixo só quando a área encolhe muito. Os testes das telas que entravam pelas abas (nível, grimório, Mochila, ficha
 do local, do personagem e do herói, missões, mapa, grupo, diário) passaram a
 entrar pelos caminhos novos. Regressões injetadas (missão principal pela ordem
 da lista, contador sem nível pendente, avisos que não chegam, engrenagem
 vazia, recolhida esquecida, tudo tratado como D&D, gaveta aberta atrás da
 tela, sem barra de baixo, linha de onde sobreposta, herói abrindo a ficha de
-NPC) foram todas pegas.
+NPC) foram todas pegas, e também as da área visível: sem o `min-height: 0`,
+gaveta em `85vh`, diário, loja ou engrenagem em `100vh`, teclado que não
+esconde a barra, teclado detectado só pelo foco e barra sem a margem segura.
 
 ## Tela de nível ("A Ascensão")
 

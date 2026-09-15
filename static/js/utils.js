@@ -9,15 +9,27 @@ const API = '';
 //  estende por trás da barra de URL inferior e no Android pode ir
 //  por baixo da barra de sistema. visualViewport.height devolve
 //  apenas a área realmente visível. Fixamos --app-height nela.
+//  Teclado aberto: um campo de texto com foco e a área visível bem
+//  menor que a altura cheia nessa largura. A barra de endereço sozinha
+//  (uns 56px) não passa do limite; o foco sem teclado também não.
 // ═══════════════════════════════════════
 (function () {
   var docEl = document.documentElement;
+  var alturaCheia = 0, larguraDaMedida = 0;
   function setAppHeight() {
     var vv = window.visualViewport;
     var h = vv ? vv.height : window.innerHeight;
     docEl.style.setProperty('--app-height', Math.round(h) + 'px');
+    var largura = window.innerWidth;
+    if (largura !== larguraDaMedida) { larguraDaMedida = largura; alturaCheia = 0; }
+    var el = document.activeElement;
+    var digitando = !!el && (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT' || el.isContentEditable);
+    if (!digitando) alturaCheia = Math.max(alturaCheia, h);
+    docEl.classList.toggle('teclado-aberto', digitando && alturaCheia - h > 150);
   }
   setAppHeight();
+  document.addEventListener('focusin', setAppHeight);
+  document.addEventListener('focusout', function () { setTimeout(setAppHeight, 0); });
   if (window.visualViewport) {
     window.visualViewport.addEventListener('resize', setAppHeight);
     window.visualViewport.addEventListener('scroll', setAppHeight);

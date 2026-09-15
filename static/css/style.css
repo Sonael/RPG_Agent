@@ -802,6 +802,10 @@ fieldset.ed-trava button { opacity: 0.62; cursor: not-allowed; }
     width: 100%;
     height: 100dvh;
     height: var(--app-height, 100dvh);
+    /* Sem isso o "body { min-height: 100vh }" geral vence: 100vh é a altura
+       com as barras do navegador escondidas, e o fim da página (campo de
+       texto e barra de baixo) fica atrás delas quando aparecem. */
+    min-height: 0;
   }
 
   body.game-page .scene {
@@ -819,14 +823,17 @@ fieldset.ed-trava button { opacity: 0.62; cursor: not-allowed; }
     flex-direction: column;
   }
 
-  /* Sidebar Gaveta (Fica oculta embaixo até abrir) */
+  /* Sidebar Gaveta (Fica oculta embaixo até abrir). Presa pelo topo e medida
+     na altura visível: com 85vh e bottom 0, o fim da gaveta ia para trás das
+     barras do navegador e do sistema quando elas encolhem a área visível. */
   #sidebar.page-left {
-    position: fixed; bottom: -100%; left: 0; right: 0; top: auto; width: 100%; height: 85vh;
-    z-index: 1000; background: var(--page-left); transition: bottom 0.3s ease;
+    position: fixed; top: 100%; bottom: auto; left: 0; right: 0; width: 100%;
+    height: calc(var(--app-height, 100vh) * 0.85);
+    z-index: 1000; background: var(--page-left); transition: top 0.3s ease;
     border-radius: 16px 16px 0 0; padding: 20px 20px 80px 20px; box-shadow: 0 -10px 30px rgba(0,0,0,0.5);
     border-right: none; display: flex; flex-direction: column; overflow-y: auto;
   }
-  #sidebar.page-left.active { bottom: 0; }
+  #sidebar.page-left.active { top: calc(var(--app-height, 100vh) * 0.15); }
 
   /* Puxador e ✕ da folha inferior: antes ela só fechava tocando fora, o que
      não tem nenhuma pista visual — quem não descobre fica preso no painel. */
@@ -1147,6 +1154,7 @@ fieldset.ed-trava button { opacity: 0.62; cursor: not-allowed; }
   right: 0;
   width: 290px;
   height: 100vh;
+  height: var(--app-height, 100vh);
   background: #f5f3eb;
   z-index: 9992;
   overflow: hidden;
@@ -2051,7 +2059,7 @@ body.combat-on { overflow: hidden; }
        viewport com o `overflow: hidden` da regra base, então 1300px de
        conteúdo eram simplesmente cortados: nem os últimos cards do grupo
        nem o diário tinham como ser alcançados. */
-    height: 100vh; min-height: 0;
+    height: var(--app-height, 100vh); min-height: 0;
     overflow: hidden auto;
     /* Respiro no fim: o conteúdo termina acima da barra fixa em vez de
        ficar preso atrás dela. A altura real da barra vem do combat.js
@@ -2577,7 +2585,7 @@ body.shop-on { overflow: hidden; }
        que cria bloco de contenção, e foi assim que a barra fixa do combate
        saiu do lugar quando o overlay rolava. Aqui não há nada fixo dentro,
        mas a regra vale igual — o frame é o scroller. */
-    height: 100vh; min-height: 0;
+    height: var(--app-height, 100vh); min-height: 0;
   }
   .shp-header { padding: var(--esp-4) var(--esp-6) var(--esp-2); }
   .shp-title  { font-size: 1.3rem; }
@@ -2918,7 +2926,7 @@ body.levelup-on { overflow: hidden; }
   #levelup-overlay { padding: 0; align-items: stretch; }
   #lvl-frame {
     max-width: none; border-radius: 0; border: none;
-    height: 100vh; min-height: 0;
+    height: var(--app-height, 100vh); min-height: 0;
   }
   .lvl-header { padding: var(--esp-4) var(--esp-6) var(--esp-2); }
   .lvl-title  { font-size: 1.3rem; }
@@ -3164,7 +3172,7 @@ body.inventory-on { overflow: hidden; }
 
 @media (max-width: 760px) {
   #inventory-overlay { padding: 0; align-items: stretch; }
-  #inv-frame { max-width: none; border-radius: 0; border: none; height: 100vh; }
+  #inv-frame { max-width: none; border-radius: 0; border: none; height: var(--app-height, 100vh); }
   .inv-header { padding: var(--esp-4) var(--esp-6) var(--esp-2); }
   .inv-title { font-size: 1.3rem; }
   .inv-resumo { gap: var(--esp-3); }
@@ -3415,7 +3423,7 @@ body.grimoire-on { overflow: hidden; }
 
 @media (max-width: 760px) {
   #grimoire-overlay { padding: 0; align-items: stretch; }
-  #grm-frame { max-width: none; border-radius: 0; border: none; height: 100vh; }
+  #grm-frame { max-width: none; border-radius: 0; border: none; height: var(--app-height, 100vh); }
   .grm-header { padding: var(--esp-4) var(--esp-6) var(--esp-2); }
   .grm-title { font-size: 1.3rem; }
   /* Uma coluna que rola inteira: lista da classe em cima, conhecidas no fim. */
@@ -3638,7 +3646,7 @@ body.rest-on { overflow: hidden; }
   #rest-overlay { padding: 0; align-items: stretch; }
   #rst-frame {
     max-width: none; max-height: none; border-radius: 0; border: none;
-    height: 100vh; min-height: 0;
+    height: var(--app-height, 100vh); min-height: 0;
   }
   .rst-header { padding: var(--esp-4) var(--esp-6) var(--esp-2); }
   .rst-title  { font-size: 1.3rem; }
@@ -4173,7 +4181,7 @@ body.local-on, body.pessoa-on, body.heroi-on, body.missoes-on, body.mapa-on, bod
 
 @media (max-width: 760px) {
   #local-overlay, #pessoa-overlay, #heroi-overlay, #missoes-overlay, #mapa-overlay, #grupo-overlay, #diario-overlay, #elenco-overlay { padding: 0; align-items: stretch; }
-  #lcl-frame, #psn-frame, #hro-frame, #msn-frame, #map-frame, #grp-frame, #dia-frame, #elc-frame { max-width: none; border-radius: 0; border: none; height: 100vh; }
+  #lcl-frame, #psn-frame, #hro-frame, #msn-frame, #map-frame, #grp-frame, #dia-frame, #elc-frame { max-width: none; border-radius: 0; border: none; height: var(--app-height, 100vh); }
   .lcl-header { padding: var(--esp-4) var(--esp-10) var(--esp-3); max-height: none; overflow: visible; }
   .lcl-title { font-size: 1.3rem; }
   .lcl-corpo { display: block; overflow-y: auto; }
@@ -4490,7 +4498,7 @@ body.loot-on { overflow: hidden; }
 
 @media (max-width: 760px) {
   #loot-overlay { padding: 0; align-items: stretch; }
-  #lot-frame { max-width: none; max-height: none; border-radius: 0; border: none; height: 100vh; }
+  #lot-frame { max-width: none; max-height: none; border-radius: 0; border: none; height: var(--app-height, 100vh); }
   .lot-header { padding: var(--esp-4) var(--esp-10) var(--esp-2); }
   .lot-title { font-size: 1.3rem; }
   .lot-corpo { display: block; overflow-y: auto; }
@@ -4826,7 +4834,7 @@ body.loot-on { overflow: hidden; }
    No desktop recolhe numa coluna de ícones; no celular vira a faixa sob o
    título e a barra de baixo, e a gaveta ("Mais") mostra os dois.
    ═══════════════════════════════════════════════════════════════════ */
-#sidebar.page-left { padding: var(--esp-6) var(--esp-4) var(--esp-10); transition: width .2s ease, padding .2s ease; }
+#sidebar.page-left { padding: var(--esp-6) var(--esp-4) var(--esp-10); transition: width .2s ease, padding .2s ease, top .3s ease; }
 .tome-spine, .bookmark { transition: left .2s ease; }
 .sb-topo {
   display: flex; align-items: flex-start; gap: var(--esp-2);
@@ -4986,6 +4994,9 @@ body.loot-on { overflow: hidden; }
     font-size: 10px; background: rgba(0,0,0,0.12); color: var(--text-main);
   }
   .bi-conta.sb-atalho-alerta { background: var(--ink-sys); color: #fff; }
+  /* Com o teclado aberto, a barra de baixo sai para o campo de texto ficar
+     colado no teclado. */
+  .teclado-aberto .barra-inferior { display: none; }
   /* A barra de baixo já afasta o campo de texto da borda da tela. */
   #input-area { padding-bottom: var(--esp-3); }
   .sb-herois { max-height: none; }
