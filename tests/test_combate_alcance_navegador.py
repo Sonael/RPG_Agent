@@ -138,6 +138,22 @@ def test_seletor_aberto_nao_corta_o_titulo_do_turno(abrir_jogo):
     assert not erros, erros[:3]
 
 
+def test_card_mostra_os_turnos_restantes_da_condicao(abrir_jogo):
+    abrir, cap = abrir_jogo
+    estado = copy.deepcopy(cap.COMBATE_ZONAS)
+    estado["characters"]["victoria"] = {"sheet": {"condicoes": [
+        {"nome": "Envenenado", "duracao": 2}, {"nome": "Cego", "duracao": None}]}}
+    pg, erros = abrir(estado)
+
+    card = pg.locator(".cbt-card", has_text="Victoria").first
+    envenenado = card.locator(".cbt-cond", has_text="Envenenado")
+    # text_content e não inner_text: o selo é em maiúsculas por CSS.
+    assert "2t" in envenenado.text_content()
+    assert "2 turnos restantes" in envenenado.get_attribute("title")
+    assert card.locator(".cbt-cond", has_text="Cego").text_content().strip() == "Cego"
+    assert not erros, erros[:3]
+
+
 def test_diario_do_estado_de_exemplo_cita_a_arma_equipada():
     """O diário das capturas dizia "Espada Longa" com o Montante Rúnico na mão."""
     import capturar_telas as cap

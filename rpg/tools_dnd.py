@@ -259,6 +259,71 @@ def _normalize_for_new_combat(char: dict) -> None:
         ]
 
 
+# ===========================================================================
+# DURAÇÃO DAS CONDIÇÕES
+# ---------------------------------------------------------------------------
+# apply_condition(..., duration_turns=2) gravava {"duracao": 2} e nada no
+# motor contava: "Envenenado (2 turnos)" ficava para sempre no card, na ficha
+# e na régua, até o mestre lembrar de remover.
+#
+# A duração é em TURNOS DO PRÓPRIO AFETADO e desconta no FIM de cada turno
+# dele. Condição aplicada durante o turno do próprio afetado não conta aquele
+# turno (marca `token_aplicacao`): "Envenenado por 1 turno" dura sempre um
+# turno inteiro dele, seja aplicada na vez dele ou na de outro.
+#
+# Quem está fora de combate (inconsciente, dormindo) não tem turno, então não
+# desconta. As condições com duração acabam com o combate; as indefinidas
+# (duracao None) só saem com remove_condition ou pela regra própria delas.
+# ===========================================================================
+
+def _turnos_restantes(cond) -> int:
+    if not isinstance(cond, dict):
+        return 0
+    try:
+        return max(0, int(cond.get("duracao") or 0))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _fim_do_turno(nome: str, token: int) -> list[str]:
+    """
+    Desconta um turno das condições de `nome`, cujo turno (marcado por
+    `token`) acabou de terminar. Devolve as linhas do que acabou.
+    """
+    ch = memory.campaign.get("characters", {}).get(memory.char_key(nome or ""))
+    if not ch:
+        return []
+    s = ch.get("sheet") or {}
+    conds = s.get("condicoes")
+    if not isinstance(conds, list) or not conds:
+        return []
+    ficam, acabaram = [], []
+    for c in conds:
+        if _turnos_restantes(c) <= 0:
+            ficam.append(c)
+            continue
+        if c.get("token_aplicacao") == token:
+            # Aplicada neste mesmo turno do afetado: não conta.
+            c.pop("token_aplicacao", None)
+            ficam.append(c)
+            continue
+        c.pop("token_aplicacao", None)
+        c["duracao"] = _turnos_restantes(c) - 1
+        if c["duracao"] <= 0:
+            acabaram.append(c.get("nome", "condição"))
+        else:
+            ficam.append(c)
+    if not acabaram:
+        return []
+    s["condicoes"] = ficam
+    linhas = []
+    for cond in acabaram:
+        linha = f"{cond} de {ch.get('name', nome)} acabou"
+        _log_combat_event("condition_end", "", ch.get("name", nome), msg=linha, condicao=cond)
+        linhas.append(linha)
+    return linhas
+
+
 def _heal_current_turn() -> None:
     """
     AUTO-CURA do ponteiro de turno: se o combatente do turno atual estiver
@@ -349,6 +414,8 @@ def _auto_advance_turn(actor_name: str = "") -> str:
                 break
 
     skipped = []
+    # O turno de quem agiu termina aqui: as condições dele descontam um turno.
+    fim_msgs = _fim_do_turno(order[idx], cs.get("turn_token", 0)) if 0 <= idx < len(order) else []
 
     for _ in range(len(order) + 1):
         idx += 1
@@ -375,9 +442,13 @@ def _auto_advance_turn(actor_name: str = "") -> str:
         skip_msg      = f"\n   Pulados: {', '.join(skipped)}" if skipped else ""
         new_round_msg = f"\n   Nova rodada! Rodada {round_num} começa." if round_num > initial_round else ""
         order_str     = " → ".join(f"[{n}]" if i == idx else n for i, n in enumerate(order))
+        # O que acabou no fim do turno e o que aconteceu na virada (ações
+        # lendárias, chamas). Antes só next_turn() mostrava a virada.
+        virada = fim_msgs + list(cs.pop("_lendarias_msg", None) or [])
+        virada_msg = "".join(f"\n   {m}" for m in virada)
         return (
             f"\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"TURNO AVANÇADO — Rodada {round_num}{new_round_msg}{skip_msg}\n"
+            f"TURNO AVANÇADO — Rodada {round_num}{new_round_msg}{skip_msg}{virada_msg}\n"
             f"Próxima vez: **{current_name}**\n"
             f"   Ordem: {order_str}"
         )
@@ -4233,7 +4304,11 @@ def get_combat_status() -> str:
         conds = s.get("condicoes", [])
         cond_tag = ""
         if conds:
-            names    = ", ".join(c["nome"].capitalize() for c in conds)
+            names    = ", ".join(
+                c["nome"].capitalize()
+                + (f" ({_turnos_restantes(c)} turno{'s' if _turnos_restantes(c) > 1 else ''})"
+                   if _turnos_restantes(c) else "")
+                for c in conds)
             cond_tag = f"\n    Condições: {names}"
 
         lines.append(
@@ -5645,7 +5720,9 @@ def apply_condition(char_name: str, condition: str, duration_turns: int = 0) -> 
     Args:
         char_name:      Nome do personagem.
         condition:      Nome da condição (ex: 'Cego', 'Envenenado', 'Paralisado').
-        duration_turns: Duração em turnos (0 = indefinida, até ser removida manualmente).
+        duration_turns: Duração em turnos DO PRÓPRIO AFETADO (0 = indefinida, até ser
+                        removida manualmente). Desconta no fim de cada turno dele,
+                        e acaba sozinha; condições com duração acabam com o combate.
     """
     from rpg.open5e import http as _req   # SRD com cache, sessão e retry
 
@@ -5660,10 +5737,16 @@ def apply_condition(char_name: str, condition: str, duration_turns: int = 0) -> 
     if any(c["nome"].lower() == c_low for c in conds):
         return f"Aviso: {char['name']} já possui a condição '{condition}'."
 
-    conds.append({
+    nova = {
         "nome":    condition.capitalize(),
         "duracao": duration_turns if duration_turns > 0 else None,
-    })
+    }
+    cs_ac = memory.campaign.get("combat_state") or {}
+    if duration_turns > 0 and cs_ac.get("is_active"):
+        # Aplicada na vez do próprio afetado: aquele turno não conta.
+        if memory.char_key(_combat_current_actor()) == memory.char_key(char["name"]):
+            nova["token_aplicacao"] = cs_ac.get("turn_token", 0)
+    conds.append(nova)
 
     # Busca descrição oficial no Open5e
     srd_desc = ""
@@ -5692,7 +5775,8 @@ def apply_condition(char_name: str, condition: str, duration_turns: int = 0) -> 
     else:
         efeito_str_antitoxina = ""
 
-    dur_str        = f" por {duration_turns} turno(s)" if duration_turns > 0 else " (indefinidamente)"
+    dur_str        = (f" por {duration_turns} turno(s) de {char['name']}" if duration_turns > 0
+                      else " (indefinidamente)")
     efeito_mecanico = f"\n   Mecânica: {', '.join(efeito_str)}." if efeito_str \
                       else "\n   (Condição narrativa — sem efeito mecânico automático.)"
     desc_oficial   = f"\n   {srd_desc}" if srd_desc else ""
@@ -8683,10 +8767,13 @@ def long_rest(char_name: str) -> str:
     conds_antes = s.get("condicoes", [])
     # Condições sem duração (indefinidas) são mantidas; com duração são removidas
     # Exceção: "doença" e "maldição" não são curadas por descanso
-    persistentes = {"doença", "maldição", "amaldiçoado"}
-    s["condicoes"] = [c for c in conds_antes if c.get("duracao") is None and c["nome"].lower() not in persistentes]
-    # Remover também as que tinham duração (foram expiradas pelo descanso)
-    s["condicoes"] = [c for c in s["condicoes"] if c.get("duracao") is None]
+    persistentes = {"doença", "doenca", "maldição", "maldicao", "amaldiçoado", "amaldicoado"}
+    # O filtro antigo removia justamente as persistentes: doença e maldição
+    # sumiam numa noite de sono, ao contrário do que o comentário acima diz.
+    s["condicoes"] = [c for c in conds_antes
+                      if isinstance(c, dict)
+                      and ((c.get("nome") or "").lower() in persistentes
+                           or c.get("duracao") is None)]
 
     removidas = len(conds_antes) - len(s["condicoes"])
     cond_msg  = f"\n   {removidas} condição(ões) temporária(s) removida(s)." if removidas else ""
@@ -9220,6 +9307,8 @@ def next_turn() -> str:
     round_num = cs.get("round", 1)
     new_round = False
     skipped   = []
+    # O turno do atual termina aqui: as condições dele descontam um turno.
+    fim_msgs  = _fim_do_turno(order[idx], cs.get("turn_token", 0)) if 0 <= idx < len(order) else []
 
     for _ in range(len(order) + 1):
         idx += 1
@@ -9246,7 +9335,7 @@ def next_turn() -> str:
         skip_msg  = f"\nPulados: {', '.join(skipped)}" if skipped else ""
         round_msg = f"\nNova rodada! Rodada {round_num} começa." if new_round else ""
         # O que os chefes lendários fizeram na virada (ver _inicio_de_turno).
-        lend_msg = "".join("\n" + m for m in (cs.pop("_lendarias_msg", None) or []))
+        lend_msg = "".join("\n" + m for m in fim_msgs + list(cs.pop("_lendarias_msg", None) or []))
         return (
             f"Turno avançado — Rodada {round_num}{round_msg}{skip_msg}{lend_msg}\n"
             f"Vez de: **{current_name}**\n"
@@ -9285,8 +9374,11 @@ def end_combat() -> str:
         if _sh.get("efeitos"):
             _sh["efeitos"] = [e for e in _efeitos(_sh) if e.get("ate") != "fim_do_combate"]
         if _sh.get("condicoes"):
+            # Duração em turnos só existe dentro do combate; as chamas também.
             _sh["condicoes"] = [c for c in _sh["condicoes"]
-                                if not (isinstance(c, dict) and (c.get("nome") or "").lower() == "queimando")]
+                                if not (isinstance(c, dict)
+                                        and ((c.get("nome") or "").lower() == "queimando"
+                                             or _turnos_restantes(c) > 0))]
     memory.save_campaign()
     return "Combate encerrado. Iniciativa e rastreador de turnos limpos."
 
@@ -12107,6 +12199,10 @@ def _combatant_snapshot(name: str) -> dict | None:
         "arma":       (s.get("equipamentos", {}) or {}).get("arma_principal") or "",
         "armas":      _combatant_weapons(ch),
         "condicoes":  conds,
+        # Turnos restantes de cada condição com duração (nome → turnos).
+        "condicoes_turnos": {(c.get("nome") or ""): _turnos_restantes(c)
+                             for c in (s.get("condicoes") or [])
+                             if _turnos_restantes(c) > 0},
         # Efeitos de item que duram o combate (resistência, antitoxina).
         "efeitos":    [e.get("nome", "") for e in _efeitos(s)],
         "habilidades": habs,

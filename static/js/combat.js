@@ -156,7 +156,14 @@
     // alvejável (não entra em isOut, então o picker de alvo o inclui).
     const asleep = (c.status || '').toLowerCase() === 'dormindo';
     const dim    = out || asleep;
-    const conds  = (c.condicoes || []).map(x => `<span class="cbt-cond">${esc(x)}</span>`).join('')
+    // Turnos restantes vêm do motor, que desconta no fim de cada turno do afetado.
+    const turnos = c.condicoes_turnos || {};
+    const conds  = (c.condicoes || []).map(x => {
+        const n = turnos[x];
+        return n
+          ? `<span class="cbt-cond" title="${esc(x)}: ${n} turno${n === 1 ? '' : 's'} restante${n === 1 ? '' : 's'}">${esc(x)} <small>${n}t</small></span>`
+          : `<span class="cbt-cond">${esc(x)}</span>`;
+      }).join('')
       + (c.efeitos || []).map(x => `<span class="cbt-cond cbt-efeito" title="Efeito de item até o fim do combate">${esc(x)}</span>`).join('');
     const meta   = `${esc(c.classe || '')}${c.nivel ? ' Nv.' + c.nivel : ''}`.trim();
     const temp   = Number(c.hp_temp || 0);

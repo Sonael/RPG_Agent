@@ -947,6 +947,34 @@ O d20 desse teste é rolado pelo sistema, inclusive para personagens
 jogáveis: ele dispara no meio do turno do inimigo, e parar tudo para pedir um
 dado quebraria o fluxo do combate. O resultado é sempre mostrado.
 
+### Duração das condições
+
+`apply_condition(..., duration_turns=N)` gravava `{"duracao": N}` e nada no
+motor contava: "Envenenado (2 turnos)" ficava para sempre no card, na ficha
+do herói e na barra lateral, até o mestre lembrar de remover.
+
+- A duração é em **turnos do próprio afetado** e desconta no **fim** de cada
+  turno dele (`_fim_do_turno`, chamado por `next_turn` e `_auto_advance_turn`
+  antes de mover o ponteiro). Chegou a zero, a condição sai, o diário registra
+  `condition_end` e o texto do avanço diz "Envenenado de Goblin acabou".
+- Aplicada **na vez do próprio afetado**, aquele turno não conta
+  (`token_aplicacao`): "Envenenado por 1 turno" dura sempre um turno inteiro
+  dele.
+- Quem está fora de combate (inconsciente, dormindo) não tem turno e não
+  desconta.
+- Condições com duração **acabam com o combate**; as indefinidas ficam.
+- As telas mostram os turnos restantes: selo "Envenenado 2t" no card do
+  combate, "(2 turnos)" na ficha do herói, em `get_combat_status` e na barra
+  lateral.
+- O texto do avanço de turno pela ferramenta de ação (`_auto_advance_turn`)
+  passou a incluir também o que acontece na virada (ações lendárias, chamas
+  do Fogo Alquímico), que antes só `next_turn` mostrava.
+
+`test_duracao_das_condicoes.py` (9) cobre a contagem, o turno de aplicação, a
+indefinida, a tela tática, quem está fora de combate, o fim do combate e o
+texto das telas. `test_combate_alcance_navegador.py` confere o selo com os
+turnos no card.
+
 ### Reação e ataque de oportunidade
 
 A economia rastreava só Ação e Bônus. A **Reação** — a única coisa que
@@ -1968,6 +1996,11 @@ feita no motor —, exaustão menos um) e, principalmente,
 horas, e decidir dentro do laço fazia o resultado depender da ordem do grupo —
 quem descansou há 20 horas era recusado se viesse primeiro e aceito se viesse
 depois de outro ter passado a noite. Se ninguém pode, **Dormir 8 horas** trava.
+
+A noite tira as condições com duração e mantém as indefinidas. Doença e
+maldição **não** saem com o descanso: o código dizia isso no comentário e fazia
+o contrário, removendo justamente as duas (coberto por
+`test_duracao_das_condicoes.py`).
 
 ### O que fecha a tela
 

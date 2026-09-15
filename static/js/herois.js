@@ -96,7 +96,7 @@
         + ` ${p.testes_de_morte.falhas} falha(s) nos testes de morte</span>`);
     }
     (p.condicoes || []).forEach(c => marcas.push(
-      `<span class="hro-marca hro-marca-perigo">${esc(maiuscula(c.nome))}${c.duracao ? ` (${c.duracao} turnos)` : ''}</span>`));
+      `<span class="hro-marca hro-marca-perigo">${esc(maiuscula(c.nome))}${c.duracao ? ` (${c.duracao} turno${c.duracao === 1 ? '' : 's'})` : ''}</span>`));
     if (p.exaustao) marcas.push(`<span class="hro-marca hro-marca-perigo">Exaustão ${p.exaustao}</span>`);
     if (p.concentracao) marcas.push(`<span class="hro-marca">Concentrado em ${esc(p.concentracao)}</span>`);
     (p.efeitos || []).forEach(e => marcas.push(
