@@ -202,3 +202,47 @@ def test_saque_nao_abre_por_cima_da_visao_geral(pagina):
     assert pg.is_hidden("#loot-overlay"), "o saque abriu por cima da visão geral"
     pg.evaluate("() => window.Grupo._fechar()")
     pg.wait_for_selector("#loot-overlay:not(.hidden)", timeout=5000)
+
+
+def _retangulos(pg):
+    return pg.evaluate("""() => {
+        const r = (sel) => document.querySelector(sel).getBoundingClientRect();
+        const ultimo = [...document.querySelectorAll('#grp-cartoes .grp-cartao')].pop();
+        return {
+          resumo: r('#grp-resumo'), rodape: r('#grupo-overlay .lcl-rodape'),
+          ultimo: ultimo.getBoundingClientRect(),
+          altura: window.innerHeight,
+        };
+    }""")
+
+
+def test_celular_o_resumo_rola_junto_com_os_cartoes(pagina):
+    """No celular o resumo fixo ocupava um quarto da tela e os cartões rolavam
+    só no resto. Agora a tela inteira rola e o rodapé fica preso embaixo."""
+    pg, _, _ = pagina
+    pg.set_viewport_size({"width": 390, "height": 844})
+    _abrir(pg)
+    assert pg.evaluate("() => getComputedStyle(document.getElementById('grp-frame')).overflowY") == "auto"
+    pg.evaluate("() => { const f = document.getElementById('grp-frame'); f.scrollTop = f.scrollHeight; }")
+    pg.wait_for_timeout(200)
+    r = _retangulos(pg)
+    assert r["resumo"]["bottom"] <= 0, "o resumo continuou na tela depois de rolar até o fim"
+    assert r["rodape"]["bottom"] <= r["altura"] + 1 and r["rodape"]["top"] < r["altura"], \
+        "o rodapé com Fechar saiu da tela"
+    assert r["ultimo"]["bottom"] <= r["rodape"]["top"] + 1, "o último cartão ficou atrás do rodapé"
+    pg.click("#grupo-overlay .lcl-fechar")
+    assert pg.is_hidden("#grupo-overlay")
+
+
+def test_desktop_so_os_cartoes_rolam(pagina):
+    pg, _, _ = pagina
+    pg.set_viewport_size({"width": 1440, "height": 560})
+    _abrir(pg)
+    estilos = pg.evaluate("""() => ({
+        frame: getComputedStyle(document.getElementById('grp-frame')).overflowY,
+        corpo: getComputedStyle(document.querySelector('#grupo-overlay .grp-corpo')).overflowY,
+    })""")
+    assert estilos == {"frame": "hidden", "corpo": "auto"}
+    pg.evaluate("() => { const c = document.querySelector('#grupo-overlay .grp-corpo'); c.scrollTop = c.scrollHeight; }")
+    pg.wait_for_timeout(200)
+    assert _retangulos(pg)["resumo"]["top"] >= 0, "no desktop o resumo fica no alto"

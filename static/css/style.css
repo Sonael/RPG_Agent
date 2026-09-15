@@ -4672,6 +4672,13 @@ body.loot-on { overflow: hidden; }
 @media (max-width: 760px) {
   .grp-corpo, .grp-resumo { padding-left: var(--esp-3); padding-right: var(--esp-3); }
   .grp-cartoes { grid-template-columns: minmax(0, 1fr); }
+  /* No celular a tela inteira rola: o resumo fixo no alto ocupava um quarto
+     da altura e os cartões rolavam só no que sobrava. O rodapé com "Fechar"
+     continua preso embaixo. No desktop só os cartões rolam, como antes. */
+  #grp-frame { overflow-y: auto; }
+  #grp-frame > * { flex-shrink: 0; }
+  #grp-frame .grp-corpo { flex: 0 0 auto; min-height: auto; overflow: visible; }
+  #grp-frame .lcl-rodape { position: sticky; bottom: 0; z-index: 1; margin-top: auto; }
 }
 
 /* ═══════════════════════════════════════════════════════════════════
