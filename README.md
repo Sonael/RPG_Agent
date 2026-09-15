@@ -1143,6 +1143,36 @@ A escolha persiste por campanha (`combat_mode` em `memory.campaign`):
 Toggle do modo: sidebar do jogo → aba Mundo → "Narrado pela IA" / "Tela
 tática".
 
+### A mesma luta não recomeça
+
+Numa campanha o mestre, num único turno, chamou `spawn_monster`,
+`roll_initiative`, `set_battlefield`, `roll_initiative`, `spawn_monster`,
+`roll_initiative` e `set_battlefield` para os mesmos dois goblins, e a tela
+mostrou três ordens de iniciativa diferentes. Cada chamada repetida desfazia
+algo:
+
+- **`roll_initiative`** com o combate ativo zerava ordem, rodada e log. Agora
+  quem já está na ordem fica como está; se todos os nomes já lutam, a resposta
+  é `Nota: o combate já está em andamento` e nada muda. Nomes novos são
+  reforços: rolam e entram no lugar do total deles (os totais ficam em
+  `combat_state["iniciativas"]`), a vez de quem está agindo não muda, e quem
+  entra antes dela age a partir da próxima rodada. Combate antigo, sem os
+  totais guardados, põe o reforço no fim.
+- **`spawn_monster`** com o combate ativo trocava o goblin ferido por um novo,
+  de vida cheia. Agora recusa se algum nome gerado já está na ordem; reforço
+  de verdade usa outro `display_name`. Fora de combate nada mudou.
+- **`set_battlefield`** com as mesmas zonas repunha todo mundo na posição
+  inicial, desfazendo os movimentos. Agora mantém as posições e só posiciona
+  quem ainda não tem zona. Zonas diferentes redefinem o campo, como antes.
+
+O servidor também deixou de reenviar a fala do jogador quando o modelo cai no
+meio do turno (503, sobrecarga) **depois** de já ter chamado ferramentas que
+mexem no jogo. A nova tentativa recebe `[TURNO INTERROMPIDO]` com a lista do
+que já foi feito e a instrução de não refazer; ferramentas de consulta
+(`get_`, `list_`, `describe_`, `check_`, `suggest_`) não entram na lista.
+`test_combate_repetido.py` refaz a sequência da campanha e testa a retomada
+pela rota `/api/chat`, com um runner que chama `roll_initiative` e cai com 503.
+
 ### Log estruturado
 
 Cada evento mecânico do combate vira uma entrada em `combat_state["log"]`
@@ -3247,6 +3277,7 @@ o nome do pacote. Também não há variável de ambiente nova.
 │   ├── test_toolsets.py         Filtro de ferramentas por modo e por estilo
 │   ├── test_varredura_de_ferramentas.py  Nenhuma ferramenta levanta exceção
 │   ├── test_kit_inicial.py      Ficha criada pelo mestre vem com o kit da classe
+│   ├── test_combate_repetido.py A mesma emboscada não reinicia a luta
 │   ├── test_erros_de_ferramenta.py       Turno segue após ferramenta inventada ou quebrada
 │   └── legacy/            Suítes em formato de script (não coletadas)
 │       ├── tests.py             Suíte funcional (13 blocos, 70 checks)

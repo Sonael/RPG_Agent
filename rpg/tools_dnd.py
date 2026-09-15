@@ -3038,7 +3038,8 @@ def set_battlefield(zones: str, description: str = "") -> str:
 
     Chame ANTES ou logo depois de roll_initiative(). Por padrão o grupo entra
     na primeira zona e os inimigos na última — mova quem começar em outro
-    lugar com move_combatant().
+    lugar com move_combatant(). Chamar de novo com as mesmas zonas não
+    reposiciona ninguém.
 
     Args:
         zones:       Zonas separadas por vírgula, da frente para o fundo.
@@ -3060,6 +3061,24 @@ def set_battlefield(zones: str, description: str = "") -> str:
         return "Há zonas com o mesmo nome. Dê nomes distintos."
 
     descs = [d.strip() for d in (description or "").split(";")]
+
+    # O mesmo campo de novo, com a luta rolando: reposicionar todo mundo
+    # desfazia os movimentos já feitos. Mantém as posições; só quem ainda não
+    # tem zona (quem entrou depois) ganha a padrão.
+    atuais = cs.get("zonas") or []
+    if cs.get("posicoes") and [_norm_txt(z) for z in atuais] == [_norm_txt(n) for n in nomes]:
+        chars = memory.campaign.get("characters", {})
+        for nome in cs.get("initiative_order", []) or []:
+            ch = chars.get(memory.char_key(nome))
+            if ch and _zona_de(nome) not in atuais:
+                _por_zona(nome, atuais[0] if memory.is_party_member(ch) else atuais[-1])
+        if any(descs):
+            cs["zona_desc"] = {n: (descs[i] if i < len(descs) else "")
+                               for i, n in enumerate(atuais)}
+        memory.save_campaign()
+        return ("Nota: o campo já está dividido assim; ninguém foi reposicionado.\n"
+                + describe_battlefield())
+
     cs["zonas"]     = nomes
     cs["zona_desc"] = {n: (descs[i] if i < len(descs) else "")
                        for i, n in enumerate(nomes)}
@@ -9455,6 +9474,107 @@ def _default_npc_sheet() -> dict:
     }
 
 
+def _combatente_para_a_luta(name: str) -> tuple[dict, bool]:
+    """O personagem pronto para lutar: quem não existe ou não tem ficha ganha a
+    ficha padrão de NPC. Devolve (personagem, se a ficha foi criada agora)."""
+    key  = memory.char_key(name)
+    char = memory.campaign["characters"].get(key)
+    if not char:
+        memory.campaign["characters"][key] = {
+            "name":        name,
+            "description": "NPC — registrado ao iniciar combate (ficha padrão).",
+            "traits":      "",
+            "status":      "inimigo",
+            "notes":       "",
+            "sheet":       _default_npc_sheet(),
+            "inventario":  [],
+            "habilidades": [],
+        }
+        return memory.campaign["characters"][key], True
+    if char.get("sheet") is None:
+        char["sheet"]       = _default_npc_sheet()
+        char["inventario"]  = char.get("inventario") or []
+        char["habilidades"] = char.get("habilidades") or []
+        return char, True
+    return char, False
+
+
+def _rolar_iniciativa(name: str, char: dict) -> dict:
+    dex_mod = _modifier(char["sheet"]["destreza"])
+    roll    = random.randint(1, 20)
+    total   = roll + dex_mod
+    sign    = "+" if dex_mod >= 0 else ""
+    return {
+        "name":       name,
+        "initiative": total,
+        "roll":       roll,
+        "mod":        dex_mod,
+        "log":        f"d20={roll} {sign}{dex_mod} = **{total}**",
+    }
+
+
+def _entrar_no_combate_em_andamento(names: list[str], cs: dict) -> str:
+    """
+    roll_initiative com a luta já rolando.
+
+    Quem já está na ordem fica como está: ordem, rodada, vez, log e vida.
+    Se todos os nomes já lutam, é uma chamada repetida e nada muda. Quem é
+    novo (reforço, aliado que chegou) rola e entra no lugar do total dele; se
+    esse lugar já passou nesta rodada, age a partir da próxima.
+    """
+    ordem  = list(cs.get("initiative_order") or [])
+    idx    = int(cs.get("current_turn_index", 0) or 0)
+    vez    = ordem[idx] if 0 <= idx < len(ordem) else "?"
+    rodada = cs.get("round", 1)
+
+    na_luta = {memory.char_key(n) for n in ordem}
+    novos, vistos = [], set()
+    for n in names:
+        k = memory.char_key(n)
+        if k not in na_luta and k not in vistos:
+            vistos.add(k)
+            novos.append(n)
+
+    if not novos:
+        return (f"Nota: o combate já está em andamento (Rodada {rodada}, vez de **{vez}**). "
+                f"A iniciativa NÃO foi rolada de novo e nada mudou.\n"
+                f"   Ordem: {' → '.join(ordem)}\n"
+                f"   Siga a luta. Para pôr alguém novo nela, chame roll_initiative só "
+                f"com o nome de quem chegou.")
+
+    totais = cs.setdefault("iniciativas", {})
+    zonas  = _zonas()
+    linhas = [f"Combate em andamento (Rodada {rodada}, vez de **{vez}**). Entram na luta:"]
+    for name in novos:
+        char, criado = _combatente_para_a_luta(name)
+        _normalize_for_new_combat(char)
+        r = _rolar_iniciativa(name, char)
+        # Sem o total de quem já lutava (combate de antes desta regra), entra
+        # no fim da ordem.
+        pos = len(ordem)
+        for i, outro in enumerate(ordem):
+            total_outro = totais.get(memory.char_key(outro))
+            if total_outro is not None and r["initiative"] > total_outro:
+                pos = i
+                break
+        ordem.insert(pos, name)
+        totais[memory.char_key(name)] = r["initiative"]
+        if pos <= idx:
+            idx += 1
+        quando = "age ainda nesta rodada" if pos > idx else "age a partir da próxima rodada"
+        if len(zonas) > 1 and _zona_de(name) not in zonas:
+            _por_zona(name, zonas[0] if memory.is_party_member(char) else zonas[-1])
+        linhas.append(f"  + {name}: {r['log']} — {quando}"
+                      + (" (ficha padrão)" if criado else ""))
+
+    cs["initiative_order"]   = ordem
+    cs["current_turn_index"] = idx
+    _log_combat_event("combat_join", msg="Entram na luta: " + ", ".join(novos), names=novos)
+    memory.save_campaign()
+    linhas.append(f"\n   Ordem: {' → '.join(ordem)}")
+    return "\n".join(linhas)
+
+
 def roll_initiative(characters_names: str) -> str:
     """
     Rola iniciativa para todos os participantes do combate (aliados e inimigos).
@@ -9464,6 +9584,10 @@ def roll_initiative(characters_names: str) -> str:
     Para inimigos GENÉRICOS desconhecidos, cria fichas padrão automaticamente
     (HP 12, CA 12). Para CHEFES importantes, chame create_character_sheet()
     ANTES desta ferramenta para definir stats específicos.
+
+    Com o combate JÁ em andamento, NÃO reinicia a luta: quem já está na ordem
+    fica como está, e só os nomes novos (reforços) rolam e entram na ordem.
+    Chame UMA vez por combate.
 
     Args:
         characters_names: Nomes separados por vírgula. Ex: "Aria, Goblin, Orc Líder"
@@ -9475,47 +9599,26 @@ def roll_initiative(characters_names: str) -> str:
     if not names:
         return "Informe ao menos um personagem."
 
+    # Luta já rolando: rolar de novo zerava a ordem, a rodada e o log no meio
+    # do combate. Numa campanha o mestre chamou roll_initiative três vezes
+    # seguidas na mesma emboscada, e a tela reiniciou a luta a cada uma.
+    cs_atual = memory.campaign.get("combat_state") or {}
+    if cs_atual.get("is_active") and cs_atual.get("initiative_order"):
+        return _entrar_no_combate_em_andamento(names, cs_atual)
+
     results      = []
     auto_created = []
 
     for name in names:
-        key  = memory.char_key(name)
-        char = memory.campaign["characters"].get(key)
-
-        if not char:
-            memory.campaign["characters"][key] = {
-                "name":        name,
-                "description": "NPC — registrado ao iniciar combate (ficha padrão).",
-                "traits":      "",
-                "status":      "inimigo",
-                "notes":       "",
-                "sheet":       _default_npc_sheet(),
-                "inventario":  [],
-                "habilidades": [],
-            }
-            char = memory.campaign["characters"][key]
-            auto_created.append(name)
-        elif char.get("sheet") is None:
-            char["sheet"]       = _default_npc_sheet()
-            char["inventario"]  = char.get("inventario") or []
-            char["habilidades"] = char.get("habilidades") or []
+        char, criado = _combatente_para_a_luta(name)
+        if criado:
             auto_created.append(name)
 
         # Combate NOVO: limpa estados transitórios herdados da luta anterior
         # — ninguém entra dormindo nem "inconsciente" com a vida cheia.
         _normalize_for_new_combat(char)
 
-        dex_mod = _modifier(char["sheet"]["destreza"])
-        roll    = random.randint(1, 20)
-        total   = roll + dex_mod
-        sign    = "+" if dex_mod >= 0 else ""
-        results.append({
-            "name":       name,
-            "initiative": total,
-            "roll":       roll,
-            "mod":        dex_mod,
-            "log":        f"d20={roll} {sign}{dex_mod} = **{total}**",
-        })
+        results.append(_rolar_iniciativa(name, char))
 
     results.sort(key=lambda x: x["initiative"], reverse=True)
 
@@ -9526,6 +9629,9 @@ def roll_initiative(characters_names: str) -> str:
     memory.campaign.pop("descanso_proposto", None)
     cs["is_active"]          = True
     cs["initiative_order"]   = [r["name"] for r in results]
+    # O total de cada um fica guardado para quem entrar no meio da luta
+    # achar o lugar dele na ordem.
+    cs["iniciativas"]        = {memory.char_key(r["name"]): r["initiative"] for r in results}
     cs["current_turn_index"] = 0
     cs["round"]              = 1
     # Combate NOVO: zera o rastreamento de turno (não herdar do anterior).
@@ -11223,6 +11329,8 @@ def spawn_monster(
     serão criados como "Goblin 1", "Goblin 2", "Goblin 3".
 
     Após spawn_monster(), chame roll_initiative() com os nomes gerados.
+    Com o combate em andamento, não recria quem já está lutando; reforços
+    precisam de outro display_name.
 
     Args:
         monster_name:  Nome do monstro em inglês (ex: 'goblin', 'orc', 'zombie',
@@ -11306,6 +11414,21 @@ def spawn_monster(
     arma_secundaria = atk_data["arma_secundaria"]
     arma_dado_sec   = atk_data["arma_dado_secundaria"]
     multiattack     = atk_data["multiattack"]
+
+    # Com a luta rolando, recriar quem já está nela devolvia a vida cheia a um
+    # goblin ferido (o personagem inteiro era trocado por um novo). Numa
+    # campanha o mestre chamou spawn_monster duas vezes na mesma emboscada.
+    cs_atual = memory.campaign.get("combat_state") or {}
+    if cs_atual.get("is_active"):
+        na_luta = {memory.char_key(n) for n in (cs_atual.get("initiative_order") or [])}
+        nomes = [base_name if quantity == 1 else f"{base_name} {i + 1}" for i in range(quantity)]
+        repetidos = [n for n in nomes if memory.char_key(n) in na_luta]
+        if repetidos:
+            verbo = "está" if len(repetidos) == 1 else "estão"
+            return (f"Nota: {', '.join(repetidos)} já {verbo} neste combate. Nada foi criado "
+                    f"nem curado.\n   Se chegaram reforços de verdade, chame spawn_monster "
+                    f"com outro display_name (ex.: '{base_name} Reforço') e depois "
+                    f"roll_initiative só com os nomes novos.")
 
     created_names = []
     for i in range(quantity):

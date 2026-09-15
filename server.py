@@ -1807,6 +1807,31 @@ _PREFIXOS_INTERNOS = (
 )
 
 
+# Ferramentas que só consultam. O WRITE_TOOLS do turno é o ícone da interface
+# e lista só as narrativas; roll_initiative e spawn_monster ficam fora dele.
+_PREFIXOS_DE_LEITURA = ("get_", "list_", "describe_", "check_", "suggest_")
+
+
+def _so_le(ferramenta: str) -> bool:
+    return ferramenta.startswith(_PREFIXOS_DE_LEITURA)
+
+
+def _mensagem_de_retomada(texto_original: str, escritas: set) -> str:
+    """
+    O que o mestre recebe quando a resposta dele caiu (modelo sobrecarregado)
+    DEPOIS de já ter mexido no jogo. O que as ferramentas fizeram está salvo;
+    reenviar a fala do jogador fazia o mestre fazer tudo de novo.
+    """
+    return (
+        "[TURNO INTERROMPIDO] A sua resposta anterior caiu no meio por "
+        "instabilidade do modelo, depois de já ter chamado: "
+        f"{', '.join(sorted(escritas))}. Isso JÁ aconteceu no jogo e está salvo. "
+        "NÃO chame essas ferramentas de novo para a mesma coisa: confira o estado "
+        "se precisar e termine a resposta a partir dali.\n\n"
+        f"A fala do jogador era: {texto_original}"
+    )
+
+
 def _tipo_de_mensagem_interna(texto: str, declarado=None) -> str:
     """
     "tela" | "dado" | "comando" | "". O cliente declara o tipo; o prefixo
@@ -1999,6 +2024,11 @@ def chat():
         _dbg(f"   ▶ Entrada: {_short(texto, 300)}")
         _dbg("─" * 70)
 
+        # Ferramentas que JÁ mexeram no jogo em tentativas que caíram. Reenviar
+        # a fala do jogador depois disso convida o mestre a refazer tudo
+        # (criar os goblins e rolar a iniciativa de novo).
+        escritas_feitas: set = set()
+
         for attempt in range(MAX_RETRIES):
             full         = ""
             tools_called = set()
@@ -2111,6 +2141,10 @@ def chat():
                     "rate limit", "quota", "resource exhausted", "deadline",
                 ))
                 if is_retryable and attempt < MAX_RETRIES - 1:
+                    escritas_feitas |= {t for t in tools_called if not _so_le(t)}
+                    if escritas_feitas:
+                        msg = gtypes.Content(role="user", parts=[gtypes.Part(
+                            text=_mensagem_de_retomada(texto, escritas_feitas))])
                     wait = (2 ** (attempt + 1)) + random.uniform(0, 1)
                     result_q.put(("retrying", f"Mestre ocupado (Tentativa {attempt + 1}/{MAX_RETRIES}). Retomando em {wait:.1f}s..."))
                     await asyncio.sleep(wait)
