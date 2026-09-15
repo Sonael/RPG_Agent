@@ -2639,8 +2639,8 @@ def _traits_lookup(sheet: dict, campo: str) -> list[dict]:
         # Poção de Resistência: vale enquanto o efeito estiver na ficha.
         extra = [{"tipos": [e["resistencia"]], "requer_magica": False,
                   "origem": e.get("origem", "")}
-                 for e in (sheet or {}).get("efeitos") or []
-                 if isinstance(e, dict) and e.get("resistencia")]
+                 for e in _efeitos(sheet or {})
+                 if e.get("resistencia")]
         if extra:
             return list(base) + extra
     return base
@@ -7575,6 +7575,103 @@ def _ca_se_equipar(char: dict, nome: str, slot: str) -> int | None:
     return copia["sheet"]["ca"]
 
 
+def _uso_na_mochila(dono: dict, item: dict) -> dict | None:
+    """
+    O botão de usar do item na Mochila, fora do combate. None quando o item
+    não é consumível. A regra é a da tela tática (_efeito_de_item); o que
+    muda é que fora do combate não há economia de ações nem zonas.
+    """
+    ficha = _efeito_de_item(item.get("nome", ""))
+    if not ficha:
+        return None
+    efeito = ficha["efeito"]
+    rotulo = "Beber" if efeito in ("cura", "resistencia") else "Usar"
+    uso = {"efeito": efeito, "rotulo": rotulo, "pode": True, "motivo": "",
+           "detalhe": ficha.get("rotulo", ""), "alvos": []}
+    cs = memory.campaign.get("combat_state") or {}
+    if cs.get("is_active"):
+        uso.update(pode=False, motivo="Em combate, use pela tela tática: custa Ação ou Ação Bônus.")
+    elif (dono.get("status") or "").lower() in ("inconsciente", "dormindo", "estabilizado"):
+        uso.update(pode=False, motivo=(f"{dono.get('name', '')} está {dono.get('status')}: "
+                                       f"outro do grupo precisa dar a poção pela mochila dele."))
+    elif efeito == "desconhecido":
+        uso.update(pode=False, motivo=("O motor não conhece o efeito deste item. "
+                                       "Descreva o uso no chat para o mestre resolver."))
+    elif efeito == "arremesso":
+        uso.update(pode=False, motivo="Arremesso contra um alvo: só em combate, pela tela tática.")
+    elif efeito == "cura":
+        # Fora do combate não há zonas: qualquer um do grupo que não esteja morto.
+        eu = dono.get("name", "")
+        outros = [c.get("name", "") for c in _grupo_com_ficha()
+                  if (c.get("status") or "").lower() != "morto"
+                  and memory.char_key(c.get("name", "")) != memory.char_key(eu)]
+        uso["alvos"] = [eu] + outros
+    return uso
+
+
+def _usar_na_mochila(char: str, item_nome: str, alvo_nome: str = "") -> str:
+    """Aplica o uso de um consumível fora do combate. Texto com o prefixo de recusa."""
+    dono, err = _get_char(char, allow_dead=False)
+    if not dono:
+        return err
+    inv = dono.get("inventario") or []
+    slot_inv = next((i for i in inv if isinstance(i, dict)
+                     and _norm_txt(i.get("nome", "")) == _norm_txt(item_nome)
+                     and int(i.get("qtd", 1) or 1) > 0), None)
+    if not slot_inv:
+        return f"Erro: {dono['name']} não tem '{item_nome}'."
+    uso = _uso_na_mochila(dono, slot_inv)
+    if not uso:
+        return f"Aviso: '{slot_inv['nome']}' não é algo que se use assim."
+    if not uso["pode"]:
+        return f"Aviso: {slot_inv['nome']}: {uso['motivo']} O item não foi gasto."
+
+    ficha = _efeito_de_item(slot_inv["nome"])
+    s = dono["sheet"]
+
+    if ficha["efeito"] == "cura":
+        alvo_nome = (alvo_nome or dono["name"]).strip()
+        if memory.char_key(alvo_nome) not in {memory.char_key(n) for n in uso["alvos"]}:
+            return f"Aviso: {alvo_nome} não pode receber {slot_inv['nome']} agora."
+        recv = memory.campaign["characters"].get(memory.char_key(alvo_nome))
+        st = recv["sheet"]
+        n_d, sides, bonus = ficha["dado"]
+        rolls = [random.randint(1, sides) for _ in range(n_d)]
+        cura = sum(rolls) + bonus
+        antes = int(st.get("vida_atual", 0) or 0)
+        teto = _hp_max_efetivo(st)
+        st["vida_atual"] = max(antes, min(teto, antes + cura))
+        depois = st["vida_atual"]
+        if antes == 0 and depois > 0 and (recv.get("status") or "").lower() in ("inconsciente", "estabilizado"):
+            recv["status"] = "vivo"
+            st["death_saves_sucessos"] = 0
+            st["death_saves_falhas"] = 0
+        quem = "bebeu" if recv is dono else f"deu a {recv['name']}"
+        nota_teto = f" (teto {teto} pela exaustão)" if teto < int(st.get("vida_max", 0) or 0) else ""
+        msg = (f"{dono['name']} {quem} {slot_inv['nome']}: {n_d}d{sides} "
+               f"[{' + '.join(str(r) for r in rolls)}] +{bonus} = +{cura} PV "
+               f"• {recv['name']} {antes}→{depois}/{int(st.get('vida_max', 0) or 0)}{nota_teto}")
+    elif ficha["efeito"] == "resistencia":
+        tipo = ficha["tipo_dano"]
+        pt = _TIPO_DANO_ITEM_PT.get(tipo, tipo)
+        _dar_efeito(s, {"nome": f"Resistência a {pt}", "resistencia": tipo,
+                        "origem": slot_inv["nome"], "ate_hora": _agora_em_horas() + 1})
+        msg = f"{dono['name']} bebeu {slot_inv['nome']}: resistência a dano de {pt} por 1 hora."
+    elif ficha["efeito"] == "antitoxina":
+        _dar_efeito(s, {"nome": "Antitoxina", "antitoxina": True,
+                        "descricao": "vantagem em salvaguardas contra Envenenado",
+                        "origem": slot_inv["nome"], "ate_hora": _agora_em_horas() + 1})
+        msg = f"{dono['name']} tomou {slot_inv['nome']}: vantagem contra Envenenado por 1 hora."
+    else:
+        return f"Aviso: {slot_inv['nome']}: não dá para usar fora do combate."
+
+    slot_inv["qtd"] = int(slot_inv.get("qtd", 1) or 1) - 1
+    if slot_inv["qtd"] <= 0:
+        inv.remove(slot_inv)
+    memory.save_campaign()
+    return msg
+
+
 def inventory_snapshot(char_name: str = "") -> dict:
     """Estado da Mochila para a tela (JSON-serializável)."""
     grupo = _grupo_com_ficha()
@@ -7638,6 +7735,7 @@ def inventory_snapshot(char_name: str = "") -> dict:
             "equipado_em": [_ROTULO_DO_SLOT[x] for x in em if x in _ROTULO_DO_SLOT],
             "opcoes_de_equipar": opcoes,
             "a_identificar": _a_identificar(it),
+            "uso": _uso_na_mochila(alvo, it),
         })
 
     base["personagem"] = {
@@ -7654,17 +7752,21 @@ def inventory_snapshot(char_name: str = "") -> dict:
     return base
 
 
-def inventory_action(action: str, char: str = "", item: str = "", slot: str = "") -> dict:
+def inventory_action(action: str, char: str = "", item: str = "", slot: str = "",
+                     alvo: str = "") -> dict:
     """
     Aplica UMA intenção da Mochila.
 
-    actions: equipar | desequipar | largar | identificar
+    actions: equipar | desequipar | largar | identificar | usar
 
     Só despacho: equip_item, unequip_item, remove_item (uma unidade) e
-    identify_item — as mesmas ferramentas do mestre.
+    identify_item — as mesmas ferramentas do mestre. "usar" aplica um
+    consumível fora do combate com a ficha da tela tática (_efeito_de_item).
     """
     a = (action or "").lower().strip()
-    if a == "equipar":
+    if a == "usar":
+        msg = _usar_na_mochila(char, item, alvo)
+    elif a == "equipar":
         msg = equip_item(char, item, slot)
     elif a == "desequipar":
         msg = unequip_item(char, slot)
@@ -12015,7 +12117,21 @@ def _alvos_de_item(ator_nome: str, ficha: dict) -> dict:
 # ── Efeitos temporários (resistência de poção, antitoxina) ─────────────────
 
 def _efeitos(sheet: dict) -> list[dict]:
-    return [e for e in (sheet.get("efeitos") or []) if isinstance(e, dict)]
+    """
+    Efeitos ativos. Os de combate valem até end_combat; os bebidos fora dele
+    têm prazo no relógio do mundo (`ate_hora`) e somem quando a hora passa.
+    """
+    agora = None
+    ativos = []
+    for e in (sheet.get("efeitos") or []):
+        if not isinstance(e, dict):
+            continue
+        if e.get("ate_hora") is not None:
+            agora = _agora_em_horas() if agora is None else agora
+            if int(e["ate_hora"]) <= agora:
+                continue
+        ativos.append(e)
+    return ativos
 
 
 def _dar_efeito(sheet: dict, efeito: dict) -> None:

@@ -4,7 +4,9 @@
 //  REGRA DE OURO, a mesma das outras telas: nenhuma regra de jogo mora
 //  aqui. Onde cada item pode ir, que CA ele daria, quanto pesa, o que está a
 //  identificar — tudo vem do motor (tools_dnd via /api/inventory/*). Os
-//  botões chamam equip_item, unequip_item, remove_item e identify_item.
+//  botões chamam equip_item, unequip_item, remove_item e identify_item, e
+//  "Beber"/"Usar" aplica um consumível fora do combate com a mesma ficha de
+//  item da tela tática (o que dá para usar e em quem vem em `uso`).
 //
 //  Diferente das outras, esta tela NÃO abre sozinha: nada no mundo pede
 //  "agora arrume a mochila". Ela abre pelo atalho no cartão do personagem.
@@ -120,6 +122,28 @@
       </div>`;
   }
 
+  // Botões de usar. Fora do combate: beber em si, dar a outro do grupo. O que
+  // não dá para usar aqui (arremesso, efeito desconhecido, em combate) aparece
+  // travado com o motivo escrito, e não só no title: no celular não há hover.
+  function usos(i) {
+    const u = i.uso;
+    if (!u) return '';
+    const dica = u.detalhe ? ` title="${esc(u.detalhe)}"` : '';
+    if (!u.pode) {
+      return `<button class="inv-btn inv-btn-usar" disabled data-travado="1"${dica}>${esc(u.rotulo)}</button>`
+        + `<small class="inv-uso-motivo">${esc(u.motivo)}</small>`;
+    }
+    if (u.efeito !== 'cura' || (u.alvos || []).length <= 1) {
+      return `<button class="inv-btn inv-btn-usar"${dica}
+                      onclick="window.Inventory._usar('${aspas(i.nome)}','')">${esc(u.rotulo)}</button>`;
+    }
+    const [eu, ...outros] = u.alvos;
+    return `<button class="inv-btn inv-btn-usar"${dica}
+                    onclick="window.Inventory._usar('${aspas(i.nome)}','${aspas(eu)}')">${esc(u.rotulo)}</button>`
+      + outros.map(n => `<button class="inv-btn inv-btn-dar"${dica}
+                    onclick="window.Inventory._usar('${aspas(i.nome)}','${aspas(n)}')">Dar a ${esc(n)}</button>`).join('');
+  }
+
   function item(i, ca) {
     const marcas = [
       i.equipado_em.length ? `<span class="inv-marca inv-marca-equip">${i.equipado_em.map(esc).join(', ')}</span>` : '',
@@ -147,6 +171,7 @@
         ${marcas ? `<div class="inv-marcas">${marcas}</div>` : ''}
         ${i.descricao ? `<p class="inv-item-desc">${esc(i.descricao)}</p>` : ''}
         <div class="inv-item-acoes">
+          ${usos(i)}
           ${botoes}
           ${i.a_identificar ? `<button class="inv-btn inv-btn-identificar"
                                        title="Confere o item no SRD de D&amp;D 5e"
@@ -231,7 +256,10 @@
     if (!frame) return;
     frame.classList.toggle('inv-ocupado', ligado);
     frame.setAttribute('aria-busy', ligado ? 'true' : 'false');
-    frame.querySelectorAll('.inv-btn, .inv-quem-sel').forEach(b => { b.disabled = ligado; });
+    // O que o motor travou (data-travado) continua travado depois da espera.
+    frame.querySelectorAll('.inv-btn, .inv-quem-sel').forEach(b => {
+      b.disabled = ligado || b.dataset.travado === '1';
+    });
   }
 
   function destacarItem(nome) {
@@ -318,6 +346,7 @@
     _equipar: (item, slot) => agir({ action: 'equipar', item, slot }),
     _desequipar: (slot) => agir({ action: 'desequipar', slot }),
     _largar: (item) => agir({ action: 'largar', item }),
+    _usar: (item, alvo) => agir({ action: 'usar', item, alvo }),
     _identificar: identificar,
   };
 

@@ -2882,6 +2882,7 @@ def inventory_action_route():
         char=(d.get("char") or "").strip(),
         item=(d.get("item") or "").strip(),
         slot=(d.get("slot") or "").strip(),
+        alvo=(d.get("alvo") or "").strip(),
     ))
 
 

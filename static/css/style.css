@@ -3138,6 +3138,10 @@ body.inventory-on { overflow: hidden; }
   .inv-item { transition: none; }
 }
 .inv-btn-largar { color: var(--inv-muted); border-color: var(--inv-line); }
+/* Usar fora do combate: verde de cura, para não competir com "equipar". */
+.inv-btn-usar, .inv-btn-dar { border-color: #2e7d32; color: #1f5e24; }
+.inv-btn-usar:hover:not(:disabled), .inv-btn-dar:hover:not(:disabled) { background: rgba(46,125,50,0.1); }
+.inv-uso-motivo { flex-basis: 100%; font-size: 0.74rem; font-style: italic; color: var(--inv-muted); }
 .inv-vazio { color: var(--inv-muted); font-style: italic; text-align: center; padding: var(--esp-8) var(--esp-4); }
 
 .inv-rodape {

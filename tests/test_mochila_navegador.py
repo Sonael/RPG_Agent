@@ -261,6 +261,61 @@ def test_item_comum_nao_tem_identificar(pagina):
     assert pg.locator(f"{_item('Corda de Cânhamo')} .inv-btn-identificar").count() == 0
 
 
+# ---- usar fora do combate ----------------------------------------------------
+
+def _mochila_com_consumiveis():
+    import copy
+    import capturar_telas as cap
+    estado = copy.deepcopy(cap.MOCHILA)
+    estado["characters"]["stelar"]["inventario"] += [
+        {"nome": "Frasco de Ácido", "qtd": 1, "descricao": ""},
+        {"nome": "Poção de Força de Gigante", "qtd": 1, "descricao": ""},
+    ]
+    estado["characters"]["helena"] = {"sheet": {"vida_atual": 5}, "status": "vivo"}
+    estado["combat_state"] = {"is_active": False, "initiative_order": []}
+    return estado
+
+
+def test_pocao_tem_beber_e_dar_a_cada_um_do_grupo(navegador):
+    pg, _ = navegador(_mochila_com_consumiveis())
+    acoes = pg.inner_text(f"{_item('Poção de Cura')} .inv-item-acoes")
+    assert "Beber" in acoes and "Dar a Helena" in acoes and "Dar a Natasha" in acoes
+
+
+def test_dar_a_pocao_cura_quem_recebe_e_gasta_uma(navegador):
+    pg, erros = navegador(_mochila_com_consumiveis())
+    _clicar(pg, f"{_item('Poção de Cura')} .inv-btn-dar:has-text('Helena')", 1200)
+
+    assert "Stelar deu a Helena Poção de Cura" in pg.inner_text("#inv-msg")
+    assert "×" not in pg.inner_text(f"{_item('Poção de Cura')} .inv-item-nome"), "a poção não foi gasta"
+    helena = pg.evaluate(
+        "async () => (await (await authFetch((window.API || '') + "
+        "'/api/heroes/sheet?personagem=Helena')).json()).personagem")
+    assert helena["vida"]["atual"] > 5
+    assert not erros, erros[:3]
+
+
+def test_o_que_nao_da_para_usar_fica_travado_com_o_motivo_escrito(navegador):
+    pg, _ = navegador(_mochila_com_consumiveis())
+    acido = _item("Frasco de Ácido")
+    assert pg.is_disabled(f"{acido} .inv-btn-usar")
+    assert "só em combate" in pg.inner_text(f"{acido} .inv-uso-motivo")
+    assert "mestre" in pg.inner_text(f"{_item('Poção de Força de Gigante')} .inv-uso-motivo")
+    # Outra ação na tela reabilita os botões ao terminar; o travado não pode voltar.
+    _clicar(pg, f"{_item('Tocha')} .inv-btn-largar")
+    assert pg.is_disabled(f"{acido} .inv-btn-usar"), "o botão travado voltou a funcionar"
+
+
+def test_em_combate_a_mochila_manda_para_a_tela_tatica(navegador):
+    estado = _mochila_com_consumiveis()
+    estado["combat_state"] = {"is_active": True, "initiative_order": ["Stelar"],
+                              "current_turn_index": 0, "round": 1}
+    pg, _ = navegador(estado)
+    pocao = _item("Poção de Cura")
+    assert pg.is_disabled(f"{pocao} .inv-btn-usar")
+    assert "tela tática" in pg.inner_text(f"{pocao} .inv-uso-motivo")
+
+
 # ---- carga, grupo, outras telas --------------------------------------------
 
 def test_sobrecarregada_pinta_a_barra(navegador):

@@ -1530,6 +1530,40 @@ A tela continua passando por `identify_item`. O resultado em dados
 (`resultado` na resposta de `inventory_action`) sai do item gravado (`nome_srd`
 e `srd`, com tipo e raridade em português), não do texto do mestre.
 
+### Usar fora do combate
+
+A Mochila só equipava, tirava, largava e identificava: beber uma poção depois
+da luta exigia pedir ao mestre. Cada item consumível agora traz `uso` no
+snapshot, calculado por `_uso_na_mochila` a partir da mesma ficha da tela
+tática (`_efeito_de_item`), e `inventory_action("usar", char, item, alvo)`
+aplica.
+
+- **Poção de Cura**: "Beber" em si, e "Dar a …" para cada um do grupo que não
+  esteja morto (fora do combate não há zonas). Rola a cura, respeita o teto da
+  exaustão e levanta quem está caído. Quem está inconsciente ou dormindo não
+  bebe sozinho: o botão dele fica travado e outro precisa dar a poção.
+- **Poção de Resistência** e **Antitoxina**: duram **1 hora no relógio do
+  mundo** (`ate_hora`). `_efeitos` descarta o que passou da hora, então
+  `advance_time` encerra o efeito sem nenhum passo extra, e um combate no meio
+  não o apaga. Os mesmos itens tomados na tela tática duram o combate.
+- **Arremessos** (ácido, fogo alquímico, água benta) e **itens sem efeito
+  conhecido** aparecem com o botão travado e o motivo **escrito** embaixo
+  (no celular não há hover). O motor recusa com "Aviso:" e não gasta nada.
+- **Em combate**, o uso é travado na Mochila com "use pela tela tática": lá ele
+  custa Ação ou Ação Bônus, e a Mochila não pode ser um atalho para pular a
+  economia do turno.
+- O botão travado continua travado depois de outra ação na tela (`ocupar`
+  respeita `data-travado`).
+- Como o resto da Mochila, usar não manda nada ao mestre: a vida e os efeitos
+  ficam na ficha, que ele lê.
+
+`test_mochila_usar.py` (10) cobre o que dá para usar e por quê, beber, dar a
+outro e levantar caído, caído que não bebe, teto da exaustão, alvo inválido,
+arremesso e desconhecido sem gastar, combate, resistência de 1 hora (sobrevive
+a um combate e acaba com `advance_time`) e antitoxina. `test_mochila_navegador.py`
+ganhou os botões Beber e Dar a, a cura em outro do grupo, o travado com o
+motivo e o combate.
+
 ## Ficha do local
 
 Os locais eram uma lista plana: Cliviate, a Forja de Cliviate e o Boticário
@@ -2202,9 +2236,10 @@ aliado em outra zona e curava acima do teto da exaustão.
   (gancho `_inicio_de_turno`), seguido do teste de DES CD 10 para apagar.
   No livro o teste gasta a Ação da criatura; aqui ele é automático, porque a
   vez do inimigo corre sem escolha. Cair a 0 PV ou o combate acabar apaga.
-- Os efeitos de 1 hora (resistência, antitoxina) ficam em `sheet["efeitos"]`
-  e acabam com o combate, porque o motor mede duração em combate e não em
-  horas. A resistência entra no cálculo de dano por `_traits_lookup`; a
+- Os efeitos de 1 hora (resistência, antitoxina) tomados **em combate** ficam
+  em `sheet["efeitos"]` e acabam com o combate, porque o combate não avança o
+  relógio do mundo. Tomados fora dele, pela Mochila, duram 1 hora no relógio
+  (ver [Usar fora do combate](#usar-fora-do-combate)). A resistência entra no cálculo de dano por `_traits_lookup`; a
   antitoxina aparece no card e na ficha do herói, e `apply_condition` lembra o
   mestre dela quando ele aplica Envenenado.
 - **Item que o motor não conhece** (Poção de Força de Gigante, pergaminhos,
