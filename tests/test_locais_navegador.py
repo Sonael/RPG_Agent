@@ -120,7 +120,7 @@ def test_lugar_longe_nao_tem_ir_nem_falar(pagina):
 
     assert "Longe do grupo" in pg.inner_text("#lcl-selo")
     assert pg.locator("#local-overlay .lcl-btn-ir").count() == 0
-    assert pg.is_disabled(f"{_item('Eremita')} button")
+    assert pg.is_disabled(f"{_item('Eremita')} button:has-text('Falar com')")
 
 
 def test_local_da_barra_lateral_abre_onde_o_grupo_esta(pagina):

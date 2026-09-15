@@ -1955,7 +1955,7 @@ def chat():
     MAX_RETRIES = 3
 
     WRITE_TOOLS = {
-        "save_character", "set_character_location", "save_location", "save_event", "set_flag",
+        "save_character", "set_character_location", "add_character_knowledge", "save_location", "save_event", "set_flag",
         "add_diary_entry", "update_character_status", "update_story_summary",
         "update_world_state", "add_party_member", "remove_party_member", "clear_flag",
     }
@@ -2592,8 +2592,11 @@ def update_character(name):
     import copy as _copy
     from rpg.tools_dnd import normalize_edited_character
     novo = _copy.deepcopy(ch)
-    # "local" entra mesmo em personagem que ainda não tinha paradeiro.
-    novo.update({k: v for k, v in data.items() if k in ch or k == "local"})
+    # "local" e "conhecido" entram mesmo em personagem que ainda não os tinha.
+    novo.update({k: v for k, v in data.items() if k in ch or k in ("local", "conhecido")})
+    if "conhecido" in data:
+        from rpg import personagens
+        novo["conhecido"] = personagens.limpar_conhecido(data.get("conhecido"))
     if "local" in data:
         from rpg import locais
         if (data.get("local") or "").strip():
@@ -2871,6 +2874,14 @@ def inventory_action_route():
         item=(d.get("item") or "").strip(),
         slot=(d.get("slot") or "").strip(),
     ))
+
+
+@app.route("/api/characters/sheet", methods=["GET"])
+@require_auth
+def character_sheet_route():
+    """Ficha do personagem: relação com o grupo, ligações, o que o grupo sabe."""
+    from rpg import personagens
+    return jsonify(personagens.ficha((request.args.get("nome") or "").strip()))
 
 
 @app.route("/api/locations/state", methods=["GET"])

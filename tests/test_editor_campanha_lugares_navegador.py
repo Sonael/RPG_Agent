@@ -116,3 +116,25 @@ def test_salvar_grava_lugares_com_o_nome_e_mantem_a_atitude(editor):
     assert "praça de cliviate" in gravado["locations"], "a chave voltou a usar sublinhado"
     assert gravado["locations"]["praça de cliviate"]["dentro_de"] == "Cliviate"
     assert "dentro_de" not in gravado["locations"]["floresta das brumas"]
+
+
+def test_o_que_o_grupo_sabe_separado_das_notas_do_mestre(editor):
+    pg, erros, gravado = editor
+    _abrir_personagem(pg, "Brom")
+    i = pg.evaluate("() => edChars.findIndex(c => c.name === 'Brom')")
+    campo = f"#ed-cb-{i} .ed-conhecido"
+    assert pg.input_value(campo).splitlines() == ["O filho dele sumiu na estrada do norte",
+                                                  "Aprendeu o ofício com o avô, em Oakhaven"]
+    assert "SEGREDO" in pg.input_value(f"#ed-cb-{i} .ed-notas")
+    assert "não aparecem na ficha" in pg.inner_text(f"#ed-cb-{i}")
+
+    pg.fill(campo, "O filho dele sumiu na estrada do norte\n\n  Deve dinheiro à guarda  \n")
+    pg.dispatch_event(campo, "change")
+    pg.evaluate("() => { saveEditedCampaign(); }")
+    pg.wait_for_selector("#dialog-overlay:not(.hidden)", timeout=10000)
+
+    brom = gravado["characters"]["brom"]
+    assert brom["conhecido"] == ["O filho dele sumiu na estrada do norte", "Deve dinheiro à guarda"]
+    assert brom["notes"].startswith("SEGREDO")
+    assert len(brom["atitude_historico"]) == 3, "salvar pelo menu apagou o histórico da atitude"
+    assert not erros, erros[:3]

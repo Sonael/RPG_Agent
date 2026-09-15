@@ -28,7 +28,9 @@ def save_character(
         description: Aparência, origem ou papel na história.
         traits:      Personalidade, maneirismos, falas típicas.
         status:      Estado atual (ex: vivo, morto, desaparecido, aliado, inimigo).
-        notes:       Qualquer detalhe adicional relevante para a narrativa.
+        notes:       Seu caderno sobre o personagem: planos, segredos, o que o
+                     grupo ainda não descobriu. Não aparece na ficha do jogador
+                     (o que o grupo já sabe vai em add_character_knowledge).
         local:       Onde o personagem está (ex: 'Forja de Cliviate'). Vazio
                      mantém o que já estava gravado.
     """
@@ -54,6 +56,34 @@ def save_character(
     memory.campaign["characters"][key] = novo
     memory.save_campaign()
     return f"Personagem '{name}' salvo na memória."
+
+
+def add_character_knowledge(name: str, fato: str) -> str:
+    """
+    Registra algo que o GRUPO descobriu sobre um personagem: um fato dito em
+    cena, um segredo revelado, um detalhe observado. Aparece na ficha do
+    personagem em "O que o grupo sabe".
+
+    Use para o que o jogador já sabe. O que só você sabe (planos, segredos
+    ainda não revelados) fica em `notes`, que não aparece na ficha.
+
+    Args:
+        name: Nome do personagem (já salvo com save_character).
+        fato: Uma frase curta (ex: 'O filho dele está entre os desaparecidos').
+    """
+    ch = memory.campaign["characters"].get(memory.char_key(name))
+    if not ch:
+        return f"Erro: Personagem '{name}' não encontrado. Use save_character primeiro."
+    texto = " ".join((fato or "").split())
+    if not texto:
+        return "Aviso: informe o fato que o grupo descobriu."
+    lista = ch.setdefault("conhecido", [])
+    if any(locais.norm(f) == locais.norm(texto) for f in lista):
+        return f"Nota: o grupo já sabia disso sobre {ch.get('name', name)}."
+    lista.append(texto)
+    del lista[:-30]
+    memory.save_campaign()
+    return f"Registrado sobre {ch.get('name', name)}: {texto}"
 
 
 def set_character_location(name: str, local: str) -> str:
@@ -937,6 +967,11 @@ def get_scene_context(extra_characters: str = "", extra_locations: str = "") -> 
             lines.append(f"• {ch['name']}{marca} ({ch['status']}): {ch['description'][:80]}")
             if ch.get("traits"):
                 lines.append(f"  Traços: {ch['traits'][:60]}")
+            # O que o jogador já viu na ficha: o mestre não conta de novo como
+            # novidade nem registra em dobro.
+            sabido = [f for f in (ch.get("conhecido") or []) if isinstance(f, str)]
+            if sabido:
+                lines.append("  Grupo sabe: " + "; ".join(s[:60] for s in sabido[-3:]))
         titulo = (
             "Personagens conhecidos (a campanha INTEIRA — ainda não há grupo "
             "nem local para filtrar; quem está na cena quem decide é você)"
@@ -1173,6 +1208,7 @@ ALL_TOOLS = [
     # Personagens
     save_character,
     set_character_location,
+    add_character_knowledge,
     get_character,
     list_characters,
     update_character_status,

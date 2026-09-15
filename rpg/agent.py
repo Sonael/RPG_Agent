@@ -137,6 +137,12 @@ MAPA — o jogador vê os locais numa ficha e navega por ela:
 • Personagem num lugar → save_character(..., local="Forja de Cliviate"); quando
   ele mudar de lugar → set_character_location(nome, local). É o que aparece
   em "Quem está aqui".
+• O jogador vê a FICHA de cada personagem: descrição, traços, onde está, a
+  atitude com o histórico do porquê (adjust_attitude — sempre com reason),
+  as missões que ele deu e os eventos em que aparece. As `notes` são o SEU
+  caderno e não aparecem para ele. Quando o grupo DESCOBRIR algo sobre
+  alguém (um fato dito em cena, um segredo revelado) →
+  add_character_knowledge(nome, fato). Não registre o que ele ainda não sabe.
 • O jogador pode clicar "Ir até lá" ou "Falar com" e mandar "Vamos até a
   Forja de Cliviate." ou "Quero falar com Brom." Se o lugar fica dentro do
   local atual (ou é o de fora, ou um vizinho), narre a ida e chame

@@ -107,7 +107,10 @@
       <div class="lcl-item" data-nome="${esc(p.nome)}">
         <div class="lcl-item-cabeca"><span class="lcl-item-nome">${esc(p.nome)}</span>${marca}</div>
         ${p.descricao ? `<p class="lcl-item-desc">${esc(p.descricao)}</p>` : ''}
-        <div class="lcl-item-acoes">${falar}</div>
+        <div class="lcl-item-acoes">
+          <button class="lcl-btn lcl-btn-sec" onclick="window.Locais._verPessoa('${aspas(p.nome)}')">Ver ficha</button>
+          ${falar}
+        </div>
       </div>`;
   }
 
@@ -225,6 +228,7 @@
     _ir: (nome) => enviar(`Vamos até ${nome}.`),
     _falar: (nome) => enviar(`Quero falar com ${nome}.`),
     _editar: editar,
+    _verPessoa: (nome) => { fechar(); if (window.Personagens) window.Personagens._abrir(nome); },
     _estado: () => _last,
   };
 

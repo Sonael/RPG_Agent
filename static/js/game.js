@@ -646,7 +646,7 @@ const TOOL_LABEL = {
   get_diary: 'lendo diário', list_characters: 'listando personagens', list_locations: 'listando locais',
   list_party: 'listando grupo', list_flags: 'listando flags', save_character: 'salvando personagem',
   save_location: 'salvando local', save_event: 'salvando evento', set_flag: 'definindo flag',
-  set_character_location: 'situando personagem',
+  set_character_location: 'situando personagem', add_character_knowledge: 'anotando o que o grupo sabe',
   add_diary_entry: 'escrevendo no diário', update_character_status: 'atualizando personagem',
   update_story_summary: 'atualizando resumo', update_world_state: 'atualizando mundo',
   add_party_member: 'adicionando ao grupo', remove_party_member: 'removendo do grupo', clear_flag: 'removendo flag',
@@ -975,7 +975,12 @@ function buildDndCharCard(c, idx, type) {
     && sheet.xp >= sheet.xp_proximo
     && (sheet.nivel || 1) < 20;
 
-  let html = `<div class="char-card editable" onclick="openEditModal('${modalType}','${keyEsc}',${dataRef})">`;
+  // O cartão de um personagem do mundo abre a ficha dele (quem é, onde está,
+  // a relação com o grupo); o do grupo continua abrindo o editor.
+  const aoClicar = type === 'party'
+    ? `openEditModal('${modalType}','${keyEsc}',${dataRef})`
+    : `abrirFichaDoPersonagem('${nameEsc}','${modalType}','${keyEsc}',${dataRef})`;
+  let html = `<div class="char-card editable" onclick="${aoClicar}">`;
   html += `<div class="char-name">${escapeHtml(c.name || '')}`;
   html += `<div style="display:flex;align-items:center;gap:6px;">`;
   if (canLevelUp) html += `<span class="levelup-badge" onclick="gameLevelUpClick(event,'${keyEsc}','${type}',${idx})" title="XP suficiente para subir de nível">Subir de nível</span>`;
@@ -1006,12 +1011,19 @@ function buildDndCharCard(c, idx, type) {
         + `</div>`;
     }
   } else {
-    const desc = c.notes || c.description || '';
+    // As notas são o caderno do mestre, com segredos: o cartão mostra a descrição.
+    const desc = c.description || '';
     if (desc) html += `<div class="char-desc">${escapeHtml(desc.substring(0, 90))}${desc.length > 90 ? '…' : ''}</div>`;
   }
   if (type !== 'party') html += linhaDoLocalDoPersonagem(c);
   html += `</div>`;
   return html;
+}
+
+// Abre a ficha do personagem; sem personagens.js carregado, cai no editor.
+function abrirFichaDoPersonagem(nome, modalType, key, data) {
+  if (window.Personagens) window.Personagens._abrir(nome);
+  else openEditModal(modalType, key, data);
 }
 
 // "Em Forja de Cliviate" no cartão do personagem, e o nome abre a ficha do
@@ -1166,7 +1178,8 @@ function renderMemory(mem) {
     if (isDnd) return buildDndCharCard(c, i, 'character');
     const st = c.status?.toLowerCase() || 'vivo';
     const cls = st.includes('mort') ? 'dead' : st.includes('desapar') ? 'missing' : '';
-    return `<div class="char-card editable" onclick="openEditModal('character','${c.name.toLowerCase().replace(/'/g, "\\'")}',window._lastMem.characters[${i}])"><div class="char-name">${c.name}<span class="char-status ${cls}">${c.status}</span></div><div class="char-desc">${(c.description || '').substring(0, 100)}${(c.description || '').length > 100 ? '…' : ''}</div>${linhaDoLocalDoPersonagem(c)}</div>`;
+    const nomeJs = (c.name || '').replace(/'/g, "\\'");
+    return `<div class="char-card editable" onclick="abrirFichaDoPersonagem('${nomeJs}','character','${nomeJs.toLowerCase()}',window._lastMem.characters[${i}])"><div class="char-name">${c.name}<span class="char-status ${cls}">${c.status}</span></div><div class="char-desc">${(c.description || '').substring(0, 100)}${(c.description || '').length > 100 ? '…' : ''}</div>${linhaDoLocalDoPersonagem(c)}</div>`;
   }).join('');
 
   const dEl = document.getElementById('sb-diary');
@@ -2093,7 +2106,9 @@ function buildEditFields(type, data) {
       html += field('description', 'Descrição', data.description, 'textarea')
         + field('traits', 'Traços', data.traits, 'textarea', { rows: 2 })
         + field('status', 'Status', data.status, 'select', { options: ['vivo', 'morto', 'ferido', 'desaparecido', 'preso', 'aliado', 'inimigo', 'exilado'] })
-        + field('notes', 'Notas', data.notes, 'textarea', { rows: 2 });
+        + field('conhecido', 'O que o grupo sabe (um fato por linha; aparece na ficha)',
+            (Array.isArray(data.conhecido) ? data.conhecido : []).join('\n'), 'textarea', { rows: 3 })
+        + field('notes', 'Notas do mestre (segredos; não aparecem na ficha)', data.notes, 'textarea', { rows: 2 });
       // O grupo está sempre no local atual; "onde está" é para os demais.
       const doGrupo = ((window._lastMem || {}).party || [])
         .some(p => (p.name || '').toLowerCase() === (data.name || '').toLowerCase());
@@ -2234,6 +2249,9 @@ function getEditValues() {
   switch (_editCtx.type) {
     case 'character': {
       const base = { name: v('name'), description: v('description'), traits: v('traits'), status: v('status'), notes: v('notes') };
+      if (document.getElementById('ef-conhecido')) {
+        base.conhecido = v('conhecido').split('\n').map(s => s.trim()).filter(Boolean);
+      }
       if (document.getElementById('ef-local')) base.local = v('local');
       if (_editCtx.data.role !== undefined) base.role = v('role');
       if (_editCtx.data.sheet) {

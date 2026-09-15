@@ -3996,7 +3996,7 @@ body.rest-on { overflow: hidden; }
    fica dentro dele. O caminho até o lugar ("Cliviate › Forja de Cliviate")
    fica no topo e cada trecho abre a ficha daquele lugar.
    ═══════════════════════════════════════════════════════════════════ */
-#local-overlay {
+#local-overlay, #pessoa-overlay {
   --lcl-paper: #fffbf0;
   --lcl-bg:    #f4ebd8;
   --lcl-dark:  #3d2a14;
@@ -4014,10 +4014,10 @@ body.rest-on { overflow: hidden; }
   padding: var(--esp-5); box-sizing: border-box;
   font-family: 'Lora', serif;
 }
-#local-overlay.hidden { display: none; }
-body.local-on { overflow: hidden; }
+#local-overlay.hidden, #pessoa-overlay.hidden { display: none; }
+body.local-on, body.pessoa-on { overflow: hidden; }
 
-#lcl-frame {
+#lcl-frame, #psn-frame {
   width: 100%; max-width: 940px;
   height: min(90vh, 820px);
   background: var(--lcl-paper); color: var(--lcl-text);
@@ -4145,8 +4145,8 @@ body.local-on { overflow: hidden; }
 .char-local { font-family: 'Lora', serif; font-size: 11px; color: var(--text-muted); margin-top: 2px; }
 
 @media (max-width: 760px) {
-  #local-overlay { padding: 0; align-items: stretch; }
-  #lcl-frame { max-width: none; border-radius: 0; border: none; height: 100vh; }
+  #local-overlay, #pessoa-overlay { padding: 0; align-items: stretch; }
+  #lcl-frame, #psn-frame { max-width: none; border-radius: 0; border: none; height: 100vh; }
   .lcl-header { padding: var(--esp-4) var(--esp-10) var(--esp-3); max-height: none; overflow: visible; }
   .lcl-title { font-size: 1.3rem; }
   .lcl-corpo { display: block; overflow-y: auto; }
@@ -4159,3 +4159,55 @@ body.local-on { overflow: hidden; }
   .lcl-msg { flex-basis: 100%; }
   .lcl-msg:empty { display: none; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   FICHA DO PERSONAGEM — static/js/personagens.js
+
+   Usa a moldura e as classes da ficha do local (lcl-*). O que é só dela:
+   a barra de atitude (de hostil a leal, com o meio marcado), o histórico
+   do porquê de cada mudança e a lista do que o grupo sabe.
+   ═══════════════════════════════════════════════════════════════════ */
+.psn-tracos { font-style: italic; color: var(--lcl-muted); margin-top: var(--esp-1); }
+.psn-tracos:empty { display: none; }
+.psn-em { font-size: 0.86rem; color: var(--lcl-muted); }
+#psn-relacao-bloco { margin-bottom: var(--esp-4); }
+#psn-relacao-bloco.hidden { display: none; }
+.psn-atitude {
+  background: var(--lcl-paper); border: 1px solid var(--lcl-line); border-radius: 8px;
+  padding: var(--esp-3) var(--esp-4); margin-bottom: var(--esp-2);
+}
+.psn-atitude-topo { display: flex; justify-content: space-between; align-items: baseline; }
+.psn-atitude-rotulo {
+  font-family: 'Playfair Display', serif; font-size: 1.05rem; font-weight: 700;
+  text-transform: capitalize; color: var(--lcl-dark);
+}
+.psn-atitude-valor { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--lcl-muted); }
+.psn-faixa-hostil .psn-atitude-rotulo, .psn-faixa-desconfiado .psn-atitude-rotulo { color: var(--lcl-red); }
+.psn-faixa-amistoso .psn-atitude-rotulo, .psn-faixa-leal .psn-atitude-rotulo { color: var(--lcl-green); }
+.psn-barra {
+  position: relative; height: 8px; margin: var(--esp-2) 0 2px; border-radius: 4px;
+  background: linear-gradient(90deg, rgba(139,35,21,0.55), #e6ded2 50%, rgba(46,125,50,0.55));
+}
+.psn-barra-meio { position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: var(--lcl-muted); }
+.psn-barra-marca {
+  position: absolute; top: 50%; width: 14px; height: 14px; border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--lcl-paper); border: 2px solid var(--lcl-dark);
+}
+.psn-barra-pontas {
+  display: flex; justify-content: space-between;
+  font-size: 0.68rem; text-transform: uppercase; letter-spacing: .05em; color: var(--lcl-muted);
+}
+.psn-conduta { margin: var(--esp-2) 0 0; font-size: 0.84rem; color: var(--lcl-text); }
+.psn-historico, .psn-sabe-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--esp-1); }
+.psn-historico li, .psn-sabe-lista li {
+  font-size: 0.86rem; line-height: 1.4; background: var(--lcl-paper);
+  border: 1px solid var(--lcl-line); border-radius: 6px; padding: var(--esp-2) var(--esp-3);
+}
+.psn-historico small { color: var(--lcl-muted); }
+.psn-delta { display: inline-block; min-width: 3ch; font-weight: 700; font-variant-numeric: tabular-nums; }
+.psn-sobe { color: var(--lcl-green); }
+.psn-desce { color: var(--lcl-red); }
+.psn-secao-sabe { margin-top: var(--esp-2); }
+.psn-evento { color: var(--lcl-text); }
+.lcl-item-nome.psn-link { cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }

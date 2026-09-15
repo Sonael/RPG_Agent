@@ -595,12 +595,37 @@ CIDADE = {
                               "estoque": [{"nome": "Poção de Cura", "preco": 50, "qtd": 3, "descricao": ""}]},
     },
     "characters": {
-        "brom": _npc("Brom", "Ferreiro corpulento, braços cobertos de fuligem.", "Forja de Cliviate"),
+        # Brom tem ficha cheia: atitude com o porquê, o que o grupo sabe, a
+        # missão que deu e os eventos em que aparece. As notas são segredo do
+        # mestre e não podem aparecer na ficha do personagem.
+        "brom": {**_npc("Brom", "Ferreiro corpulento, braços cobertos de fuligem.", "Forja de Cliviate"),
+                 "traits": "Desconfiado com forasteiros, leal a quem cumpre a palavra.",
+                 "notes": "SEGREDO: forja as lâminas dos bandidos da estrada em troca do filho.",
+                 "atitude": 35,
+                 "atitude_historico": [
+                     {"delta": -10, "motivo": "Lyra pechinchou demais pela espada", "cap": 1},
+                     {"delta": 25, "motivo": "O grupo trouxe o martelo do avô de volta", "cap": 2},
+                     {"delta": 20, "motivo": "Alden defendeu a forja dos guardas", "cap": 2},
+                 ],
+                 "conhecido": ["O filho dele sumiu na estrada do norte",
+                               "Aprendeu o ofício com o avô, em Oakhaven"]},
         "mira": _npc("Mira", "Boticária de óculos redondos e mãos manchadas de ervas.", "Boticário da Mira"),
         "tiel": _npc("Guarda Tiel", "Guarda da praça, entediado e atento a forasteiros.", "Praça de Cliviate"),
         "velha nana": _npc("Velha Nana", "Vende maçãs e segredos por uma moeda de cobre.", "Praça de Cliviate"),
         "eremita": _npc("Eremita", "Vive na neblina e não gosta de visitas.", "Floresta das Brumas"),
     },
+    "quests": {
+        "o filho do ferreiro": {"titulo": "O filho do ferreiro", "status": "ativa",
+                                "descricao": "Encontrar o filho de Brom na estrada do norte.",
+                                "objetivos": [], "quem_deu": "brom", "recompensa": "Uma espada sob medida",
+                                "cap_inicio": 2},
+    },
+    "events": [
+        {"summary": "O grupo devolveu o martelo do avô a Brom.", "characters_involved": "Brom, Lyra, Alden",
+         "location": "Forja de Cliviate", "consequence": ""},
+        {"summary": "Guardas tentaram fechar a forja por dívida de impostos.", "characters_involved": "Brom; Guarda Tiel",
+         "location": "Forja de Cliviate", "consequence": ""},
+    ],
 }
 
 
@@ -989,6 +1014,20 @@ TELAS = [
      "estado": CIDADE, "espera": 800,
      "js": "window.Locais._abrir('Forja de Cliviate')",
      "exigir": "#local-overlay:not(.hidden) .lcl-item"},
+
+    # ── Ficha do personagem ──────────────────────────────────────────
+    # Abre pelo cartão da Enciclopédia ou pelo "Ver ficha" na ficha do local.
+    # Brom: a relação com o grupo e o porquê, o que o grupo sabe, a missão
+    # que deu e os eventos. Está ao lado da praça: "Falar com" e "Ir até".
+    {"nome": "personagem-ficha", "pagina": "/game.html",
+     "estado": CIDADE, "espera": 800,
+     "js": "window.Personagens._abrir('Brom')",
+     "exigir": "#pessoa-overlay:not(.hidden) .psn-atitude"},
+    # Longe do grupo e sem histórico: "Falar com" travado, listas vazias.
+    {"nome": "personagem-longe", "pagina": "/game.html",
+     "estado": CIDADE, "espera": 800,
+     "js": "window.Personagens._abrir('Eremita')",
+     "exigir": "#pessoa-overlay:not(.hidden) .psn-atitude"},
 
     # ── Combate ──────────────────────────────────────────────────────
     {"nome": "combate-regua-de-turnos", "pagina": "/game.html",

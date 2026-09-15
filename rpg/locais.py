@@ -205,6 +205,9 @@ def normalizar_campanha_editada(novos_locais: dict, antigos_locais: dict,
                   or {})
         for campo, valor in antigo.items():
             ch.setdefault(campo, valor)
+        if "conhecido" in ch:
+            from rpg.personagens import limpar_conhecido
+            ch["conhecido"] = limpar_conhecido(ch["conhecido"])
         if "local" in ch:
             if (ch.get("local") or "").strip():
                 ch["local"] = canonico(ch["local"])

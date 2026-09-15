@@ -92,18 +92,19 @@ abre o loop **percepção → deliberação → ação → verificação** em de
 9. [Tela de magias ("O Grimório")](#tela-de-magias-o-grimório)
 10. [Tela de equipamento ("A Mochila")](#tela-de-equipamento-a-mochila)
 11. [Ficha do local](#ficha-do-local)
-12. [Tela de loja ("O Balcão")](#tela-de-loja-o-balcão)
-13. [Tela de descanso ("A Fogueira")](#tela-de-descanso-a-fogueira)
-14. [Wizard e editores de ficha](#wizard-e-editores-de-ficha)
-15. [Tela de combate tática (Pergaminho Épico)](#tela-de-combate-tática-pergaminho-épico)
-16. [Tools, o catálogo do agente](#tools-o-catálogo-do-agente)
-17. [Endpoints HTTP](#endpoints-http)
-18. [Frontend](#frontend)
-19. [PWA e instalação](#pwa-e-instalação)
-20. [Testes e garantias](#testes-e-garantias)
-21. [Estrutura de arquivos](#estrutura-de-arquivos)
-22. [Configuração e execução](#configuração-e-execução)
-23. [Limitações conhecidas](#limitações-conhecidas)
+12. [Ficha do personagem](#ficha-do-personagem)
+13. [Tela de loja ("O Balcão")](#tela-de-loja-o-balcão)
+14. [Tela de descanso ("A Fogueira")](#tela-de-descanso-a-fogueira)
+15. [Wizard e editores de ficha](#wizard-e-editores-de-ficha)
+16. [Tela de combate tática (Pergaminho Épico)](#tela-de-combate-tática-pergaminho-épico)
+17. [Tools, o catálogo do agente](#tools-o-catálogo-do-agente)
+18. [Endpoints HTTP](#endpoints-http)
+19. [Frontend](#frontend)
+20. [PWA e instalação](#pwa-e-instalação)
+21. [Testes e garantias](#testes-e-garantias)
+22. [Estrutura de arquivos](#estrutura-de-arquivos)
+23. [Configuração e execução](#configuração-e-execução)
+24. [Limitações conhecidas](#limitações-conhecidas)
 
 ---
 
@@ -1681,6 +1682,78 @@ A fixture `campanha` dos testes passou a zerar também `locations`,
 `current_location` e `negocios`: um local salvo num teste aparecia como lugar
 "dentro" de outro no teste seguinte.
 
+## Ficha do personagem
+
+Quase tudo o que o jogo sabe sobre um NPC já estava gravado e não aparecia em
+lugar nenhum: a atitude (-100 a +100) e o motivo de cada mudança
+(`adjust_attitude` guarda as últimas cinco), as missões que ele encomendou
+(`quests[...]["quem_deu"]`), os eventos em que aparece
+(`events[...]["characters_involved"]`) e onde ele está. O cartão da
+Enciclopédia abria direto o editor e mostrava as `notes`, campo que o editor
+sugeria para "objetivos secretos": spoiler na frente do jogador.
+
+### Dados
+
+- `rpg/personagens.py`, `ficha(nome)`: quem é (descrição, traços, status),
+  onde está e o alcance (o do grupo é o local atual), a atitude com a faixa e a
+  conduta de `_faixa_atitude` e o histórico do mais recente para o mais antigo,
+  o que o grupo sabe, as missões que deu, os eventos em que aparece (os
+  últimos oito), a loja onde trabalha (quando o `local` é uma loja) e se dá
+  para falar com ele agora (perto, vivo, não preso nem desaparecido).
+- Nomes casam sem caixa nem acento. Nos eventos, o nome precisa ser um item da
+  lista ("Brom, Lyra" ou "Guarda Tiel; Brom") ou uma palavra inteira do texto:
+  "Bromwell" não conta como Brom.
+- **O que o grupo sabe** é campo novo, `conhecido`: uma lista de fatos, sem
+  repetidos, no máximo trinta (`limpar_conhecido`). O mestre registra com a
+  ferramenta nova `add_character_knowledge(nome, fato)` quando o grupo
+  descobre algo. Fato repetido volta com "Nota:", vazio com "Aviso:".
+- **As `notes` continuam do mestre** e não entram na ficha. A instrução do
+  agente explica a diferença: segredo ainda não revelado vai em `notes`, o que
+  o jogador já descobriu vai em `add_character_knowledge`.
+- O bloco de cena mostra ao mestre, em cada personagem relevante, "Grupo sabe:"
+  com os três fatos mais recentes, para ele não contar de novo nem contradizer.
+
+### A tela
+
+`static/js/personagens.js`, `GET /api/characters/sheet?nome=`. Usa a moldura e
+as classes da ficha do local, para as duas lerem igual. Abre pelo cartão do
+personagem na Enciclopédia (o do grupo continua abrindo o editor) e pelo "Ver
+ficha" em "Quem está aqui" na ficha do local. Mostra:
+
+- nome, status, "Em Forja de Cliviate" (abre a ficha do local), descrição e
+  traços;
+- **Relação com o grupo**: a barra de hostil a leal com o meio marcado, a
+  faixa, a conduta e cada mudança com o sinal, o motivo e o capítulo;
+- **O que o grupo sabe**;
+- **Ligações**: a loja onde trabalha, as missões que deu e os eventos.
+
+"Falar com" e "Ir até onde está" mandam ao mestre a mesma fala comum da ficha
+do local ("Quero falar com Brom.", "Vamos até Forja de Cliviate."). Longe do
+grupo, "Falar com" fica travado e diz por quê. "Editar personagem" abre o
+editor de sempre.
+
+### Nos editores
+
+O editor do jogo e o da campanha (menu) ganharam "O que o grupo sabe (um fato
+por linha; aparece na ficha)", e "Notas" virou "Notas do mestre (segredos; não
+aparecem na ficha)". O `PUT /api/memory/characters/<nome>` aceita `conhecido`
+mesmo em personagem que ainda não tinha o campo, e
+`normalizar_campanha_editada` limpa a lista e a preserva quando o editor não a
+manda.
+
+### Testes
+
+`test_personagens.py` cobre a ficha (notas fora, alcance, morto perto, membro do
+grupo), a atitude e o histórico, as missões, os eventos sem confundir nomes
+parecidos, `add_character_knowledge` (repetido, vazio, desconhecido, limite),
+o bloco de cena, a rota e os dois editores no servidor.
+`test_personagens_navegador.py` abre a ficha pela Enciclopédia e pela ficha do
+local, confere cada seção e que as notas não aparecem nem no cartão, clica em
+"Falar com" e "Ir até onde está", confere o personagem longe e sem histórico e
+grava pelo editor o que o grupo sabe. `test_editor_campanha_lugares_navegador.py`
+ganhou o campo no menu, salvando sem perder o histórico da atitude. Capturas:
+`personagem-ficha` e `personagem-longe`.
+
 ## Tela de loja ("O Balcão")
 
 A segunda tela do jogo, e a primeira construída depois de perguntar **por que**
@@ -2211,6 +2284,7 @@ ou uma fração — e portanto se vale a pena mexer em mais alguma coisa. Com
 |---|---|
 | `save_character` | Cria/atualiza NPC ou personagem do grupo (com `local` opcional) |
 | `set_character_location` | Onde um NPC está agora (aparece na ficha do local) |
+| `add_character_knowledge` | O que o grupo descobriu sobre alguém (aparece na ficha do personagem) |
 | `get_character` / `list_characters` | Lê personagem(ns) |
 | `update_character_status` | Muda status (vivo, ferido, morto, aliado…) |
 | `add_party_member` / `remove_party_member` / `list_party` | Gerencia o grupo |
@@ -2312,6 +2386,9 @@ acessam memória):
 - `GET /api/locations/state?local=` → ficha do local (caminho, alcance, o que
   fica dentro, quem está lá). O `PUT` de local aceita `dentro_de` (e recusa
   ciclo); o de personagem aceita `local`. Veja [Ficha do local](#ficha-do-local).
+- `GET /api/characters/sheet?nome=` → ficha do personagem (onde está, atitude e
+  histórico, o que o grupo sabe, missões, eventos, loja). O `PUT` de personagem
+  aceita `conhecido`. Veja [Ficha do personagem](#ficha-do-personagem).
 - O `PUT` de personagem (e o `PUT /api/campaigns/<name>`) passa por
   `normalize_edited_character`; aceita `correcao_manual` e devolve `mantidos`.
   Veja [Wizard e editores de ficha](#wizard-e-editores-de-ficha).
@@ -2418,6 +2495,8 @@ ferramentas do mestre.
   **`rest.js`**, as telas de nível, magias, equipamento, loja e descanso.
 - **`locais.js`**, a ficha do local (o que fica dentro, quem está lá, "Ir até
   lá" e "Falar com").
+- **`personagens.js`**, a ficha do personagem (relação com o grupo e o porquê,
+  o que o grupo sabe, ligações, "Falar com" e "Ir até onde está").
   Mesma regra: renderizam o snapshot do motor e despacham intenções. A fila
   que decide qual abre primeiro (combate, nível, grimório, descanso, loja; a
   Mochila só abre pelo atalho) e o empilhamento das pílulas ficam em
@@ -2698,6 +2777,7 @@ o nome do pacote. Também não há variável de ambiente nova.
 │   ├── agent.py           Instruções de estilo + create_agent
 │   ├── tools.py           Tools narrativas + ALL_TOOLS
 │   ├── locais.py          Hierarquia de locais, paradeiro e ficha do local
+│   ├── personagens.py     Ficha do personagem: relação, o que o grupo sabe, ligações
 │   ├── tools_dnd.py       Motor D&D 5e + combate (~7900 linhas, 38 tools)
 │   ├── memory.py          Estado por sessão, proxy, persistência
 │   ├── database.py        Camada Supabase

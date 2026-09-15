@@ -3678,6 +3678,7 @@ async function openEditCampaign(e, name) {
       notes:       ch.notes       || '',
       role:        ch.role        || '',
       local:       ch.local       || '',
+      conhecido:   Array.isArray(ch.conhecido) ? ch.conhecido.join('\n') : '',
       isParty:     (c.party||[]).some(p => p.name?.toLowerCase() === (ch.name||key).toLowerCase()),
       sheet:       ch.sheet ? Object.assign(edBlankSheet(), ch.sheet) : edBlankSheet(),
       inventario:  Array.isArray(ch.inventario)  ? ch.inventario.map(it => ({...it}))  : [],
@@ -4467,8 +4468,12 @@ function edRenderChars() {
           <textarea rows="2" onchange="edChars[${i}].traits=this.value" placeholder="Motivações, medos...">${escHtml(ch.traits)}</textarea>
         </div>
         <div>
-          <span class="cwc-label">Notas</span>
-          <textarea rows="2" onchange="edChars[${i}].notes=this.value" placeholder="Informações adicionais...">${escHtml(ch.notes)}</textarea>
+          <span class="cwc-label">O que o grupo sabe <small>(um fato por linha; aparece na ficha do personagem)</small></span>
+          <textarea class="ed-conhecido" rows="2" onchange="edChars[${i}].conhecido=this.value" placeholder="Ex: Perdeu o filho para os bandidos da estrada">${escHtml(ch.conhecido || '')}</textarea>
+        </div>
+        <div>
+          <span class="cwc-label">Notas do mestre <small>(segredos; não aparecem na ficha)</small></span>
+          <textarea class="ed-notas" rows="2" onchange="edChars[${i}].notes=this.value" placeholder="Planos, segredos, o que o grupo ainda não descobriu...">${escHtml(ch.notes)}</textarea>
         </div>
         ${isDnd ? `<div id="ed-dnd-sections-${i}">${edBuildDndSections(i)}</div>` : ''}
       </div>
@@ -4578,6 +4583,7 @@ async function saveEditedCampaign() {
       role:        ch.role,
       // Vazio apaga o paradeiro; o servidor grava com o nome do lugar salvo.
       local:       (ch.local || '').trim(),
+      conhecido:   String(ch.conhecido || '').split('\n').map(s => s.trim()).filter(Boolean),
       sheet:       isDnd && ch.sheet ? ch.sheet : null,
       inventario:  isDnd ? (ch.inventario || []) : [],
       habilidades: isDnd ? (ch.habilidades || []) : [],
