@@ -1920,6 +1920,10 @@ body.combat-on { overflow: hidden; }
   scroll-margin-top: var(--esp-16);
 }
 .cbt-picker.hidden { display: none; }
+/* Efeito de item (resistência de poção, antitoxina): verde, para não ser lido
+   como condição ruim ao lado de Envenenado ou Queimando. */
+.cbt-cond.cbt-efeito { background: rgba(46,125,50,0.12); color: #2e7d32; border-color: rgba(46,125,50,0.35); }
+.cbt-item-desconhecido small { font-style: italic; }
 .cbt-tgt-title {
   font-size: 0.88rem; font-weight: 700;
   color: var(--cbt-dark); margin-bottom: var(--esp-3);
@@ -4251,6 +4255,7 @@ body.local-on, body.pessoa-on, body.heroi-on { overflow: hidden; }
 .hro-marca { font-size: 0.74rem; padding: 2px 8px; border-radius: 999px;
   border: 1px solid var(--lcl-line); background: var(--lcl-paper); color: var(--lcl-text); }
 .hro-marca-perigo { border-color: var(--lcl-red); color: var(--lcl-red); }
+.hro-marca-efeito { border-color: var(--lcl-green); color: var(--lcl-green); }
 
 .hro-recursos { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
   gap: var(--esp-2); padding: var(--esp-3) var(--esp-5); border-bottom: 1px solid var(--lcl-line);

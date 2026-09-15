@@ -713,6 +713,21 @@ COMBATE_ZONAS["combat_state"].update({
                      "movimento_usado": False},
 })
 
+# ITENS NA TELA TÁTICA. Stelar no Pátio com uma poção, um frasco de ácido, uma
+# água benta e um item que o motor não conhece. Helena e Natasha no Portão
+# (vizinho): a poção não chega a elas, o ácido chega. Victoria na Sacada
+# (vizinha): o ácido chega; a água benta não faz nada nela, que não é morta-viva.
+COMBATE_ITENS = copy.deepcopy(COMBATE_ZONAS)
+COMBATE_ITENS["characters"]["stelar"] = {
+    "sheet": {"vida_atual": 19},
+    "inventario": [
+        {"nome": "Poção de Cura", "qtd": 2, "descricao": "2d4+2 PV"},
+        {"nome": "Frasco de Ácido", "qtd": 1, "descricao": ""},
+        {"nome": "Água Benta", "qtd": 1, "descricao": ""},
+        {"nome": "Poção de Força de Gigante", "qtd": 1, "descricao": ""},
+    ],
+}
+
 
 # Painel de fim de combate (vitória do grupo).
 COMBATE_ENCERRADO = copy.deepcopy(COMBATE_ATIVO)
@@ -1085,6 +1100,20 @@ TELAS = [
     {"nome": "combate-escolher-zona", "pagina": "/game.html",
      "estado": COMBATE_ZONAS, "espera": 700,
      "js": "window.Combat._sel('move')", "exigir": "#cbt-targets:not(.hidden)"},
+    # Itens: o que o motor não conhece aparece travado, com o motivo.
+    {"nome": "combate-itens", "pagina": "/game.html",
+     "estado": COMBATE_ITENS, "espera": 700,
+     "js": "window.Combat._sel('item')", "exigir": "#cbt-targets .cbt-item-desconhecido"},
+    # Poção: Helena e Natasha estão em outra zona, só Stelar alcança.
+    {"nome": "combate-pocao-alcance", "pagina": "/game.html",
+     "estado": COMBATE_ITENS, "espera": 700,
+     "js": "window.Combat._sel('item'); window.Combat._selItem('Poção de Cura', 'heal')",
+     "exigir": "#cbt-targets .cbt-fora"},
+    # Água Benta: Victoria não é morta-viva, fica "sem efeito".
+    {"nome": "combate-agua-benta", "pagina": "/game.html",
+     "estado": COMBATE_ITENS, "espera": 700,
+     "js": "window.Combat._sel('item'); window.Combat._selItem('Água Benta', 'arremesso')",
+     "exigir": "#cbt-targets .cbt-fora"},
     {"nome": "combate-vitoria", "pagina": "/game.html",
      "estado": COMBATE_ATIVO, "espera": 700,
      "estado2": COMBATE_ENCERRADO, "js2": "window.Combat.sync()",

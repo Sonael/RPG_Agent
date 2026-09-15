@@ -156,7 +156,8 @@
     // alvejável (não entra em isOut, então o picker de alvo o inclui).
     const asleep = (c.status || '').toLowerCase() === 'dormindo';
     const dim    = out || asleep;
-    const conds  = (c.condicoes || []).map(x => `<span class="cbt-cond">${esc(x)}</span>`).join('');
+    const conds  = (c.condicoes || []).map(x => `<span class="cbt-cond">${esc(x)}</span>`).join('')
+      + (c.efeitos || []).map(x => `<span class="cbt-cond cbt-efeito" title="Efeito de item até o fim do combate">${esc(x)}</span>`).join('');
     const meta   = `${esc(c.classe || '')}${c.nivel ? ' Nv.' + c.nivel : ''}`.trim();
     const temp   = Number(c.hp_temp || 0);
     const defs   = selosDeDefesa(c);
@@ -294,8 +295,10 @@
 
     const hasAcaoAbil  = (cur.habilidades || []).some(h => h.tipo_acao !== 'bonus');
     const hasBonusAbil = (cur.habilidades || []).some(h => h.tipo_acao === 'bonus');
-    const hasAcaoItem  = (cur.itens_combate || []).some(i => i.tipo_acao !== 'bonus');
-    const hasBonusItem = (cur.itens_combate || []).some(i => i.tipo_acao === 'bonus');
+    // Item sem efeito conhecido aparece na lista, mas não conta como opção.
+    const itensUsaveis = (cur.itens_combate || []).filter(i => i.usavel !== false);
+    const hasAcaoItem  = itensUsaveis.some(i => i.tipo_acao !== 'bonus');
+    const hasBonusItem = itensUsaveis.some(i => i.tipo_acao === 'bonus');
     const habUsable  = (hasAcaoAbil && !acaoUsed) || (hasBonusAbil && !bonusUsed);
     const itemUsable = (hasAcaoItem && !acaoUsed) || (hasBonusItem && !bonusUsed);
 
@@ -619,12 +622,20 @@
       tgtEl.innerHTML =
         `<div class="cbt-tgt-title">Item:</div>`
         + `<div class="cbt-picker-btns">`
-        + itens.map(it =>
-            `<button class="cbt-btn" ${dis(it.tipo_acao)} title="${esc(it.descricao)}" `
-            + `onclick="window.Combat._selItem('${esc(it.nome).replace(/'/g,"\\'")}','${esc(it.kind)}')">`
-            + `${esc(it.nome)} <small>×${it.qtd}${it.dice ? ' · ' + esc(it.dice) : ''}</small>`
-            + ` <em class="cbt-eco-tag eco-${it.tipo_acao}">${tag(it.tipo_acao)}</em></button>`
-          ).join('')
+        + itens.map(it => {
+            // O que o motor não sabe resolver fica travado e diz por quê:
+            // antes era gasto sem efeito nenhum.
+            const conhecido = it.usavel !== false;
+            const trava = conhecido ? dis(it.tipo_acao) : 'disabled';
+            const dica  = conhecido ? (it.descricao || it.dice || '') : it.motivo;
+            const nota  = conhecido
+              ? `×${it.qtd}${it.dice ? ' · ' + esc(it.dice) : ''}`
+              : `×${it.qtd} · efeito desconhecido`;
+            return `<button class="cbt-btn${conhecido ? '' : ' cbt-fora cbt-item-desconhecido'}" ${trava} title="${esc(dica)}" `
+              + `onclick="window.Combat._selItem('${esc(it.nome).replace(/'/g,"\\'")}','${esc(it.kind)}')">`
+              + `${esc(it.nome)} <small>${nota}</small>`
+              + ` <em class="cbt-eco-tag eco-${it.tipo_acao}">${tag(it.tipo_acao)}</em></button>`;
+          }).join('')
         + `<button class="cbt-btn cbt-cancel" onclick="window.Combat._cancel()">✕ Cancelar</button>`
         + `</div>`;
       tgtEl.classList.remove('hidden');
@@ -662,26 +673,55 @@
     if (_busy) return;
     const cur = (_last.combatants || []).find(c => c.is_current);
     if (!cur) return;
-    if (kind === 'heal') {
-      _pick = { kind: 'item', item: name };
-      const tgtEl = document.getElementById('cbt-targets');
-      const alvos = (_last.combatants || []).filter(c =>
-        c.is_party && (c.status || '').toLowerCase() !== 'morto');
-      const lista = alvos.length
-        ? alvos.map(c =>
-            `<button class="cbt-btn" onclick="window.Combat._target('${esc(c.name).replace(/'/g,"\\'")}')">`
-            + `${esc(c.name)} <small>${c.hp}/${c.hp_max}</small></button>`).join('')
-        : `<button class="cbt-btn" onclick="window.Combat._target('${esc(cur.name).replace(/'/g,"\\'")}')">${esc(cur.name)} (em si)</button>`;
-      tgtEl.innerHTML =
-        `<div class="cbt-tgt-title">Curar quem:</div>`
-        + `<div class="cbt-picker-btns">${lista}`
-        + `<button class="cbt-btn cbt-cancel" onclick="window.Combat._cancel()">✕ Cancelar</button>`
-        + `</div>`;
-      tgtEl.classList.remove('hidden');
-      trazerParaVista(tgtEl);
-    } else {
-      act({ action: 'item', actor: cur.name, item: name });
+    const it = (cur.itens_combate || []).find(i => i.nome === name) || {};
+    if (it.usavel === false) {
+      if (window.showToast) window.showToast(it.motivo || 'Efeito desconhecido.');
+      return;
     }
+    if (kind === 'si') {
+      act({ action: 'item', actor: cur.name, item: name, target: cur.name });
+      return;
+    }
+    if (kind !== 'heal' && kind !== 'arremesso') {
+      act({ action: 'item', actor: cur.name, item: name });
+      return;
+    }
+    // Poção: em si ou num aliado da mesma zona. Arremesso: qualquer outro na
+    // zona ou na vizinha — aliado incluído (fogo amigo). Quem alcança quem
+    // vem do motor (it.alvos); a tela só trava o que ele recusaria.
+    _pick = { kind: 'item', item: name };
+    const tgtEl = document.getElementById('cbt-targets');
+    const alvos = it.alvos || {};
+    const nomes = Object.keys(alvos);
+    const porNome = n => (_last.combatants || []).find(c => c.name === n) || {};
+    const NOTA = { fora: 'fora de alcance', sem_efeito: 'sem efeito' };
+    const lista = nomes.length
+      ? nomes.map(n => {
+          const estado = alvos[n];
+          const c = porNome(n);
+          const trava = estado !== 'ok';
+          const dica = estado === 'fora'
+            ? (kind === 'heal'
+                ? `${n} está em ${c.zona || 'outra zona'}: a poção só chega a quem está na mesma zona.`
+                : `${n} está em ${c.zona || 'outra zona'}: o arremesso alcança a própria zona ou a vizinha.`)
+            : (estado === 'sem_efeito' ? `${name} só fere mortos-vivos e infernais.` : '');
+          const extra = trava ? ` <small>· ${NOTA[estado]}</small>`
+            : (kind === 'heal' ? ` <small>${c.hp}/${c.hp_max}</small>` : '');
+          return `<button class="cbt-btn${trava ? ' cbt-fora' : ''}" ${trava ? 'disabled' : ''}`
+            + (dica ? ` title="${esc(dica)}"` : '')
+            + ` onclick="window.Combat._target('${esc(n).replace(/'/g,"\\'")}')">`
+            + `${esc(n)}${n === cur.name ? ' (em si)' : ''}${extra}</button>`;
+        }).join('')
+      : (kind === 'heal'
+          ? `<button class="cbt-btn" onclick="window.Combat._target('${esc(cur.name).replace(/'/g,"\\'")}')">${esc(cur.name)} (em si)</button>`
+          : '<div class="cbt-empty">Ninguém ao alcance.</div>');
+    tgtEl.innerHTML =
+      `<div class="cbt-tgt-title">${kind === 'heal' ? 'Curar quem:' : `Alvo de ${esc(name)}:`}</div>`
+      + `<div class="cbt-picker-btns">${lista}`
+      + `<button class="cbt-btn cbt-cancel" onclick="window.Combat._cancel()">✕ Cancelar</button>`
+      + `</div>`;
+    tgtEl.classList.remove('hidden');
+    trazerParaVista(tgtEl);
   }
   function _selWeapon(name) { showTargets('attack',  { weapon: name }); }
   function _selHab(name, mode) {

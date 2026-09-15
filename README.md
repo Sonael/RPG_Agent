@@ -870,8 +870,9 @@ O turno **só avança** quando:
 - o jogador foge (consome Ação + sai), ou
 - o sistema detecta que um lado foi todo derrotado.
 
-Classificadores (`rpg/tools_dnd.py:_ability_action_type` e `_item_action_type`)
-detectam Bônus por nome (PT e EN). Default: Ação.
+`rpg/tools_dnd.py:_ability_action_type` detecta Bônus por nome (PT e EN), com
+Ação como padrão. O custo de um item vem da ficha dele (`_efeito_de_item`, ver
+[Submenu Item](#submenu-item-itens-com-efeito)).
 
 ### Tipos de dano, resistência, imunidade e vulnerabilidade
 
@@ -2143,18 +2144,53 @@ em cada ponto — o destaque marca a zona de quem joga agora:
 - Cada ativa traz etiqueta `[Ação]` (azul) ou `[Bônus]` (verde).
 - Desabilitada se o slot já foi gasto.
 
-### Submenu Item, consumíveis classificados
+### Submenu Item, itens com efeito
 
-- Filtra inventário por **consumíveis** (`_CONSUMABLE_KEYWORDS`: poção,
-  pergaminho, óleo, frasco, ácido, fogo alquímico, água benta…) e exclui
-  armas/armaduras/utilidades.
-- Poções de cura: detecta automaticamente o nível (básica → 2d4+2, maior →
-  4d4+4, superior → 8d4+8, suprema → 10d4+20). Rola, aplica cura, gasta o
-  slot **Bônus** (regra 2024).
-- Cura abre picker de alvo (qualquer membro do grupo, **inclusive
-  inconsciente**, restaura status para `vivo`). Outros itens aplicam no
-  próprio personagem.
+Antes só a Poção de Cura fazia alguma coisa. Todo o resto que parecia
+consumível pelo nome (ácido, fogo alquímico, antídoto, poção de resistência)
+gastava a Ação e a unidade sem efeito nenhum, e a própria poção chegava a
+aliado em outra zona e curava acima do teto da exaustão.
+
+`_efeito_de_item` dá a cada item uma ficha com o efeito do SRD (regras de
+2024):
+
+| Item | Custo | Alvo | Efeito |
+|---|---|---|---|
+| Poção de Cura (básica, maior, superior, suprema) | Bônus | em si ou aliado da **mesma zona** | 2d4+2 / 4d4+4 / 8d4+8 / 10d4+20 PV, até o teto da exaustão; levanta quem está caído |
+| Poção de Resistência a X | Bônus | em si | resistência a dano X até o fim do combate |
+| Antitoxina / Antídoto | Bônus | em si | vantagem em salvaguardas contra Envenenado até o fim do combate |
+| Frasco de Ácido | Ação | qualquer outro na zona ou na vizinha | salvaguarda de DES (CD 8 + DES + proficiência) ou 2d6 ácido |
+| Fogo Alquímico | Ação | idem | idem, 1d4 fogo, e o alvo fica **Queimando** |
+| Água Benta | Ação | idem, só mortos-vivos e infernais | idem, 2d8 radiante |
+
+- O arremesso vale para aliados também (fogo amigo), e o dano passa pelas
+  resistências e imunidades do alvo como qualquer outro.
+- **Queimando**: 1d4 de fogo no início de cada turno de quem está em chamas
+  (gancho `_inicio_de_turno`), seguido do teste de DES CD 10 para apagar.
+  No livro o teste gasta a Ação da criatura; aqui ele é automático, porque a
+  vez do inimigo corre sem escolha. Cair a 0 PV ou o combate acabar apaga.
+- Os efeitos de 1 hora (resistência, antitoxina) ficam em `sheet["efeitos"]`
+  e acabam com o combate, porque o motor mede duração em combate e não em
+  horas. A resistência entra no cálculo de dano por `_traits_lookup`; a
+  antitoxina aparece no card e na ficha do herói, e `apply_condition` lembra o
+  mestre dela quando ele aplica Envenenado.
+- **Item que o motor não conhece** (Poção de Força de Gigante, pergaminhos,
+  óleos) continua na lista, **travado**, com o motivo ("descreva o uso em
+  Ação Livre para o mestre resolver"). Chamado mesmo assim, o motor recusa com
+  "Aviso:" e o item não é gasto.
+- Alvo, alcance e "sem efeito" são validados **antes** de gastar a economia e
+  a unidade: uma recusa não custa o turno nem o item. O snapshot traz, para
+  cada item, quem ele alcança (`alvos`: ok, fora, sem_efeito), e a tela só
+  trava o que o motor recusaria.
 - Consome 1 unidade; remove do inventário quando qtd zera.
+
+`test_itens_de_combate.py` (19) cobre as fichas, o item desconhecido, alcance
+e teto da poção, arremessos (salvaguarda, dano, alcance, fogo amigo,
+resistência, água benta, derrubar), Queimando e os efeitos em si.
+`test_itens_de_combate_navegador.py` (4) confere na tela o item travado, a
+poção só oferecendo a mesma zona, o ácido alcançando a zona vizinha e a água
+benta "sem efeito". Capturas: `combate-itens`, `combate-pocao-alcance` e
+`combate-agua-benta`.
 
 ### Outros botões
 

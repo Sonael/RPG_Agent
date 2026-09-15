@@ -99,6 +99,8 @@
       `<span class="hro-marca hro-marca-perigo">${esc(maiuscula(c.nome))}${c.duracao ? ` (${c.duracao} turnos)` : ''}</span>`));
     if (p.exaustao) marcas.push(`<span class="hro-marca hro-marca-perigo">Exaustão ${p.exaustao}</span>`);
     if (p.concentracao) marcas.push(`<span class="hro-marca">Concentrado em ${esc(p.concentracao)}</span>`);
+    (p.efeitos || []).forEach(e => marcas.push(
+      `<span class="hro-marca hro-marca-efeito" title="Efeito de item até o fim do combate">${esc(e)}</span>`));
     if (p.carga && p.carga.estado !== 'livre') {
       marcas.push(`<span class="hro-marca hro-marca-perigo">${p.carga.estado === 'imovel' ? 'Imóvel' : 'Sobrecarregado'}</span>`);
     }

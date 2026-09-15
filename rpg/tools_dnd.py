@@ -2558,11 +2558,21 @@ def _traits_lookup(sheet: dict, campo: str) -> list[dict]:
     """Lê resistencias/imunidades/vulnerabilidades da ficha, tolerando formatos antigos."""
     bruto = (sheet or {}).get(campo)
     if not bruto:
-        return []
-    if isinstance(bruto, list) and bruto and isinstance(bruto[0], dict):
-        return bruto
-    # Lista simples de strings (ex.: preenchida à mão) → normaliza.
-    return _parse_damage_traits(bruto)
+        base = []
+    elif isinstance(bruto, list) and bruto and isinstance(bruto[0], dict):
+        base = bruto
+    else:
+        # Lista simples de strings (ex.: preenchida à mão) → normaliza.
+        base = _parse_damage_traits(bruto)
+    if campo == "resistencias":
+        # Poção de Resistência: vale enquanto o efeito estiver na ficha.
+        extra = [{"tipos": [e["resistencia"]], "requer_magica": False,
+                  "origem": e.get("origem", "")}
+                 for e in (sheet or {}).get("efeitos") or []
+                 if isinstance(e, dict) and e.get("resistencia")]
+        if extra:
+            return list(base) + extra
+    return base
 
 
 # Materiais que furam a resistência "de ataques não-mágicos" sem a arma ser
@@ -5676,6 +5686,12 @@ def apply_condition(char_name: str, condition: str, duration_turns: int = 0) -> 
     if effects.get("check_disadvantage"):   efeito_str.append("desvantagem em testes")
     if effects.get("auto_crit"):            efeito_str.append("crítico automático em corpo-a-corpo")
 
+    if c_low == "envenenado" and _tem_antitoxina(s):
+        efeito_str_antitoxina = (f"\n   Nota: {char['name']} está sob Antitoxina: a salvaguarda "
+                                 f"contra Envenenado tinha vantagem. Se ele passou, use remove_condition.")
+    else:
+        efeito_str_antitoxina = ""
+
     dur_str        = f" por {duration_turns} turno(s)" if duration_turns > 0 else " (indefinidamente)"
     efeito_mecanico = f"\n   Mecânica: {', '.join(efeito_str)}." if efeito_str \
                       else "\n   (Condição narrativa — sem efeito mecânico automático.)"
@@ -5684,7 +5700,7 @@ def apply_condition(char_name: str, condition: str, duration_turns: int = 0) -> 
     memory.save_campaign()
     return (
         f"{char['name']} recebeu a condição **{condition.capitalize()}**{dur_str}."
-        f"{efeito_mecanico}{desc_oficial}"
+        f"{efeito_mecanico}{efeito_str_antitoxina}{desc_oficial}"
     )
 
 
@@ -7255,6 +7271,7 @@ def hero_snapshot(char_name: str = "") -> dict:
                             if vida == 0 else None),
         "concentracao": conc.get("magia", "") if isinstance(conc, dict) else "",
         "condicoes": condicoes,
+        "efeitos": [e.get("nome", "") for e in _efeitos(s)],
         "defesas": {"resistencias": _tipos("resistencias"), "imunidades": _tipos("imunidades"),
                     "vulnerabilidades": _tipos("vulnerabilidades")},
         "atributos": atributos,
@@ -9264,6 +9281,12 @@ def end_combat() -> str:
         if _sh.get("concentracao"):
             _sh["concentracao"] = None
         _sh.pop("reacao_rodada", None)
+        # Efeitos de item duram o combate; as chamas também não passam dele.
+        if _sh.get("efeitos"):
+            _sh["efeitos"] = [e for e in _efeitos(_sh) if e.get("ate") != "fim_do_combate"]
+        if _sh.get("condicoes"):
+            _sh["condicoes"] = [c for c in _sh["condicoes"]
+                                if not (isinstance(c, dict) and (c.get("nome") or "").lower() == "queimando")]
     memory.save_campaign()
     return "Combate encerrado. Iniciativa e rastreador de turnos limpos."
 
@@ -11554,20 +11577,6 @@ def _ability_target_mode(name: str, hab: dict | None = None) -> str:
     return "single"
 
 
-def _item_action_type(name: str) -> str:
-    """
-    'bonus' para itens que custam Ação Bônus pela regra (2024).
-    Atualmente: Poção de Cura e variantes. Outros consumíveis → 'acao'.
-    """
-    n = _norm_txt(name)
-    if not n:
-        return "acao"
-    if ("pocao de cura" in n or "potion of healing" in n or
-            "healing potion" in n or "pocao de vida" in n):
-        return "bonus"
-    return "acao"
-
-
 def _reset_turn_economy(cs: dict) -> None:
     """
     Início do turno de um combatente: zera Ação/Bônus e roda o que a regra
@@ -11597,6 +11606,9 @@ def _inicio_de_turno(cs: dict) -> None:
     _rolar_recargas(ch)
     _repor_lendarias(ch)
     cs["_lendarias_msg"] = _gastar_lendarias_dos_chefes(order[idx])
+    queimou = _queimar_no_inicio_do_turno(ch)
+    if queimou:
+        cs["_lendarias_msg"] = list(cs.get("_lendarias_msg") or []) + queimou
 
 
 def _gastar_lendarias_dos_chefes(quem_comeca: str) -> list[str]:
@@ -11708,15 +11720,34 @@ def _ability_is_passive(hab: dict) -> bool:
     return False
 
 
-# Itens consumíveis usáveis EM COMBATE (palavras no nome).
-_CONSUMABLE_KEYWORDS = (
-    "poção", "pocao", "potion", "elixir", "frasco", "ampola",
-    "pergaminho", "scroll", "óleo", "oleo",
-    "ácido", "acido", "fogo alquímico", "fogo alquimico", "água benta",
-    "agua benta", "bomba", "granada", "explosivo", "tônico", "tonico",
-    "veneno", "antídoto", "antidoto", "remédio", "remedio",
-)
-# Itens que claramente NÃO são consumíveis (filtro extra para evitar falso positivo).
+# ===========================================================================
+# ITENS DE COMBATE
+# ---------------------------------------------------------------------------
+# Antes só a Poção de Cura fazia alguma coisa. Todo o resto que parecia
+# consumível pelo nome (ácido, fogo alquímico, antídoto, poção de resistência)
+# virava um botão "genérico" que gastava a Ação e a unidade e não aplicava
+# efeito nenhum: o item sumia da mochila em silêncio.
+#
+# Agora cada item tem uma ficha com o efeito do SRD (regras de 2024, as mesmas
+# da Poção de Cura como Ação Bônus). O que o motor não conhece continua
+# aparecendo na lista, TRAVADO e com o motivo, e é recusado com "Aviso:" antes
+# de gastar qualquer coisa: quem resolve é o mestre, pela Ação Livre.
+#
+#   Poção de Cura            Bônus   em si ou num aliado da MESMA zona
+#   Poção de Resistência a X Bônus   em si: resistência a X até o fim do combate
+#   Antitoxina / Antídoto    Bônus   em si: vantagem contra Envenenado
+#   Frasco de Ácido          Ação    arremesso até a zona vizinha, salvaguarda
+#                                    de DES (CD 8 + DES + proficiência) ou 2d6 ácido
+#   Fogo Alquímico           Ação    idem, 1d4 fogo e o alvo fica Queimando
+#   Água Benta               Ação    idem, 2d8 radiante, só mortos-vivos e infernais
+#
+# Simplificações assumidas, porque o motor mede duração em combate e não em
+# horas: os efeitos de 1 hora (resistência, antitoxina) acabam com o combate;
+# quem está Queimando toma 1d4 de fogo no início de cada turno e faz sozinho
+# o teste de DES CD 10 para apagar (no livro, isso gasta a Ação dele).
+# ===========================================================================
+
+# Itens que claramente NÃO são consumíveis (filtro contra falso positivo).
 _NON_CONSUMABLE_KEYWORDS = (
     "espada", "arco", "besta", "adaga", "lança", "lanca", "machado",
     "armadura", "escudo", "capa", "amuleto", "anel", "elmo", "bota",
@@ -11724,40 +11755,223 @@ _NON_CONSUMABLE_KEYWORDS = (
     "manopla", "virote", "flecha", "munição", "municao", "tocha", "corda",
     "pacote", "saco", "mochila",
 )
+# Palavras que fazem um item PARECER consumível de combate. Os que não têm
+# ficha abaixo entram na lista travados, com o motivo.
+_CONSUMABLE_KEYWORDS = (
+    "poção", "pocao", "potion", "elixir", "frasco", "ampola", "vial",
+    "pergaminho", "scroll", "óleo", "oleo",
+    "ácido", "acido", "acid", "fogo alquímico", "fogo alquimico", "alchemist",
+    "água benta", "agua benta", "holy water", "bomba", "granada", "explosivo",
+    "tônico", "tonico", "veneno", "antídoto", "antidoto", "antitoxina",
+    "antitoxin", "remédio", "remedio",
+)
 
-# Padrões de poções de cura conhecidos → (n_dice, sides, bonus). 5e SRD.
+# Poções de cura (SRD) → (n_dados, faces, bônus).
 _HEAL_POTIONS = [
     ("suprema",    (10, 4, 20)),   # 10d4+20
+    ("supreme",    (10, 4, 20)),
     ("superior",   (8,  4,  8)),   # 8d4+8
     ("greater",    (4,  4,  4)),   # 4d4+4
     ("maior",      (4,  4,  4)),
 ]
 _HEAL_BASE = (2, 4, 2)             # poção de cura básica → 2d4+2
 
+# Fichas dos itens com efeito, na ordem em que são testadas.
+_ITENS_COM_EFEITO = (
+    (("fogo alquimico", "alchemist"),
+     {"efeito": "arremesso", "slot": "acao", "dado": (1, 4, 0), "tipo_dano": "fire",
+      "queimando": True, "rotulo": "1d4 fogo · queimando"}),
+    (("agua benta", "holy water"),
+     {"efeito": "arremesso", "slot": "acao", "dado": (2, 8, 0), "tipo_dano": "radiant",
+      "so_profanos": True, "rotulo": "2d8 radiante · mortos-vivos e infernais"}),
+    (("acido", "acid"),
+     {"efeito": "arremesso", "slot": "acao", "dado": (2, 6, 0), "tipo_dano": "acid",
+      "rotulo": "2d6 ácido"}),
+    (("antitoxina", "antidoto", "antitoxin"),
+     {"efeito": "antitoxina", "slot": "bonus",
+      "rotulo": "vantagem contra envenenado"}),
+)
 
-def _item_combat_kind(item_name: str):
+_TIPO_DANO_ITEM_PT = {
+    "acid": "ácido", "bludgeoning": "concussão", "cold": "frio", "fire": "fogo",
+    "force": "força", "lightning": "elétrico", "necrotic": "necrótico",
+    "piercing": "perfurante", "poison": "veneno", "psychic": "psíquico",
+    "radiant": "radiante", "slashing": "cortante", "thunder": "trovejante",
+}
+
+_MOTIVO_DESCONHECIDO = ("O motor não conhece o efeito deste item. Descreva o uso "
+                        "em Ação Livre para o mestre resolver.")
+
+
+def _efeito_de_item(item_name: str) -> dict | None:
     """
-    Classifica um item para uso em combate.
-    Retorna: ("heal", n_dice, sides, bonus)  |  ("generic", 0, 0, 0)  |  None.
-    None = item não é consumível de combate (não vira botão).
+    Ficha de combate de um item, ou None quando ele não é consumível.
+
+    efeito: "cura" | "resistencia" | "antitoxina" | "arremesso" | "desconhecido"
+    slot:   "acao" | "bonus"
     """
-    if not item_name:
-        return None
-    n = _norm_txt(item_name)
+    n = _norm_txt(item_name or "")
     if not n:
         return None
     if any(kw in n for kw in (_norm_txt(k) for k in _NON_CONSUMABLE_KEYWORDS)):
         return None
-    if not any(kw in n for kw in (_norm_txt(k) for k in _CONSUMABLE_KEYWORDS)):
-        return None
-    # Poções de cura: detecta nível pelo qualificador.
-    if "pocao de cura" in n or "potion of healing" in n or "healing potion" in n \
-            or "pocao de vida" in n:
-        for tag, dice in _HEAL_POTIONS:
-            if _norm_txt(tag) in n:
-                return ("heal",) + dice
-        return ("heal",) + _HEAL_BASE
-    return ("generic", 0, 0, 0)
+
+    if ("pocao de cura" in n or "potion of healing" in n or "healing potion" in n
+            or "pocao de vida" in n):
+        dado = next((d for tag, d in _HEAL_POTIONS if _norm_txt(tag) in n), _HEAL_BASE)
+        return {"efeito": "cura", "slot": "bonus", "dado": dado,
+                "rotulo": f"{dado[0]}d{dado[1]}+{dado[2]} PV"}
+
+    if ("resistencia" in n or "resistance" in n) and ("pocao" in n or "potion" in n):
+        tipo = _damage_type_from_text(item_name)
+        if not tipo:
+            return {"efeito": "desconhecido", "slot": "bonus",
+                    "motivo": "O nome não diz a que tipo de dano a poção dá resistência."}
+        return {"efeito": "resistencia", "slot": "bonus", "tipo_dano": tipo,
+                "rotulo": f"resistência a {_TIPO_DANO_ITEM_PT.get(tipo, tipo)}"}
+
+    for chaves, ficha in _ITENS_COM_EFEITO:
+        if any(k in n for k in chaves):
+            return dict(ficha)
+
+    if any(kw in n for kw in (_norm_txt(k) for k in _CONSUMABLE_KEYWORDS)):
+        return {"efeito": "desconhecido", "slot": "acao", "motivo": _MOTIVO_DESCONHECIDO}
+    return None
+
+
+_PROFANOS = ("undead", "morto-vivo", "morto vivo", "mortos-vivos", "fiend", "infernal",
+             "demon", "demonio", "devil", "diabo", "zombie", "zumbi", "skeleton",
+             "esqueleto", "ghoul", "carnical", "vampir", "wight", "wraith", "espectro",
+             "specter", "ghost", "fantasma", "lich", "mummy", "mumia", "imp", "diabrete")
+
+
+def _e_profano(ch: dict) -> bool:
+    """Morto-vivo ou infernal: o que a Água Benta fere."""
+    s = ch.get("sheet") or {}
+    texto = _norm_txt(" ".join(str(x or "") for x in (
+        s.get("tipo"), s.get("raca"), ch.get("description"), ch.get("name"))))
+    return any(_norm_txt(p) in texto for p in _PROFANOS)
+
+
+_FALHA_AUTOMATICA_EM_DES = ("paralisado", "atordoado", "inconsciente", "petrificado")
+
+
+def _salvaguarda_de_destreza(alvo: dict, cd: int) -> tuple[bool, str]:
+    """Salvaguarda de DES do alvo contra um item arremessado."""
+    s = alvo.get("sheet") or {}
+    conds = {_norm_txt(c.get("nome", "") if isinstance(c, dict) else str(c))
+             for c in (s.get("condicoes") or [])}
+    status = (alvo.get("status") or "").lower()
+    if conds & set(_FALHA_AUTOMATICA_EM_DES) or status in ("inconsciente", "dormindo"):
+        return False, f"falha automática na salvaguarda de DES (CD {cd})"
+    mod = _modifier(int(s.get("destreza", 10) or 10))
+    classe = (s.get("classe") or "").lower()
+    if memory.is_party_member(alvo) and "destreza" in CLASS_DATA.get(classe, {}).get("saves", []):
+        mod += int(s.get("proficiencia", 2) or 2)
+    d20 = random.randint(1, 20)
+    total = d20 + mod
+    return total >= cd, f"salvaguarda de DES {d20}{mod:+d} = {total} vs CD {cd}"
+
+
+def _cd_de_arremesso(ator: dict) -> int:
+    s = ator.get("sheet") or {}
+    prof = int(s.get("proficiencia", _proficiency_bonus(int(s.get("nivel", 1) or 1))) or 2)
+    return 8 + _modifier(int(s.get("destreza", 10) or 10)) + prof
+
+
+def _alcance_de_item(ator_nome: str, alvo: dict, ficha: dict) -> str:
+    """
+    "ok" | "fora" | "sem_efeito" para usar o item de `ator_nome` em `alvo`.
+    Poção num aliado: mesma zona. Arremesso: a própria zona ou a vizinha
+    (6 metros). Sem zonas em jogo, tudo alcança.
+    """
+    nome = alvo.get("name", "")
+    if ficha.get("so_profanos") and not _e_profano(alvo):
+        return "sem_efeito"
+    if memory.char_key(nome) == memory.char_key(ator_nome):
+        return "ok"
+    dist = _distancia(ator_nome, nome)
+    if dist is None:
+        return "ok"
+    limite = 0 if ficha["efeito"] == "cura" else 1
+    return "ok" if dist <= limite else "fora"
+
+
+def _alvos_de_item(ator_nome: str, ficha: dict) -> dict:
+    """Quem cada item alcança, para a tela não oferecer o alvo que o motor recusa."""
+    if ficha["efeito"] not in ("cura", "arremesso"):
+        return {}
+    cs = memory.campaign.get("combat_state") or {}
+    chars = memory.campaign.get("characters", {})
+    saida = {}
+    for nm in cs.get("initiative_order", []) or []:
+        ch = chars.get(memory.char_key(nm))
+        if not ch or not ch.get("sheet"):
+            continue
+        status = (ch.get("status") or "").lower()
+        if status in ("morto", "fugiu"):
+            continue
+        eu = memory.char_key(nm) == memory.char_key(ator_nome)
+        if ficha["efeito"] == "cura" and not memory.is_party_member(ch):
+            continue
+        if ficha["efeito"] == "arremesso" and eu:
+            continue
+        saida[ch.get("name", nm)] = _alcance_de_item(ator_nome, ch, ficha)
+    return saida
+
+
+# ── Efeitos temporários (resistência de poção, antitoxina) ─────────────────
+
+def _efeitos(sheet: dict) -> list[dict]:
+    return [e for e in (sheet.get("efeitos") or []) if isinstance(e, dict)]
+
+
+def _dar_efeito(sheet: dict, efeito: dict) -> None:
+    """Grava um efeito na ficha; o mesmo efeito de novo só renova."""
+    lista = [e for e in _efeitos(sheet) if e.get("nome") != efeito["nome"]]
+    lista.append(efeito)
+    sheet["efeitos"] = lista
+
+
+def _tem_antitoxina(sheet: dict) -> bool:
+    return any(e.get("antitoxina") for e in _efeitos(sheet))
+
+
+def _queimar_no_inicio_do_turno(ch: dict) -> list[str]:
+    """
+    Fogo Alquímico: 1d4 de fogo no início do turno de quem está Queimando,
+    e em seguida o teste de DES CD 10 para apagar.
+    """
+    s = ch.get("sheet") or {}
+    conds = s.get("condicoes") or []
+    if not any(_norm_txt(c.get("nome", "") if isinstance(c, dict) else str(c)) == "queimando"
+               for c in conds):
+        return []
+    nome = ch.get("name", "")
+    dano = random.randint(1, 4)
+    res = _apply_damage(ch, dano, "fire", source_name="fogo alquímico")
+    linha = (f"{nome} queima: {dano} de fogo"
+             f"{' (' + '; '.join(res['notas']) + ')' if res['notas'] else ''} "
+             f"• HP {res['hp_antes']}→{res['hp_depois']}")
+    apagou = False
+    if res["hp_depois"] == 0:
+        if res["hp_antes"] > 0:
+            linha += _mark_at_zero_hp(ch, "fogo alquímico")
+        apagou = True                     # caído, as chamas não contam mais
+    else:
+        d20 = random.randint(1, 20)
+        mod = _modifier(int(s.get("destreza", 10) or 10))
+        if d20 + mod >= 10:
+            apagou = True
+            linha += f" • apagou as chamas (DES {d20}{mod:+d} vs CD 10)"
+        else:
+            linha += f" • continua em chamas (DES {d20}{mod:+d} vs CD 10)"
+    if apagou:
+        s["condicoes"] = [c for c in conds
+                          if _norm_txt(c.get("nome", "") if isinstance(c, dict) else str(c))
+                          != "queimando"]
+    _log_combat_event("burning", "", nome, msg=linha, dano=res["dano"], hp=res["hp_depois"])
+    return [linha]
 
 
 _WEAPON_KEYWORDS = (
@@ -11837,13 +12051,21 @@ def _combatant_snapshot(name: str) -> dict | None:
             "descricao": it.get("descricao", ""),
         }
         itens.append(entry)
-        kind = _item_combat_kind(entry["nome"])
-        if kind and entry["qtd"] > 0:
+        ficha = _efeito_de_item(entry["nome"])
+        if ficha and entry["qtd"] > 0:
+            # kind: o que a tela faz ao clicar. "heal" abre "Curar quem",
+            # "arremesso" abre o alvo, "si" aplica direto, "desconhecido" fica
+            # travado com o motivo.
+            kind = {"cura": "heal", "arremesso": "arremesso",
+                    "resistencia": "si", "antitoxina": "si"}.get(ficha["efeito"], "desconhecido")
             itens_combate.append({
                 **entry,
-                "kind": kind[0],
-                "tipo_acao": _item_action_type(entry["nome"]),
-                "dice": f"{kind[1]}d{kind[2]}+{kind[3]}" if kind[0] == "heal" else "",
+                "kind": kind,
+                "tipo_acao": ficha["slot"],
+                "dice": ficha.get("rotulo", ""),
+                "usavel": kind != "desconhecido",
+                "motivo": ficha.get("motivo", ""),
+                "alvos": _alvos_de_item(ch.get("name", name), ficha),
             })
     # Anota a subescolha de cada habilidade de classe (Estilo de Combate,
     # Inimigo Favorecido, Metamagia…) na entrada correspondente — assim a UI
@@ -11885,6 +12107,8 @@ def _combatant_snapshot(name: str) -> dict | None:
         "arma":       (s.get("equipamentos", {}) or {}).get("arma_principal") or "",
         "armas":      _combatant_weapons(ch),
         "condicoes":  conds,
+        # Efeitos de item que duram o combate (resistência, antitoxina).
+        "efeitos":    [e.get("nome", "") for e in _efeitos(s)],
         "habilidades": habs,
         "passivas":   passivas,
         "inventario": itens,
@@ -12101,61 +12325,146 @@ def combat_action(action: str, actor: str = "", target: str = "",
             inv = ch.get("inventario") or []
             slot_inv = next((it for it in inv
                              if isinstance(it, dict)
-                             and (it.get("nome") or "").strip().lower() == item_name.lower()
+                             and _norm_txt(it.get("nome") or "") == _norm_txt(item_name)
                              and int(it.get("qtd", 1) or 1) > 0), None)
             if not slot_inv:
                 return {"ok": False,
-                        "message": f"'{actor}' não tem '{item_name}' utilizável.",
+                        "message": f"Erro: '{actor}' não tem '{item_name}' utilizável.",
                         "snapshot": combat_snapshot()}
-            kind = _item_combat_kind(slot_inv.get("nome", ""))
-            if not kind:
+            ficha = _efeito_de_item(slot_inv.get("nome", ""))
+            if not ficha:
                 return {"ok": False,
-                        "message": f"'{item_name}' não é consumível de combate.",
+                        "message": f"Aviso: '{slot_inv['nome']}' não é consumível de combate.",
                         "snapshot": combat_snapshot()}
-            # Custo de ação do ITEM (poção de cura = Bônus pela 5e 2024).
-            slot = ("bonus" if _item_action_type(slot_inv["nome"]) == "bonus"
-                    else "acao")
+            if ficha["efeito"] == "desconhecido":
+                return {"ok": False,
+                        "message": f"Aviso: {slot_inv['nome']}: {ficha['motivo']} O item não foi gasto.",
+                        "snapshot": combat_snapshot()}
+
+            # Alvo validado ANTES de gastar a economia e a unidade: uma recusa
+            # nunca custa o turno nem o item.
+            chars = memory.campaign["characters"]
+            if ficha["efeito"] in ("resistencia", "antitoxina"):
+                recv = ch
+            else:
+                recv_name = (target or ("" if ficha["efeito"] == "arremesso" else actor)).strip()
+                if not recv_name:
+                    return {"ok": False, "message": f"Aviso: escolha em quem usar {slot_inv['nome']}.",
+                            "snapshot": combat_snapshot()}
+                recv = chars.get(memory.char_key(recv_name))
+                if not recv or not recv.get("sheet"):
+                    return {"ok": False, "message": f"Erro: alvo '{recv_name}' inválido.",
+                            "snapshot": combat_snapshot()}
+                if (recv.get("status") or "").lower() in ("morto", "fugiu"):
+                    return {"ok": False,
+                            "message": f"Aviso: {recv['name']} está fora do combate.",
+                            "snapshot": combat_snapshot()}
+                if ficha["efeito"] == "arremesso" and recv is ch:
+                    return {"ok": False,
+                            "message": f"Aviso: escolha outro alvo para {slot_inv['nome']}.",
+                            "snapshot": combat_snapshot()}
+                alcance = _alcance_de_item(actor, recv, ficha)
+                if alcance == "fora":
+                    za, zb = _zona_de(actor), _zona_de(recv["name"])
+                    regra = ("dar a poção a outra pessoa só na mesma zona"
+                             if ficha["efeito"] == "cura"
+                             else "o arremesso alcança a própria zona ou a vizinha")
+                    return {"ok": False,
+                            "message": (f"Erro: FORA DE ALCANCE: {actor} está em **{za}** e "
+                                        f"{recv['name']}, em **{zb}**: {regra}."),
+                            "snapshot": combat_snapshot()}
+                if alcance == "sem_efeito":
+                    return {"ok": False,
+                            "message": (f"Aviso: {slot_inv['nome']} só fere mortos-vivos e "
+                                        f"infernais; em {recv['name']} não faria nada. "
+                                        f"O item não foi gasto."),
+                            "snapshot": combat_snapshot()}
+
+            slot = ficha["slot"]
             err = _use_slot(eco, slot)
             if err:
                 return {"ok": False, "message": err, "snapshot": combat_snapshot()}
-            # Aplica efeito
-            if kind[0] == "heal":
-                _, n_d, sides, bonus = kind
+            tag_eco = "Bônus" if slot == "bonus" else "Ação"
+            st = recv["sheet"]
+
+            if ficha["efeito"] == "cura":
+                n_d, sides, bonus = ficha["dado"]
                 rolls = [random.randint(1, sides) for _ in range(n_d)]
                 heal  = sum(rolls) + bonus
-                recv_name = (target or actor).strip() or actor
-                recv = memory.campaign["characters"].get(memory.char_key(recv_name))
-                if not recv or not recv.get("sheet"):
-                    # devolve o slot consumido (alvo inválido) — segurança extra
-                    eco[slot + "_usada"] = False
-                    return {"ok": False, "message": f"Alvo '{recv_name}' inválido.",
-                            "snapshot": combat_snapshot()}
-                st = recv["sheet"]
                 hp_antes = int(st.get("vida_atual", 0) or 0)
                 hp_max   = int(st.get("vida_max", 0) or 0)
-                st["vida_atual"] = max(0, min(hp_max, hp_antes + heal))
+                # O teto da exaustão vale para a poção como vale para o descanso.
+                teto     = _hp_max_efetivo(st)
+                st["vida_atual"] = max(0, min(teto, hp_antes + heal))
                 hp_depois = st["vida_atual"]
                 if hp_antes == 0 and hp_depois > 0 and (recv.get("status", "") or "").lower() in ("inconsciente", "estabilizado"):
                     recv["status"] = "vivo"
                     st["death_saves_sucessos"] = 0
                     st["death_saves_falhas"]   = 0
                 detail = " + ".join(str(r) for r in rolls)
-                tag_eco = "Bônus" if slot == "bonus" else "Ação"
+                nota_teto = f" (teto {teto} pela exaustão)" if teto < hp_max else ""
                 _log_combat_event(
                     "item_heal", actor, recv["name"],
                     msg=(f"{actor} usou {slot_inv['nome']} em {recv['name']} "
                          f"[{tag_eco}]: {n_d}d{sides}: [{detail}] +{bonus} = "
-                         f"{heal} cura • HP {hp_antes}→{hp_depois}/{hp_max}"),
+                         f"{heal} cura • HP {hp_antes}→{hp_depois}/{hp_max}{nota_teto}"),
                     item=slot_inv["nome"], rolls=list(rolls), heal=heal,
                     hp=hp_depois, hp_max=hp_max, slot=slot,
                 )
                 msg = (f"{actor} usou {slot_inv['nome']} em {recv['name']} "
-                       f"[{tag_eco}]: +{heal} HP ({hp_antes}→{hp_depois}/{hp_max}).")
-            else:
-                _log_combat_event("item_use", actor, target,
-                                  msg=f"{actor} usou {slot_inv['nome']}",
-                                  item=slot_inv["nome"], slot=slot)
-                msg = f"{actor} usou {slot_inv['nome']}."
+                       f"[{tag_eco}]: +{heal} HP ({hp_antes}→{hp_depois}/{hp_max}){nota_teto}.")
+
+            elif ficha["efeito"] == "resistencia":
+                tipo = ficha["tipo_dano"]
+                pt = _TIPO_DANO_ITEM_PT.get(tipo, tipo)
+                _dar_efeito(st, {"nome": f"Resistência a {pt}", "resistencia": tipo,
+                                 "origem": slot_inv["nome"], "ate": "fim_do_combate"})
+                msg = f"{actor} bebeu {slot_inv['nome']} [{tag_eco}]: resistência a dano de {pt} até o fim do combate."
+                _log_combat_event("item_buff", actor, actor, msg=msg, item=slot_inv["nome"], slot=slot)
+
+            elif ficha["efeito"] == "antitoxina":
+                _dar_efeito(st, {"nome": "Antitoxina", "antitoxina": True,
+                                 "descricao": "vantagem em salvaguardas contra Envenenado",
+                                 "origem": slot_inv["nome"], "ate": "fim_do_combate"})
+                msg = (f"{actor} tomou {slot_inv['nome']} [{tag_eco}]: vantagem em "
+                       f"salvaguardas contra Envenenado até o fim do combate.")
+                _log_combat_event("item_buff", actor, actor, msg=msg, item=slot_inv["nome"], slot=slot)
+
+            else:   # arremesso
+                cd = _cd_de_arremesso(ch)
+                passou, texto_save = _salvaguarda_de_destreza(recv, cd)
+                n_d, sides, bonus = ficha["dado"]
+                if passou:
+                    linha = (f"{actor} arremessou {slot_inv['nome']} em {recv['name']} "
+                             f"[{tag_eco}]: {texto_save} — passou, sem dano")
+                    _log_combat_event("item_attack", actor, recv["name"], msg=linha,
+                                      item=slot_inv["nome"], slot=slot, dano=0)
+                    msg = linha + "."
+                else:
+                    rolls = [random.randint(1, sides) for _ in range(n_d)]
+                    bruto = sum(rolls) + bonus
+                    res = _apply_damage(recv, bruto, ficha["tipo_dano"],
+                                        source_name=actor, arma_magica=True)
+                    pt = _TIPO_DANO_ITEM_PT.get(ficha["tipo_dano"], ficha["tipo_dano"])
+                    linha = (f"{actor} arremessou {slot_inv['nome']} em {recv['name']} "
+                             f"[{tag_eco}]: {texto_save} — falhou: {n_d}d{sides} "
+                             f"[{' + '.join(str(r) for r in rolls)}] = {res['dano']} de {pt} "
+                             f"• HP {res['hp_antes']}→{res['hp_depois']}/{int(st.get('vida_max', 0) or 0)}")
+                    if res["notas"]:
+                        linha += " (" + "; ".join(res["notas"]) + ")"
+                    if res["hp_depois"] == 0 and res["hp_antes"] > 0:
+                        linha += _mark_at_zero_hp(recv, actor)
+                    elif ficha.get("queimando") and res["hp_depois"] > 0:
+                        conds = st.setdefault("condicoes", [])
+                        if not any((c.get("nome", "") if isinstance(c, dict) else str(c)).lower() == "queimando"
+                                   for c in conds):
+                            conds.append({"nome": "Queimando", "duracao": None})
+                        linha += f" • {recv['name']} está QUEIMANDO"
+                    _log_combat_event("item_attack", actor, recv["name"], msg=linha,
+                                      item=slot_inv["nome"], slot=slot, dano=res["dano"],
+                                      hp=res["hp_depois"])
+                    msg = linha + "."
+
             slot_inv["qtd"] = int(slot_inv.get("qtd", 1) or 1) - 1
             if slot_inv["qtd"] <= 0:
                 try: inv.remove(slot_inv)
