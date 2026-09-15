@@ -629,6 +629,29 @@ CIDADE = {
 }
 
 
+# FICHA DO HERÓI. Stelar é um Campeão de Grande Arma com XP para subir:
+# o ataque mostra as notas do estilo e do crítico, e o botão de nível aparece.
+# Helena está envenenada e concentrada em Bênção, com PV temporários.
+HEROI = {
+    "characters": {
+        "stelar": {
+            "habilidades": [
+                {"nome": "Crítico Aprimorado", "descricao": "Acerto crítico com 19 ou 20 no d20.",
+                 "custo_mana": 0, "dado": ""},
+                {"nome": "Retomar o Fôlego", "descricao": "Ação bônus: recupera 1d10 + nível de PV. Uma vez por descanso.",
+                 "custo_mana": 0, "dado": "1d10"},
+            ],
+            "sheet": {"xp": 2700, "feature_choices": {"Estilo de Combate": "Grande Arma"},
+                      "equipamentos": {"arma_principal": "Espada Grande"}},
+        },
+        "helena": {
+            "sheet": {"condicoes": [{"nome": "envenenado", "duracao": 2}],
+                      "concentracao": {"magia": "Bênção"}, "vida_temp": 4},
+        },
+    },
+}
+
+
 # DESCANSO CURTO depois de uma emboscada. Cada um do grupo retrata um estado do
 # botão de dado, porque é isso que a tela comunica:
 #   • Helena, muito ferida e com a reserva cheia — o caso de gastar;
@@ -1028,6 +1051,18 @@ TELAS = [
      "estado": CIDADE, "espera": 800,
      "js": "window.Personagens._abrir('Eremita')",
      "exigir": "#pessoa-overlay:not(.hidden) .psn-atitude"},
+
+    # ── Ficha do herói ───────────────────────────────────────────────
+    # Abre pelo cartão do grupo. Leitura: todo número vem do motor.
+    {"nome": "heroi-ficha", "pagina": "/game.html",
+     "estado": HEROI, "espera": 800,
+     "js": "window.Herois._abrir('Stelar')",
+     "exigir": "#heroi-overlay:not(.hidden) .hro-atributo"},
+    # Conjuradora com condição, concentração e PV temporários.
+    {"nome": "heroi-conjuradora", "pagina": "/game.html",
+     "estado": HEROI, "espera": 800,
+     "js": "window.Herois._abrir('Helena')",
+     "exigir": "#heroi-overlay:not(.hidden) .hro-atributo"},
 
     # ── Combate ──────────────────────────────────────────────────────
     {"nome": "combate-regua-de-turnos", "pagina": "/game.html",

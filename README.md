@@ -93,18 +93,19 @@ abre o loop **percepção → deliberação → ação → verificação** em de
 10. [Tela de equipamento ("A Mochila")](#tela-de-equipamento-a-mochila)
 11. [Ficha do local](#ficha-do-local)
 12. [Ficha do personagem](#ficha-do-personagem)
-13. [Tela de loja ("O Balcão")](#tela-de-loja-o-balcão)
-14. [Tela de descanso ("A Fogueira")](#tela-de-descanso-a-fogueira)
-15. [Wizard e editores de ficha](#wizard-e-editores-de-ficha)
-16. [Tela de combate tática (Pergaminho Épico)](#tela-de-combate-tática-pergaminho-épico)
-17. [Tools, o catálogo do agente](#tools-o-catálogo-do-agente)
-18. [Endpoints HTTP](#endpoints-http)
-19. [Frontend](#frontend)
-20. [PWA e instalação](#pwa-e-instalação)
-21. [Testes e garantias](#testes-e-garantias)
-22. [Estrutura de arquivos](#estrutura-de-arquivos)
-23. [Configuração e execução](#configuração-e-execução)
-24. [Limitações conhecidas](#limitações-conhecidas)
+13. [Ficha do herói](#ficha-do-herói)
+14. [Tela de loja ("O Balcão")](#tela-de-loja-o-balcão)
+15. [Tela de descanso ("A Fogueira")](#tela-de-descanso-a-fogueira)
+16. [Wizard e editores de ficha](#wizard-e-editores-de-ficha)
+17. [Tela de combate tática (Pergaminho Épico)](#tela-de-combate-tática-pergaminho-épico)
+18. [Tools, o catálogo do agente](#tools-o-catálogo-do-agente)
+19. [Endpoints HTTP](#endpoints-http)
+20. [Frontend](#frontend)
+21. [PWA e instalação](#pwa-e-instalação)
+22. [Testes e garantias](#testes-e-garantias)
+23. [Estrutura de arquivos](#estrutura-de-arquivos)
+24. [Configuração e execução](#configuração-e-execução)
+25. [Limitações conhecidas](#limitações-conhecidas)
 
 ---
 
@@ -1754,6 +1755,72 @@ grava pelo editor o que o grupo sabe. `test_editor_campanha_lugares_navegador.py
 ganhou o campo no menu, salvando sem perder o histórico da atitude. Capturas:
 `personagem-ficha` e `personagem-longe`.
 
+## Ficha do herói
+
+Clicar no cartão de um membro do grupo abria o editor da ficha: um formulário
+de campos travados (as telas controlam nível, atributos, itens e magias) que
+não respondia a pergunta que o jogador faz na mesa, "quanto eu somo nisso?".
+O bônus de perícia, a salvaguarda e o acerto com a arma não apareciam em
+lugar nenhum; o `/ficha` do chat mostrava só atributos, CA e equipamento.
+
+### Motor
+
+`tools_dnd.hero_snapshot(nome)` monta a ficha de leitura com as mesmas funções
+que resolvem as jogadas, para o número mostrado ser o número usado:
+
+- vida (com PV temporários e o teto da exaustão), mana, CA, iniciativa,
+  proficiência, percepção passiva e dados de vida;
+- atributos com modificador e salvaguarda, que soma a proficiência só nas
+  salvaguardas da classe (`CLASS_DATA["saves"]`);
+- perícias com o bônus e a marca de proficiente;
+- ataques das armas equipadas com as contas de `attack_roll`: atributo pela
+  arma (distância usa DES, acuidade usa o maior), proficiência, Arquearia no
+  acerto, Duelo no dano, a nota da Grande Arma e o crítico aprimorado. O dado
+  vem do SRD; arma que não está lá mostra "dado do mestre", como no combate;
+- estado: condições com duração, exaustão, concentração, testes de morte (com
+  0 PV) e carga, além de resistências, imunidades e vulnerabilidades;
+- habilidades, equipamento, moedas, XP e se pode subir de nível.
+
+Não grava nada.
+
+### Um desencontro que a ficha expôs
+
+A lista de perícias de cada classe vivia dentro do `social_check`, e só ele
+somava a proficiência. O `make_skill_check(..., skill="percepção")` rolava
+só o atributo: a mesma perícia dava totais diferentes conforme a ferramenta
+que o mestre chamava. A tabela virou `PERICIAS_DA_CLASSE`, no módulo, lida
+pelas duas ferramentas e pela ficha; `make_skill_check` com perícia da classe
+soma a proficiência e mostra "+2(prof)" no resultado. Sem `skill`, continua
+sendo teste de atributo puro.
+
+### A tela
+
+`static/js/herois.js`, `GET /api/heroes/sheet?personagem=`. Mesma moldura das
+fichas do local e do personagem, mais larga. Cabeçalho com seletor de herói,
+classe, raça, nível, barra de XP e as marcas de estado; a faixa de recursos;
+à esquerda atributos e salvaguardas e as perícias; à direita ataques,
+habilidades (a descrição abre no clique), equipamento e quem é.
+
+Os botões levam às telas que mudam a ficha: "Subir de nível" (ou "Escolhas
+de nível", com escolha pendente), "Grimório" para quem conjura, "Mochila" e
+"Corrigir ficha", que abre o editor de antes. Aberta, a fila de telas a
+redesenha quando o mestre muda algo no chat. No celular a ficha rola inteira
+com o rodapé preso embaixo.
+
+O cartão do grupo com ficha D&D abre a ficha do herói; membro sem ficha D&D
+continua no editor.
+
+### Testes
+
+`test_ficha_heroi.py` (12) cobre quem entra, recursos, salvaguardas, perícias
+e percepção passiva, o bônus igual ao do `make_skill_check`, o ataque com as
+contas do `attack_roll`, Arquearia e crítico aprimorado, estado e defesas,
+"pode subir", que a ficha não muda nada e a rota.
+`test_ficha_heroi_navegador.py` (7) abre pelo cartão (e não o editor), confere
+os números da tela contra o motor, condições e habilidades, troca de herói,
+os botões para Mochila e tela de nível, "Corrigir ficha" e o redesenho.
+Capturas: `heroi-ficha` e `heroi-conjuradora`.
+
 ## Tela de loja ("O Balcão")
 
 A segunda tela do jogo, e a primeira construída depois de perguntar **por que**
@@ -2389,6 +2456,9 @@ acessam memória):
 - `GET /api/characters/sheet?nome=` → ficha do personagem (onde está, atitude e
   histórico, o que o grupo sabe, missões, eventos, loja). O `PUT` de personagem
   aceita `conhecido`. Veja [Ficha do personagem](#ficha-do-personagem).
+- `GET /api/heroes/sheet?personagem=` → ficha de leitura de um membro do grupo
+  (bônus de salvaguarda, perícia e ataque calculados pelo motor). Veja
+  [Ficha do herói](#ficha-do-herói).
 - O `PUT` de personagem (e o `PUT /api/campaigns/<name>`) passa por
   `normalize_edited_character`; aceita `correcao_manual` e devolve `mantidos`.
   Veja [Wizard e editores de ficha](#wizard-e-editores-de-ficha).
@@ -2497,6 +2567,8 @@ ferramentas do mestre.
   lá" e "Falar com").
 - **`personagens.js`**, a ficha do personagem (relação com o grupo e o porquê,
   o que o grupo sabe, ligações, "Falar com" e "Ir até onde está").
+- **`herois.js`**, a ficha de leitura do herói (atributos, salvaguardas,
+  perícias, ataques, estado e os atalhos para as telas que mudam a ficha).
   Mesma regra: renderizam o snapshot do motor e despacham intenções. A fila
   que decide qual abre primeiro (combate, nível, grimório, descanso, loja; a
   Mochila só abre pelo atalho) e o empilhamento das pílulas ficam em

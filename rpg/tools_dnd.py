@@ -4382,6 +4382,36 @@ def modify_mana(char_name: str, amount: int, reason: str = "") -> str:
 # ---------------------------------------------------------------------------
 
 # Mapa de perícias D&D 5e → atributo correspondente
+# Perícias em que cada classe é proficiente (simplificado: a lista de opções
+# da classe inteira, sem a escolha de duas ou quatro do PHB). Lida pelo
+# social_check, pelo make_skill_check e pela ficha do herói, para o bônus
+# mostrado ser o bônus usado.
+PERICIAS_DA_CLASSE: dict[str, set[str]] = {
+    "guerreiro": {"atletismo", "intimidação", "percepção", "sobrevivência", "história", "acrobacia"},
+    "bárbaro":   {"atletismo", "intimidação", "percepção", "sobrevivência", "natureza", "manusear animais"},
+    "ladino":    {"acrobacia", "atletismo", "enganação", "furtividade", "intimidação", "investigação",
+                  "percepção", "atuação", "persuasão", "prestidigitação"},
+    "bardo":     {"acrobacia", "enganação", "história", "intuição", "atuação", "persuasão"},
+    "mago":      {"arcana", "história", "intuição", "investigação", "medicina", "religião"},
+    "arcanista": {"arcana", "história", "intuição", "investigação", "medicina", "religião"},
+    "clérigo":   {"história", "intuição", "medicina", "persuasão", "religião"},
+    "druida":    {"arcana", "intuição", "manusear animais", "medicina", "natureza", "percepção", "religião", "sobrevivência"},
+    "paladino":  {"atletismo", "intuição", "intimidação", "medicina", "persuasão", "religião"},
+    "patrulheiro": {"atletismo", "furtividade", "investigação", "natureza", "percepção", "sobrevivência"},
+    "monge":     {"acrobacia", "atletismo", "história", "intuição", "religião", "furtividade"},
+    "feiticeiro": {"arcana", "enganação", "intuição", "intimidação", "persuasão", "religião"},
+    "bruxo":     {"arcana", "enganação", "história", "intimidação", "investigação", "natureza"},
+}
+
+
+def _proficiente_na_pericia(sheet: dict, pericia: str) -> bool:
+    nome = (pericia or "").lower().strip()
+    if nome == "lidar com animais":
+        nome = "manusear animais"
+    classe = (sheet.get("classe") or "").lower().strip()
+    return nome in PERICIAS_DA_CLASSE.get(classe, set())
+
+
 SKILL_ATTR_MAP: dict[str, str] = {
     "atletismo":          "forca",
     "acrobacia":          "destreza",
@@ -4466,6 +4496,11 @@ def make_skill_check(
 
     attr_val = s[attr_key]
     mod      = _modifier(attr_val)
+    # Perícia da classe soma a proficiência. Antes só o social_check somava, e
+    # o mesmo "percepção" dava totais diferentes conforme a ferramenta.
+    prof_pericia = 0
+    if skill and _proficiente_na_pericia(s, skill):
+        prof_pericia = int(s.get("proficiencia", _proficiency_bonus(int(s.get("nivel", 1) or 1))) or 2)
     # Usa a rolagem do JOGADOR quando fornecida e válida (1–20); senão o
     # mestre/sistema rola (com vantagem/desvantagem se aplicável).
     if isinstance(player_roll, int) and 1 <= player_roll <= 20:
@@ -4473,8 +4508,9 @@ def make_skill_check(
         roll_log = f"d20={d20} (rolado pelo jogador)"
     else:
         d20, roll_log = _roll_d20_with_adv(advantage, disadvantage)
-    total    = d20 + mod
+    total    = d20 + mod + prof_pericia
     sign     = "+" if mod >= 0 else ""
+    prof_str = f" +{prof_pericia}(prof)" if prof_pericia else ""
 
     critico       = d20 == 20
     falha_critica = d20 == 1
@@ -4483,7 +4519,7 @@ def make_skill_check(
     skill_label = f"{skill.capitalize()} ({attribute.capitalize()})" if skill else attribute.capitalize()
     result = (
         f"Teste de {skill_label} — CD {difficulty}\n"
-        f"   {char['name']}: {roll_log} {sign}{mod}(mod) = **{total}**\n"
+        f"   {char['name']}: {roll_log} {sign}{mod}(mod){prof_str} = **{total}**\n"
     )
     if critico:
         result += "   CRÍTICO NATURAL! Sucesso automático."
@@ -4535,25 +4571,7 @@ def social_check(
     mod          = _modifier(s.get(attr_key, 10))
     prof         = s.get("proficiencia", 2)
 
-    # Verifica proficiência na perícia (simplificado: guerreiros têm atletismo/intimidação,
-    # bardos/ladinos têm persuasão/enganação, etc.)
-    PROF_BY_CLASS = {
-        "guerreiro": {"atletismo", "intimidação", "percepção", "sobrevivência", "história", "acrobacia"},
-        "bárbaro":   {"atletismo", "intimidação", "percepção", "sobrevivência", "natureza", "manusear animais"},
-        "ladino":    {"acrobacia", "atletismo", "enganação", "furtividade", "intimidação", "investigação",
-                      "percepção", "atuação", "persuasão", "prestidigitação"},
-        "bardo":     {"acrobacia", "enganação", "história", "intuição", "atuação", "persuasão"},
-        "mago":      {"arcana", "história", "intuição", "investigação", "medicina", "religião"},
-        "clérigo":   {"história", "intuição", "medicina", "persuasão", "religião"},
-        "druida":    {"arcana", "intuição", "manusear animais", "medicina", "natureza", "percepção", "religião", "sobrevivência"},
-        "paladino":  {"atletismo", "intuição", "intimidação", "medicina", "persuasão", "religião"},
-        "patrulheiro": {"atletismo", "furtividade", "investigação", "natureza", "percepção", "sobrevivência"},
-        "monge":     {"acrobacia", "atletismo", "história", "intuição", "religião", "furtividade"},
-        "feiticeiro": {"arcana", "enganação", "intuição", "intimidação", "persuasão", "religião"},
-        "bruxo":     {"arcana", "enganação", "história", "intimidação", "investigação", "natureza"},
-    }
-    classe       = s.get("classe", "").lower()
-    is_proficient = skill_lower in PROF_BY_CLASS.get(classe, set())
+    is_proficient = _proficiente_na_pericia(s, skill_lower)
     total_mod    = mod + (prof if is_proficient else 0)
 
     # A ATITUDE DO ALVO mexe na CD. É o que faz a memória social ter peso
@@ -7079,6 +7097,182 @@ def levelup_action(action: str, char: str = "", feature: str = "",
 
     ok = not msg.lstrip().startswith(("Aviso:", "Erro:", "Nota:"))
     return {"ok": ok, "message": msg, "snapshot": levelup_snapshot(char)}
+
+# ===========================================================================
+# FICHA DO HERÓI (leitura)
+# ---------------------------------------------------------------------------
+# A ficha completa de um membro do grupo para a tela: tudo o que o jogador
+# precisa para decidir e rolar, calculado AQUI com as mesmas funções que o
+# motor usa na hora de resolver. A tela não soma nada: o bônus de ataque é o
+# de attack_roll, o de perícia é o de make_skill_check, a salvaguarda soma a
+# proficiência das salvaguardas da classe (CLASS_DATA["saves"]).
+#
+# Não muda nada: nível, atributos e escolhas mudam pela tela de nível; itens
+# pela Mochila; magias pelo Grimório. A tela só leva até elas.
+# ===========================================================================
+
+_TIPO_DE_DANO_PT = {
+    "acid": "ácido", "bludgeoning": "concussão", "cold": "frio", "fire": "fogo",
+    "force": "força", "lightning": "elétrico", "necrotic": "necrótico",
+    "piercing": "perfurante", "poison": "veneno", "psychic": "psíquico",
+    "radiant": "radiante", "slashing": "cortante", "thunder": "trovejante",
+}
+
+_PERICIAS_DA_FICHA = sorted(k for k in SKILL_ATTR_MAP if k != "lidar com animais")
+
+
+def _fmt_bonus(n: int) -> str:
+    return f"+{n}" if n >= 0 else str(n)
+
+
+def _ataque_da_ficha(char: dict, arma: str) -> dict:
+    """O ataque com uma arma equipada, com as contas de attack_roll."""
+    s = char.get("sheet") or {}
+    atributo, mod = _weapon_attr(arma, s)
+    prof = int(s.get("proficiencia", _proficiency_bonus(int(s.get("nivel", 1) or 1))) or 2)
+    nome_l = arma.lower()
+    distancia = any(r in nome_l for r in RANGED_WEAPONS)
+    duas_maos = any(w in nome_l for w in TWO_HANDED_WEAPONS)
+    estilo = _get_feature_choice(char, "Estilo de Combate")
+    bonus_acerto, bonus_dano, notas = 0, 0, []
+    if estilo == "Arquearia" and distancia:
+        bonus_acerto = 2
+        notas.append("Arquearia: +2 no acerto")
+    elif (estilo == "Duelo" and not distancia and not duas_maos
+          and not (s.get("equipamentos") or {}).get("arma_secundaria")):
+        bonus_dano = 2
+        notas.append("Duelo: +2 no dano")
+    elif estilo == "Grande Arma" and not distancia and duas_maos:
+        notas.append("Grande Arma: rola de novo 1 e 2 no dano")
+    critico = _crit_threshold(char)
+    if critico < 20:
+        notas.append(f"crítico com {critico} ou mais")
+
+    dado = ""
+    dados = _npc_attack_dice(s, arma) or _fetch_weapon_data(arma)
+    if dados:
+        n, faces = dados
+        extra = mod + bonus_dano
+        dado = f"{n}d{faces}" + (f"{'+' if extra >= 0 else '-'}{abs(extra)}" if extra else "")
+    tipo = _weapon_damage_type(arma)
+    return {
+        "arma": arma,
+        "atributo": _ATRIBUTO_SIGLA.get(atributo, atributo.upper()),
+        "acerto": _fmt_bonus(mod + prof + bonus_acerto),
+        "dano": dado,
+        "tipo": _TIPO_DE_DANO_PT.get(tipo, ""),
+        "alcance": "à distância" if distancia else "corpo a corpo",
+        "notas": notas,
+    }
+
+
+def hero_snapshot(char_name: str = "") -> dict:
+    """Ficha de leitura de um membro do grupo para a tela (JSON-serializável)."""
+    grupo = _grupo_com_ficha()
+    alvo = None
+    if char_name:
+        alvo = next((c for c in grupo
+                     if _norm_txt(c.get("name", "")) == _norm_txt(char_name)), None)
+    base = {"tem_personagem": bool(alvo), "grupo": [c.get("name", "") for c in grupo],
+            "personagem": None}
+    if not alvo:
+        return base
+
+    s = alvo["sheet"]
+    classe = (s.get("classe") or "").lower().strip()
+    nivel = int(s.get("nivel", 1) or 1)
+    prof = int(s.get("proficiencia", _proficiency_bonus(nivel)) or 2)
+    xp = int(s.get("xp", 0) or 0)
+    prox = int(s.get("xp_proximo", 0) or 0)
+    piso = XP_THRESHOLDS[nivel - 1] if 0 < nivel <= len(XP_THRESHOLDS) else 0
+    saves_da_classe = set(CLASS_DATA.get(classe, {}).get("saves", []))
+
+    atributos = []
+    for a in _ATRIBUTOS:
+        valor = int(s.get(a, 10) or 10)
+        mod = _modifier(valor)
+        proficiente = a in saves_da_classe
+        atributos.append({
+            "chave": a, "nome": _ATRIBUTO_PT[a], "sigla": _ATRIBUTO_SIGLA[a],
+            "valor": valor, "mod": _fmt_bonus(mod),
+            "salvaguarda": _fmt_bonus(mod + (prof if proficiente else 0)),
+            "salvaguarda_proficiente": proficiente,
+        })
+
+    pericias = []
+    for nome in _PERICIAS_DA_FICHA:
+        atributo = SKILL_ATTR_MAP[nome]
+        proficiente = _proficiente_na_pericia(s, nome)
+        bonus = _modifier(int(s.get(atributo, 10) or 10)) + (prof if proficiente else 0)
+        pericias.append({"nome": nome, "sigla": _ATRIBUTO_SIGLA[atributo],
+                         "bonus": _fmt_bonus(bonus), "proficiente": proficiente,
+                         "_valor": bonus})
+    percepcao = next((p["_valor"] for p in pericias if p["nome"] == "percepção"), 0)
+    for p in pericias:
+        p.pop("_valor")
+
+    equip = s.get("equipamentos") or {}
+    ataques = [_ataque_da_ficha(alvo, equip[slot])
+               for slot in ("arma_principal", "arma_secundaria") if equip.get(slot)]
+
+    condicoes = []
+    for c in (s.get("condicoes") or []):
+        if isinstance(c, dict) and c.get("nome"):
+            condicoes.append({"nome": c["nome"], "duracao": c.get("duracao") or 0})
+        elif isinstance(c, str) and c:
+            condicoes.append({"nome": c, "duracao": 0})
+
+    def _tipos(campo):
+        entradas = _traits_lookup(s, campo)
+        return sorted({_TIPO_DE_DANO_PT.get(tp, tp) for e in entradas for tp in e.get("tipos", [])})
+
+    restantes, maximo = _reserva_de_dados(s)
+    estado, carga, cap = _estado_de_carga(alvo)
+    vida = int(s.get("vida_atual", 0) or 0)
+    conc = s.get("concentracao") or {}
+
+    base["personagem"] = {
+        "nome": alvo.get("name", ""),
+        "classe": s.get("classe", ""), "raca": s.get("raca", ""),
+        "nivel": nivel, "xp": xp, "xp_proximo": prox,
+        "xp_pct": max(0, min(100, round((xp - piso) / max(1, prox - piso) * 100))),
+        "pode_subir": bool(prox) and xp >= prox and nivel < 20,
+        "escolhas_pendentes": len(_escolhas_pendentes(alvo)),
+        "escolhas": dict(s.get("feature_choices") or {}),
+        "descricao": alvo.get("description", "") or "",
+        "tracos": alvo.get("traits", "") or "",
+        "vida": {"atual": vida, "max": int(s.get("vida_max", 0) or 0),
+                 "teto": _hp_max_efetivo(s), "temp": _temp_hp(s)},
+        "mana": {"atual": int(s.get("mana_atual", 0) or 0), "max": int(s.get("mana_max", 0) or 0)},
+        "ca": int(s.get("ca", 10) or 10),
+        "proficiencia": _fmt_bonus(prof),
+        "iniciativa": _fmt_bonus(_modifier(int(s.get("destreza", 10) or 10))),
+        "percepcao_passiva": 10 + percepcao,
+        "dados_de_vida": {"restantes": restantes, "max": maximo, "dado": f"d{_dado_de_vida(s)}"},
+        "exaustao": _exaustao(s),
+        "testes_de_morte": ({"sucessos": int(s.get("death_saves_sucessos", 0) or 0),
+                             "falhas": int(s.get("death_saves_falhas", 0) or 0)}
+                            if vida == 0 else None),
+        "concentracao": conc.get("magia", "") if isinstance(conc, dict) else "",
+        "condicoes": condicoes,
+        "defesas": {"resistencias": _tipos("resistencias"), "imunidades": _tipos("imunidades"),
+                    "vulnerabilidades": _tipos("vulnerabilidades")},
+        "atributos": atributos,
+        "pericias": pericias,
+        "ataques": ataques,
+        "equipados": [{"rotulo": _ROTULO_DO_SLOT[slot], "item": equip.get(slot) or ""}
+                      for slot in _SLOTS],
+        "moedas": {"ouro": int(s.get("ouro", 0) or 0), "prata": int(s.get("prata", 0) or 0),
+                   "cobre": int(s.get("cobre", 0) or 0)},
+        "carga": {"kg": carga, "capacidade": cap, "estado": estado},
+        "itens": sum(1 for i in (alvo.get("inventario") or []) if isinstance(i, dict)),
+        "habilidades": [{"nome": h.get("nome", ""), "descricao": h.get("descricao", "") or "",
+                         "custo_mana": int(h.get("custo_mana", 0) or 0), "dado": h.get("dado", "") or ""}
+                        for h in (alvo.get("habilidades") or []) if isinstance(h, dict)],
+        "conjura": _max_mana_for(classe, nivel) > 0,
+    }
+    return base
+
 
 # ===========================================================================
 # CARGA E LOJA

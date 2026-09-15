@@ -975,10 +975,12 @@ function buildDndCharCard(c, idx, type) {
     && sheet.xp >= sheet.xp_proximo
     && (sheet.nivel || 1) < 20;
 
-  // O cartão de um personagem do mundo abre a ficha dele (quem é, onde está,
-  // a relação com o grupo); o do grupo continua abrindo o editor.
+  // O cartão abre a ficha de leitura: a do herói para quem é do grupo e tem
+  // ficha D&D, a do personagem para os demais. Corrigir a ficha continua a
+  // um clique, pelo botão dentro dela.
   const aoClicar = type === 'party'
-    ? `openEditModal('${modalType}','${keyEsc}',${dataRef})`
+    ? (sheet ? `abrirFichaDoHeroi('${nameEsc}','${modalType}','${keyEsc}',${dataRef})`
+             : `openEditModal('${modalType}','${keyEsc}',${dataRef})`)
     : `abrirFichaDoPersonagem('${nameEsc}','${modalType}','${keyEsc}',${dataRef})`;
   let html = `<div class="char-card editable" onclick="${aoClicar}">`;
   html += `<div class="char-name">${escapeHtml(c.name || '')}`;
@@ -1023,6 +1025,12 @@ function buildDndCharCard(c, idx, type) {
 // Abre a ficha do personagem; sem personagens.js carregado, cai no editor.
 function abrirFichaDoPersonagem(nome, modalType, key, data) {
   if (window.Personagens) window.Personagens._abrir(nome);
+  else openEditModal(modalType, key, data);
+}
+
+// Abre a ficha de leitura do herói; sem herois.js carregado, cai no editor.
+function abrirFichaDoHeroi(nome, modalType, key, data) {
+  if (window.Herois) window.Herois._abrir(nome);
   else openEditModal(modalType, key, data);
 }
 
@@ -1234,6 +1242,8 @@ function sincronizarTelas() {
     try { if (window.Shop)    await window.Shop.sync();    } catch (_) {}
     // A Mochila não abre sozinha: aberta, só redesenha com o que mudou.
     try { if (window.Inventory) await window.Inventory.sync(); } catch (_) {}
+    // A ficha do herói também: aberta, mostra o dano, o XP e o item na hora.
+    try { if (window.Herois) await window.Herois.sync(); } catch (_) {}
   };
   _filaTelas = _filaTelas.then(rodada, rodada);
   return _filaTelas;

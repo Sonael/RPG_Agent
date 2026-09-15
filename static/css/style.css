@@ -3996,7 +3996,7 @@ body.rest-on { overflow: hidden; }
    fica dentro dele. O caminho até o lugar ("Cliviate › Forja de Cliviate")
    fica no topo e cada trecho abre a ficha daquele lugar.
    ═══════════════════════════════════════════════════════════════════ */
-#local-overlay, #pessoa-overlay {
+#local-overlay, #pessoa-overlay, #heroi-overlay {
   --lcl-paper: #fffbf0;
   --lcl-bg:    #f4ebd8;
   --lcl-dark:  #3d2a14;
@@ -4014,10 +4014,10 @@ body.rest-on { overflow: hidden; }
   padding: var(--esp-5); box-sizing: border-box;
   font-family: 'Lora', serif;
 }
-#local-overlay.hidden, #pessoa-overlay.hidden { display: none; }
-body.local-on, body.pessoa-on { overflow: hidden; }
+#local-overlay.hidden, #pessoa-overlay.hidden, #heroi-overlay.hidden { display: none; }
+body.local-on, body.pessoa-on, body.heroi-on { overflow: hidden; }
 
-#lcl-frame, #psn-frame {
+#lcl-frame, #psn-frame, #hro-frame {
   width: 100%; max-width: 940px;
   height: min(90vh, 820px);
   background: var(--lcl-paper); color: var(--lcl-text);
@@ -4145,8 +4145,8 @@ body.local-on, body.pessoa-on { overflow: hidden; }
 .char-local { font-family: 'Lora', serif; font-size: 11px; color: var(--text-muted); margin-top: 2px; }
 
 @media (max-width: 760px) {
-  #local-overlay, #pessoa-overlay { padding: 0; align-items: stretch; }
-  #lcl-frame, #psn-frame { max-width: none; border-radius: 0; border: none; height: 100vh; }
+  #local-overlay, #pessoa-overlay, #heroi-overlay { padding: 0; align-items: stretch; }
+  #lcl-frame, #psn-frame, #hro-frame { max-width: none; border-radius: 0; border: none; height: 100vh; }
   .lcl-header { padding: var(--esp-4) var(--esp-10) var(--esp-3); max-height: none; overflow: visible; }
   .lcl-title { font-size: 1.3rem; }
   .lcl-corpo { display: block; overflow-y: auto; }
@@ -4211,3 +4211,88 @@ body.local-on, body.pessoa-on { overflow: hidden; }
 .psn-secao-sabe { margin-top: var(--esp-2); }
 .psn-evento { color: var(--lcl-text); }
 .lcl-item-nome.psn-link { cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   FICHA DO HERÓI — static/js/herois.js
+
+   A moldura e as seções são as das fichas do local e do personagem (lcl-*).
+   O que é só dela: a faixa de recursos (vida, CA, iniciativa...), a grade
+   de atributos com a salvaguarda, a lista de perícias com a marca de
+   proficiente e os números do ataque. Mais larga: são duas colunas cheias.
+   ═══════════════════════════════════════════════════════════════════ */
+#hro-frame { max-width: 1080px; }
+.hro-sub { display: flex; justify-content: center; align-items: center; gap: var(--esp-2);
+  flex-wrap: wrap; color: var(--lcl-muted); font-size: 0.9rem; }
+.hro-quem-sel { width: auto; max-width: 100%; font: inherit; padding: 2px 6px; border: 1px solid var(--lcl-line);
+  border-radius: 6px; background: var(--lcl-paper); color: var(--lcl-text); }
+.hro-xp { display: flex; align-items: center; justify-content: center; gap: var(--esp-2);
+  margin-top: var(--esp-2); font-size: 0.78rem; color: var(--lcl-muted); font-variant-numeric: tabular-nums; }
+.hro-xp-trilho { width: min(260px, 50%); height: 6px; border-radius: 3px; background: var(--lcl-line); overflow: hidden; }
+.hro-xp-fill { height: 100%; background: var(--lcl-gold); }
+.hro-estado { display: flex; justify-content: center; flex-wrap: wrap; gap: var(--esp-1); margin-top: var(--esp-2); }
+.hro-estado:empty { display: none; }
+.hro-marca { font-size: 0.74rem; padding: 2px 8px; border-radius: 999px;
+  border: 1px solid var(--lcl-line); background: var(--lcl-paper); color: var(--lcl-text); }
+.hro-marca-perigo { border-color: var(--lcl-red); color: var(--lcl-red); }
+
+.hro-recursos { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: var(--esp-2); padding: var(--esp-3) var(--esp-5); border-bottom: 1px solid var(--lcl-line);
+  flex: 0 0 auto; }
+.hro-recurso { display: flex; flex-direction: column; align-items: center; text-align: center;
+  background: var(--lcl-paper); border: 1px solid var(--lcl-line); border-radius: 8px; padding: var(--esp-2); }
+.hro-recurso-rotulo { font-size: 0.66rem; text-transform: uppercase; letter-spacing: .05em; color: var(--lcl-muted); }
+.hro-recurso-valor { font-family: 'Playfair Display', serif; font-size: 1.3rem; font-weight: 700;
+  color: var(--lcl-dark); font-variant-numeric: tabular-nums; }
+.hro-recurso-detalhe { font-size: 0.7rem; color: var(--lcl-muted); }
+.hro-recurso-perigo .hro-recurso-valor { color: var(--lcl-red); }
+
+.hro-atributos { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--esp-2); margin-bottom: var(--esp-4); }
+.hro-atributo { display: grid; grid-template-columns: 1fr auto; grid-template-areas: "sigla valor" "mod mod" "save save";
+  background: var(--lcl-paper); border: 1px solid var(--lcl-line); border-radius: 8px; padding: var(--esp-2) var(--esp-3); }
+.hro-atributo-sigla { grid-area: sigla; font-size: 0.72rem; letter-spacing: .06em; color: var(--lcl-muted); font-weight: 700; }
+.hro-atributo-valor { grid-area: valor; font-size: 0.78rem; color: var(--lcl-muted); font-variant-numeric: tabular-nums; }
+.hro-atributo-mod { grid-area: mod; text-align: center; font-family: 'Playfair Display', serif;
+  font-size: 1.35rem; font-weight: 700; color: var(--lcl-dark); font-variant-numeric: tabular-nums; }
+.hro-atributo-save { grid-area: save; text-align: center; font-size: 0.74rem; color: var(--lcl-muted); }
+.hro-atributo-save.hro-prof { color: var(--lcl-green); font-weight: 700; }
+
+.hro-pericias { display: grid; grid-template-columns: 1fr 1fr; gap: 2px var(--esp-3); }
+.hro-pericia { display: grid; grid-template-columns: 3.2ch 1fr auto; align-items: baseline; gap: var(--esp-2);
+  font-size: 0.84rem; padding: 3px 0; border-bottom: 1px dotted var(--lcl-line); }
+.hro-pericia-bonus { font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; color: var(--lcl-text); }
+.hro-pericia-sigla { font-size: 0.68rem; color: var(--lcl-muted); }
+.hro-pericia.hro-prof .hro-pericia-nome::after, .hro-ponto {
+  content: ""; display: inline-block; width: 6px; height: 6px; margin-left: 6px; border-radius: 50%;
+  background: var(--lcl-green); vertical-align: middle; }
+.hro-pericia.hro-prof .hro-pericia-bonus { color: var(--lcl-green); }
+.hro-legenda { grid-column: 1 / -1; margin: var(--esp-2) 0 0; font-size: 0.72rem; color: var(--lcl-muted); }
+.hro-legenda .hro-ponto { margin: 0 4px 0 0; }
+
+.hro-ataque-numeros { display: flex; flex-wrap: wrap; gap: var(--esp-2) var(--esp-4); margin-top: var(--esp-1);
+  font-variant-numeric: tabular-nums; }
+.hro-ataque-numeros small { font-size: 0.68rem; text-transform: uppercase; letter-spacing: .04em; color: var(--lcl-muted); }
+.hro-ataque-numeros b { font-size: 1.05rem; color: var(--lcl-dark); }
+.hro-habilidade summary { cursor: pointer; list-style: none; }
+.hro-habilidade summary::-webkit-details-marker { display: none; }
+.hro-habilidade[open] summary .lcl-item-nome { text-decoration: underline; text-underline-offset: 3px; }
+.hro-slots { display: grid; grid-template-columns: 1fr 1fr; gap: var(--esp-1) var(--esp-3); }
+.hro-slot { display: flex; flex-direction: column; font-size: 0.84rem; padding: var(--esp-1) 0;
+  border-bottom: 1px dotted var(--lcl-line); }
+.hro-slot-rotulo { font-size: 0.66rem; text-transform: uppercase; letter-spacing: .05em; color: var(--lcl-muted); }
+.hro-slot-item i { color: var(--lcl-muted); }
+.hro-linha { margin: var(--esp-2) 0 0; font-size: 0.8rem; color: var(--lcl-muted); }
+#hro-quem-bloco { margin-top: var(--esp-4); }
+#hro-quem-bloco.hidden { display: none; }
+@media (max-width: 760px) {
+  /* No celular a ficha rola inteira, com o rodapé preso embaixo: com a faixa
+     de recursos fixa sobrava pouco espaço para atributos e perícias. */
+  #hro-frame { overflow-y: auto; }
+  #hro-frame .lcl-corpo { flex: 0 0 auto; overflow: visible; }
+  #hro-frame .lcl-rodape { position: sticky; bottom: 0; z-index: 1; }
+  .hro-recursos { grid-template-columns: repeat(4, 1fr); gap: var(--esp-1); padding: var(--esp-3); }
+  .hro-recurso { padding: var(--esp-1); }
+  .hro-recurso-rotulo { font-size: 0.58rem; }
+  .hro-recurso-valor { font-size: 1.05rem; }
+  .hro-atributos { grid-template-columns: repeat(2, 1fr); }
+  .hro-pericias, .hro-slots { grid-template-columns: 1fr; }
+}

@@ -2852,6 +2852,15 @@ def levelup_action_route():
     ))
 
 
+@app.route("/api/heroes/sheet", methods=["GET"])
+@require_auth
+def hero_sheet_route():
+    """Ficha de leitura de um membro do grupo (ver tools_dnd.hero_snapshot)."""
+    from rpg import tools_dnd
+    return jsonify(tools_dnd.hero_snapshot(
+        (request.args.get("personagem") or "").strip()))
+
+
 @app.route("/api/inventory/state", methods=["GET"])
 @require_auth
 def inventory_state_route():
