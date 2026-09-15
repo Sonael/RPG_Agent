@@ -365,6 +365,9 @@ def save_event(
         "characters_involved": characters_involved,
         "location":            location,
         "consequence":         consequence,
+        # O capítulo em que aconteceu: o diário (rpg/diario.py) mostra os
+        # eventos na página do capítulo. Antes não era gravado.
+        "chapter":             memory.campaign.get("chapter", 1),
     }
     events.append(event)
     memory.save_campaign()

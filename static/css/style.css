@@ -4023,7 +4023,7 @@ body.rest-on { overflow: hidden; }
    fica dentro dele. O caminho até o lugar ("Cliviate › Forja de Cliviate")
    fica no topo e cada trecho abre a ficha daquele lugar.
    ═══════════════════════════════════════════════════════════════════ */
-#local-overlay, #pessoa-overlay, #heroi-overlay, #missoes-overlay, #mapa-overlay, #grupo-overlay {
+#local-overlay, #pessoa-overlay, #heroi-overlay, #missoes-overlay, #mapa-overlay, #grupo-overlay, #diario-overlay {
   --lcl-paper: #fffbf0;
   --lcl-bg:    #f4ebd8;
   --lcl-dark:  #3d2a14;
@@ -4041,10 +4041,10 @@ body.rest-on { overflow: hidden; }
   padding: var(--esp-5); box-sizing: border-box;
   font-family: 'Lora', serif;
 }
-#local-overlay.hidden, #pessoa-overlay.hidden, #heroi-overlay.hidden, #missoes-overlay.hidden, #mapa-overlay.hidden, #grupo-overlay.hidden { display: none; }
-body.local-on, body.pessoa-on, body.heroi-on, body.missoes-on, body.mapa-on, body.grupo-on { overflow: hidden; }
+#local-overlay.hidden, #pessoa-overlay.hidden, #heroi-overlay.hidden, #missoes-overlay.hidden, #mapa-overlay.hidden, #grupo-overlay.hidden, #diario-overlay.hidden { display: none; }
+body.local-on, body.pessoa-on, body.heroi-on, body.missoes-on, body.mapa-on, body.grupo-on, body.diario-on { overflow: hidden; }
 
-#lcl-frame, #psn-frame, #hro-frame, #msn-frame, #map-frame, #grp-frame {
+#lcl-frame, #psn-frame, #hro-frame, #msn-frame, #map-frame, #grp-frame, #dia-frame {
   width: 100%; max-width: 940px;
   height: min(90vh, 820px);
   background: var(--lcl-paper); color: var(--lcl-text);
@@ -4172,8 +4172,8 @@ body.local-on, body.pessoa-on, body.heroi-on, body.missoes-on, body.mapa-on, bod
 .char-local { font-family: 'Lora', serif; font-size: 11px; color: var(--text-muted); margin-top: 2px; }
 
 @media (max-width: 760px) {
-  #local-overlay, #pessoa-overlay, #heroi-overlay, #missoes-overlay, #mapa-overlay, #grupo-overlay { padding: 0; align-items: stretch; }
-  #lcl-frame, #psn-frame, #hro-frame, #msn-frame, #map-frame, #grp-frame { max-width: none; border-radius: 0; border: none; height: 100vh; }
+  #local-overlay, #pessoa-overlay, #heroi-overlay, #missoes-overlay, #mapa-overlay, #grupo-overlay, #diario-overlay { padding: 0; align-items: stretch; }
+  #lcl-frame, #psn-frame, #hro-frame, #msn-frame, #map-frame, #grp-frame, #dia-frame { max-width: none; border-radius: 0; border: none; height: 100vh; }
   .lcl-header { padding: var(--esp-4) var(--esp-10) var(--esp-3); max-height: none; overflow: visible; }
   .lcl-title { font-size: 1.3rem; }
   .lcl-corpo { display: block; overflow-y: auto; }
@@ -4672,4 +4672,95 @@ body.loot-on { overflow: hidden; }
 @media (max-width: 760px) {
   .grp-corpo, .grp-resumo { padding-left: var(--esp-3); padding-right: var(--esp-3); }
   .grp-cartoes { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   O DIÁRIO COMO LIVRO — static/js/diario.js
+
+   Moldura das fichas (lcl-*). O que é só dele: o índice de capítulos à
+   esquerda e a página à direita, com o texto das entradas em coluna de
+   leitura (serifa, entrelinha larga, capitular no primeiro parágrafo) e o
+   "Neste capítulo" com eventos, personagens, locais e missões.
+   ═══════════════════════════════════════════════════════════════════ */
+#dia-frame { max-width: 1120px; }
+.dia-corpo {
+  flex: 1 1 auto; min-height: 0;
+  display: grid; grid-template-columns: minmax(200px, 260px) minmax(0, 1fr);
+}
+.dia-indice {
+  overflow-y: auto; padding: var(--esp-3); background: var(--lcl-bg);
+  border-right: 1px solid var(--lcl-line); display: flex; flex-direction: column; gap: var(--esp-1);
+}
+.dia-cap-item {
+  display: flex; flex-direction: column; gap: 2px; text-align: left; cursor: pointer;
+  padding: var(--esp-2) var(--esp-3); border-radius: 8px; border: 1px solid transparent;
+  background: none; font: inherit; color: var(--lcl-text);
+}
+.dia-cap-item:hover { background: var(--lcl-paper); border-color: var(--lcl-line); }
+.dia-cap-aberto { background: var(--lcl-paper); border-color: var(--lcl-gold); }
+.dia-cap-numero { font-family: 'Playfair Display', serif; font-size: 0.98rem; color: var(--lcl-ink); }
+.dia-cap-titulo { font-size: 0.84rem; color: var(--lcl-dark); }
+.dia-cap-contagem { font-size: 0.74rem; color: var(--lcl-muted); }
+.dia-cap-sem .dia-cap-numero { color: var(--lcl-muted); }
+.dia-pagina { overflow-y: auto; padding: var(--esp-5) var(--esp-6); }
+.dia-pagina-cabeca { max-width: 68ch; margin: 0 auto var(--esp-4); text-align: center; }
+.dia-pagina-numero {
+  margin: 0; font-size: 0.78rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--lcl-gold);
+}
+.dia-pagina-titulo { margin: var(--esp-1) 0 0; font-family: 'Playfair Display', serif; font-size: 1.6rem; color: var(--lcl-ink); }
+.dia-entradas, .dia-ligacoes, .dia-pagina > .lcl-desc, .dia-pagina > .dia-eventos { max-width: 68ch; margin-left: auto; margin-right: auto; }
+.dia-entrada { padding: var(--esp-3) 0; border-bottom: 1px dashed var(--lcl-line); }
+.dia-entrada:last-child { border-bottom: none; }
+.dia-destaque { background: rgba(184,153,71,0.12); border-radius: 8px; padding-left: var(--esp-3); padding-right: var(--esp-3); }
+.dia-entrada-cabeca { display: flex; align-items: baseline; justify-content: space-between; gap: var(--esp-2); }
+.dia-entrada-cabeca h3 { margin: 0; font-family: 'Playfair Display', serif; font-size: 1.15rem; color: var(--lcl-dark); }
+.dia-editar {
+  border: none; background: none; cursor: pointer; font: inherit; font-size: 0.78rem;
+  color: var(--lcl-muted); text-decoration: underline; text-underline-offset: 3px;
+}
+.dia-editar:hover { color: var(--lcl-red); }
+.dia-texto p {
+  margin: var(--esp-2) 0 0; font-family: 'Lora', serif; font-size: 1rem; line-height: 1.75;
+  color: var(--lcl-text); text-align: justify; hyphens: auto;
+}
+.dia-texto p:first-child::first-letter {
+  float: left; font-family: 'Playfair Display', serif; font-size: 2.6em; line-height: 0.9;
+  padding: 4px 6px 0 0; color: var(--lcl-ink);
+}
+.dia-ligacoes {
+  margin-top: var(--esp-5); padding: var(--esp-4); border: 1px solid var(--lcl-line);
+  border-radius: 10px; background: var(--lcl-bg);
+}
+.dia-ligacoes-titulo { margin: 0 0 var(--esp-3); font-family: 'Playfair Display', serif; font-size: 1.1rem; color: var(--lcl-ink); }
+.dia-ligacoes .lcl-secao { font-size: 0.92rem; margin-top: var(--esp-3); }
+.dia-eventos { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: var(--esp-3); }
+.dia-evento-resumo { margin: 0; font-size: 0.92rem; color: var(--lcl-text); }
+.dia-evento-local, .dia-evento-consequencia { margin: 2px 0 0; font-size: 0.8rem; color: var(--lcl-muted); }
+.dia-evento-consequencia { font-style: italic; }
+.dia-pessoas, .dia-locais { display: flex; flex-wrap: wrap; gap: var(--esp-1); margin-top: var(--esp-1); }
+.dia-pessoa {
+  font-family: 'Lora', serif; font-size: 0.8rem; cursor: pointer; padding: 1px var(--esp-2);
+  border-radius: 999px; border: 1px solid var(--lcl-line); background: var(--lcl-paper); color: var(--lcl-text);
+}
+.dia-pessoa:hover { border-color: var(--lcl-gold); }
+.dia-pessoa-sem { cursor: default; color: var(--lcl-muted); border-style: dashed; }
+.dia-link {
+  border: none; background: none; padding: 0; cursor: pointer; font: inherit; color: var(--lcl-dark);
+  text-decoration: underline dotted; text-underline-offset: 3px;
+}
+.dia-locais .dia-link { font-size: 0.86rem; margin-right: var(--esp-2); }
+.dia-link:hover { color: var(--lcl-red); text-decoration-style: solid; }
+.dia-missoes { margin: 0; padding-left: 1.2em; font-size: 0.88rem; }
+.dia-missoes li { margin-top: 2px; }
+.dia-mover { display: flex; gap: var(--esp-2); align-items: center; margin-top: var(--esp-2); }
+.dia-mover .lcl-btn { white-space: nowrap; }
+.dia-pagina > .lcl-desc { max-width: 68ch; text-align: left; }
+.dia-mover select { flex: 0 1 auto; font: inherit; font-size: 0.82rem; padding: 2px var(--esp-2); border-radius: 6px; border: 1px solid var(--lcl-line); background: var(--lcl-paper); color: var(--lcl-text); }
+#dia-nova.hidden { display: none; }
+@media (max-width: 760px) {
+  .dia-corpo { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .dia-indice { flex-direction: row; overflow-x: auto; overflow-y: hidden; border-right: none; border-bottom: 1px solid var(--lcl-line); }
+  .dia-cap-item { flex: 0 0 auto; max-width: 200px; }
+  .dia-pagina { padding: var(--esp-4) var(--esp-3); }
+  .dia-texto p { text-align: left; }
 }

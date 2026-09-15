@@ -96,20 +96,21 @@ abre o loop **percepção → deliberação → ação → verificação** em de
 13. [Ficha do herói](#ficha-do-herói)
 14. [Mapa do mundo](#mapa-do-mundo)
 15. [Visão geral do grupo](#visão-geral-do-grupo)
-16. [Tela de loja ("O Balcão")](#tela-de-loja-o-balcão)
-17. [Tela de missões ("O Livro de Missões")](#tela-de-missões-o-livro-de-missões)
-18. [Tela de saque ("O Espólio")](#tela-de-saque-o-espólio)
-19. [Tela de descanso ("A Fogueira")](#tela-de-descanso-a-fogueira)
-20. [Wizard e editores de ficha](#wizard-e-editores-de-ficha)
-21. [Tela de combate tática (Pergaminho Épico)](#tela-de-combate-tática-pergaminho-épico)
-22. [Tools, o catálogo do agente](#tools-o-catálogo-do-agente)
-23. [Endpoints HTTP](#endpoints-http)
-24. [Frontend](#frontend)
-25. [PWA e instalação](#pwa-e-instalação)
-26. [Testes e garantias](#testes-e-garantias)
-27. [Estrutura de arquivos](#estrutura-de-arquivos)
-28. [Configuração e execução](#configuração-e-execução)
-29. [Limitações conhecidas](#limitações-conhecidas)
+16. [O diário como livro](#o-diário-como-livro)
+17. [Tela de loja ("O Balcão")](#tela-de-loja-o-balcão)
+18. [Tela de missões ("O Livro de Missões")](#tela-de-missões-o-livro-de-missões)
+19. [Tela de saque ("O Espólio")](#tela-de-saque-o-espólio)
+20. [Tela de descanso ("A Fogueira")](#tela-de-descanso-a-fogueira)
+21. [Wizard e editores de ficha](#wizard-e-editores-de-ficha)
+22. [Tela de combate tática (Pergaminho Épico)](#tela-de-combate-tática-pergaminho-épico)
+23. [Tools, o catálogo do agente](#tools-o-catálogo-do-agente)
+24. [Endpoints HTTP](#endpoints-http)
+25. [Frontend](#frontend)
+26. [PWA e instalação](#pwa-e-instalação)
+27. [Testes e garantias](#testes-e-garantias)
+28. [Estrutura de arquivos](#estrutura-de-arquivos)
+29. [Configuração e execução](#configuração-e-execução)
+30. [Limitações conhecidas](#limitações-conhecidas)
 
 ---
 
@@ -2056,6 +2057,77 @@ ferido, nível abrindo a ficha, curto sem dado de vida, sem aviso de limite,
 morto nas contas, teto da exaustão ignorado) foram todas pegas. Captura nova
 (ainda não gerada): `grupo-visao-geral`.
 
+## O diário como livro
+
+O diário era uma lista de entradas na barra lateral que abria um modal de
+edição, e os eventos da linha do tempo não apareciam em lugar nenhum da tela
+(só na ficha do personagem). Para reler a campanha o jogador exportava um .md.
+
+### Motor (`rpg/diario.py`, `GET /api/diary/book`)
+
+`diary_snapshot()` devolve os capítulos em ordem (os do diário, os dos
+eventos e o atual, mesmo vazio). Cada capítulo traz:
+
+- `entradas` do diário daquele capítulo, com o `indice` na lista (para o
+  editor) e o título da primeira como título do capítulo;
+- `eventos` registrados nele, cada um com local, consequência e os
+  personagens separados (`tem_ficha` diz se vira link);
+- `personagens` ligados: os dos eventos mais os citados no texto das
+  entradas, casados como palavra inteira, sem caixa nem acento ("Ana" não
+  casa em "banana"), os mais citados primeiro;
+- `locais`: os dos eventos mais os locais e lojas citados no texto;
+- `missoes` que começaram (`cap_inicio`) ou terminaram (`cap_fim`) ali.
+
+Capítulo gravado como `"2"` (JSON importado) vale como 2.
+
+**Eventos e capítulo.** `save_event` não guardava o capítulo; agora guarda.
+Evento gravado antes não tem como ser datado e aparece em
+`eventos_sem_capitulo`. `mover_evento` (`POST /api/diary/move-event`) põe um
+evento no capítulo que o jogador escolher.
+
+Dois defeitos antigos corrigidos no caminho:
+
+- **"+ Entrada" não gravava.** O editor manda a entrada nova para a posição
+  logo depois da última, e o servidor respondia "Não encontrado". Agora essa
+  posição cria a entrada.
+- **Evento com número gravado como texto** (`"index": "3"`, de JSON
+  importado) não era achado pela edição, que comparava com o número 3.
+
+### A tela (`static/js/diario.js`)
+
+- Abre pelo **Ler o diário** na aba Diário, pelo **Capítulo** da aba Mundo
+  (no capítulo atual) e pela entrada da barra lateral, que agora abre o livro
+  na página dela, em destaque, em vez do editor.
+- Índice à esquerda com cada capítulo (título, entradas, eventos, o atual
+  marcado) e "Sem capítulo" quando há eventos antigos. À direita, a página:
+  as entradas como texto corrido, com capitular, e o **Neste capítulo** com os
+  eventos, os personagens (fichas), os locais (fichas dos locais) e as
+  missões (tela de missões). **Capítulo anterior** e **Próximo capítulo**
+  viram as páginas.
+- A escrita continua no editor de sempre: **Editar** em cada entrada e **Nova
+  entrada**, já com o capítulo da página.
+- Na página "Sem capítulo", cada evento tem um seletor (sugere o capítulo
+  atual) e **Pôr no capítulo**.
+- Aberto, a fila de telas o redesenha: a entrada que o mestre acabou de
+  escrever aparece na página. As telas que abrem sozinhas esperam ele fechar.
+
+### Testes
+
+`test_diario.py` (14) cobre os capítulos em ordem com as entradas, o capítulo
+gravado no evento, personagens com e sem ficha, os mais citados primeiro,
+nome só como palavra inteira, locais do evento e do texto, missão que começou
+e terminou, capítulo gravado como texto, evento sem capítulo e o mover,
+capítulo atual vazio, diário vazio, as rotas, o "+ Entrada" e o evento com
+número em texto. `test_diario_navegador.py` (10) confere a abertura pelo "Ler
+o diário", pelo capítulo da aba Mundo e pela entrada da barra lateral, virar
+as páginas, os links do "Neste capítulo", Editar, Nova entrada gravando de
+verdade, pôr evento no capítulo, o redesenho com o livro aberto e o saque
+esperando ele fechar. Regressões injetadas (entrada abrindo o editor, entrada
+nova com 404, sem destaque, sem nomes do texto, evento sem capítulo, mover
+quebrado, sem redesenho, saque por cima, eventos de todos os capítulos, nome
+dentro de palavra, número do evento em texto) foram todas pegas. Capturas
+novas (ainda não geradas): `diario-capitulo` e `diario-sem-capitulo`.
+
 ## Tela de loja ("O Balcão")
 
 A segunda tela do jogo, e a primeira construída depois de perguntar **por que**
@@ -2957,6 +3029,9 @@ ferramentas do mestre.
   `GET /api/shop/recap?desde=&loja=` → `{text}` com o que foi negociado na visita.
 - `GET /api/rest/state` / `POST /api/rest/action`
   `{action: dado|concluir|cancelar, char}`.
+- `GET /api/diary/book` → o diário por capítulo, com eventos, personagens,
+  locais e missões / `POST /api/diary/move-event` `{index, chapter}`. Veja
+  [O diário como livro](#o-diário-como-livro).
 - `GET /api/party/overview` → os heróis lado a lado com o resumo de descanso e
   carga. Veja [Visão geral do grupo](#visão-geral-do-grupo).
 - `GET /api/map/state` → a árvore de lugares, onde o grupo está, o que está a
@@ -3038,13 +3113,15 @@ ferramentas do mestre.
 - **`loot.js`**, a tela de saque (quem leva o quê, com a carga prevista).
 - **`missoes.js`**, o livro de missões (abas por situação, objetivos marcáveis,
   quem deu e desfecho).
+- **`diario.js`**, o diário como livro (capítulos, entradas em texto
+  corrido, eventos, personagens, locais e missões ligados).
 - **`grupo.js`**, a visão geral do grupo (heróis lado a lado, resumo de
   descanso e carga, pedir descanso).
 - **`mapa.js`**, o mapa do mundo (árvore de lugares, quem está onde, o que está
   a um passo e busca).
   Mesma regra: renderizam o snapshot do motor e despacham intenções. A fila
   que decide qual abre primeiro (combate, nível, grimório, saque, descanso,
-  loja; a Mochila, as fichas, as missões, o mapa e a visão geral do grupo só abrem pelo clique) e o empilhamento das
+  loja; a Mochila, as fichas, as missões, o mapa, a visão geral do grupo e o diário só abrem pelo clique) e o empilhamento das
   pílulas ficam em `game.js`.
 
 ### Tema
@@ -3327,6 +3404,7 @@ o nome do pacote. Também não há variável de ambiente nova.
 │   ├── missoes.py         Tela de missões: snapshot, marcar, abandonar, aviso ao mestre
 │   ├── mapa.py            Mapa do mundo: árvore de lugares, alcance e paradeiro
 │   ├── grupo.py           Visão geral do grupo: descanso, carga e nível lado a lado
+│   ├── diario.py          O diário como livro: capítulos com eventos, personagens e missões
 │   ├── tools_dnd.py       Motor D&D 5e + combate (~7900 linhas, 38 tools)
 │   ├── memory.py          Estado por sessão, proxy, persistência
 │   ├── database.py        Camada Supabase

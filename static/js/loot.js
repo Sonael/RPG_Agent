@@ -39,7 +39,7 @@
 
   // Nenhuma tela abre sozinha por cima de outra.
   const OUTRAS_TELAS = ['combat-on', 'levelup-on', 'grimoire-on', 'rest-on', 'shop-on',
-                        'inventory-on', 'local-on', 'pessoa-on', 'heroi-on', 'missoes-on', 'mapa-on', 'grupo-on'];
+                        'inventory-on', 'local-on', 'pessoa-on', 'heroi-on', 'missoes-on', 'mapa-on', 'grupo-on', 'diario-on'];
   const outraTelaAberta = () => OUTRAS_TELAS.some(c => document.body.classList.contains(c));
 
   // ---- DOM ---------------------------------------------------------

@@ -35,7 +35,7 @@
        Sem isso, a narração da IA (ou texto injetado) poderia conter
        <script>/<img onerror> e executar — XSS. -->
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.7/dist/purify.min.js"></script>
-  <link rel="stylesheet" href="/static/css/style.css?v=63">
+  <link rel="stylesheet" href="/static/css/style.css?v=64">
 </head>
 
 <body class="game-page">
@@ -110,7 +110,8 @@
               </h3>
               <div class="linha-info">
                 <span style="color:var(--text-muted);">Capítulo</span>
-                <span id="ws-chapter" style="font-weight:600;">—</span>
+                <span id="ws-chapter" class="local-clicavel" title="Ler este capítulo no diário"
+                      onclick="window.Diario && window.Diario._abrir()" style="font-weight:600;">—</span>
               </div>
               <div style="display:flex;justify-content:space-between;font-family: 'Lora', serif; font-size:13px;">
                 <span style="color:var(--text-muted);">Local</span>
@@ -213,8 +214,12 @@
             <div class="sb-section">
               <h3 class="sb-section-title" style="display:flex;align-items:center;justify-content:space-between;">
                 ENTRADAS DO DIÁRIO
-                <button onclick="addNewDiaryEntry()" class="clean-button btn-texto">+
-                  Entrada</button>
+                <span class="sb-titulo-acoes">
+                  <button id="sb-diario-ler" onclick="window.Diario && window.Diario._abrir()"
+                          class="clean-button btn-texto" title="Ler o diário capítulo a capítulo">Ler o diário</button>
+                  <button onclick="addNewDiaryEntry()" class="clean-button btn-texto">+
+                    Entrada</button>
+                </span>
               </h3>
               <div id="sb-diary"><span class="empty-state">Carregando...</span></div>
             </div>
@@ -371,20 +376,21 @@
   </div>
 
   <script src="/static/js/utils.js?v=12"></script>
-  <script src="/static/js/game.js?v=39"></script>
+  <script src="/static/js/game.js?v=40"></script>
   <script src="/static/js/combat.js?v=21"></script>
-  <script src="/static/js/shop.js?v=11"></script>
-  <script src="/static/js/levelup.js?v=9"></script>
-  <script src="/static/js/rest.js?v=9"></script>
-  <script src="/static/js/grimoire.js?v=7"></script>
+  <script src="/static/js/shop.js?v=12"></script>
+  <script src="/static/js/levelup.js?v=10"></script>
+  <script src="/static/js/rest.js?v=10"></script>
+  <script src="/static/js/grimoire.js?v=8"></script>
   <script src="/static/js/inventory.js?v=3"></script>
   <script src="/static/js/locais.js?v=4"></script>
   <script src="/static/js/personagens.js?v=1"></script>
   <script src="/static/js/herois.js?v=3"></script>
-  <script src="/static/js/loot.js?v=4"></script>
+  <script src="/static/js/loot.js?v=5"></script>
   <script src="/static/js/missoes.js?v=1"></script>
   <script src="/static/js/mapa.js?v=1"></script>
   <script src="/static/js/grupo.js?v=1"></script>
+  <script src="/static/js/diario.js?v=1"></script>
 
   <script>
     (function() {

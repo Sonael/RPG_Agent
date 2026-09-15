@@ -2333,6 +2333,24 @@ def get_memory_state():
     })
 
 
+@app.route("/api/diary/book", methods=["GET"])
+@require_auth
+def diary_book_route():
+    """O diário como livro, capítulo a capítulo (ver rpg/diario.py)."""
+    from rpg import diario
+    return jsonify(diario.diary_snapshot())
+
+
+@app.route("/api/diary/move-event", methods=["POST"])
+@require_auth
+def diary_move_event_route():
+    """Põe um evento sem capítulo (ou no capítulo errado) no capítulo certo."""
+    from rpg import diario
+    d = request.json or {}
+    r = diario.mover_evento(d.get("index"), d.get("chapter"))
+    return jsonify({**r, "book": diario.diary_snapshot()}), (200 if r["ok"] else 400)
+
+
 @app.route("/api/diary/export", methods=["POST"])
 @require_auth
 def export_diary():
@@ -2785,7 +2803,9 @@ def update_event(index):
     data   = request.json
     events = memory.campaign["events"]
     for e in events:
-        if e["index"] == index:
+        # O número vem como 3 ou "3" (campanha importada de JSON): comparar
+        # como texto deixava o evento "3" impossível de editar.
+        if str(e.get("index")) == str(index):
             e.update({k: v for k, v in data.items() if k in e})
             memory.save_campaign()
             return jsonify({"ok": True})
@@ -2808,6 +2828,10 @@ def delete_event(index):
 def update_diary(index):
     data  = request.json
     diary = memory.campaign["diary"]
+    # "+ Entrada" grava na posição logo depois da última. Antes essa posição
+    # dava "Não encontrado", e criar entrada pelo diário não funcionava.
+    if index == len(diary):
+        diary.append({"chapter": memory.campaign.get("chapter", 1), "title": "", "content": ""})
     if index < 0 or index >= len(diary):
         return jsonify({"error": "Não encontrado"}), 404
     diary[index].update({k: v for k, v in data.items() if k in diary[index]})

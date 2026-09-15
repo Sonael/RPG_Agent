@@ -728,6 +728,40 @@ GRUPO = {
     },
 }
 
+# O DIÁRIO COMO LIVRO. As entradas e os eventos do temp.json, com o capítulo de
+# cada evento (os gravados antes da regra não tinham). O quarto fica sem
+# capítulo de propósito: é a página "Sem capítulo". A audiência real começou
+# no capítulo 2, para a página dele mostrar a missão.
+DIARIO = {
+    "chapter": 2,
+    "events": [
+        {"index": 1, "chapter": 1,
+         "summary": "O Duelo das Pétalas: Elowen humilha Kaelen ao transformar seu ataque de plasma "
+                    "azul em uma explosão de jasmins e cerejeiras.",
+         "characters_involved": "Elowen, Kaelen, Helena, Stelar", "location": "Planícies Queimadas",
+         "consequence": "Elowen atrai a atenção indesejada dos altos escalões de Luminas."},
+        {"index": 2, "chapter": 2,
+         "summary": "O Recrutamento das Sombras: Natasha intercepta o grupo na estrada.",
+         "characters_involved": "Elowen, Natasha, Helena, Stelar", "location": "Estrada para Luminas",
+         "consequence": "Natasha entra no grupo, e com ela a tensão entre as companheiras."},
+        {"index": 3, "chapter": 2,
+         "summary": "O Teste de Infiltração: Natasha invade a Villa Ravenhurst durante a noite.",
+         "characters_involved": "Natasha, Helena, Stelar, Elowen", "location": "Villa Ravenhurst",
+         "consequence": "Stelar e Helena passam a treinar com Natasha."},
+        {"index": 4,
+         "summary": "O Reconhecimento Real: a Princesa Elara para a carruagem diante de Elowen.",
+         "characters_involved": "Elowen, Princesa Elara, Helena, Stelar, Natasha",
+         "location": "Avenida dos Mil Sóis",
+         "consequence": "O grupo recebe um convite para uma audiência privada."},
+    ],
+    "quests": {
+        "a audiencia real": {"titulo": "A audiência real", "status": "ativa",
+                             "descricao": "Comparecer à audiência privada com a Princesa Elara.",
+                             "objetivos": [], "quem_deu": "Princesa Elara", "recompensa": "",
+                             "cap_inicio": 2},
+    },
+}
+
 # DESCANSO CURTO depois de uma emboscada. Cada um do grupo retrata um estado do
 # botão de dado, porque é isso que a tela comunica:
 #   • Helena, muito ferida e com a reserva cheia — o caso de gastar;
@@ -1163,6 +1197,19 @@ TELAS = [
      "estado": GRUPO, "espera": 800,
      "js": "window.Grupo._abrir()",
      "exigir": "#grupo-overlay:not(.hidden) .grp-cartao"},
+
+    # ── O diário como livro ──────────────────────────────────────────
+    # Abre pelo "Ler o diário" da aba Diário. O capítulo 2 com as entradas,
+    # os eventos, os personagens, os locais e a missão que começou nele.
+    {"nome": "diario-capitulo", "pagina": "/game.html",
+     "estado": DIARIO, "espera": 800,
+     "js": "window.Diario._abrir(2)",
+     "exigir": "#diario-overlay:not(.hidden) .dia-entrada"},
+    # Os eventos gravados antes de o capítulo ser guardado, com "Pôr no capítulo".
+    {"nome": "diario-sem-capitulo", "pagina": "/game.html",
+     "estado": DIARIO, "espera": 800,
+     "js": "window.Diario._abrir('sem')",
+     "exigir": "#diario-overlay:not(.hidden) .dia-mover"},
 
     # ── Missões ──────────────────────────────────────────────────────
     # Abre pelo "Ver todas" das missões na barra lateral.

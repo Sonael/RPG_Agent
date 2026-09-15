@@ -1204,7 +1204,10 @@ function renderMemory(mem) {
   const dEl = document.getElementById('sb-diary');
   dEl.innerHTML = !mem.diary.length ? '<span class="empty-state">Diário vazio.</span>' : [...mem.diary].reverse().slice(0, 8).map((d, i) => {
     const ri = mem.diary.length - 1 - i;
-    return `<div class="diary-entry editable" onclick="openEditModal('diary',null,window._lastMem.diary[${ri}],${ri})"><div class="diary-entry-title">Cap.${d.chapter} — ${d.title}</div><div class="diary-entry-content">${(d.content || '').substring(0, 160)}${(d.content || '').length > 160 ? '…' : ''}</div></div>`;
+    // Abre o livro na página do capítulo, com a entrada em destaque; o
+    // "Editar" dela, dentro do livro, leva ao editor.
+    const abrir = `window.Diario ? window.Diario._abrir(${parseInt(d.chapter, 10) || 1}, ${ri}) : openEditModal('diary',null,window._lastMem.diary[${ri}],${ri})`;
+    return `<div class="diary-entry editable" data-indice="${ri}" onclick="${abrir}"><div class="diary-entry-title">Cap.${d.chapter} — ${d.title}</div><div class="diary-entry-content">${(d.content || '').substring(0, 160)}${(d.content || '').length > 160 ? '…' : ''}</div></div>`;
   }).join('');
 
   const lEl = document.getElementById('sb-locs');
@@ -1261,6 +1264,8 @@ function sincronizarTelas() {
     try { if (window.Herois) await window.Herois.sync(); } catch (_) {}
     // E a visão geral do grupo, pelo mesmo motivo.
     try { if (window.Grupo)  await window.Grupo.sync();  } catch (_) {}
+    // E o diário: a entrada que o mestre acabou de escrever aparece na página.
+    try { if (window.Diario) await window.Diario.sync(); } catch (_) {}
   };
   _filaTelas = _filaTelas.then(rodada, rodada);
   return _filaTelas;

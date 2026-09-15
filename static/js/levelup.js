@@ -44,7 +44,7 @@
   // sobre a loja na fila, mas se a loja JÁ estiver aberta (o jogador está
   // comprando) e um grant_xp chegar, esta espera a loja fechar.
   const OUTRAS_TELAS = ['combat-on', 'shop-on', 'rest-on', 'grimoire-on', 'inventory-on',
-                        'loot-on', 'local-on', 'pessoa-on', 'heroi-on', 'missoes-on', 'mapa-on', 'grupo-on'];
+                        'loot-on', 'local-on', 'pessoa-on', 'heroi-on', 'missoes-on', 'mapa-on', 'grupo-on', 'diario-on'];
   const outraTelaAberta = () => OUTRAS_TELAS.some(c => document.body.classList.contains(c));
 
   // Rascunho do incremento de atributo, igual ao wizard de criação: o jogador
