@@ -4817,3 +4817,177 @@ body.loot-on { overflow: hidden; }
 .ed-flag-remover { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 14px; padding: 4px; }
 .ed-flag-remover:hover { color: var(--ink-sys); }
 .ed-flags-vazio { font-size: 13px; color: var(--text-muted); font-style: italic; padding: 8px 0; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   BARRA LATERAL DO JOGO — static/js/barra.js
+
+   Duas partes: o relance (onde, capítulo e hora; uma linha por herói; a
+   missão principal; os avisos do verificador) e os atalhos para as telas.
+   No desktop recolhe numa coluna de ícones; no celular vira a faixa sob o
+   título e a barra de baixo, e a gaveta ("Mais") mostra os dois.
+   ═══════════════════════════════════════════════════════════════════ */
+#sidebar.page-left { padding: var(--esp-6) var(--esp-4) var(--esp-10); transition: width .2s ease, padding .2s ease; }
+.tome-spine, .bookmark { transition: left .2s ease; }
+.sb-topo {
+  display: flex; align-items: flex-start; gap: var(--esp-2);
+  border-bottom: 1px solid var(--page-edge); padding-bottom: var(--esp-3); margin-bottom: var(--esp-3);
+}
+#sidebar .book-title {
+  flex: 1; min-width: 0; margin: 0; padding: 0; border: none;
+  font-size: 18px; line-height: 1.25; text-align: left; overflow-wrap: anywhere;
+}
+.sb-recolher {
+  flex: 0 0 auto; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+  background: none; border: 1px solid transparent; border-radius: 6px; cursor: pointer; color: var(--text-muted);
+}
+.sb-recolher:hover { border-color: var(--page-edge); color: var(--text-main); }
+.sb-recolher svg { transition: transform .2s ease; }
+#sidebar .sidebar-content {
+  display: flex; flex-direction: column; gap: var(--esp-4);
+  overflow-y: auto; padding-right: var(--esp-1);
+}
+.sb-relance { display: flex; flex-direction: column; gap: var(--esp-3); }
+
+.sb-onde { display: flex; align-items: center; gap: 2px; font-family: 'Lora', serif; font-size: 13px; }
+.sb-onde-item {
+  display: inline-flex; align-items: center; gap: 4px; min-width: 0; white-space: nowrap;
+  background: none; border: 1px solid transparent; border-radius: 6px; padding: 3px 5px;
+  font: inherit; color: var(--text-main); cursor: pointer;
+}
+.sb-onde-item:hover { border-color: var(--page-edge); }
+.sb-onde-local { flex: 1 1 auto; overflow: hidden; }
+.sb-onde-item:not(.sb-onde-local) { flex: 0 0 auto; }
+#sb-location-nome { overflow: hidden; text-overflow: ellipsis; }
+.sb-onde-icone { display: inline-flex; flex: 0 0 auto; color: var(--text-muted); }
+.sb-periodo { color: var(--text-muted); }
+
+.sb-herois { display: flex; flex-direction: column; gap: var(--esp-2); max-height: 38vh; overflow-y: auto; }
+.sb-heroi {
+  display: grid; grid-template-columns: minmax(0, 1fr) 64px auto;
+  align-items: center; column-gap: var(--esp-2); row-gap: 3px;
+}
+.sb-heroi-nome {
+  background: none; border: none; padding: 0; text-align: left; cursor: pointer;
+  font-family: 'Playfair Display', serif; font-size: 14px; font-weight: 700; color: var(--text-main);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.sb-heroi-nome:hover { text-decoration: underline; text-underline-offset: 3px; }
+.sb-heroi-vida { display: block; height: 6px; border-radius: 999px; background: rgba(0,0,0,0.09); overflow: hidden; }
+.sb-heroi-vida > span { display: block; height: 100%; border-radius: 999px; background: #2e7d32; }
+.sb-vida-alerta > span { background: #b89947; }
+.sb-vida-perigo > span { background: var(--ink-sys); }
+.sb-heroi-num { min-width: 3.4em; text-align: right; font-family: 'Lora', serif; font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.sb-heroi-num small { margin-left: 2px; color: var(--ink-user); }
+.sb-heroi-marcas { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px; }
+.sb-marca {
+  font-family: 'Lora', serif; font-size: 11px; line-height: 1.5; padding: 0 7px;
+  border-radius: 999px; border: 1px solid var(--page-edge); color: var(--text-muted);
+}
+.sb-marca-perigo { border-color: var(--ink-sys); color: var(--ink-sys); }
+.sb-marca-nivel { border-color: #b89947; background: rgba(184,153,71,0.16); color: var(--text-main); cursor: pointer; }
+.sb-heroi-morto { opacity: .55; }
+.sb-heroi-sem-ficha { grid-template-columns: minmax(0, 1fr) auto; }
+.sb-heroi-papel { font-size: 12px; color: var(--text-muted); }
+.sb-vazio { font-size: 13px; }
+
+.sb-missao {
+  display: flex; flex-direction: column; gap: 4px; text-align: left; cursor: pointer;
+  background: rgba(0,0,0,0.025); border: 1px solid var(--page-edge); border-radius: 8px;
+  padding: var(--esp-2) var(--esp-3); font: inherit; color: var(--text-main);
+}
+.sb-missao:hover { border-color: var(--input-border); }
+.sb-missao-rotulo { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--text-muted); }
+.sb-missao-titulo { font-family: 'Playfair Display', serif; font-size: 14px; font-weight: 700; }
+.sb-missao-progresso { display: flex; align-items: center; gap: var(--esp-2); }
+.sb-missao-trilho { flex: 1; height: 5px; border-radius: 999px; background: rgba(0,0,0,0.09); overflow: hidden; }
+.sb-missao-trilho > span { display: block; height: 100%; background: var(--ink-user); }
+.sb-missao-conta { font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+.sb-avisos-botao {
+  display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+  background: none; border: 1px dashed var(--page-edge); border-radius: 6px; padding: 3px 8px;
+  font: inherit; font-size: 12px; color: var(--text-muted);
+}
+.sb-avisos-erro { border-color: var(--ink-sys); color: var(--ink-sys); }
+.sb-avisos-lista { margin-top: var(--esp-2); display: flex; flex-direction: column; gap: var(--esp-2); }
+.sb-avisos-lista .violation-item { margin: 0; padding: var(--esp-2) 0; font-size: 12px; line-height: 1.4; }
+.sb-avisos-lista .violation-rule { font-size: 11px; letter-spacing: .02em; color: var(--text-muted); }
+.sb-avisos-lista .violation-msg { font-size: 12.5px; }
+.sb-avisos-lista .violation-detail { font-size: 11.5px; }
+.sb-aviso-cabeca { display: flex; justify-content: space-between; gap: 6px; }
+.sb-aviso-fechar { background: none; border: none; cursor: pointer; color: var(--text-muted); }
+
+.sb-atalhos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--esp-2); }
+.sb-atalho {
+  position: relative; display: flex; align-items: center; gap: 6px;
+  padding: 9px 6px 9px var(--esp-2); border: 1px solid var(--page-edge); border-radius: 8px; background: transparent;
+  font-family: 'Lora', serif; font-size: 13.5px; color: var(--text-main); text-align: left; cursor: pointer;
+}
+.sb-atalho:hover { background: rgba(0,0,0,0.04); border-color: var(--input-border); }
+.sb-atalho .sb-icone { flex: 0 0 auto; color: var(--ink-user); }
+.sb-atalho-rotulo { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* O contador fica sobre o ícone: ao lado do rótulo, cortava "Personagens". */
+.sb-atalho-conta {
+  position: absolute; top: 3px; left: 20px; min-width: 16px; padding: 0 4px; border-radius: 999px;
+  text-align: center; font-size: 10px; line-height: 15px; font-variant-numeric: tabular-nums;
+  background: var(--page-edge); color: var(--text-main);
+}
+.sb-atalho-alerta { background: var(--ink-sys); color: #fff; }
+
+/* Celular: escondidos no desktop. */
+.faixa-relance, .barra-inferior { display: none; }
+
+/* Engrenagem: a seção da campanha. */
+.settings-subtitulo { margin: var(--esp-3) 0 var(--esp-2); font-family: 'Lora', serif; font-size: 12px; font-weight: 600; color: var(--text-muted); }
+.settings-nota { margin-top: var(--esp-1); font-size: 12px; color: var(--text-muted); }
+.settings-quota { margin: 0; }
+.settings-acoes-campanha { display: flex; flex-wrap: wrap; gap: var(--esp-2); margin-top: var(--esp-4); }
+.settings-acoes-campanha .clean-button { flex: 1; }
+.settings-sair { color: var(--ink-sys); border-color: var(--ink-sys); }
+
+@media (min-width: 901px) {
+  body.barra-recolhida #sidebar.page-left { width: 76px; padding: var(--esp-5) var(--esp-2); }
+  body.barra-recolhida .tome-spine, body.barra-recolhida .bookmark { left: 76px; }
+  body.barra-recolhida #sb-campaign, body.barra-recolhida #sb-relance,
+  body.barra-recolhida .sb-atalho-rotulo, body.barra-recolhida #sidebar .page-number { display: none; }
+  body.barra-recolhida .sb-topo { justify-content: center; border-bottom: none; }
+  body.barra-recolhida #sb-recolher svg { transform: rotate(180deg); }
+  body.barra-recolhida .sb-atalhos { grid-template-columns: 1fr; margin-top: 0; }
+  body.barra-recolhida .sb-atalho { justify-content: center; padding: 10px 0; }
+  body.barra-recolhida .sb-atalho-conta { top: 2px; left: auto; right: 2px; }
+}
+
+@media (max-width: 900px) {
+  .sb-recolher { display: none; }
+  #sidebar .book-title { text-align: center; font-size: 20px; }
+  .faixa-relance {
+    display: flex; align-items: center; gap: var(--esp-3); width: 100%; flex-shrink: 0;
+    padding: 6px var(--esp-4); background: var(--page-left); border: none; border-bottom: 1px solid var(--page-edge);
+    font-family: 'Lora', serif; font-size: 13px; color: var(--text-main); text-align: left; cursor: pointer;
+  }
+  .faixa-onde { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .faixa-hora { color: var(--text-muted); }
+  .faixa-vidas { display: flex; flex: 0 0 auto; gap: var(--esp-2); }
+  .faixa-heroi { display: flex; align-items: center; gap: 3px; }
+  .faixa-inicial { font-family: 'Playfair Display', serif; font-size: 12px; font-weight: 700; color: var(--text-muted); }
+  .faixa-heroi .sb-heroi-vida { width: 26px; }
+  .barra-inferior {
+    display: flex; flex-shrink: 0; background: var(--page-left); border-top: 1px solid var(--page-edge);
+    padding: 2px 4px calc(env(safe-area-inset-bottom, 0px) + var(--esp-2));
+  }
+  .bi-botao {
+    flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: pointer;
+    background: none; border: none; padding: 6px 0; font-family: 'Lora', serif; font-size: 11px; color: var(--text-muted);
+  }
+  .bi-botao:active { color: var(--text-main); }
+  .bi-icone { position: relative; display: inline-flex; color: var(--ink-user); }
+  .bi-conta {
+    position: absolute; top: -4px; right: -11px; min-width: 16px; padding: 0 4px; border-radius: 999px;
+    font-size: 10px; background: rgba(0,0,0,0.12); color: var(--text-main);
+  }
+  .bi-conta.sb-atalho-alerta { background: var(--ink-sys); color: #fff; }
+  /* A barra de baixo já afasta o campo de texto da borda da tela. */
+  #input-area { padding-bottom: var(--esp-3); }
+  .sb-herois { max-height: none; }
+  .sb-atalhos { margin-top: var(--esp-2); }
+}

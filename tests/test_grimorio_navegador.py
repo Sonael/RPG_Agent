@@ -299,13 +299,14 @@ def test_fechar_e_recarregar_nao_reabre(pagina):
     assert "Helena: magias a aprender" in pg.inner_text("#grm-reopen")
 
 
-def test_atalho_no_cartao_do_grupo_abre_sem_o_modal(navegador):
+def test_atalho_da_visao_geral_abre_sem_o_modal(navegador):
     import capturar_telas as cap
     pg, _ = navegador(cap.GRIMORIO)
     _clicar(pg, ".grm-close", 400)
-    _clicar(pg, ".tab-btn[data-tab='enciclopedia']", 400)
-    pg.wait_for_selector(".grimorio-link", state="visible", timeout=5000)
-    _clicar(pg, ".grimorio-link", 1000)
+    _clicar(pg, "#sb-atalho-grupo", 400)
+    atalho = "#grupo-overlay .grp-cartao[data-nome='Helena'] button:has-text('Grimório')"
+    pg.wait_for_selector(atalho, state="visible", timeout=5000)
+    _clicar(pg, atalho, 1000)
     assert pg.is_visible("#grimoire-overlay")
     assert not pg.is_visible("#edit-overlay"), "o clique abriu também o modal de edição"
 

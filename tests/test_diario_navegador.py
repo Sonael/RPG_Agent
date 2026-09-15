@@ -1,8 +1,8 @@
 """
 test_diario_navegador.py
 
-O diário como livro no navegador: abre pelo "Ler o diário", pelo capítulo da
-aba Mundo e pela entrada da barra lateral (na página dela, em destaque, e não
+O diário como livro no navegador: abre pelo atalho Diário e pelo capítulo no
+relance da barra lateral, e numa entrada (na página dela, em destaque, e não
 no editor); vira as páginas; leva às fichas dos personagens e dos locais e à
 missão; "Editar" e "Nova entrada" usam o editor de sempre (e a entrada nova
 agora é gravada); põe um evento sem capítulo no capítulo certo; e se
@@ -79,8 +79,7 @@ def _esperar_pagina(pg, rotulo):
 
 def test_ler_o_diario_abre_no_capitulo_atual(pagina):
     pg, erros, _ = pagina
-    pg.click(".tab-btn[data-tab='diario']")
-    pg.click("#sb-diario-ler")
+    pg.click("#sb-atalho-diario")
     _esperar_pagina(pg, "Capítulo 2")
     indice = [el.get_attribute("data-numero") for el in pg.query_selector_all("#dia-indice .dia-cap-item")]
     assert indice == ["resumo", "1", "2", "sem"]
@@ -92,18 +91,15 @@ def test_ler_o_diario_abre_no_capitulo_atual(pagina):
     assert not erros, erros[:3]
 
 
-def test_capitulo_da_aba_mundo_abre_o_livro(pagina):
+def test_capitulo_do_relance_abre_o_livro(pagina):
     pg, _, _ = pagina
-    pg.click(".tab-btn[data-tab='mundo']")
     pg.click("#ws-chapter")
     _esperar_pagina(pg, "Capítulo 2")
 
 
-def test_entrada_da_barra_lateral_abre_a_pagina_dela_e_nao_o_editor(pagina):
+def test_abrir_numa_entrada_destaca_ela_e_nao_abre_o_editor(pagina):
     pg, _, _ = pagina
-    pg.click(".tab-btn[data-tab='diario']")
-    # A barra lateral lista da mais nova para a mais antiga: a última é a do capítulo 1.
-    pg.locator("#sb-diary .diary-entry").last.click()
+    pg.evaluate("() => window.Diario._abrir(1, 0)")
     _esperar_pagina(pg, "Capítulo 1")
     assert pg.locator("#dia-pagina .dia-entrada.dia-destaque[data-indice='0']").count() == 1
     assert not pg.is_visible("#edit-overlay")

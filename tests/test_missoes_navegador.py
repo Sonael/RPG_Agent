@@ -77,11 +77,11 @@ def _esperar_lista(pg):
                          timeout=5000)
 
 
-def test_ver_todas_abre_nas_ativas(pagina):
+def test_atalho_abre_nas_ativas(pagina):
     pg, erros = pagina
-    pg.click("#sb-missoes-abrir")
+    pg.click("#sb-atalho-missoes")
     _esperar_lista(pg)
-    assert "(5)" in pg.inner_text("#sb-missoes-abrir")
+    assert pg.inner_text("#sb-atalho-missoes .sb-atalho-conta") == "3", "o contador são as ativas"
     abas = pg.inner_text("#msn-abas")
     assert "Ativas 3" in abas and "Concluídas 1" in abas and "Falhadas e abandonadas 1" in abas
     assert pg.locator("#msn-lista .msn-cartao").count() == 3
@@ -90,9 +90,11 @@ def test_ver_todas_abre_nas_ativas(pagina):
     assert not erros, erros[:3]
 
 
-def test_missao_na_barra_lateral_abre_a_tela_nela(pagina):
+def test_missao_principal_da_barra_lateral_abre_a_tela_nela(pagina):
     pg, _ = pagina
-    pg.click(".missao-clicavel:has-text('A dívida de Torbin')")
+    # A principal é a ativa do capítulo mais recente: a dívida de Torbin.
+    assert pg.get_attribute("#sb-missao", "data-titulo") == "A dívida de Torbin"
+    pg.click("#sb-missao")
     pg.wait_for_selector(f"{_cartao('A dívida de Torbin')}.msn-destaque", timeout=5000)
 
 
@@ -115,11 +117,9 @@ def test_marcar_objetivo_e_avisar_o_mestre_ao_fechar(pagina):
     pg.wait_for_function("() => document.getElementById('msn-msg').textContent.includes('feito (1/1)')",
                          timeout=5000)
     assert "pronta para entregar" in pg.inner_text(_cartao("A dívida de Torbin"))
-    # A barra lateral acompanha.
+    # A missão principal no relance acompanha.
     pg.wait_for_function(
-        "() => [...document.querySelectorAll('.missao-clicavel')]"
-        ".some(m => /A dívida de Torbin/.test(m.textContent) && /1\\/1/.test(m.textContent))",
-        timeout=5000)
+        "() => /1\\/1/.test(document.getElementById('sb-missao').textContent)", timeout=5000)
 
     pg.click("#missoes-overlay .lcl-fechar")
     pg.wait_for_function("() => window.__enviados.length === 1", timeout=5000)

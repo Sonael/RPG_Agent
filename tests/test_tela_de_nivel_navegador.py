@@ -459,8 +459,7 @@ def test_selo_de_nivel_sobe_pelo_motor_e_abre_a_tela(navegador):
     pg, _ = navegador(estado, esperar=None)
     assert not pg.is_visible("#levelup-overlay"), "nada pendente antes de subir"
 
-    # O selo mora no cartão do grupo, na aba Enciclopédia — o caminho do jogador.
-    _clicar(pg, ".tab-btn[data-tab='enciclopedia']", 300)
+    # O selo mora na linha do herói, no relance da barra lateral.
     pg.wait_for_selector(".levelup-badge", state="visible", timeout=5000)
     _clicar(pg, ".levelup-badge", 400)
     popup = pg.inner_text("#levelup-popup")
@@ -493,7 +492,6 @@ def test_popup_do_selo_e_opaco(navegador):
         {"nivel": 3, "xp": 2800, "xp_proximo": 2700,
          "feature_choices": {"Estilo de Combate": "Defesa", "Arquétipo Marcial": "Campeão"}})
     pg, _ = navegador(estado, esperar=None)
-    _clicar(pg, ".tab-btn[data-tab='enciclopedia']", 300)
     pg.wait_for_selector(".levelup-badge", state="visible", timeout=5000)
     _clicar(pg, ".levelup-badge", 400)
 

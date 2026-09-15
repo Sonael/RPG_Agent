@@ -987,10 +987,18 @@ TELAS = [
 
     # ── Jogo ─────────────────────────────────────────────────────────
     {"nome": "jogo-mundo", "pagina": "/game.html"},
-    {"nome": "jogo-enciclopedia", "pagina": "/game.html",
-     "js": "switchTab('enciclopedia')"},
-    {"nome": "jogo-diario", "pagina": "/game.html",
-     "js": "switchTab('diario')"},
+    # A barra recolhida numa coluna de ícones.
+    {"nome": "jogo-barra-recolhida", "pagina": "/game.html", "viewport": "desktop",
+     "js": "if (!document.body.classList.contains('barra-recolhida')) window.Barra.alternar()",
+     "exigir": "body.barra-recolhida"},
+    # Os avisos do verificador, abertos: só aparecem quando há algum.
+    {"nome": "jogo-avisos", "pagina": "/game.html",
+     "js": "renderViolations([{severity: 'erro', rule: 'dano_sem_ferramenta',"
+           " message: 'O mestre narrou dano sem chamar modify_hp.', detail: ''},"
+           " {severity: 'aviso', rule: 'unknown_location', message: 'Local citado sem registro.',"
+           " detail: 'Porto de Vhar'}]); window.Barra.alternarAvisos();"
+           " if (window.innerWidth <= 900) toggleSidebar();",
+     "exigir": "#sb-avisos .violation-item"},
     {"nome": "jogo-bandeja-dados", "pagina": "/game.html",
      "js": "toggleDiceTray()"},
     {"nome": "jogo-menu-comandos", "pagina": "/game.html",
@@ -1016,20 +1024,20 @@ TELAS = [
      "js": "openWorldEdit()"},
     {"nome": "jogo-modal-local", "pagina": "/game.html",
      "exigir": "#edit-overlay:not(.hidden)",
-     "js": "switchTab('enciclopedia'); "
-           "openEditModal('location', 'oakhaven', window._lastMem.locations[0]);"},
+     "js": "openEditModal('location', 'oakhaven', window._lastMem.locations[0]);"},
     {"nome": "jogo-modal-diario", "pagina": "/game.html",
      "exigir": "#edit-overlay:not(.hidden)",
-     "js": "switchTab('diario'); "
-           "openEditModal('diary', null, window._lastMem.diary[0], 0);"},
+     "js": "openEditModal('diary', null, window._lastMem.diary[0], 0);"},
     {"nome": "jogo-configuracoes", "pagina": "/game.html",
      "exigir": "#settings-panel.open",
      "js": "toggleSettingsPanel()"},
     {"nome": "jogo-guia", "pagina": "/game.html",
      "exigir": "#guide-overlay",
      "js": "openGuide()"},
-    {"nome": "jogo-sidebar-mobile", "pagina": "/game.html",
-     "js": "toggleSidebar()", "viewport": "mobile"},
+    # Celular: o "Mais" da barra de baixo abre o painel com o relance e os atalhos.
+    {"nome": "jogo-painel-mobile", "pagina": "/game.html",
+     "js": "document.getElementById('bi-mais').click()", "viewport": "mobile",
+     "exigir": "#sidebar.active"},
 
     {"nome": "jogo-missoes-e-tempo", "pagina": "/game.html",
      "estado": MUNDO_ONDA4, "espera": 900,
@@ -1039,10 +1047,8 @@ TELAS = [
      # lateral, que tem rolagem própria.
      # 900px é o mesmo corte que o game.js usa para decidir se a lateral é
      # gaveta (ver toggleSidebar(true) ao abrir um modal).
-     "js": "if (window.innerWidth <= 900) toggleSidebar();"
-           "setTimeout(() => document.getElementById('sb-missoes-secao')"
-           ".scrollIntoView({block:'center'}), 250)",
-     "exigir": "#sb-missoes-secao:not(.hidden)"},
+     "js": "if (window.innerWidth <= 900) toggleSidebar();",
+     "exigir": "#sb-missao:not(.hidden)"},
 
     # ── Loja ─────────────────────────────────────────────────────────
     # A tela abre SOZINHA quando o grupo entra num local que tem loja, então
@@ -1087,9 +1093,9 @@ TELAS = [
      "exigir": ".lvl-ok"},
     {"nome": "nivel-selo-da-ficha", "pagina": "/game.html",
      "estado": NIVEL_SELO, "espera": 400,
-     # O selo mora no cartão do grupo, na aba Enciclopédia.
-     "js": "switchTab('enciclopedia');"
-           "setTimeout(() => document.querySelector('.levelup-badge').click(), 300)",
+     # O selo mora na linha do herói, no relance da barra.
+     "js": "if (window.innerWidth <= 900) toggleSidebar();"
+           "setTimeout(() => document.querySelector('.levelup-badge').click(), 600)",
      "exigir": "#levelup-popup"},
 
     # ── Grimório ─────────────────────────────────────────────────────

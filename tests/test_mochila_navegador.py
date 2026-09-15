@@ -116,11 +116,11 @@ def test_nao_abre_sozinha(navegador):
     assert not pg.is_visible("#inventory-overlay")
 
 
-def test_atalho_no_cartao_abre_sem_o_modal(navegador):
+def test_atalho_da_visao_geral_abre_sem_o_modal(navegador):
     import capturar_telas as cap
     pg, _ = navegador(cap.MOCHILA, abrir_mochila=False)
-    _clicar(pg, ".tab-btn[data-tab='enciclopedia']", 400)
-    atalho = "xpath=//div[contains(@class,'char-card')][.//text()[contains(.,'Stelar')]]//span[contains(@class,'mochila-link')]"
+    _clicar(pg, "#sb-atalho-grupo", 400)
+    atalho = "#grupo-overlay .grp-cartao[data-nome='Stelar'] button:has-text('Mochila')"
     pg.wait_for_selector(atalho, state="visible", timeout=5000)
     _clicar(pg, atalho, 1000)
     assert pg.is_visible("#inventory-overlay")

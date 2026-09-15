@@ -71,12 +71,11 @@ def _esperar(pg, nome):
 
 
 def _abrir_pelo_cartao(pg, nome):
-    pg.click(".tab-btn[data-tab='enciclopedia']")
-    cartao =pg.locator("#sb-party .char-card", has_text=nome).first
-    cartao.wait_for(state="visible", timeout=5000)
-    # A barra de vida, não o nome: no meio da linha do nome fica o selo
-    # "Subir de nível", que abre o próprio aviso.
-    cartao.locator(".stat-bar-wrap").first.click()
+    # O nome do herói no relance da barra lateral abre a ficha; o selo de
+    # nível fica numa linha própria e não atrapalha o clique.
+    nome_no_relance = f"#sb-herois .sb-heroi[data-nome='{nome}'] .sb-heroi-nome"
+    pg.wait_for_selector(nome_no_relance, state="visible", timeout=5000)
+    pg.click(nome_no_relance)
     _esperar(pg, nome)
 
 

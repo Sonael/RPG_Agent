@@ -1,7 +1,7 @@
 """
 test_mapa_navegador.py
 
-O mapa do mundo no navegador: abre pelo "Ver o mapa" da barra lateral e pela
+O mapa do mundo no navegador: abre pelo atalho Mapa da barra lateral e pela
 ficha do local, mostra o caminho até o grupo aberto, abre e fecha ramos,
 busca por lugar e por pessoa, manda "Vamos até X." ao mestre e leva às
 fichas do local e do personagem. As telas que abrem sozinhas esperam o mapa
@@ -84,7 +84,7 @@ def _abrir(pg):
 
 def test_ver_o_mapa_abre_com_o_caminho_do_grupo_aberto(pagina):
     pg, erros, _ = pagina
-    pg.click("#sb-mapa")
+    pg.click("#sb-atalho-mapa")
     pg.wait_for_selector("#mapa-overlay:not(.hidden) .map-no-grupo", timeout=5000)
     assert pg.get_attribute(".map-no-grupo", "data-nome") == "Praça de Cliviate"
     assert "Cliviate" in pg.inner_text("#map-onde") and "Praça de Cliviate" in pg.inner_text("#map-onde")
@@ -198,3 +198,12 @@ def test_saque_nao_abre_por_cima_do_mapa(pagina):
     assert pg.is_hidden("#loot-overlay"), "o saque abriu por cima do mapa"
     pg.evaluate("() => window.Mapa._fechar()")
     pg.wait_for_selector("#loot-overlay:not(.hidden)", timeout=5000)
+
+
+def test_novo_local_abre_o_editor(pagina):
+    pg, _, _ = pagina
+    _abrir(pg)
+    pg.click("#map-novo")
+    pg.wait_for_selector("#edit-overlay:not(.hidden)", timeout=5000)
+    assert "Local" in pg.text_content("#edit-type")
+    assert pg.is_hidden("#mapa-overlay")

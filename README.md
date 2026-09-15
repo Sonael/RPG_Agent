@@ -88,30 +88,31 @@ abre o loop **percepção → deliberação → ação → verificação** em de
 5. [Persistência (Supabase) e autenticação](#persistência-supabase-e-autenticação)
 6. [Modo D&D, mecânicas](#modo-dd-mecânicas)
 7. [Sistema de combate](#sistema-de-combate)
-8. [Tela de nível ("A Ascensão")](#tela-de-nível-a-ascensão)
-9. [Tela de magias ("O Grimório")](#tela-de-magias-o-grimório)
-10. [Tela de equipamento ("A Mochila")](#tela-de-equipamento-a-mochila)
-11. [Ficha do local](#ficha-do-local)
-12. [Ficha do personagem](#ficha-do-personagem)
-13. [Ficha do herói](#ficha-do-herói)
-14. [Mapa do mundo](#mapa-do-mundo)
-15. [Visão geral do grupo](#visão-geral-do-grupo)
-16. [O diário como livro](#o-diário-como-livro)
-17. [Índice de personagens](#índice-de-personagens)
-18. [Tela de loja ("O Balcão")](#tela-de-loja-o-balcão)
-19. [Tela de missões ("O Livro de Missões")](#tela-de-missões-o-livro-de-missões)
-20. [Tela de saque ("O Espólio")](#tela-de-saque-o-espólio)
-21. [Tela de descanso ("A Fogueira")](#tela-de-descanso-a-fogueira)
-22. [Wizard e editores de ficha](#wizard-e-editores-de-ficha)
-23. [Tela de combate tática (Pergaminho Épico)](#tela-de-combate-tática-pergaminho-épico)
-24. [Tools, o catálogo do agente](#tools-o-catálogo-do-agente)
-25. [Endpoints HTTP](#endpoints-http)
-26. [Frontend](#frontend)
-27. [PWA e instalação](#pwa-e-instalação)
-28. [Testes e garantias](#testes-e-garantias)
-29. [Estrutura de arquivos](#estrutura-de-arquivos)
-30. [Configuração e execução](#configuração-e-execução)
-31. [Limitações conhecidas](#limitações-conhecidas)
+8. [A barra lateral do jogo](#a-barra-lateral-do-jogo)
+9. [Tela de nível ("A Ascensão")](#tela-de-nível-a-ascensão)
+10. [Tela de magias ("O Grimório")](#tela-de-magias-o-grimório)
+11. [Tela de equipamento ("A Mochila")](#tela-de-equipamento-a-mochila)
+12. [Ficha do local](#ficha-do-local)
+13. [Ficha do personagem](#ficha-do-personagem)
+14. [Ficha do herói](#ficha-do-herói)
+15. [Mapa do mundo](#mapa-do-mundo)
+16. [Visão geral do grupo](#visão-geral-do-grupo)
+17. [O diário como livro](#o-diário-como-livro)
+18. [Índice de personagens](#índice-de-personagens)
+19. [Tela de loja ("O Balcão")](#tela-de-loja-o-balcão)
+20. [Tela de missões ("O Livro de Missões")](#tela-de-missões-o-livro-de-missões)
+21. [Tela de saque ("O Espólio")](#tela-de-saque-o-espólio)
+22. [Tela de descanso ("A Fogueira")](#tela-de-descanso-a-fogueira)
+23. [Wizard e editores de ficha](#wizard-e-editores-de-ficha)
+24. [Tela de combate tática (Pergaminho Épico)](#tela-de-combate-tática-pergaminho-épico)
+25. [Tools, o catálogo do agente](#tools-o-catálogo-do-agente)
+26. [Endpoints HTTP](#endpoints-http)
+27. [Frontend](#frontend)
+28. [PWA e instalação](#pwa-e-instalação)
+29. [Testes e garantias](#testes-e-garantias)
+30. [Estrutura de arquivos](#estrutura-de-arquivos)
+31. [Configuração e execução](#configuração-e-execução)
+32. [Limitações conhecidas](#limitações-conhecidas)
 
 ---
 
@@ -1149,7 +1150,7 @@ A escolha persiste por campanha (`combat_mode` em `memory.campaign`):
   meio). No fim, o servidor monta um log estruturado e a IA é chamada **uma
   vez** para narrar a luta inteira + gerar saque.
 
-Toggle do modo: sidebar do jogo → aba Mundo → "Narrado pela IA" / "Tela
+Toggle do modo: engrenagem → "Esta campanha" → "Narrado pela IA" / "Tela
 tática".
 
 ### A mesma luta não recomeça
@@ -1204,6 +1205,92 @@ Eventos: `combat_start`, `attack_hit`, `attack_crit`, `attack_miss`,
 `hp`/`hp_max`), úteis para a narração final da IA.
 
 ---
+
+## A barra lateral do jogo
+
+A barra era um livro de listas em três abas (Mundo, Enciclopédia e Diário),
+numa coluna de 320 px com rolagem própria. O cabeçalho (título em duas linhas,
+local, "Uso do modelo" e as abas) ocupava quase metade da altura, e "Menu
+Principal" e "Sair do Sistema" ficavam fixos embaixo. Ela também tinha
+envelhecido: grupo, missões, mapa, diário e fichas viraram telas, e a barra
+repetia, em miniatura, o que elas mostram melhor. Validação, Observações e
+Uso do modelo não são do jogador.
+
+### O que ela mostra (`static/js/barra.js`)
+
+**O relance**, sempre à vista e sem rolagem:
+
+- local atual, capítulo e hora do mundo numa linha só, cada um clicável (ficha
+  do local, página do capítulo no diário, visão geral do grupo);
+- uma linha por herói: nome (abre a ficha), barra e números de vida e as marcas
+  que pedem atenção: condição (com as outras na dica), caído ou morto,
+  sobrecarregado ou imóvel e **nível**, o mesmo selo de antes, que abre o aviso
+  de subir de nível (ou a tela de nível, se é escolha pendente). Os números vêm
+  do motor, por `/api/party/overview`; em campanha sem regras aparecem só o
+  nome e o papel;
+- a missão principal com o progresso ("2/3"), que abre a tela de missões nela.
+  A principal é a ativa do capítulo mais recente; no empate, a mais adiantada.
+  Não dá para usar a ordem da lista: o banco guarda as missões num objeto, e a
+  ordem das chaves não é a de criação;
+- os avisos do verificador, só quando há algum: um botão discreto com a
+  contagem (em vermelho se há erro) que abre a lista, com dispensar e
+  "Limpar todos". Antes era uma seção fixa da aba Mundo, e um erro trocava a
+  aba.
+
+**Os atalhos**, logo abaixo: Grupo, Missões, Mapa, Diário, Personagens e
+Mochila (só em campanha D&D; em campanha sem regras, Grupo leva ao índice de
+personagens filtrado no grupo). Contador quando diz algo: heróis que pedem
+atenção (nível pendente ou caído), missões ativas e personagens fora do grupo.
+
+### Para onde foi o resto
+
+| Antes, na barra | Agora |
+|---|---|
+| Uso do modelo, Status do sistema | engrenagem, seção "Esta campanha" |
+| Modo de combate | engrenagem, seção "Esta campanha" |
+| Menu Principal, Sair do Sistema | engrenagem, seção "Esta campanha" |
+| Resumo (e "editar" do estado) | página "Até aqui" do diário |
+| Observações | editor da campanha, no menu |
+| Validação | aviso discreto no relance |
+| Grupo (cartões) e "+ Membro" | relance, visão geral do grupo e índice de personagens |
+| Personagens e "+ Personagem" | índice de personagens |
+| Locais e "+ Local" | mapa ("Novo local" no rodapé) |
+| Entradas do diário, "+ Entrada", exportar | diário |
+| Missões ativas | missão principal no relance e tela de missões |
+
+### Desktop e celular
+
+- **Recolher** (as setas no alto): a barra vira uma coluna de 76 px só com os
+  ícones dos atalhos, com o contador sobre o ícone. A escolha fica em
+  `localStorage` (`rpg_barra_recolhida`) e volta ao recarregar.
+- **Celular**: o botão de menu saiu. Sob o título fica uma faixa com o local, a
+  hora e a vida do grupo (inicial e barra de cada herói); tocar nela abre o
+  painel. Embaixo, uma barra fixa com Grupo, Missões, Mapa, Diário e **Mais**,
+  que abre a gaveta com o relance inteiro e os seis atalhos. Um atalho tocado
+  na gaveta fecha a gaveta antes de abrir a tela.
+
+O guia "Como Jogar" descreve a barra nova, e as capturas do jogo ganharam
+`jogo-barra-recolhida`, `jogo-avisos` e `jogo-painel-mobile` no lugar das
+abas antigas.
+
+### Testes
+
+`test_barra_navegador.py` (17) confere a linha de onde, capítulo e hora (lado
+a lado, sem sobrepor e sem cortar), cada um abrindo a sua tela; uma linha por
+herói com a vida do motor e as marcas; o nome abrindo a ficha e o selo abrindo
+o aviso de nível; carga pesada como marca; a missão principal e o bloco sumindo
+sem missão ativa; os seis atalhos abrindo as telas; os contadores; os avisos só
+quando há algum; a engrenagem com o modo de combate funcionando; que nada da
+barra antiga ficou na página e que a barra não precisa de rolagem nem corta
+rótulo; recolher e lembrar depois de recarregar; a campanha sem regras; e, no
+celular, a faixa, a barra de baixo, o "Mais" com a gaveta e o toque na faixa.
+Os testes das telas que entravam pelas abas (nível, grimório, Mochila, ficha
+do local, do personagem e do herói, missões, mapa, grupo, diário) passaram a
+entrar pelos caminhos novos. Regressões injetadas (missão principal pela ordem
+da lista, contador sem nível pendente, avisos que não chegam, engrenagem
+vazia, recolhida esquecida, tudo tratado como D&D, gaveta aberta atrás da
+tela, sem barra de baixo, linha de onde sobreposta, herói abrindo a ficha de
+NPC) foram todas pegas.
 
 ## Tela de nível ("A Ascensão")
 
@@ -1292,7 +1379,7 @@ ferramenta e fim do turno).
 
 ### O selo "Subir de nível"
 
-O selo no cartão do personagem (aba Enciclopédia) aparece quando o XP já passa
+O selo na linha do herói, no relance da barra lateral, aparece quando o XP já passa
 do limite e o nível não subiu — XP ajustado à mão, por exemplo. Ele gravava o
 nível direto pela rota de edição, com PV calculados no navegador pela média do
 dado, e pulava tudo o que o `grant_xp` faz: habilidades da classe, mana,
@@ -1659,8 +1746,8 @@ partir de onde o grupo está:
 
 ### A tela
 
-Abre ao clicar num local da Enciclopédia, no "Local:" da barra lateral, ou no
-"Em Forja de Cliviate" do cartão de um personagem (`static/js/locais.js`,
+Abre ao clicar num lugar do mapa, no local do relance da barra lateral, ou em
+qualquer tela que cite o lugar (`static/js/locais.js`,
 `GET /api/locations/state?local=`). Mostra:
 
 - o caminho até o lugar ("Cliviate ›"), com cada trecho clicável;
@@ -1969,7 +2056,7 @@ lugares num plano inventaria uma geografia que a campanha não tem. É uma
 
 ### A tela (`static/js/mapa.js`, `GET /api/map/state`)
 
-- Abre pelo **Ver o mapa** da barra lateral (abaixo do "Local:") e pelo **Ver
+- Abre pelo atalho **Mapa** da barra lateral e pelo **Ver
   no mapa** da ficha do local, que abre a árvore até aquele lugar e o destaca.
 - Mesma moldura das fichas. À esquerda, a árvore: o caminho até o grupo
   começa aberto, o resto abre e fecha pela seta; cada lugar mostra as marcas
@@ -2028,7 +2115,7 @@ do herói, a tela de descanso e a carga). `group_snapshot()` devolve:
 
 ### A tela (`static/js/grupo.js`)
 
-- Abre pelo **Visão geral** no título do grupo, na Enciclopédia. Mesma
+- Abre pelo atalho **Grupo** e pela hora do relance, na barra lateral. Mesma
   moldura das fichas.
 - No alto, o resumo e **Pedir descanso curto** / **Pedir descanso longo**, que
   mandam ao mestre a fala do jogador ("Vamos fazer um descanso curto."); ele
@@ -2096,9 +2183,9 @@ Dois defeitos antigos corrigidos no caminho:
 
 ### A tela (`static/js/diario.js`)
 
-- Abre pelo **Ler o diário** na aba Diário, pelo **Capítulo** da aba Mundo
-  (no capítulo atual) e pela entrada da barra lateral, que agora abre o livro
-  na página dela, em destaque, em vez do editor.
+- Abre pelo atalho **Diário** e pelo **Capítulo** do relance (no capítulo
+  atual), na barra lateral; `Diario._abrir(capítulo, entrada)` abre numa
+  entrada, em destaque.
 - Índice à esquerda com cada capítulo (título, entradas, eventos, o atual
   marcado) e "Sem capítulo" quando há eventos antigos. À direita, a página:
   as entradas como texto corrido, com capitular, e o **Neste capítulo** com os
@@ -2333,10 +2420,8 @@ O que aconteceu na história continua sendo decisão do mestre:
 
 ### A tela (`static/js/missoes.js`)
 
-- Abre pelo **Ver todas** no título da seção de missões da barra lateral, e
-  pelo clique em cada missão (aberta na aba dela e destacada). A seção
-  aparece com qualquer missão registrada; sem ativas, mostra "Nenhuma missão
-  ativa" e continua levando às encerradas.
+- Abre pelo atalho **Missões** da barra lateral (com a contagem das ativas)
+  e pela missão principal do relance (aberta na aba dela e destacada).
 - Mesma moldura das fichas. Abas: **Ativas**, **Concluídas** e **Falhadas e
   abandonadas**, com a contagem. Cada missão: título, progresso, capítulos,
   descrição, **Encomendada por** (link para a ficha do personagem quando ele
@@ -3152,8 +3237,8 @@ ferramentas do mestre.
 - **`static/menu.html`**, lista de campanhas, wizard de criação (mundo +
   personagens), edição, importação por prompt, escolha de modelo e chave
   de API.
-- **`static/game.html`**, chat principal + sidebar (Mundo, Enciclopédia,
-  Diário) + dice tray + tela de combate (`combat.js`).
+- **`static/game.html`**, chat principal + barra lateral (relance e atalhos,
+  `barra.js`) + dice tray + tela de combate (`combat.js`).
 - **`static/offline.html`**, tela "Acordando o servidor…" do PWA (CSS/JS
   inline, autossuficiente), exibida pelo service worker durante o cold
   start do Render; faz polling em `/healthz` e recarrega sozinha quando o
@@ -3191,6 +3276,9 @@ ferramentas do mestre.
 - **`loot.js`**, a tela de saque (quem leva o quê, com a carga prevista).
 - **`missoes.js`**, o livro de missões (abas por situação, objetivos marcáveis,
   quem deu e desfecho).
+- **`barra.js`**, a barra lateral do jogo (relance, atalhos com contador,
+  avisos, recolher, faixa e barra de baixo no celular, e a seção "Esta
+  campanha" da engrenagem).
 - **`elenco.js`**, o índice de personagens (busca, filtros e a ficha de cada
   um).
 - **`diario.js`**, o diário como livro (capítulos, entradas em texto
@@ -3441,7 +3529,7 @@ Roda em toda resposta do agente; emite avisos (não interrompe) para:
 - Contradições com flags ("portao_aberto=fechado" + texto descreve aberto).
 - NPC novo introduzido sem `save_character`.
 
-Os avisos aparecem na sidebar (aba Mundo → Validação).
+Os avisos aparecem no relance da barra lateral, num botão discreto que só existe quando há algum.
 
 ### Verificador mecânico (`server.py:_verify_agent_response`)
 

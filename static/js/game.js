@@ -59,8 +59,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   let session;
   try { session = JSON.parse(raw); } catch (_) { window.location.href = '/menu.html'; return; }
 
+  // Uso do modelo, modo de combate, Menu principal e Sair moram na
+  // engrenagem agora (barra.js). A seção precisa existir antes de preencher.
+  if (window.Barra) window.Barra.montarConfiguracoes();
   document.getElementById('sb-campaign').textContent = session.campaign || '—';
-  document.getElementById('sb-model').textContent = session.model || '—';
+  const modeloEl = document.getElementById('sb-model');
+  if (modeloEl) modeloEl.textContent = session.model || '—';
   document.getElementById('mobile-title').textContent = session.campaign || '—';
 
   if (session.campaign_config) applyCampaignConfig(session.campaign_config);
@@ -896,152 +900,23 @@ async function typewriter(el, text) {
   const t = setInterval(() => { op = Math.min(1, op + 0.08); el.style.opacity = op; scrollDown(); if (op >= 1) clearInterval(t); }, 20);
 }
 
+// Avisos do verificador: um botão discreto no relance, só quando há algum
+// (barra.js). Antes era uma seção fixa da aba Mundo, e um erro trocava a aba.
 function renderViolations(violations) {
-  const el = document.getElementById('sb-violations');
-  if (!violations || !violations.length) { 
-    el.innerHTML = '<span class="empty-state">Nenhuma violação detetada.</span>'; 
-    return; 
-  }
-  
-  if (el.querySelector('.empty-state')) el.innerHTML = '';
-  if (el.querySelectorAll('.violation-item').length >= 9) el.innerHTML = '';
-  
-  const newHtml = violations.map((v, i) => {
-    const uid = `viol-${Date.now()}-${i}`;
-    return `<div class="violation-item ${v.severity}" id="${uid}">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px;">
-        <div class="violation-rule">${v.rule}</div>
-        <button onclick="document.getElementById('${uid}').remove();cleanViolations();" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:14px;padding:0;line-height:1;transition:color 0.15s;" onmouseover="this.style.color='var(--text-main)'" onmouseout="this.style.color='var(--text-muted)'">✕</button>
-      </div>
-      <div class="violation-msg">${v.message}</div>
-      ${v.detail ? `<div class="violation-detail">${v.detail}</div>` : ''}
-    </div>`;
-  }).join('');
-  
-  el.innerHTML = newHtml + el.innerHTML;
-  if (violations.some(v => v.severity === 'erro')) switchTab('mundo');
-}
-
-function cleanViolations() {
-  const el = document.getElementById('sb-violations');
-  if (!el.querySelector('.violation-item')) {
-    el.innerHTML = '<span class="empty-state">Nenhuma violação detetada.</span>';
-  }
+  if (window.Barra) window.Barra.avisos(violations || []);
 }
 
 function scrollDown() { const h = document.getElementById('chat-history'); h.scrollTop = h.scrollHeight; }
 function setInputDisabled(d) { document.getElementById('chat-input').disabled = d; document.getElementById('send-btn').disabled = d; }
 
 // ═══════════════════════════════════════
-//  Sidebar
+//  Sidebar (desenhada por barra.js)
 // ═══════════════════════════════════════
-function switchTab(name) {
-  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById(`tab-${name}`)?.classList.add('active');
-  document.querySelectorAll('.tab-btn').forEach(b => { if (b.dataset.tab === name) b.classList.add('active'); });
-}
-
 function applyCampaignConfig(cfg) {
   if (!cfg) return;
   window._campaignConfig = cfg;
-  const pt = document.getElementById('sb-party-title'); if (pt) pt.textContent = cfg.party_label || 'GRUPO DE AVENTUREIROS';
-}
-
-function buildDndCharCard(c, idx, type) {
-  const sheet = c.sheet || null;
-  const hpCur  = sheet?.vida_atual  !== undefined ? sheet.vida_atual  : '?';
-  const hpMax  = sheet?.vida_max    !== undefined ? sheet.vida_max    : '?';
-  const manaCur = sheet?.mana_atual !== undefined ? sheet.mana_atual  : null;
-  const manaMax = sheet?.mana_max   !== undefined ? sheet.mana_max    : null;
-  const ca      = sheet?.ca !== undefined ? sheet.ca : null;
-  const condicoes = Array.isArray(sheet?.condicoes) ? sheet.condicoes : [];
-
-  const hpPct = (typeof hpMax === 'number' && hpMax > 0 && typeof hpCur === 'number') ? Math.min(100, Math.max(0, (hpCur / hpMax) * 100)) : 0;
-  const manaPct = (typeof manaMax === 'number' && manaMax > 0 && typeof manaCur === 'number') ? Math.min(100, Math.max(0, (manaCur / manaMax) * 100)) : 0;
-
-  const st = (c.status || '').toLowerCase();
-  const stCls = st.includes('mort') ? 'dead' : st.includes('desapar') ? 'missing' : '';
-
-  const nameEsc = (c.name || '').replace(/'/g, "\\'");
-  const keyEsc  = (c.name || '').toLowerCase().trim().replace(/'/g, "\\'");
-  const dataRef = type === 'party' ? `window._lastMem.party[${idx}]` : `window._lastMem.characters[${idx}]`;
-  const modalType = (type === 'party' && sheet) ? 'character' : type;
-
-  // Detecta se o personagem tem XP suficiente para upar de nível
-  const canLevelUp = sheet
-    && typeof sheet.xp === 'number'
-    && typeof sheet.xp_proximo === 'number'
-    && sheet.xp >= sheet.xp_proximo
-    && (sheet.nivel || 1) < 20;
-
-  // O cartão abre a ficha de leitura: a do herói para quem é do grupo e tem
-  // ficha D&D, a do personagem para os demais. Corrigir a ficha continua a
-  // um clique, pelo botão dentro dela.
-  const aoClicar = type === 'party'
-    ? (sheet ? `abrirFichaDoHeroi('${nameEsc}','${modalType}','${keyEsc}',${dataRef})`
-             : `openEditModal('${modalType}','${keyEsc}',${dataRef})`)
-    : `abrirFichaDoPersonagem('${nameEsc}','${modalType}','${keyEsc}',${dataRef})`;
-  let html = `<div class="char-card editable" onclick="${aoClicar}">`;
-  html += `<div class="char-name">${escapeHtml(c.name || '')}`;
-  html += `<div style="display:flex;align-items:center;gap:6px;">`;
-  if (canLevelUp) html += `<span class="levelup-badge" onclick="gameLevelUpClick(event,'${keyEsc}','${type}',${idx})" title="XP suficiente para subir de nível">Subir de nível</span>`;
-  if (c.status) html += `<span class="char-status ${stCls}">${escapeHtml(c.status)}</span>`;
-  if (ca !== null) html += `<span class="dnd-ca">CA ${ca}</span>`;
-  html += `</div></div>`;
-
-  if (sheet) {
-    html += `<div class="stat-bar-wrap"><div class="stat-bar-label"><span>HP</span><span>${hpCur}/${hpMax}</span></div><div class="stat-bar-track"><div class="stat-bar-fill" style="width:${hpPct}%;background:var(--ink-sys);"></div></div></div>`;
-    if (manaMax !== null && manaMax > 0) html += `<div class="stat-bar-wrap"><div class="stat-bar-label"><span>Mana</span><span>${manaCur}/${manaMax}</span></div><div class="stat-bar-track"><div class="stat-bar-fill" style="width:${manaPct}%;background:var(--ink-user);"></div></div></div>`;
-    if (condicoes.length) {
-      html += `<div class="condition-badges">`;
-      condicoes.forEach(cd => {
-        const { nome, dur } = _condInfo(cd);
-        html += `<span class="condition-badge" style="background:rgba(139,58,58,0.1);color:var(--ink-sys);">${escapeHtml(nome)}${typeof dur === 'number' && dur > 0 ? ` (${dur}t)` : ''}</span>`;
-      });
-      html += `</div>`;
-    }
-    // Atalhos das telas do personagem, numa linha própria: no cabeçalho, ao
-    // lado do nome, do status e da CA, eles espremiam a CA em duas linhas na
-    // lateral estreita. Mochila para todo o grupo; Grimório só para quem
-    // conjura. stopPropagation porque o cartão inteiro abre o modal de edição.
-    if (type === 'party') {
-      const conjura = GAME_CASTER_CLASSES.has(String(sheet.classe || '').toLowerCase());
-      html += `<div class="cartao-atalhos">`
-        + `<span class="cartao-atalho mochila-link" role="button" tabindex="0" onclick="event.stopPropagation(); window.Inventory && window.Inventory._abrir('${nameEsc}')" title="Abrir a Mochila">Mochila</span>`
-        + (conjura ? `<span class="cartao-atalho grimorio-link" role="button" tabindex="0" onclick="event.stopPropagation(); window.Grimoire && window.Grimoire._abrir('${nameEsc}')" title="Abrir o Grimório">Grimório</span>` : '')
-        + `</div>`;
-    }
-  } else {
-    // As notas são o caderno do mestre, com segredos: o cartão mostra a descrição.
-    const desc = c.description || '';
-    if (desc) html += `<div class="char-desc">${escapeHtml(desc.substring(0, 90))}${desc.length > 90 ? '…' : ''}</div>`;
-  }
-  if (type !== 'party') html += linhaDoLocalDoPersonagem(c);
-  html += `</div>`;
-  return html;
-}
-
-// Abre a ficha do personagem; sem personagens.js carregado, cai no editor.
-function abrirFichaDoPersonagem(nome, modalType, key, data) {
-  if (window.Personagens) window.Personagens._abrir(nome);
-  else openEditModal(modalType, key, data);
-}
-
-// Abre a ficha de leitura do herói; sem herois.js carregado, cai no editor.
-function abrirFichaDoHeroi(nome, modalType, key, data) {
-  if (window.Herois) window.Herois._abrir(nome);
-  else openEditModal(modalType, key, data);
-}
-
-// "Em Forja de Cliviate" no cartão do personagem, e o nome abre a ficha do
-// local. stopPropagation porque o cartão inteiro abre o modal de edição.
-function linhaDoLocalDoPersonagem(c) {
-  if (!c || !c.local) return '';
-  const alvo = String(c.local).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-  return `<div class="char-local">Em <span class="local-clicavel" role="button" tabindex="0"`
-    + ` onclick="event.stopPropagation(); window.Locais && window.Locais._abrir('${escapeHtml(alvo)}')"`
-    + ` title="Ver o local">${escapeHtml(c.local)}</span></div>`;
+  const pt = document.getElementById('sb-relance');
+  if (pt) pt.setAttribute('aria-label', `De relance: ${cfg.party_label || 'o grupo'}`);
 }
 
 function renderTurnTracker(cs) {
@@ -1082,57 +957,6 @@ async function refreshMemory() {
   } catch (_) { }
 }
 
-// Relógio de mundo (onda 4). Campanha que nunca chamou advance_time() não
-// tem `relogio` — a linha inteira some, em vez de mostrar um "Dia 1" falso.
-const _PERIODOS_DIA = [[0, 6, 'madrugada'], [6, 12, 'manhã'],
-                       [12, 18, 'tarde'], [18, 24, 'noite']];
-
-function renderTempo(relogio) {
-  const linha = document.getElementById('sb-tempo-linha');
-  const alvo  = document.getElementById('sb-tempo');
-  if (!linha || !alvo) return;
-  if (!relogio || relogio.dia === undefined) { linha.classList.add('hidden'); return; }
-  const h = Number(relogio.hora || 0);
-  const p = (_PERIODOS_DIA.find(([a, b]) => h >= a && h < b) || [0, 0, ''])[2];
-  alvo.textContent = `Dia ${relogio.dia}, ${String(h).padStart(2, '0')}h · ${p}`;
-  linha.classList.remove('hidden');
-}
-
-// Missões ativas, com o progresso dos objetivos. As encerradas ficam de fora
-// da lista: a barra lateral é "o que fazer agora". Elas continuam a um clique,
-// na tela de missões ("Ver todas"), que também abre ao clicar numa missão.
-function renderMissoes(quests) {
-  const secao = document.getElementById('sb-missoes-secao');
-  const alvo  = document.getElementById('sb-missoes');
-  if (!secao || !alvo) return;
-
-  const todas  = (quests || []).filter(Boolean);
-  const ativas = todas.filter(q => q.status === 'ativa');
-  if (!todas.length) { secao.classList.add('hidden'); alvo.innerHTML = ''; return; }
-  const abrirBtn = document.getElementById('sb-missoes-abrir');
-  if (abrirBtn) abrirBtn.textContent = `Ver todas (${todas.length})`;
-  if (!ativas.length) {
-    alvo.innerHTML = '<span class="empty-state">Nenhuma missão ativa.</span>';
-    secao.classList.remove('hidden');
-    return;
-  }
-
-  alvo.innerHTML = ativas.map(q => {
-    const objs   = q.objetivos || [];
-    const feitos = objs.filter(o => o.feito).length;
-    const passos = objs.map(o =>
-      `<div class="missao-passo ${o.feito ? 'feito' : ''}">`
-      + `<span class="missao-marca" aria-hidden="true"></span>${escapeHtml(o.texto || '')}</div>`).join('');
-    const contador = objs.length ? `<span class="missao-contagem">${feitos}/${objs.length}</span>` : '';
-    const dono = q.quem_deu ? `<div class="missao-dono">de ${escapeHtml(q.quem_deu)}</div>` : '';
-    const tituloJs = escapeHtml(String(q.titulo || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
-    return `<div class="missao-item missao-clicavel" role="button" tabindex="0" title="Abrir a missão"`
-         + ` onclick="window.Missoes && window.Missoes._abrir('${tituloJs}')"><div class="missao-titulo">`
-         + `${escapeHtml(q.titulo || '')}${contador}</div>${dono}${passos}</div>`;
-  }).join('');
-  secao.classList.remove('hidden');
-}
-
 function renderMemory(mem) {
   // Normaliza campos que podem faltar em dados antigos/parciais — sem isso,
   // um Object.keys(undefined) abortaria toda a renderização da sidebar.
@@ -1143,19 +967,8 @@ function renderMemory(mem) {
   mem.locations   = mem.locations   || [];
   mem.events      = mem.events      || [];
   window._lastMem = mem;
-  document.getElementById('sb-location').textContent = mem.current_location || '—';
-  document.getElementById('ws-chapter').textContent = mem.chapter || 1;
-  document.getElementById('ws-location').textContent = mem.current_location || '—';
-  document.getElementById('sb-summary').textContent = mem.story_summary || 'Nenhum resumo ainda.';
 
   renderTurnTracker(mem.combat_state);
-
-  renderTempo(mem.relogio);
-  renderMissoes(mem.quests);
-
-  const fEl = document.getElementById('sb-flags');
-  fEl.innerHTML = !Object.keys(mem.quest_flags).length ? '<span class="empty-state">Nenhuma observação.</span>' :
-    Object.entries(mem.quest_flags).map(([k, v]) => `<div class="flag-item editable" onclick="openEditModal('flag','${k}',{key:'${k}',value:'${v.replace(/'/g, "\\'")}'})"><span class="flag-key">${k}</span><span class="flag-val">${v}</span></div>`).join('');
 
   const isDnd = mem.dnd_mode === true || mem.campaign_type === 'dnd';
   const diceTrayBtn = document.getElementById('dice-tray-btn');
@@ -1178,50 +991,8 @@ function renderMemory(mem) {
     );
   }
 
-  const pEl = document.getElementById('sb-party');
-  pEl.innerHTML = !mem.party.length ? '<span class="empty-state">Nenhum membro ainda.</span>' : mem.party.map((p, i) => {
-    if (isDnd) return buildDndCharCard(p, i, 'party');
-    // Se o membro do grupo tem entrada correspondente em characters (descrição,
-    // traços, status…), abre o editor completo de personagem em vez do modal
-    // mínimo de grupo. O backend (/api/memory) já mescla a ficha do
-    // personagem em mem.party. Mantém o modal 'party' apenas para membros
-    // soltos, sem ficha de personagem por trás.
-    const hasCharData = !!(p.description || p.traits || p.status || p.sheet);
-    const modalType   = hasCharData ? 'character' : 'party';
-    const keyEsc      = (hasCharData ? (p.name || '').toLowerCase().trim() : (p.name || '')).replace(/'/g, "\\'");
-    return `<div class="char-card editable" onclick="openEditModal('${modalType}','${keyEsc}',window._lastMem.party[${i}])"><div class="char-name">${p.name} <span class="char-status">${p.role}</span></div><div class="char-desc">${p.notes || ''}</div></div>`;
-  }).join('');
-
-  const cEl = document.getElementById('sb-chars');
-  cEl.innerHTML = !mem.characters.length ? '<span class="empty-state">Nenhum personagem ainda.</span>' : mem.characters.map((c, i) => {
-    if (isDnd) return buildDndCharCard(c, i, 'character');
-    const st = c.status?.toLowerCase() || 'vivo';
-    const cls = st.includes('mort') ? 'dead' : st.includes('desapar') ? 'missing' : '';
-    const nomeJs = (c.name || '').replace(/'/g, "\\'");
-    return `<div class="char-card editable" onclick="abrirFichaDoPersonagem('${nomeJs}','character','${nomeJs.toLowerCase()}',window._lastMem.characters[${i}])"><div class="char-name">${c.name}<span class="char-status ${cls}">${c.status}</span></div><div class="char-desc">${(c.description || '').substring(0, 100)}${(c.description || '').length > 100 ? '…' : ''}</div>${linhaDoLocalDoPersonagem(c)}</div>`;
-  }).join('');
-
-  const dEl = document.getElementById('sb-diary');
-  dEl.innerHTML = !mem.diary.length ? '<span class="empty-state">Diário vazio.</span>' : [...mem.diary].reverse().slice(0, 8).map((d, i) => {
-    const ri = mem.diary.length - 1 - i;
-    // Abre o livro na página do capítulo, com a entrada em destaque; o
-    // "Editar" dela, dentro do livro, leva ao editor.
-    const abrir = `window.Diario ? window.Diario._abrir(${parseInt(d.chapter, 10) || 1}, ${ri}) : openEditModal('diary',null,window._lastMem.diary[${ri}],${ri})`;
-    return `<div class="diary-entry editable" data-indice="${ri}" onclick="${abrir}"><div class="diary-entry-title">Cap.${d.chapter} — ${d.title}</div><div class="diary-entry-content">${(d.content || '').substring(0, 160)}${(d.content || '').length > 160 ? '…' : ''}</div></div>`;
-  }).join('');
-
-  const lEl = document.getElementById('sb-locs');
-  if (lEl) {
-    const locs = mem.locations || [];
-    // O cartão abre a ficha do local (o que fica dentro, quem está lá); a
-    // edição continua pelo botão "Editar local" dentro da ficha.
-    lEl.innerHTML = !locs.length ? '<span class="empty-state">Nenhum local ainda.</span>' : locs.map((l, i) => {
-      const nomeJs = escapeHtml(String(l.name || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
-      const pai = l.dentro_de ? `<div class="char-local">Em ${escapeHtml(l.dentro_de)}</div>` : '';
-      const aberta = `window.Locais ? window.Locais._abrir('${nomeJs}') : openEditModal('location','${nomeJs.toLowerCase()}',window._lastMem.locations[${i}])`;
-      return `<div class="char-card editable local-card" data-local="${escapeHtml(l.name || '')}" onclick="${aberta}"><div class="char-name">${escapeHtml(l.name || '')}</div>${pai}<div class="char-desc">${escapeHtml((l.description || '').substring(0, 100))}${(l.description || '').length > 100 ? '…' : ''}</div></div>`;
-    }).join('');
-  }
+  // O relance e os atalhos da barra (e a faixa e a barra de baixo no celular).
+  if (window.Barra) window.Barra.render(mem);
 
   // As telas (combate, nível, loja) decidem sozinhas se aparecem — mas pela
   // fila abaixo, uma de cada vez.
@@ -2383,6 +2154,5 @@ async function deleteCurrentItem() {
 }
 
 window.clearAllViolations = function() {
-  const violationsDiv = document.getElementById('sb-violations');
-  if (violationsDiv) violationsDiv.innerHTML = '<span class="empty-state">Nenhuma violação detetada.</span>';
+  if (window.Barra) window.Barra.limparAvisos();
 };

@@ -60,6 +60,8 @@
         </div>
         <div class="lcl-rodape">
           <div id="map-msg" class="lcl-msg" aria-live="polite"></div>
+          <button id="map-novo" class="lcl-btn lcl-btn-sec" onclick="window.Mapa._novo()"
+                  title="Registrar um lugar novo">Novo local</button>
           <button class="lcl-fechar" onclick="window.Mapa._fechar()">Fechar</button>
         </div>
       </div>`;
@@ -247,6 +249,8 @@
     _buscar: (texto) => { _busca = norm(texto); render(_last); },
     _ir: (nome) => enviar(`Vamos até ${nome}.`),
     _verLocal: (nome) => { fechar(); if (window.Locais) window.Locais._abrir(nome); },
+    // A lista de locais saiu da barra lateral; criar um lugar é aqui.
+    _novo: () => { fechar(); if (typeof window.addNewLocation === 'function') window.addNewLocation(); },
     _verPessoa: (nome) => { fechar(); if (window.Personagens) window.Personagens._abrir(nome); },
     _estado: () => _last,
   };

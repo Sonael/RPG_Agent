@@ -35,7 +35,7 @@
        Sem isso, a narração da IA (ou texto injetado) poderia conter
        <script>/<img onerror> e executar — XSS. -->
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.7/dist/purify.min.js"></script>
-  <link rel="stylesheet" href="/static/css/style.css?v=67">
+  <link rel="stylesheet" href="/static/css/style.css?v=68">
 </head>
 
 <body class="game-page">
@@ -52,191 +52,44 @@
 
       <div id="sidebar-overlay" onclick="toggleSidebar(true)"></div>
 
-      <aside id="sidebar" class="page-left">
+      <aside id="sidebar" class="page-left" aria-label="Painel da campanha">
         <!-- Puxador e botão de fechar: no mobile a barra abre como folha
-             inferior e só fechava tocando fora dela, o que não é visível. -->
+             inferior (pelo "Mais" da barra de baixo). -->
         <div class="sidebar-grab" aria-hidden="true"></div>
         <button class="sidebar-close" onclick="toggleSidebar(true)"
                 aria-label="Fechar o painel">✕</button>
         <div class="sidebar-header">
-          <div class="sidebar-header-row">
+          <div class="sb-topo">
             <h2 id="sb-campaign" class="book-title">—</h2>
-
-            <div class="world-state">
-              <div class="linha-info">
-                <span style="color:var(--text-main); font-weight: 600;">Local:</span>
-                <span id="sb-location" class="local-clicavel" title="Ver o local" onclick="window.Locais && window.Locais._abrir('')" style="color:var(--text-muted); text-align:right;">—</span>
-              </div>
-              <!-- O mundo inteiro de uma vez: a árvore de lugares, quem está onde. -->
-              <div class="linha-info linha-mapa">
-                <button id="sb-mapa" class="clean-button btn-texto btn-texto-mini"
-                        onclick="window.Mapa && window.Mapa._abrir('')" title="Ver o mapa do mundo">Ver o mapa</button>
-              </div>
-              <!-- Relógio de mundo. Some quando a campanha nunca chamou
-                   advance_time() — nem toda mesa quer contar as horas. -->
-              <div id="sb-tempo-linha" class="hidden"
-                style="display:flex;justify-content:space-between;font-family:'Lora',serif;font-size:13px;">
-                <span style="color:var(--text-main); font-weight: 600;">Tempo:</span>
-                <span id="sb-tempo" style="color:var(--text-muted); text-align:right;">—</span>
-              </div>
-            </div>
-
-            <div class="quota-panel">
-              <div class="quota-titulo">
-                Uso do modelo</div>
-              <div class="quota-linha">
-                <div title="Requisições feitas nesta sessão, do limite diário do seu modelo">Requisições: <span id="stat-req">0</span></div>
-                <div title="Tokens consumidos nesta sessão">Tokens: <span id="stat-tokens">0</span></div>
-              </div>
-              <div class="quota-barra">
-                <div id="rpm-bar" style="width: 0%; height: 100%; background: var(--ink-user); transition: width 0.4s;">
-                </div>
-              </div>
-            </div>
+            <!-- No desktop a barra recolhe numa coluna de ícones. -->
+            <button id="sb-recolher" class="sb-recolher" type="button"
+                    onclick="window.Barra && window.Barra.alternar()"
+                    aria-label="Recolher a barra" aria-expanded="true" title="Recolher a barra"></button>
           </div>
         </div>
 
-        <div class="sidebar-tabs">
-          <button class="tab-btn active" data-tab="mundo" onclick="switchTab('mundo')">Mundo</button>
-          <button class="tab-btn" data-tab="enciclopedia" onclick="switchTab('enciclopedia')">Enciclopédia</button>
-          <button class="tab-btn" data-tab="diario" onclick="switchTab('diario')">Diário</button>
-        </div>
-
-        <div class="sidebar-content scroll-area">
-
-          <div id="tab-mundo" class="tab-panel active">
-            <div class="sb-section">
-              <h3 class="sb-section-title">ESTADO <span onclick="openWorldEdit()" class="sb-editar">(editar)</span>
-              </h3>
-              <div class="linha-info">
-                <span style="color:var(--text-muted);">Capítulo</span>
-                <span id="ws-chapter" class="local-clicavel" title="Ler este capítulo no diário"
-                      onclick="window.Diario && window.Diario._abrir()" style="font-weight:600;">—</span>
-              </div>
-              <div style="display:flex;justify-content:space-between;font-family: 'Lora', serif; font-size:13px;">
-                <span style="color:var(--text-muted);">Local</span>
-                <span id="ws-location" class="local-clicavel" title="Ver o local" onclick="window.Locais && window.Locais._abrir('')" style="font-weight:600; text-align:right;">—</span>
-              </div>
+        <div class="sidebar-content">
+          <!-- De relance, sem rolagem: onde, quem, o que fazer. Preenchido por
+               barra.js a partir do motor. -->
+          <section id="sb-relance" class="sb-relance" aria-label="De relance">
+            <div class="sb-onde">
+              <button id="sb-location" class="sb-onde-item sb-onde-local" type="button"
+                      onclick="window.Locais && window.Locais._abrir('')" title="Ver o local">
+                <span id="sb-icone-local" class="sb-onde-icone"></span><span id="sb-location-nome">—</span></button>
+              <button id="ws-chapter" class="sb-onde-item" type="button"
+                      onclick="window.Diario && window.Diario._abrir()" title="Ler este capítulo no diário">
+                <span id="sb-icone-capitulo" class="sb-onde-icone"></span>Cap. <span id="ws-chapter-num">1</span></button>
+              <button id="sb-tempo" class="sb-onde-item hidden" type="button"
+                      onclick="window.Barra && window.Barra.abrir('grupo')" title="Hora do mundo: veja quem pode descansar">
+                <span id="sb-icone-hora" class="sb-onde-icone"></span><span id="sb-tempo-texto">—</span></button>
             </div>
+            <div id="sb-herois" class="sb-herois" aria-label="O grupo"></div>
+            <button id="sb-missao" class="sb-missao hidden" type="button"
+                    onclick="window.Barra && window.Barra.abrirMissao()"></button>
+            <div id="sb-avisos" class="sb-avisos hidden" aria-live="polite"></div>
+          </section>
 
-            <div class="sb-section">
-              <h3 class="sb-section-title" style="display:flex;justify-content:space-between;align-items:center;">
-                VALIDAÇÃO
-                <button onclick="clearAllViolations()" class="clean-button btn-texto btn-texto-mini">Limpar Todas</button>
-              </h3>
-              <div id="sb-violations"><span class="empty-state">Nenhuma violação detetada.</span></div>
-            </div>
-
-            <div class="sb-section">
-              <h3 class="sb-section-title">RESUMO <span onclick="openSummaryEdit()" class="sb-editar">(editar)</span>
-              </h3>
-              <div id="sb-summary"
-                style="font-family: 'Lora', serif; font-size: 14px; line-height: 1.6; text-align: justify; color: var(--text-muted);">
-                —</div>
-            </div>
-
-            <!-- Missões. O painel inteiro some sem missão registrada: a
-                 onda 4 é aditiva e campanha antiga não pode ganhar uma seção
-                 vazia do nada. O título e cada missão abrem a tela de missões. -->
-            <div id="sb-missoes-secao" class="sb-section hidden">
-              <h3 class="sb-section-title" style="display:flex;align-items:center;justify-content:space-between;">
-                MISSÕES
-                <button id="sb-missoes-abrir" onclick="window.Missoes && window.Missoes._abrir('')"
-                        class="clean-button btn-texto">Ver todas</button>
-              </h3>
-              <div id="sb-missoes"></div>
-            </div>
-
-            <div class="sb-section">
-              <h3 class="sb-section-title" style="display:flex;align-items:center;justify-content:space-between;">
-                OBSERVAÇÕES
-                <button onclick="addNewFlag()" class="clean-button btn-texto">+
-                  Adicionar</button>
-              </h3>
-              <div id="sb-flags"><span class="empty-state">Nenhuma observação.</span></div>
-            </div>
-
-            <div class="sb-section">
-              <h3 class="sb-section-title sb-titulo-rente">MODO DE COMBATE</h3>
-              <div class="sb-nota">
-                Como as lutas são resolvidas nesta campanha.
-              </div>
-              <div id="combat-mode-toggle" class="combat-mode-toggle">
-                <button type="button" data-mode="narrado" class="cm-opt active"
-                  onclick="setCombatMode('narrado')">Narrado pela IA</button>
-                <button type="button" data-mode="tela" class="cm-opt"
-                  onclick="setCombatMode('tela')">Tela tática</button>
-              </div>
-              <div id="combat-mode-hint"></div>
-            </div>
-
-            <div class="sb-section">
-              <h3 class="sb-section-title sb-titulo-rente">STATUS DO SISTEMA</h3>
-              <div style="font-family: 'Lora', serif; font-size: 12px; color: var(--text-muted);">
-                Modelo: <span id="sb-model">—</span><br>
-                Tokens em uso: <span id="sb-stat-tokens">0</span>
-              </div>
-            </div>
-          </div>
-
-          <div id="tab-enciclopedia" class="tab-panel">
-            <div class="sb-section">
-              <h3 class="sb-section-title" style="display:flex;align-items:center;justify-content:space-between;">
-                <span id="sb-party-title">GRUPO DE AVENTUREIROS</span>
-                <span class="sb-titulo-acoes">
-                  <button id="sb-grupo-abrir" onclick="window.Grupo && window.Grupo._abrir()"
-                          class="clean-button btn-texto" title="Os heróis lado a lado">Visão geral</button>
-                  <button onclick="addNewPartyMember()" class="clean-button btn-texto">+
-                    Membro</button>
-                </span>
-              </h3>
-              <div id="sb-party"><span class="empty-state">Carregando...</span></div>
-            </div>
-            <div class="sb-section">
-              <h3 class="sb-section-title" style="display:flex;align-items:center;justify-content:space-between;">
-                PERSONAGENS
-                <span class="sb-titulo-acoes">
-                  <button id="sb-elenco-abrir" onclick="window.Elenco && window.Elenco._abrir()"
-                          class="clean-button btn-texto" title="Todos os personagens, com busca">Ver todos</button>
-                  <button onclick="addNewCharacter()" class="clean-button btn-texto">+
-                    Personagem</button>
-                </span>
-              </h3>
-              <div id="sb-chars"><span class="empty-state">Carregando...</span></div>
-            </div>
-            <div class="sb-section">
-              <h3 class="sb-section-title" style="display:flex;align-items:center;justify-content:space-between;">
-                LOCAIS
-                <button onclick="addNewLocation()" class="clean-button btn-texto">+
-                  Local</button>
-              </h3>
-              <div id="sb-locs"><span class="empty-state">Carregando...</span></div>
-            </div>
-          </div>
-
-          <div id="tab-diario" class="tab-panel">
-            <div class="sb-section">
-              <h3 class="sb-section-title" style="display:flex;align-items:center;justify-content:space-between;">
-                ENTRADAS DO DIÁRIO
-                <span class="sb-titulo-acoes">
-                  <button id="sb-diario-ler" onclick="window.Diario && window.Diario._abrir()"
-                          class="clean-button btn-texto" title="Ler o diário capítulo a capítulo">Ler o diário</button>
-                  <button onclick="addNewDiaryEntry()" class="clean-button btn-texto">+
-                    Entrada</button>
-                </span>
-              </h3>
-              <div id="sb-diary"><span class="empty-state">Carregando...</span></div>
-            </div>
-            <button class="clean-button btn-exportar" onclick="exportDiary()">Exportar como
-              Arquivo (.md)</button>
-          </div>
-
-        </div>
-
-        <div class="bottom-actions">
-          <button class="clean-button" onclick="customBackToMenu()">Menu Principal</button>
-          <button class="clean-button" style="color: var(--ink-sys); border-color: var(--ink-sys);"
-            onclick="customLogout()">Sair do Sistema</button>
+          <nav id="sb-atalhos" class="sb-atalhos" aria-label="Telas"></nav>
         </div>
         <div class="page-number left">14</div>
       </aside>
@@ -244,14 +97,6 @@
       <main id="chat-area" class="page-right">
 
         <div id="mobile-header">
-          <button id="mobile-menu-btn" onclick="toggleSidebar()" aria-label="Abrir Menu">
-            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="pena-icon">
-              <line x1="3" y1="12" x2="21" y2="12"></line>
-              <line x1="3" y1="6" x2="21" y2="6"></line>
-              <line x1="3" y1="18" x2="21" y2="18"></line>
-            </svg>
-          </button>
           <div id="mobile-title">RPG Agent</div>
           <button class="settings-trigger-btn" onclick="toggleSettingsPanel()" aria-label="Configurações">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -261,6 +106,10 @@
             </svg>
           </button>
         </div>
+
+        <!-- Celular: local, hora e a vida do grupo; tocar abre o painel. -->
+        <button id="faixa-relance" class="faixa-relance" type="button"
+                onclick="toggleSidebar()" aria-label="Abrir o painel da campanha"></button>
 
         <div id="turn-tracker" class="hidden">
           <div id="turn-tracker-inner">
@@ -328,6 +177,9 @@
             Digite / para ver os comandos</div>
         </div>
 
+        <!-- Celular: as telas mais usadas a um toque. -->
+        <nav id="barra-inferior" class="barra-inferior" aria-label="Telas"></nav>
+
         <div class="page-number right">15</div>
       </main>
     </div>
@@ -379,8 +231,8 @@
     </div>
   </div>
 
-  <script src="/static/js/utils.js?v=12"></script>
-  <script src="/static/js/game.js?v=42"></script>
+  <script src="/static/js/utils.js?v=13"></script>
+  <script src="/static/js/game.js?v=43"></script>
   <script src="/static/js/combat.js?v=21"></script>
   <script src="/static/js/shop.js?v=13"></script>
   <script src="/static/js/levelup.js?v=11"></script>
@@ -392,10 +244,11 @@
   <script src="/static/js/herois.js?v=3"></script>
   <script src="/static/js/loot.js?v=6"></script>
   <script src="/static/js/missoes.js?v=1"></script>
-  <script src="/static/js/mapa.js?v=1"></script>
+  <script src="/static/js/mapa.js?v=2"></script>
   <script src="/static/js/grupo.js?v=1"></script>
   <script src="/static/js/diario.js?v=3"></script>
   <script src="/static/js/elenco.js?v=1"></script>
+  <script src="/static/js/barra.js?v=1"></script>
 
   <script>
     (function() {

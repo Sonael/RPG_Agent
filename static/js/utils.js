@@ -607,21 +607,27 @@ const _GUIDE_HTML = `
       </details>
 
       <details class="guide-sec">
-        <summary>A barra lateral: Mundo, Enciclopédia e Diário</summary>
+        <summary>A barra lateral e as telas</summary>
         <div class="guide-sec-body">
           <p>
-            Durante o jogo, a barra lateral mostra o "estado" da sua aventura.
-            No computador ela fica à esquerda; no celular, toque no botão
-            <b>☰</b> no topo para abri-la. Ela tem três abas:
+            A barra lateral mostra a aventura de relance: onde o grupo está, o
+            capítulo e a hora; uma linha por herói com a vida e o que pede
+            atenção (condição, nível para subir, carga pesada); e a missão
+            principal com o progresso. Tudo é clicável.
           </p>
-          <ul>
-            <li><b>Mundo</b> — o capítulo e o local atuais, avisos de
-              Validação, o Resumo da história e as Observações (flags).</li>
-            <li><b>Enciclopédia</b> — o seu grupo, os personagens (NPCs) que
-              você conheceu e os locais registrados.</li>
-            <li><b>Diário</b> — as crônicas da aventura, capítulo a capítulo.
-              Pode ser exportado como arquivo <b>.md</b>.</li>
-          </ul>
+          <p>
+            Logo abaixo ficam os atalhos para as telas: <b>Grupo</b>,
+            <b>Missões</b>, <b>Mapa</b>, <b>Diário</b>, <b>Personagens</b> e
+            <b>Mochila</b>. No computador a barra pode ser recolhida numa coluna
+            de ícones (as setas no alto). No celular, a faixa sob o título mostra
+            o local, a hora e a vida do grupo, e a barra de baixo tem Grupo,
+            Missões, Mapa, Diário e <b>Mais</b>, que abre o painel inteiro.
+          </p>
+          <p>
+            O resumo da história é a primeira página do Diário ("Até aqui"), que
+            também exporta o diário como arquivo <b>.md</b>. O uso do modelo, o
+            modo de combate, voltar ao menu e sair ficam na engrenagem.
+          </p>
         </div>
       </details>
 
@@ -644,8 +650,8 @@ const _GUIDE_HTML = `
               vale a pena lembrar mais tarde.</dd>
 
             <dt>Resumo</dt>
-            <dd>Uma recapitulação curta de tudo até agora. Você pode editá-la
-              clicando em <i>(editar)</i> na aba Mundo.</dd>
+            <dd>Uma recapitulação curta de tudo até agora. Fica na página
+              "Até aqui" do Diário, com o botão para editá-la.</dd>
 
             <dt>Observações (Flags)</dt>
             <dd>
@@ -656,7 +662,8 @@ const _GUIDE_HTML = `
               <code>veneno_no_vinho = verdadeiro</code>. Servem para a
               história ser <b>coerente no longo prazo</b>: se você abriu um
               portão no capítulo 1, ele continua aberto no capítulo 5; se um
-              NPC desconfia de você, isso pesa nas próximas conversas.
+              NPC desconfia de você, isso pesa nas próximas conversas. As
+              observações ficam no editor da campanha, no menu.
             </dd>
 
             <dt>Diário</dt>
@@ -714,14 +721,14 @@ const _GUIDE_HTML = `
         <summary>Editando e corrigindo à mão</summary>
         <div class="guide-sec-body">
           <p>
-            Durante o jogo, tudo na barra lateral pode ser ajustado
-            diretamente — útil quando o Mestre erra um detalhe ou esquece algo:
+            Durante o jogo, dá para ajustar à mão o que o Mestre errou ou
+            esqueceu:
           </p>
           <ul>
-            <li><b>Clique em qualquer registro</b> (personagem, local, flag…)
-              para abrir o editor.</li>
-            <li>Use os botões <b>+ Adicionar / + Personagem / + Local /
-              + Entrada</b> para criar algo novo.</li>
+            <li>Nas fichas, <b>Editar local</b> e <b>Corrigir ficha</b> abrem o
+              editor; no Diário, <b>Editar</b> em cada entrada.</li>
+            <li><b>Novo personagem</b> e <b>Novo membro do grupo</b> ficam no
+              índice de Personagens; <b>Nova entrada</b>, no Diário.</li>
             <li>Dentro do editor, <b>Deletar Registro</b> remove o item.</li>
             <li><b>Limpar Todas</b> apaga os avisos de Validação.</li>
           </ul>
@@ -789,8 +796,8 @@ const _GUIDE_HTML = `
           <h4 class="guide-h4">O combate: dois modos</h4>
           <p>
             O combate acontece por <b>turnos</b>, seguindo uma ordem de
-            iniciativa. Você escolhe como quer vivê-lo (na barra lateral →
-            aba <b>Mundo</b> → <b>Modo de Combate</b>):
+            iniciativa. Você escolhe como quer vivê-lo (na engrenagem →
+            <b>Esta campanha</b> → <b>Modo de combate</b>):
           </p>
           <ul>
             <li><b>Narrado pela IA</b> — o Mestre descreve cada turno no
@@ -844,8 +851,8 @@ const _GUIDE_HTML = `
         <div class="guide-sec-body">
           <h4 class="guide-h4">O tempo passa</h4>
           <p>
-            Viagem, vigília, espera pelo anoitecer: tudo consome horas, e a
-            barra lateral mostra o <b>dia e a hora</b> quando a sua campanha
+            Viagem, vigília, espera pelo anoitecer: tudo consome horas, e o
+            relance da barra lateral mostra o <b>dia e a hora</b> quando a sua campanha
             usa o relógio. Isso existe por um motivo concreto: o
             <b>descanso longo vale uma vez a cada 24 horas</b> e consome 8
             delas. Dormir depois de cada luta deixou de ser de graça.
@@ -892,7 +899,7 @@ const _GUIDE_HTML = `
           <ul>
             <li>Seja específico: quanto mais detalhe na sua ação, melhor a narração.</li>
             <li>Não gostou de uma cena? <b>Corrija</b> — você é coautor.</li>
-            <li>Confira a barra lateral para acompanhar o estado do mundo.</li>
+            <li>Confira o relance da barra lateral: quem está ferido, onde o grupo está, a missão da vez.</li>
             <li>Se o Mestre esquecer algo importante, salve à mão ou peça para ele salvar.</li>
             <li>Sua jornada é <b>salva automaticamente</b> quando você volta ao menu.</li>
           </ul>

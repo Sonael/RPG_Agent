@@ -1,7 +1,7 @@
 """
 test_personagens_navegador.py
 
-A ficha do personagem no navegador: abre pelo cartão da Enciclopédia e pelo
+A ficha do personagem no navegador: abre pelo índice de personagens e pelo
 "Ver ficha" da ficha do local, mostra a relação com o grupo e o porquê, o que
 o grupo sabe e as ligações, esconde as notas do mestre, e "Falar com" / "Ir
 até onde está" mandam a fala do jogador ao mestre.
@@ -72,17 +72,18 @@ def _esperar_ficha(pg, nome):
         " && !document.getElementById('psn-msg').textContent", timeout=5000)
 
 
-def _abrir_pela_enciclopedia(pg, nome):
-    pg.click(".tab-btn[data-tab='enciclopedia']")
-    cartao = pg.locator("#sb-chars .char-card", has_text=nome).first
-    cartao.wait_for(state="visible", timeout=5000)
-    cartao.locator(".char-name").click()
+def _abrir_pelo_indice(pg, nome):
+    # A lista de personagens saiu da barra lateral: o caminho é o índice.
+    pg.click("#sb-atalho-personagens")
+    cartao = f"#elenco-overlay .elc-cartao[data-nome='{nome}']"
+    pg.wait_for_selector(cartao, state="visible", timeout=5000)
+    pg.click(cartao)
     _esperar_ficha(pg, nome)
 
 
-def test_cartao_da_enciclopedia_abre_a_ficha_completa(pagina):
+def test_cartao_do_indice_abre_a_ficha_completa(pagina):
     pg, erros, _ = pagina
-    _abrir_pela_enciclopedia(pg, "Brom")
+    _abrir_pelo_indice(pg, "Brom")
 
     assert not pg.is_visible("#edit-overlay"), "o cartão abriu o editor em vez da ficha"
     assert "Forja de Cliviate" in pg.inner_text("#psn-onde")
@@ -106,15 +107,17 @@ def test_cartao_da_enciclopedia_abre_a_ficha_completa(pagina):
 
 def test_notas_do_mestre_nao_aparecem(pagina):
     pg, _, _ = pagina
-    _abrir_pela_enciclopedia(pg, "Brom")
+    _abrir_pelo_indice(pg, "Brom")
     assert "SEGREDO" not in pg.inner_text("#pessoa-overlay")
     pg.keyboard.press("Escape")
-    assert "SEGREDO" not in pg.inner_text("#sb-chars"), "o cartão mostrava as notas do mestre"
+    pg.evaluate("() => window.Elenco._abrir('todos')")
+    pg.wait_for_selector("#elenco-overlay:not(.hidden) .elc-cartao", timeout=5000)
+    assert "SEGREDO" not in pg.inner_text("#elenco-overlay"), "o índice mostrava as notas do mestre"
 
 
 def test_falar_com_manda_a_fala_do_jogador(pagina):
     pg, _, _ = pagina
-    _abrir_pela_enciclopedia(pg, "Brom")
+    _abrir_pelo_indice(pg, "Brom")
     pg.click("#psn-onde button:has-text('Falar com')")
     pg.wait_for_function("() => window.__enviado !== null", timeout=3000)
     assert pg.evaluate("() => window.__enviado") == "Quero falar com Brom."
@@ -124,7 +127,7 @@ def test_falar_com_manda_a_fala_do_jogador(pagina):
 
 def test_ir_ate_onde_ele_esta(pagina):
     pg, _, _ = pagina
-    _abrir_pela_enciclopedia(pg, "Brom")
+    _abrir_pelo_indice(pg, "Brom")
     pg.click("#psn-onde button:has-text('Ir até onde está')")
     pg.wait_for_function("() => window.__enviado !== null", timeout=3000)
     assert pg.evaluate("() => window.__enviado") == "Vamos até Forja de Cliviate."
@@ -159,7 +162,7 @@ def test_ver_ficha_a_partir_da_ficha_do_local_e_voltar(pagina):
 
 def test_editor_grava_o_que_o_grupo_sabe_e_a_ficha_mostra(pagina):
     pg, erros, _ = pagina
-    _abrir_pela_enciclopedia(pg, "Brom")
+    _abrir_pelo_indice(pg, "Brom")
     pg.click("#psn-editar")
     pg.wait_for_selector("#edit-overlay:not(.hidden) #ef-conhecido", timeout=5000)
 

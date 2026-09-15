@@ -1,7 +1,7 @@
 """
 test_grupo_navegador.py
 
-A visão geral do grupo no navegador: abre pelo "Visão geral" da barra
+A visão geral do grupo no navegador: abre pelo atalho Grupo da barra
 lateral, mostra os heróis lado a lado com os números do motor, leva à ficha,
 à Mochila e à tela de nível, pede descanso ao mestre e se redesenha quando o
 mestre muda algo com ela aberta. As telas que abrem sozinhas esperam ela
@@ -82,8 +82,7 @@ def _abrir(pg):
 
 def test_visao_geral_abre_pela_barra_lateral(pagina):
     pg, erros, _ = pagina
-    pg.click(".tab-btn[data-tab='enciclopedia']")
-    pg.click("#sb-grupo-abrir")
+    pg.click("#sb-atalho-grupo")
     pg.wait_for_selector("#grupo-overlay:not(.hidden) .grp-cartao", timeout=5000)
     nomes = [el.get_attribute("data-nome") for el in pg.query_selector_all("#grp-cartoes .grp-cartao")]
     assert set(nomes) == {"Helena", "Stelar", "Natasha"}
