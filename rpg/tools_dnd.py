@@ -4028,6 +4028,185 @@ def _apply_initial_spells(
     return added
 
 
+# ---------------------------------------------------------------------------
+# Kit inicial
+# ---------------------------------------------------------------------------
+# create_character_sheet entregava a ficha de mãos vazias: CA 10, nenhuma
+# arma, nenhuma poção e 0 de ouro. A instrução pedia ao mestre add_item e
+# modify_currency logo depois, e ele esquecia: a clériga recrutada no meio da
+# campanha entrou na primeira luta sem armadura e sem maça.
+#
+# O kit é o padrão de cada classe no wizard (CLASS_EQUIP_CHOICES_WZ em
+# static/js/menu.js, a primeira opção de cada escolha), para as duas portas de
+# criação entregarem o mesmo herói. Duas diferenças de propósito: a peça
+# vestida também vai para a mochila, porque equip_item só veste o que está
+# nela; e mago e feiticeiro não levam armadura, que a classe não sabe usar.
+# A peça é vestida por equip_item, então a CA sai da mesma tabela do resto
+# do jogo.
+_POCAO = ("Poção de Cura", 1, "Restaura 2d4+2 de vida. Ação para beber.")
+_PACOTE_EXPLORADOR = ("Pacote de Explorador", 1, "Mochila, saco de dormir, corda, archotes, rações e cantil.")
+_PACOTE_MASMORRA = ("Pacote de Masmorra", 1, "Mochila, pé de cabra, martelo, pítons, archotes e rações.")
+
+KIT_INICIAL: dict[str, dict] = {
+    "bárbaro": {
+        "itens": [("Armadura de Peles", 1, "CA 12 + DES (máx. +2)."),
+                  ("Machado Grande", 1, "1d12 cortante. Pesado, duas mãos."),
+                  ("Javelin", 4, "1d6 perfurante. Arremesso (9/36 m)."),
+                  _PACOTE_EXPLORADOR, _POCAO],
+        "vestir": [("Armadura de Peles", "armadura"), ("Machado Grande", "arma_principal")],
+    },
+    "bardo": {
+        "itens": [("Armadura de Couro", 1, "CA 11 + DES."),
+                  ("Rapieira", 1, "1d8 perfurante. Acuidade."),
+                  ("Adaga", 1, "1d4 perfurante. Leve, arremesso."),
+                  ("Alaúde", 1, "Foco bárdico."),
+                  ("Pacote de Diplomata", 1, "Baú, roupas finas, tinta, pena e pergaminhos."),
+                  _POCAO],
+        "vestir": [("Armadura de Couro", "armadura"), ("Rapieira", "arma_principal")],
+    },
+    "bruxo": {
+        "itens": [("Armadura de Couro", 1, "CA 11 + DES."),
+                  ("Adaga", 2, "1d4 perfurante. Leve, arremesso."),
+                  ("Besta Leve", 1, "1d8 perfurante. Alcance 24 m."),
+                  ("Virotes", 20, "Munição para besta."),
+                  ("Bolsa de Componentes", 1, "Componentes materiais para magias."),
+                  ("Pacote de Estudioso", 1, "Livro, tinta, pena e pergaminhos."),
+                  _POCAO],
+        "vestir": [("Armadura de Couro", "armadura"), ("Adaga", "arma_principal")],
+    },
+    "clérigo": {
+        "itens": [("Cota de Malha", 1, "CA 16. Armadura pesada."),
+                  ("Escudo", 1, "+2 CA."),
+                  ("Maça", 1, "1d6 concussão."),
+                  ("Símbolo Sagrado", 1, "Foco divino para conjuração."),
+                  ("Besta Leve", 1, "1d8 perfurante. Alcance 24 m."),
+                  ("Virotes", 20, "Munição para besta."),
+                  ("Poção de Cura", 2, _POCAO[2])],
+        "vestir": [("Cota de Malha", "armadura"), ("Escudo", "escudo"), ("Maça", "arma_principal")],
+    },
+    "druida": {
+        "itens": [("Armadura de Couro", 1, "CA 11 + DES."),
+                  ("Escudo de Madeira", 1, "+2 CA."),
+                  ("Cimitarra", 1, "1d6 cortante. Acuidade, leve."),
+                  ("Bolsa de Componentes", 1, "Ervas, pedras e componentes naturais."),
+                  _PACOTE_EXPLORADOR, _POCAO],
+        "vestir": [("Armadura de Couro", "armadura"), ("Escudo de Madeira", "escudo"),
+                   ("Cimitarra", "arma_principal")],
+    },
+    "feiticeiro": {
+        "itens": [("Adaga", 2, "1d4 perfurante. Leve, arremesso."),
+                  ("Besta Leve", 1, "1d8 perfurante. Alcance 24 m."),
+                  ("Virotes", 20, "Munição para besta."),
+                  ("Bolsa de Componentes", 1, "Componentes materiais para magias."),
+                  _PACOTE_EXPLORADOR, _POCAO],
+        "vestir": [("Adaga", "arma_principal")],
+    },
+    "guerreiro": {
+        "itens": [("Cota de Malha", 1, "CA 16. Armadura pesada."),
+                  ("Espada Longa", 1, "1d8 cortante (1d10 com duas mãos). Versátil."),
+                  ("Escudo", 1, "+2 CA."),
+                  ("Besta Leve", 1, "1d8 perfurante. Alcance 24 m."),
+                  ("Virotes", 20, "Munição para besta."),
+                  _PACOTE_MASMORRA, _POCAO],
+        "vestir": [("Cota de Malha", "armadura"), ("Escudo", "escudo"),
+                   ("Espada Longa", "arma_principal")],
+    },
+    "ladino": {
+        "itens": [("Armadura de Couro", 1, "CA 11 + DES."),
+                  ("Rapieira", 1, "1d8 perfurante. Acuidade."),
+                  ("Adaga", 2, "1d4 perfurante. Leve, arremesso."),
+                  ("Arco Curto", 1, "1d6 perfurante. Alcance 24 m."),
+                  ("Flechas", 20, "Munição para arco."),
+                  ("Ferramentas de Ladrão", 1, "Para abrir fechaduras e desarmar armadilhas."),
+                  ("Pacote de Assaltante", 1, "Mochila, esferas, corda, pé de cabra e lanterna."),
+                  _POCAO],
+        "vestir": [("Armadura de Couro", "armadura"), ("Rapieira", "arma_principal")],
+    },
+    "mago": {
+        "itens": [("Cajado", 1, "Foco arcano. 1d6 concussão (1d8 com duas mãos)."),
+                  ("Adaga", 1, "1d4 perfurante. Leve, arremesso."),
+                  ("Grimório", 1, "Livro com as magias aprendidas."),
+                  ("Bolsa de Componentes", 1, "Componentes materiais para magias."),
+                  ("Pacote de Estudioso", 1, "Livro, tinta, pena e pergaminhos."),
+                  _POCAO],
+        "vestir": [("Cajado", "arma_principal")],
+    },
+    "monge": {
+        "itens": [("Espada Curta", 1, "1d6 perfurante. Acuidade, leve."),
+                  ("Dardos", 10, "1d4 perfurante. Arremesso (6/18 m)."),
+                  _PACOTE_MASMORRA, _POCAO],
+        "vestir": [("Espada Curta", "arma_principal")],
+    },
+    "paladino": {
+        "itens": [("Cota de Malha", 1, "CA 16. Armadura pesada."),
+                  ("Espada Longa", 1, "1d8 cortante (1d10 com duas mãos). Versátil."),
+                  ("Escudo", 1, "+2 CA."),
+                  ("Javelin", 5, "1d6 perfurante. Arremesso (9/36 m)."),
+                  ("Símbolo Sagrado", 1, "Foco divino para conjuração."),
+                  ("Pacote Sacerdotal", 1, "Mochila, cobertor, velas, incenso e roupas de vestimenta."),
+                  ("Poção de Cura", 2, _POCAO[2])],
+        "vestir": [("Cota de Malha", "armadura"), ("Escudo", "escudo"),
+                   ("Espada Longa", "arma_principal")],
+    },
+    "patrulheiro": {
+        "itens": [("Armadura de Escamas", 1, "CA 14 + DES (máx. +2)."),
+                  ("Espada Curta", 2, "1d6 perfurante. Acuidade, leve."),
+                  ("Arco Longo", 1, "1d8 perfurante. Alcance 45 m."),
+                  ("Flechas", 20, "Munição para arco."),
+                  _PACOTE_MASMORRA, _POCAO],
+        "vestir": [("Armadura de Escamas", "armadura"), ("Espada Curta", "arma_principal"),
+                   ("Espada Curta", "arma_secundaria")],
+    },
+}
+
+# Classe fora da tabela (homebrew, artífice): o mínimo para não entrar de
+# mãos nuas.
+_KIT_GENERICO = {
+    "itens": [("Adaga", 1, "1d4 perfurante. Leve, arremesso."), _PACOTE_EXPLORADOR, _POCAO],
+    "vestir": [("Adaga", "arma_principal")],
+}
+
+# As mesmas moedas do wizard.
+_MOEDAS_INICIAIS = {"ouro": 10, "prata": 5, "cobre": 0}
+
+
+def _kit_da_classe(classe: str) -> dict | None:
+    alvo = _norm_txt(classe)
+    if alvo in ("", "npc"):
+        return None
+    for nome, kit in KIT_INICIAL.items():
+        if _norm_txt(nome) == alvo:
+            return kit
+    return _KIT_GENERICO
+
+
+def _dar_kit_inicial(char: dict) -> str:
+    """
+    Põe o kit da classe na mochila, veste o que é para vestir e dá as moedas.
+    Só age em quem chega de mãos vazias: um NPC que já carregava coisas
+    (dadas antes com add_item) fica com o que tem. Devolve a linha do resumo.
+    """
+    s = char["sheet"]
+    kit = _kit_da_classe(s.get("classe", ""))
+    if not kit or char.get("inventario"):
+        return ""
+
+    char["inventario"] = [{"nome": nome, "qtd": qtd, "descricao": desc}
+                          for nome, qtd, desc in kit["itens"]]
+    for moeda, valor in _MOEDAS_INICIAIS.items():
+        if not int(s.get(moeda, 0) or 0):
+            s[moeda] = valor
+
+    vestidos = []
+    for nome, slot in kit["vestir"]:
+        r = equip_item(char["name"], nome, slot)
+        if not r.startswith(("Erro", "Nota")):
+            vestidos.append(nome)
+    itens = ", ".join(f"{nome}{f' x{qtd}' if qtd > 1 else ''}" for nome, qtd, _ in kit["itens"])
+    return (f"\n   Kit inicial: {itens}"
+            f"\n   Equipado: {', '.join(dict.fromkeys(vestidos)) or 'nada'}")
+
+
 def create_character_sheet(
     name: str,
     classe: str,
@@ -4131,16 +4310,20 @@ def create_character_sheet(
             f"add_item etc. — NÃO recrie a ficha."
         )
 
-    char_obj = {
-        "name":        name,
-        "description": description,
+    # Personagem que já existia sem ficha (NPC do save_character): mantém o
+    # que a campanha sabe dele (local, atitude, o que o grupo sabe, se já é
+    # do grupo). Antes o dict inteiro era trocado e isso tudo sumia.
+    char_obj = dict(existing) if isinstance(existing, dict) else {}
+    char_obj.update({
+        "name":        existing.get("name") or name,
+        "description": description or existing.get("description", ""),
         "traits":      existing.get("traits", ""),
-        "status":      "vivo",
+        "status":      existing.get("status") if existing.get("status") not in (None, "", "morto", "inimigo") else "vivo",
         "notes":       existing.get("notes", ""),
         "sheet":       sheet,
-        "inventario":  existing.get("inventario", []),
-        "habilidades": existing.get("habilidades", []),
-    }
+        "inventario":  existing.get("inventario") or [],
+        "habilidades": existing.get("habilidades") or [],
+    })
     memory.campaign["characters"][char_key_val] = char_obj
 
     # Aplica bônus de raça (Open5e) — modifica sheet e adiciona traços raciais
@@ -4164,6 +4347,8 @@ def create_character_sheet(
     if not memory.campaign.get("protagonist"):
         memory.campaign["protagonist"] = name
 
+    kit_str = _dar_kit_inicial(char_obj)
+
     memory.save_campaign()
     return (
         f"Ficha criada para {name}!\n"
@@ -4172,7 +4357,8 @@ def create_character_sheet(
         f"   Vida: {sheet['vida_max']}/{sheet['vida_max']} | Mana: {sheet['mana_max']}/{sheet['mana_max']} | CA: {sheet['ca']}\n"
         f"   FOR {_mod_str(sheet['forca'])}  DES {_mod_str(sheet['destreza'])}  CON {_mod_str(sheet['constituicao'])}\n"
         f"   INT {_mod_str(sheet['inteligencia'])}  SAB {_mod_str(sheet['sabedoria'])}  CAR {_mod_str(sheet['carisma'])}\n"
-        f"   Ouro: 0 | Prata: 0 | Cobre: 0"
+        f"   Ouro: {sheet.get('ouro', 0)} | Prata: {sheet.get('prata', 0)} | Cobre: {sheet.get('cobre', 0)}"
+        f"{kit_str}"
     )
 
 

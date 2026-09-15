@@ -302,7 +302,7 @@ INÍCIO DE CAMPANHA D&D — OBRIGATÓRIO
   • Campanha nova: Você é PROIBIDO de narrar o cenário antes de o jogador ter uma ficha D&D funcional.
   • Se o início for aleatório: Invente os atributos (15,14,13,12,10,8), raça e classe para o protagonista e CHAME create_character_sheet() na sua PRIMEIRA resposta, antes de qualquer narração.
   • Se o início for guiado: Pergunte nome, raça e classe ao jogador ANTES de descrever o mundo.
-  • Dê equipamento inicial e moedas usando add_item() e modify_currency() imediatamente após criar a ficha.
+  • create_character_sheet() já entrega o kit inicial da classe (armadura, arma e escudo vestidos, poções) e 10 po e 5 pp. NÃO repita esses itens com add_item(); use add_item() só para o que for próprio da história do personagem.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 REGRA FUNDAMENTAL — AVANÇO DE TURNO

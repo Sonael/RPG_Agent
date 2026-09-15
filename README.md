@@ -450,6 +450,19 @@ slots; casos comuns cobertos). Resumo:
   ao Open5e).
 - Calcula proficiência por nível (`_proficiency_bonus`).
 - Sheet completa: 6 atributos, HP/MP/CA, equipamentos, condições, moedas, etc.
+- Entrega o **kit inicial** da classe (`KIT_INICIAL`): armadura, escudo e
+  arma vestidos por `equip_item` (a CA sai da mesma `ARMOR_TABLE` do resto do
+  jogo), poções, pacote e 10 po e 5 pp, as mesmas moedas do wizard. Antes a
+  ficha nascia de mãos vazias (CA 10, sem arma, 0 de ouro) e dependia de o
+  mestre lembrar de `add_item`; uma clériga recrutada no meio da campanha
+  entrou na luta sem armadura. O kit é o padrão de cada classe no wizard (a
+  primeira opção de cada escolha), com duas diferenças: a peça vestida
+  também vai para a mochila, porque `equip_item` só veste o que está nela, e
+  mago e feiticeiro não levam armadura. Classe fora da tabela ganha adaga,
+  pacote e poção; `npc` não ganha nada.
+- Quem já carregava itens fica com eles (sem kit), e um NPC que já existia
+  sem ficha mantém local, atitude, o que o grupo sabe e se é do grupo. Antes
+  o personagem inteiro era trocado por um dict novo e isso sumia.
 
 ### Raças / classes (Open5e)
 
@@ -3233,6 +3246,7 @@ o nome do pacote. Também não há variável de ambiente nova.
 │   ├── test_reactions.py        Reação e ataque de oportunidade
 │   ├── test_toolsets.py         Filtro de ferramentas por modo e por estilo
 │   ├── test_varredura_de_ferramentas.py  Nenhuma ferramenta levanta exceção
+│   ├── test_kit_inicial.py      Ficha criada pelo mestre vem com o kit da classe
 │   ├── test_erros_de_ferramenta.py       Turno segue após ferramenta inventada ou quebrada
 │   └── legacy/            Suítes em formato de script (não coletadas)
 │       ├── tests.py             Suíte funcional (13 blocos, 70 checks)
