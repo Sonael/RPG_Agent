@@ -4966,7 +4966,7 @@ body.loot-on { overflow: hidden; }
     font-family: 'Lora', serif; font-size: 13px; color: var(--text-main); text-align: left; cursor: pointer;
   }
   .faixa-onde { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .faixa-hora { color: var(--text-muted); }
+  .faixa-hora { flex: 0 0 auto; color: var(--text-muted); white-space: nowrap; }
   .faixa-vidas { display: flex; flex: 0 0 auto; gap: var(--esp-2); }
   .faixa-heroi { display: flex; align-items: center; gap: 3px; }
   .faixa-inicial { font-family: 'Playfair Display', serif; font-size: 12px; font-weight: 700; color: var(--text-muted); }

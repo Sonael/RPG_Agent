@@ -296,13 +296,24 @@ def test_campanha_sem_regras_sem_mochila_e_grupo_no_indice(abrir, estado):
 # Celular
 # ---------------------------------------------------------------------------
 
-def test_celular_faixa_e_barra_de_baixo(abrir):
-    pg, erros = abrir(**CELULAR)
+def test_celular_faixa_e_barra_de_baixo(abrir, estado):
+    # Nome longo de propósito: é com ele que a hora sumia nas reticências.
+    estado["current_location"] = "Palácio Real de Luminas - Ante-sala de Prata"
+    pg, erros = abrir(estado, **CELULAR)
     assert pg.is_hidden("#sidebar") or not pg.evaluate(
         "() => document.getElementById('sidebar').classList.contains('active')")
     assert pg.locator("#mobile-menu-btn").count() == 0
     faixa = pg.inner_text("#faixa-relance")
     assert "Palácio Real de Luminas" in faixa and "Dia 4, 20h" in faixa
+    # A hora aparece inteira, mesmo com o nome do local cortado: o que está
+    # na tela no fim do texto da hora é a própria hora, não um corte por cima.
+    hora = pg.evaluate("""() => {
+        const h = document.querySelector('#faixa-relance .faixa-hora');
+        const r = h.getBoundingClientRect();
+        const pontos = [[r.left + 2, r.top + r.height / 2], [r.right - 2, r.top + r.height / 2]];
+        return pontos.map(([x, y]) => { const e = document.elementFromPoint(x, y); return !!e && h.contains(e); });
+    }""")
+    assert hora == [True, True], "a hora da faixa está cortada ou coberta"
     assert pg.locator("#faixa-relance .faixa-heroi").count() == 3
     botoes = [el.get_attribute("data-tela") for el in pg.query_selector_all("#barra-inferior .bi-botao")]
     assert botoes == ["grupo", "missoes", "mapa", "diario", "mais"]

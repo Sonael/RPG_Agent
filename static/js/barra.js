@@ -289,8 +289,11 @@
         <span class="faixa-inicial">${esc(h.nome.charAt(0))}</span>
         <span class="sb-heroi-vida ${classeDaVida(h)}"><span style="width:${h.vida.pct}%"></span></span>
       </span>`).join('') : '';
+    // A hora fica fora do texto do local: dentro dele, um nome longo a cortava
+    // nas reticências.
     faixa.innerHTML = `
-      <span class="faixa-onde">${esc(_mem.current_location || 'Local não definido')}${hora ? ` <span class="faixa-hora">· ${esc(hora)}</span>` : ''}</span>
+      <span class="faixa-onde">${esc(_mem.current_location || 'Local não definido')}</span>
+      ${hora ? `<span class="faixa-hora">${esc(hora)}</span>` : ''}
       ${vidas ? `<span class="faixa-vidas">${vidas}</span>` : ''}`;
   }
 
