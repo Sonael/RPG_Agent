@@ -2355,11 +2355,14 @@ def diary_move_event_route():
 @require_auth
 def export_diary():
     content  = memory.export_diary_md()
-    filename = f"{memory.CAMPAIGN_NAME or 'campanha'}.diario.md"
+    nome     = memory.campaign.get("name") or "campanha"
+    # Só letras, números, espaço, hífen e sublinhado: o nome vai num cabeçalho.
+    seguro   = "".join(c for c in nome if c.isalnum() or c in " _-").strip() or "campanha"
+    filename = f"{seguro}.diario.md"
     return Response(
         content,
         mimetype="text/markdown",
-        headers={"Content-Disposition": f"attachment; filename={filename}"},
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 

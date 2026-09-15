@@ -173,3 +173,21 @@ def test_editar_evento_com_numero_gravado_como_texto(cronica):
                                          json={"summary": "O martelo do avô devolvido"}):
         assert server.update_event.__wrapped__(1).get_json() == {"ok": True}
     assert memory.campaign["events"][0]["summary"] == "O martelo do avô devolvido"
+
+
+def test_ate_aqui_traz_o_resumo_a_cena_e_o_local(cronica):
+    memory.campaign["story_summary"] = "O grupo chegou a Cliviate."
+    memory.campaign["current_scene"] = "Na forja, com Brom."
+    memory.campaign["current_location"] = "Cliviate"
+    assert diario.diary_snapshot()["ate_aqui"] == {
+        "resumo": "O grupo chegou a Cliviate.", "cena": "Na forja, com Brom.", "local": "Cliviate"}
+
+
+def test_exportar_devolve_o_markdown_com_nome_de_arquivo_seguro(cronica):
+    import server
+    memory.campaign["name"] = 'A "Saga"/de Brom'
+    with server.app.test_request_context("/api/diary/export", method="POST"):
+        resposta = server.export_diary.__wrapped__()
+    assert resposta.mimetype == "text/markdown"
+    assert resposta.headers["Content-Disposition"] == 'attachment; filename="A Sagade Brom.diario.md"'
+    assert resposta.get_data(as_text=True).startswith("# Diário de Campanha")

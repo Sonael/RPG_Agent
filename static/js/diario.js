@@ -46,8 +46,10 @@
 
         <div class="lcl-rodape">
           <div id="dia-msg" class="lcl-msg" aria-live="polite"></div>
-          <button id="dia-anterior" class="lcl-btn lcl-btn-sec" onclick="window.Diario._virar(-1)">Capítulo anterior</button>
-          <button id="dia-proximo" class="lcl-btn lcl-btn-sec" onclick="window.Diario._virar(1)">Próximo capítulo</button>
+          <button id="dia-anterior" class="lcl-btn lcl-btn-sec" onclick="window.Diario._virar(-1)">Página anterior</button>
+          <button id="dia-proximo" class="lcl-btn lcl-btn-sec" onclick="window.Diario._virar(1)">Próxima página</button>
+          <button id="dia-exportar" class="lcl-btn lcl-btn-sec" onclick="window.Diario._exportar()"
+                  title="Baixa o diário como arquivo Markdown">Exportar (.md)</button>
           <button id="dia-nova" class="lcl-btn lcl-btn-sec" onclick="window.Diario._nova()">Nova entrada</button>
           <button class="lcl-fechar" onclick="window.Diario._fechar()">Fechar</button>
         </div>
@@ -72,7 +74,13 @@
   }
 
   function indice() {
-    const itens = capitulos().map(c => `
+    const resumo = `
+      <button class="dia-cap-item dia-cap-resumo${_pagina === 'resumo' ? ' dia-cap-aberto' : ''}" data-numero="resumo"
+              onclick="window.Diario._ir('resumo')">
+        <span class="dia-cap-numero">Até aqui</span>
+        <span class="dia-cap-contagem">o resumo da história e onde estamos</span>
+      </button>`;
+    const itens = resumo + capitulos().map(c => `
       <button class="dia-cap-item${c.numero === _pagina ? ' dia-cap-aberto' : ''}" data-numero="${c.numero}"
               onclick="window.Diario._ir(${c.numero})">
         <span class="dia-cap-numero">Capítulo ${c.numero}${c.atual ? ' <span class="lcl-marca lcl-marca-grupo">atual</span>' : ''}</span>
@@ -145,6 +153,33 @@
       ${ligacoes ? `<aside class="dia-ligacoes" aria-label="Neste capítulo"><h3 class="dia-ligacoes-titulo">Neste capítulo</h3>${ligacoes}</aside>` : ''}`;
   }
 
+  function paginaAteAqui() {
+    const a = _last.ate_aqui || {};
+    const atual = capitulo(_last.capitulo_atual);
+    return `
+      <header class="dia-pagina-cabeca">
+        <p class="dia-pagina-numero">a história até o capítulo ${_last.capitulo_atual || 1}</p>
+        <h2 class="dia-pagina-titulo">Até aqui</h2>
+      </header>
+      <div class="dia-entradas">
+        <section class="dia-entrada dia-resumo">
+          <div class="dia-texto">${paragrafos(a.resumo) || '<p class="lcl-vazio">O mestre ainda não escreveu o resumo da história.</p>'}</div>
+        </section>
+      </div>
+      <aside class="dia-ligacoes" aria-label="Onde estamos">
+        <h3 class="dia-ligacoes-titulo">Onde estamos</h3>
+        <p class="dia-onde"><span>Capítulo</span>
+          <button class="dia-link" onclick="window.Diario._ir(${_last.capitulo_atual || 1})">${_last.capitulo_atual || 1}${atual && atual.titulo ? ` · ${esc(atual.titulo)}` : ''}</button></p>
+        ${a.local ? `<p class="dia-onde"><span>Local</span>
+          <button class="dia-link" onclick="window.Diario._verLocal('${aspas(a.local)}')">${esc(a.local)}</button></p>` : ''}
+        ${a.cena ? `<p class="dia-onde dia-cena"><span>Cena</span> ${esc(a.cena)}</p>` : ''}
+        <div class="dia-ate-aqui-acoes">
+          <button id="dia-editar-mundo" class="lcl-btn lcl-btn-sec" onclick="window.Diario._editarMundo()"
+                  title="Resumo, capítulo, local e cena">Editar resumo e estado do mundo</button>
+        </div>
+      </aside>`;
+  }
+
   function paginaSemCapitulo() {
     const evs = _last.eventos_sem_capitulo || [];
     return `
@@ -162,19 +197,22 @@
     _last = d || {};
     ensureDom();
     const nums = capitulos().map(c => c.numero);
-    if (_pagina !== 'sem' && !nums.includes(_pagina)) _pagina = _last.capitulo_atual;
+    if (_pagina !== 'sem' && _pagina !== 'resumo' && !nums.includes(_pagina)) _pagina = _last.capitulo_atual;
     if (_pagina === 'sem' && !(_last.eventos_sem_capitulo || []).length) _pagina = _last.capitulo_atual;
 
     q('dia-campanha').textContent = _last.campanha || '';
     q('dia-indice').innerHTML = indice();
     mostrarNoIndice();
-    const c = _pagina === 'sem' ? null : capitulo(_pagina);
-    q('dia-pagina').innerHTML = c ? paginaDoCapitulo(c) : paginaSemCapitulo();
+    const c = typeof _pagina === 'number' ? capitulo(_pagina) : null;
+    q('dia-pagina').innerHTML = _pagina === 'resumo' ? paginaAteAqui()
+      : c ? paginaDoCapitulo(c) : paginaSemCapitulo();
 
-    const i = nums.indexOf(_pagina);
-    q('dia-anterior').disabled = _pagina === 'sem' ? !nums.length : i <= 0;
-    q('dia-proximo').disabled = _pagina === 'sem' || i < 0 || i >= nums.length - 1;
-    q('dia-nova').classList.toggle('hidden', _pagina === 'sem');
+    // A ordem das páginas: Até aqui, os capítulos, Sem capítulo.
+    const paginas = ['resumo', ...nums, ...((_last.eventos_sem_capitulo || []).length ? ['sem'] : [])];
+    const i = paginas.indexOf(_pagina);
+    q('dia-anterior').disabled = i <= 0;
+    q('dia-proximo').disabled = i < 0 || i >= paginas.length - 1;
+    q('dia-nova').classList.toggle('hidden', typeof _pagina !== 'number');
 
     if (_destaque != null) {
       const el = q('dia-pagina').querySelector(`.dia-entrada[data-indice="${_destaque}"]`);
@@ -214,7 +252,8 @@
   // ---- Abrir / fechar ----------------------------------------------
   async function abrir(numero, indiceEntrada) {
     ensureDom();
-    _pagina = numero == null || numero === '' ? null : (numero === 'sem' ? 'sem' : parseInt(numero, 10));
+    _pagina = numero == null || numero === '' ? null
+      : (numero === 'sem' || numero === 'resumo' ? numero : parseInt(numero, 10));
     _destaque = indiceEntrada == null ? null : parseInt(indiceEntrada, 10);
     if (!_open) {
       q('diario-overlay').classList.remove('hidden');
@@ -245,16 +284,22 @@
   }
 
   function ir(numero) {
-    _pagina = numero === 'sem' ? 'sem' : parseInt(numero, 10);
+    _pagina = numero === 'sem' || numero === 'resumo' ? numero : parseInt(numero, 10);
     _destaque = null;
     render(_last);
   }
 
   function virar(passo) {
-    const nums = capitulos().map(c => c.numero);
-    if (_pagina === 'sem') { if (nums.length) ir(nums[nums.length - 1]); return; }
-    const i = nums.indexOf(_pagina) + passo;
-    if (i >= 0 && i < nums.length) ir(nums[i]);
+    const paginas = ['resumo', ...capitulos().map(c => c.numero),
+                     ...((_last.eventos_sem_capitulo || []).length ? ['sem'] : [])];
+    const i = paginas.indexOf(_pagina) + passo;
+    if (i >= 0 && i < paginas.length) ir(paginas[i]);
+  }
+
+  function editarMundo() {
+    if (typeof window.openWorldEdit !== 'function') return;
+    fechar();
+    window.openWorldEdit();
   }
 
   // A escrita continua no editor de sempre.
@@ -267,7 +312,7 @@
 
   function nova() {
     if (typeof window.openEditModal !== 'function') return;
-    const numero = _pagina === 'sem' ? _last.capitulo_atual : _pagina;
+    const numero = typeof _pagina === 'number' ? _pagina : _last.capitulo_atual;
     fechar();
     window.openEditModal('diary', null, { chapter: numero, title: '', content: '' }, -1);
   }
@@ -297,6 +342,8 @@
     _virar: virar,
     _editar: editar,
     _nova: nova,
+    _editarMundo: editarMundo,
+    _exportar: () => { if (typeof window.exportDiary === 'function') window.exportDiary(); },
     _mover: mover,
     _verPessoa: (nome) => { fechar(); if (window.Personagens) window.Personagens._abrir(nome); },
     _verLocal: (nome) => { fechar(); if (window.Locais) window.Locais._abrir(nome); },

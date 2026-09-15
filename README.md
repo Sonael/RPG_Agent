@@ -2112,6 +2112,19 @@ Dois defeitos antigos corrigidos no caminho:
 - Aberto, a fila de telas o redesenha: a entrada que o mestre acabou de
   escrever aparece na página. As telas que abrem sozinhas esperam ele fechar.
 
+### Até aqui e exportar
+
+- A primeira página do livro é **Até aqui**: o resumo da história (que morava
+  na barra lateral), o capítulo atual, o local e a cena, com **Editar resumo e
+  estado do mundo**. `diary_snapshot()` traz `ate_aqui` com o resumo, a cena e
+  o local. As páginas seguem a ordem Até aqui, capítulos, Sem capítulo, e os
+  botões do rodapé viraram **Página anterior** e **Próxima página**.
+- **Exportar (.md)** no rodapé baixa o diário. O botão da barra lateral nunca
+  funcionou: a rota devolve o próprio arquivo, e o `exportDiary` lia a
+  resposta como JSON e quebrava antes de baixar. A rota também usava
+  `memory.CAMPAIGN_NAME`, que não é o nome da campanha, e agora monta o nome
+  do arquivo só com letras, números, espaço, hífen e sublinhado.
+
 ### Testes
 
 `test_diario.py` (14) cobre os capítulos em ordem com as entradas, o capítulo
@@ -2128,6 +2141,12 @@ nova com 404, sem destaque, sem nomes do texto, evento sem capítulo, mover
 quebrado, sem redesenho, saque por cima, eventos de todos os capítulos, nome
 dentro de palavra, número do evento em texto) foram todas pegas. Capturas
 novas (ainda não geradas): `diario-capitulo` e `diario-sem-capitulo`.
+
+A página Até aqui e o exportar somam dois testes de motor (o `ate_aqui` e o
+nome de arquivo seguro) e três de navegador (o resumo com o local e a volta ao
+capítulo, o editor do mundo e o download com o conteúdo em Markdown).
+Regressões injetadas (exportar lendo JSON, virar sem a página Até aqui,
+resumo vazio) foram pegas.
 
 ## Índice de personagens
 

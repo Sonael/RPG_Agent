@@ -1364,9 +1364,27 @@ async function openSummaryEdit() {
   openWorldEdit();
 }
 
+// A rota devolve o próprio arquivo .md. Ler a resposta como JSON quebrava
+// antes de qualquer coisa acontecer, e o botão não exportava nada.
 async function exportDiary() {
-  const d = await (await authFetch(`${API}/api/diary/export`, { method: 'POST' })).json();
-  showToast('Exportado: ' + d.path);
+  try {
+    const res = await authFetch(`${API}/api/diary/export`, { method: 'POST' });
+    if (!res.ok) throw new Error(String(res.status));
+    const blob = await res.blob();
+    const nome = ((res.headers.get('Content-Disposition') || '').match(/filename="?([^";]+)"?/) || [])[1]
+      || 'diario.md';
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = nome;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    showToast('Diário exportado: ' + nome);
+  } catch (_) {
+    showToast('Não foi possível exportar o diário.');
+  }
 }
 
 // ═══════════════════════════════════════

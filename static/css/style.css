@@ -4803,3 +4803,11 @@ body.loot-on { overflow: hidden; }
   .elc-lista { grid-template-columns: minmax(0, 1fr); }
 }
 
+/* Diário: a página "Até aqui" (resumo da história e onde o grupo está). */
+.dia-cap-resumo .dia-cap-numero { font-style: italic; }
+.dia-onde { margin: var(--esp-1) 0 0; display: flex; gap: var(--esp-2); font-size: 0.9rem; color: var(--lcl-text); }
+.dia-onde > span:first-child { min-width: 5.5em; color: var(--lcl-muted); }
+.dia-cena { display: block; }
+.dia-cena > span:first-child { display: block; }
+.dia-ate-aqui-acoes { margin-top: var(--esp-3); display: flex; flex-wrap: wrap; gap: var(--esp-2); }
+

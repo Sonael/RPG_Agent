@@ -160,6 +160,14 @@ def diary_snapshot() -> dict:
     return {
         "campanha": camp.get("name", "") or "",
         "capitulo_atual": atual,
+        # A primeira página do livro: o resumo da história e onde o grupo
+        # está. O resumo morava na barra lateral, espremido entre a validação
+        # e as observações.
+        "ate_aqui": {
+            "resumo": camp.get("story_summary", "") or "",
+            "cena": camp.get("current_scene", "") or "",
+            "local": camp.get("current_location", "") or "",
+        },
         "capitulos": capitulos,
         "eventos_sem_capitulo": [_evento(e, conhecidos) for e in eventos if not _capitulo(e.get("chapter"))],
         "total_entradas": len(diario),

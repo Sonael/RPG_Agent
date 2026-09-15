@@ -83,11 +83,12 @@ def test_ler_o_diario_abre_no_capitulo_atual(pagina):
     pg.click("#sb-diario-ler")
     _esperar_pagina(pg, "Capítulo 2")
     indice = [el.get_attribute("data-numero") for el in pg.query_selector_all("#dia-indice .dia-cap-item")]
-    assert indice == ["1", "2", "sem"]
+    assert indice == ["resumo", "1", "2", "sem"]
     assert "atual" in pg.inner_text("#dia-indice .dia-cap-item[data-numero='2']")
     titulos = [t.inner_text() for t in pg.query_selector_all("#dia-pagina .dia-entrada h3")]
     assert titulos == ["Entre Sedas e Sombras", "O Peso da Coroa e o Aroma do Jasmim"]
-    assert pg.is_disabled("#dia-proximo") and pg.is_enabled("#dia-anterior")
+    # Depois do capítulo 2 ainda vem a página "Sem capítulo".
+    assert pg.is_enabled("#dia-proximo") and pg.is_enabled("#dia-anterior")
     assert not erros, erros[:3]
 
 
@@ -114,8 +115,12 @@ def test_virar_as_paginas_e_o_indice(pagina):
     _esperar_pagina(pg, "Capítulo 2")
     pg.click("#dia-anterior")
     _esperar_pagina(pg, "Capítulo 1")
-    assert pg.is_disabled("#dia-anterior")
     assert "Duelo das Pétalas" in pg.inner_text("#dia-pagina .dia-eventos")
+    pg.click("#dia-anterior")
+    _esperar_pagina(pg, "Até aqui")
+    assert pg.is_disabled("#dia-anterior"), "Até aqui é a primeira página"
+    pg.click("#dia-proximo")
+    _esperar_pagina(pg, "Capítulo 1")
     pg.click("#dia-proximo")
     _esperar_pagina(pg, "Capítulo 2")
     pg.click("#dia-indice .dia-cap-item[data-numero='sem']")
@@ -267,3 +272,55 @@ def test_muitos_capitulos_a_coluna_rola_ate_o_aberto(pagina):
     assert pg.evaluate("() => { const n = document.getElementById('dia-indice');"
                        " return n.scrollHeight > n.clientHeight; }"), "a coluna precisa rolar neste cenário"
     assert _visivel_no_indice(pg, 20)
+
+
+def test_ate_aqui_mostra_o_resumo_e_onde_estamos(pagina):
+    import requests
+    pg, erros, url = pagina
+    requests.post(f"{url}/__estado", json={
+        "story_summary": "Elowen se disfarça de boticário.\n\nA princesa Elara conhece o segredo.",
+        "current_scene": "A antessala de prata, antes da audiência.",
+        "current_location": "Palácio Real de Luminas",
+    }, timeout=10)
+    pg.evaluate("() => window.Diario._abrir('resumo')")
+    _esperar_pagina(pg, "Até aqui")
+    texto = pg.inner_text("#dia-pagina")
+    assert "Elowen se disfarça de boticário." in texto and "A princesa Elara conhece o segredo." in texto
+    assert pg.locator("#dia-pagina .dia-resumo .dia-texto p").count() == 2
+    assert "A antessala de prata" in texto
+    assert pg.locator("#dia-indice .dia-cap-aberto[data-numero='resumo']").count() == 1
+    assert pg.is_hidden("#dia-nova"), "nova entrada é de capítulo"
+
+    pg.locator("#dia-pagina .dia-onde .dia-link", has_text="Palácio Real de Luminas").click()
+    pg.wait_for_function("() => document.getElementById('lcl-nome').textContent === 'Palácio Real de Luminas'",
+                         timeout=5000)
+    pg.evaluate("() => window.Locais._fechar()")
+
+    pg.evaluate("() => window.Diario._abrir('resumo')")
+    _esperar_pagina(pg, "Até aqui")
+    pg.locator("#dia-pagina .dia-onde .dia-link").first.click()
+    _esperar_pagina(pg, "Capítulo 2")
+    assert not erros, erros[:3]
+
+
+def test_editar_resumo_abre_o_editor_do_mundo(pagina):
+    pg, _, _ = pagina
+    pg.evaluate("() => window.Diario._abrir('resumo')")
+    _esperar_pagina(pg, "Até aqui")
+    pg.click("#dia-editar-mundo")
+    pg.wait_for_selector("#edit-overlay:not(.hidden) #ef-story_summary", timeout=5000)
+    assert pg.is_hidden("#diario-overlay")
+
+
+def test_exportar_baixa_o_diario_em_markdown(pagina):
+    pg, erros, _ = pagina
+    pg.evaluate("() => window.Diario._abrir(2)")
+    _esperar_pagina(pg, "Capítulo 2")
+    with pg.expect_download(timeout=5000) as baixado:
+        pg.click("#dia-exportar")
+    arquivo = baixado.value
+    assert arquivo.suggested_filename.endswith(".diario.md")
+    conteudo = Path(arquivo.path()).read_text(encoding="utf-8")
+    assert conteudo.startswith("# Diário de Campanha")
+    assert "Entre Sedas e Sombras" in conteudo
+    assert not erros, erros[:3]
