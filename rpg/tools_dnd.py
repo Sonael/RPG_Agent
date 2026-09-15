@@ -2106,12 +2106,20 @@ def reconcile_character_archetypes(char: dict) -> list[str]:
     return added
 
 
+# Nomes em português E em inglês: as armas dos monstros chegam do stat block do
+# Open5e ("scimitar", "shortbow"). Só com os nomes em português, o goblin
+# atacava de cimitarra e de arco curto com a Força (8, -1) em vez da Destreza
+# (14, +2), e acertava com +1 em vez do +4 do livro. A rapieira do ladino e do
+# bardo também caía na Força: a lista tinha "rapier", não "rapieira".
 RANGED_WEAPONS = {
     "arco", "arco curto", "arco longo", "besta", "besta leve", "besta de mão",
     "besta pesada", "funda", "zarabatana", "dardo", "virote", "flecha", "shuriken",
+    "shortbow", "longbow", "crossbow", "sling", "blowgun", "dart",
 }
 FINESSE_WEAPONS = {
-    "adaga", "espada curta", "rapier", "florete", "chicote", "sabre", "espada de duelo",
+    "adaga", "espada curta", "rapieira", "rapier", "florete", "cimitarra", "chicote",
+    "sabre", "espada de duelo",
+    "dagger", "shortsword", "short sword", "scimitar", "whip",
 }
 HEALING_KEYWORDS = {
     "cura", "cura ferimentos", "curar", "restaura", "restaurar",

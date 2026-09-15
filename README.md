@@ -483,7 +483,13 @@ slots; casos comuns cobertos). Resumo:
   achatava o dano de **todo** inimigo do jogo.
 - `_fetch_weapon_data` busca dano/tipo de armas no Open5e (PT→EN via
   `WEAPON_PT_TO_EN`).
-- `_weapon_attr` decide DEX×STR (ranged→DEX, finesse→max, melee→STR).
+- `_weapon_attr` decide DEX×STR (ranged→DEX, finesse→max, melee→STR). As
+  listas `RANGED_WEAPONS` e `FINESSE_WEAPONS` têm os nomes em português **e**
+  em inglês: a arma do monstro chega do stat block como "scimitar" ou
+  "shortbow", e só com os nomes em português o goblin (FOR 8, DES 14) atacava
+  de cimitarra e de arco com a Força, acertando com +1 em vez do +4 do livro.
+  "Rapieira" também faltava (a lista tinha "rapier"), e a rapieira do ladino e
+  do bardo usava a Força. `test_atributo_da_arma.py` trava os dois idiomas.
 - `ARMOR_TABLE` fixa CA base e bônus de DEX por tipo de armadura.
 
 ### Camada de acesso ao SRD (`rpg/open5e.py`)
@@ -3278,6 +3284,7 @@ o nome do pacote. Também não há variável de ambiente nova.
 │   ├── test_varredura_de_ferramentas.py  Nenhuma ferramenta levanta exceção
 │   ├── test_kit_inicial.py      Ficha criada pelo mestre vem com o kit da classe
 │   ├── test_combate_repetido.py A mesma emboscada não reinicia a luta
+│   ├── test_atributo_da_arma.py Acuidade e distância em português e em inglês
 │   ├── test_erros_de_ferramenta.py       Turno segue após ferramenta inventada ou quebrada
 │   └── legacy/            Suítes em formato de script (não coletadas)
 │       ├── tests.py             Suíte funcional (13 blocos, 70 checks)
