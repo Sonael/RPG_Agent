@@ -2960,6 +2960,14 @@ def inventory_action_route():
     ))
 
 
+@app.route("/api/characters/index", methods=["GET"])
+@require_auth
+def characters_index_route():
+    """Todos os personagens, com a categoria e se estão aqui (ver rpg/personagens.py)."""
+    from rpg import personagens
+    return jsonify(personagens.indice())
+
+
 @app.route("/api/characters/sheet", methods=["GET"])
 @require_auth
 def character_sheet_route():

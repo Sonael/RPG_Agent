@@ -112,3 +112,77 @@ def ficha(nome: str) -> dict:
         "pode_falar": (not do_grupo and bool(alcance)
                        and status.lower() not in _FORA_DE_ALCANCE),
     }
+
+
+# ---------------------------------------------------------------------------
+# Índice de personagens
+# ---------------------------------------------------------------------------
+# A Enciclopédia da barra lateral era o único lugar que listava todos os
+# personagens, espremida numa coluna estreita e sem busca. O índice é a lista
+# para a tela: cada um com a categoria (grupo, conhecido, inimigo, morto), se
+# está aqui com o grupo, onde está e a relação com o grupo. A ficha de cada
+# um continua sendo ficha().
+
+# Ordem da lista: o grupo, depois quem está aqui, depois o resto por categoria.
+_ORDEM_DA_CATEGORIA = {"conhecido": 0, "inimigo": 1, "morto": 2}
+_TAMANHO_DA_DESCRICAO = 140
+
+
+def _categoria(ch: dict) -> str:
+    status = (ch.get("status") or "").lower()
+    if memory.is_party_member(ch) and status != "morto":
+        return "grupo"
+    if status == "morto":
+        return "morto"
+    if status == "inimigo":
+        return "inimigo"
+    return "conhecido"
+
+
+def indice() -> dict:
+    """Todos os personagens da campanha, na ordem da tela, com a contagem por filtro."""
+    from rpg.tools import _faixa_atitude, atitude_de
+
+    atual = memory.campaign.get("current_location", "") or ""
+    pessoas = []
+    for ch in (memory.campaign.get("characters") or {}).values():
+        if not isinstance(ch, dict) or not ch.get("name"):
+            continue
+        categoria = _categoria(ch)
+        do_grupo = categoria == "grupo"
+        local = atual if do_grupo else (ch.get("local", "") or "")
+        descricao = " ".join((ch.get("description", "") or "").split())
+        if len(descricao) > _TAMANHO_DA_DESCRICAO:
+            descricao = descricao[:_TAMANHO_DA_DESCRICAO].rsplit(" ", 1)[0] + "…"
+        pessoas.append({
+            "nome": ch["name"],
+            "status": ch.get("status", "") or "vivo",
+            "categoria": categoria,
+            "do_grupo": do_grupo,
+            "aqui": categoria != "morto" and bool(local) and locais.alcance(local) == "aqui",
+            "local": locais.nome_canonico(local) if local else "",
+            "descricao": descricao,
+            # A relação só aparece para quem o mestre já mexeu: um "neutro"
+            # em todo mundo seria ruído.
+            "atitude": (_faixa_atitude(atitude_de(ch))[0]
+                        if not do_grupo and "atitude" in ch else ""),
+            "tem_ficha": bool(ch.get("sheet")),
+        })
+
+    def _posicao(p):
+        if p["categoria"] == "grupo":
+            return 0
+        if p["aqui"]:
+            return 1
+        return 2 + _ORDEM_DA_CATEGORIA[p["categoria"]]
+
+    pessoas.sort(key=lambda p: (_posicao(p), locais.norm(p["nome"])))
+    contagem = {
+        "todos": len(pessoas),
+        "aqui": sum(p["aqui"] for p in pessoas),
+        "grupo": sum(p["categoria"] == "grupo" for p in pessoas),
+        "conhecidos": sum(p["categoria"] == "conhecido" for p in pessoas),
+        "inimigos": sum(p["categoria"] == "inimigo" for p in pessoas),
+        "mortos": sum(p["categoria"] == "morto" for p in pessoas),
+    }
+    return {"personagens": pessoas, "contagem": contagem, "local_atual": atual}

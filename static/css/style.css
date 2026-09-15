@@ -4023,7 +4023,7 @@ body.rest-on { overflow: hidden; }
    fica dentro dele. O caminho até o lugar ("Cliviate › Forja de Cliviate")
    fica no topo e cada trecho abre a ficha daquele lugar.
    ═══════════════════════════════════════════════════════════════════ */
-#local-overlay, #pessoa-overlay, #heroi-overlay, #missoes-overlay, #mapa-overlay, #grupo-overlay, #diario-overlay {
+#local-overlay, #pessoa-overlay, #heroi-overlay, #missoes-overlay, #mapa-overlay, #grupo-overlay, #diario-overlay, #elenco-overlay {
   --lcl-paper: #fffbf0;
   --lcl-bg:    #f4ebd8;
   --lcl-dark:  #3d2a14;
@@ -4041,10 +4041,10 @@ body.rest-on { overflow: hidden; }
   padding: var(--esp-5); box-sizing: border-box;
   font-family: 'Lora', serif;
 }
-#local-overlay.hidden, #pessoa-overlay.hidden, #heroi-overlay.hidden, #missoes-overlay.hidden, #mapa-overlay.hidden, #grupo-overlay.hidden, #diario-overlay.hidden { display: none; }
-body.local-on, body.pessoa-on, body.heroi-on, body.missoes-on, body.mapa-on, body.grupo-on, body.diario-on { overflow: hidden; }
+#local-overlay.hidden, #pessoa-overlay.hidden, #heroi-overlay.hidden, #missoes-overlay.hidden, #mapa-overlay.hidden, #grupo-overlay.hidden, #diario-overlay.hidden, #elenco-overlay.hidden { display: none; }
+body.local-on, body.pessoa-on, body.heroi-on, body.missoes-on, body.mapa-on, body.grupo-on, body.diario-on, body.elenco-on { overflow: hidden; }
 
-#lcl-frame, #psn-frame, #hro-frame, #msn-frame, #map-frame, #grp-frame, #dia-frame {
+#lcl-frame, #psn-frame, #hro-frame, #msn-frame, #map-frame, #grp-frame, #dia-frame, #elc-frame {
   width: 100%; max-width: 940px;
   height: min(90vh, 820px);
   background: var(--lcl-paper); color: var(--lcl-text);
@@ -4172,8 +4172,8 @@ body.local-on, body.pessoa-on, body.heroi-on, body.missoes-on, body.mapa-on, bod
 .char-local { font-family: 'Lora', serif; font-size: 11px; color: var(--text-muted); margin-top: 2px; }
 
 @media (max-width: 760px) {
-  #local-overlay, #pessoa-overlay, #heroi-overlay, #missoes-overlay, #mapa-overlay, #grupo-overlay, #diario-overlay { padding: 0; align-items: stretch; }
-  #lcl-frame, #psn-frame, #hro-frame, #msn-frame, #map-frame, #grp-frame, #dia-frame { max-width: none; border-radius: 0; border: none; height: 100vh; }
+  #local-overlay, #pessoa-overlay, #heroi-overlay, #missoes-overlay, #mapa-overlay, #grupo-overlay, #diario-overlay, #elenco-overlay { padding: 0; align-items: stretch; }
+  #lcl-frame, #psn-frame, #hro-frame, #msn-frame, #map-frame, #grp-frame, #dia-frame, #elc-frame { max-width: none; border-radius: 0; border: none; height: 100vh; }
   .lcl-header { padding: var(--esp-4) var(--esp-10) var(--esp-3); max-height: none; overflow: visible; }
   .lcl-title { font-size: 1.3rem; }
   .lcl-corpo { display: block; overflow-y: auto; }
@@ -4771,3 +4771,35 @@ body.loot-on { overflow: hidden; }
   .dia-pagina { padding: var(--esp-4) var(--esp-3); }
   .dia-texto p { text-align: left; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   ÍNDICE DE PERSONAGENS ("Personagens") — static/js/elenco.js
+
+   Moldura e cartões das fichas (lcl-*), busca do mapa (map-busca). O que é
+   só dele: os filtros com contagem e a grade de cartões clicáveis.
+   ═══════════════════════════════════════════════════════════════════ */
+#elc-frame { max-width: 1040px; }
+.elc-filtros { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--esp-1); margin-top: var(--esp-3); }
+.elc-filtro {
+  font: inherit; font-size: 0.82rem; cursor: pointer; padding: 3px var(--esp-3); border-radius: 999px;
+  border: 1px solid var(--lcl-line); background: var(--lcl-paper); color: var(--lcl-text);
+}
+.elc-filtro:hover { border-color: var(--lcl-gold); }
+.elc-filtro-ativo { background: var(--lcl-ink); border-color: var(--lcl-ink); color: var(--lcl-paper); }
+.elc-filtro-conta { font-variant-numeric: tabular-nums; opacity: 0.75; margin-left: 2px; }
+.elc-corpo { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: var(--esp-4) var(--esp-5); }
+.elc-lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--esp-2); }
+.elc-cartao {
+  display: flex; flex-direction: column; gap: var(--esp-1); text-align: left; cursor: pointer;
+  font: inherit; color: inherit; width: 100%;
+}
+.elc-cartao:hover { border-color: var(--lcl-gold); }
+.elc-cartao .lcl-item-cabeca { display: flex; flex-wrap: wrap; align-items: center; gap: var(--esp-1); }
+.elc-local { font-size: 0.78rem; color: var(--lcl-muted); }
+.elc-morto { opacity: 0.7; }
+.elc-marca-morto { border-color: var(--lcl-red); color: var(--lcl-red); }
+@media (max-width: 760px) {
+  .elc-corpo { padding: var(--esp-3); }
+  .elc-lista { grid-template-columns: minmax(0, 1fr); }
+}
+

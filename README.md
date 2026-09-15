@@ -97,20 +97,21 @@ abre o loop **percepção → deliberação → ação → verificação** em de
 14. [Mapa do mundo](#mapa-do-mundo)
 15. [Visão geral do grupo](#visão-geral-do-grupo)
 16. [O diário como livro](#o-diário-como-livro)
-17. [Tela de loja ("O Balcão")](#tela-de-loja-o-balcão)
-18. [Tela de missões ("O Livro de Missões")](#tela-de-missões-o-livro-de-missões)
-19. [Tela de saque ("O Espólio")](#tela-de-saque-o-espólio)
-20. [Tela de descanso ("A Fogueira")](#tela-de-descanso-a-fogueira)
-21. [Wizard e editores de ficha](#wizard-e-editores-de-ficha)
-22. [Tela de combate tática (Pergaminho Épico)](#tela-de-combate-tática-pergaminho-épico)
-23. [Tools, o catálogo do agente](#tools-o-catálogo-do-agente)
-24. [Endpoints HTTP](#endpoints-http)
-25. [Frontend](#frontend)
-26. [PWA e instalação](#pwa-e-instalação)
-27. [Testes e garantias](#testes-e-garantias)
-28. [Estrutura de arquivos](#estrutura-de-arquivos)
-29. [Configuração e execução](#configuração-e-execução)
-30. [Limitações conhecidas](#limitações-conhecidas)
+17. [Índice de personagens](#índice-de-personagens)
+18. [Tela de loja ("O Balcão")](#tela-de-loja-o-balcão)
+19. [Tela de missões ("O Livro de Missões")](#tela-de-missões-o-livro-de-missões)
+20. [Tela de saque ("O Espólio")](#tela-de-saque-o-espólio)
+21. [Tela de descanso ("A Fogueira")](#tela-de-descanso-a-fogueira)
+22. [Wizard e editores de ficha](#wizard-e-editores-de-ficha)
+23. [Tela de combate tática (Pergaminho Épico)](#tela-de-combate-tática-pergaminho-épico)
+24. [Tools, o catálogo do agente](#tools-o-catálogo-do-agente)
+25. [Endpoints HTTP](#endpoints-http)
+26. [Frontend](#frontend)
+27. [PWA e instalação](#pwa-e-instalação)
+28. [Testes e garantias](#testes-e-garantias)
+29. [Estrutura de arquivos](#estrutura-de-arquivos)
+30. [Configuração e execução](#configuração-e-execução)
+31. [Limitações conhecidas](#limitações-conhecidas)
 
 ---
 
@@ -2128,6 +2129,45 @@ quebrado, sem redesenho, saque por cima, eventos de todos os capítulos, nome
 dentro de palavra, número do evento em texto) foram todas pegas. Capturas
 novas (ainda não geradas): `diario-capitulo` e `diario-sem-capitulo`.
 
+## Índice de personagens
+
+A Enciclopédia da barra lateral era o único lugar que listava todos os
+personagens, numa coluna estreita e sem busca. O índice é uma tela.
+
+### Motor (`rpg/personagens.py`, `indice`; `GET /api/characters/index`)
+
+- Cada personagem com a **categoria** (grupo, conhecido, inimigo, morto; um
+  membro do grupo morto vai para os mortos), se está **aqui** (no mesmo lugar
+  que o grupo, pela mesma regra de alcance da ficha do local; morto não conta),
+  onde está, a descrição curta e a relação com o grupo, só para quem o mestre
+  já mexeu na atitude.
+- Ordem: o grupo, quem está aqui, depois conhecidos, inimigos e mortos, por
+  nome.
+- A contagem por filtro: todos, aqui, grupo, conhecidos, inimigos, mortos.
+
+### A tela (`static/js/elenco.js`)
+
+- Busca sem caixa nem acento pelo nome, pelo lugar, pela descrição e pela
+  situação; filtros com a contagem do motor.
+- Clicar abre a ficha que já existe: a do herói para quem é do grupo e tem
+  ficha, a do personagem para os demais.
+- **Novo personagem** e **Novo membro do grupo** abrem o editor de sempre.
+- Aberta, a fila de telas a redesenha; as telas que abrem sozinhas esperam
+  ela fechar.
+
+### Testes
+
+`test_indice_personagens.py` (9) cobre a ordem, as categorias, quem está aqui,
+a contagem, a atitude só quando mexida, a descrição curta, membro do grupo
+morto e a rota. `test_elenco_navegador.py` (7) confere a lista com a contagem,
+os filtros, a busca sem acento por nome, lugar e descrição, a ficha certa ao
+clicar, o editor para novo personagem e novo membro, o redesenho com a tela
+aberta e o saque esperando. Regressões injetadas (sem redesenho, saque por
+cima, busca só no nome, herói abrindo a ficha de NPC, filtro "aqui" ignorado,
+morto contado como presente, membro morto no grupo) foram todas pegas.
+Capturas novas (ainda não geradas): `personagens-indice` e
+`personagens-aqui`.
+
 ## Tela de loja ("O Balcão")
 
 A segunda tela do jogo, e a primeira construída depois de perguntar **por que**
@@ -3029,6 +3069,8 @@ ferramentas do mestre.
   `GET /api/shop/recap?desde=&loja=` → `{text}` com o que foi negociado na visita.
 - `GET /api/rest/state` / `POST /api/rest/action`
   `{action: dado|concluir|cancelar, char}`.
+- `GET /api/characters/index` → todos os personagens com a categoria, se estão
+  aqui e a contagem por filtro. Veja [Índice de personagens](#índice-de-personagens).
 - `GET /api/diary/book` → o diário por capítulo, com eventos, personagens,
   locais e missões / `POST /api/diary/move-event` `{index, chapter}`. Veja
   [O diário como livro](#o-diário-como-livro).
@@ -3113,6 +3155,8 @@ ferramentas do mestre.
 - **`loot.js`**, a tela de saque (quem leva o quê, com a carga prevista).
 - **`missoes.js`**, o livro de missões (abas por situação, objetivos marcáveis,
   quem deu e desfecho).
+- **`elenco.js`**, o índice de personagens (busca, filtros e a ficha de cada
+  um).
 - **`diario.js`**, o diário como livro (capítulos, entradas em texto
   corrido, eventos, personagens, locais e missões ligados).
 - **`grupo.js`**, a visão geral do grupo (heróis lado a lado, resumo de
@@ -3121,7 +3165,7 @@ ferramentas do mestre.
   a um passo e busca).
   Mesma regra: renderizam o snapshot do motor e despacham intenções. A fila
   que decide qual abre primeiro (combate, nível, grimório, saque, descanso,
-  loja; a Mochila, as fichas, as missões, o mapa, a visão geral do grupo e o diário só abrem pelo clique) e o empilhamento das
+  loja; a Mochila, as fichas, as missões, o mapa, a visão geral do grupo, o diário e o índice de personagens só abrem pelo clique) e o empilhamento das
   pílulas ficam em `game.js`.
 
 ### Tema

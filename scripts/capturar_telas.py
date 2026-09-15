@@ -1225,6 +1225,18 @@ TELAS = [
      "js": "window.Diario._abrir('sem')",
      "exigir": "#diario-overlay:not(.hidden) .dia-mover"},
 
+    # ── Índice de personagens ────────────────────────────────────────
+    # Todos os personagens, o grupo e quem está na praça primeiro.
+    {"nome": "personagens-indice", "pagina": "/game.html",
+     "estado": MAPA, "espera": 800,
+     "js": "window.Elenco._abrir('todos')",
+     "exigir": "#elenco-overlay:not(.hidden) .elc-cartao"},
+    # Filtro "Aqui": quem está no mesmo lugar que o grupo.
+    {"nome": "personagens-aqui", "pagina": "/game.html",
+     "estado": MAPA, "espera": 800,
+     "js": "window.Elenco._abrir('aqui')",
+     "exigir": "#elenco-overlay:not(.hidden) .elc-cartao"},
+
     # ── Missões ──────────────────────────────────────────────────────
     # Abre pelo "Ver todas" das missões na barra lateral.
     {"nome": "missoes-ativas", "pagina": "/game.html",

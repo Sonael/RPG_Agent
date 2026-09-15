@@ -1266,6 +1266,7 @@ function sincronizarTelas() {
     try { if (window.Grupo)  await window.Grupo.sync();  } catch (_) {}
     // E o diário: a entrada que o mestre acabou de escrever aparece na página.
     try { if (window.Diario) await window.Diario.sync(); } catch (_) {}
+    try { if (window.Elenco) await window.Elenco.sync(); } catch (_) {}
   };
   _filaTelas = _filaTelas.then(rodada, rodada);
   return _filaTelas;
