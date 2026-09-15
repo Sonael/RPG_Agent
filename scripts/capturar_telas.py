@@ -668,9 +668,23 @@ MAPA["characters"].update({
 })
 
 # SAQUE depois da emboscada. A cota de malha é a escolha: pesa 25 kg, e com
-# ela a Helena (FOR 10) passa da metade da capacidade.
+# ela a Helena (FOR 10, sobrecarregada acima de 34 kg) passa da metade da
+# capacidade. Só com o que ela carrega no temp.json (6,9 kg) a cota a deixava
+# em 31,9 kg, ainda livre, e a captura saque-divisao nunca achava o estado
+# piorando: por isso ela leva também o relicário do templo.
 SAQUE = {
     "combat_state": {"is_active": False, "initiative_order": []},
+    "characters": {
+        "helena": {"inventario": [
+            {"nome": "armadura de couro batido", "qtd": 1,
+             "descricao": "Sedas sagradas sobrepostas com couro leve protetor."},
+            {"nome": "Cajado de Madeira Rúnica", "qtd": 1, "descricao": "Canalizador divino."},
+            {"nome": "Pingente de Cristal da Alvorada", "qtd": 1,
+             "descricao": "Brilha conforme suas emoções."},
+            {"nome": "Relicário do Templo", "qtd": 1, "peso": 4,
+             "descricao": "Caixa de bronze com as relíquias de Lathander."},
+        ]},
+    },
     "saque_proposto": {
         "id": 7, "origem": "os bandidos da estrada", "moedas_para": "igual",
         "proximo_item": 4,
