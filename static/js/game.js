@@ -1110,8 +1110,11 @@ document.addEventListener('DOMContentLoaded', () => {
   if (!('ResizeObserver' in window)) return;
   // Bandeja de dados abrindo/fechando, textarea crescendo e o menu de comandos
   // aparecendo mudam alturas sem mudar a janela: só um observador de tamanho vê.
+  // A barra de baixo do celular entra na conta porque nasce vazia e ganha
+  // altura quando a barra lateral desenha os botões, empurrando o campo para
+  // cima: sem observá-la, a pílula ficava com a medida antiga, por cima dele.
   const obs = new ResizeObserver(posicionarPilulas);
-  ['input-area', 'cmd-menu'].forEach(id => {
+  ['input-area', 'cmd-menu', 'barra-inferior'].forEach(id => {
     const el = document.getElementById(id);
     if (el) obs.observe(el);
   });

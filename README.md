@@ -1271,7 +1271,10 @@ atenção (nível pendente ou caído), missões ativas e personagens fora do gru
 
 O guia "Como Jogar" descreve a barra nova, e as capturas do jogo ganharam
 `jogo-barra-recolhida`, `jogo-avisos` e `jogo-painel-mobile` no lugar das
-abas antigas.
+abas antigas. A semente das capturas apaga `rpg_barra_recolhida` junto com a
+memória das telas: o `localStorage` sobrevive entre as capturas do mesmo
+navegador, e sem apagar a captura da barra recolhida deixava recolhidas todas
+as capturas de desktop seguintes.
 
 ### Barras do navegador e do sistema
 
@@ -1312,7 +1315,9 @@ segura de 34 px emulada pelo Chromium (os botões da barra de baixo ficam acima
 dela) e a área visível 90 px menor que a janela (barra de baixo, campo de
 texto, rodapés de Grupo, Missões, Mapa e Diário, a gaveta, o Sair da
 engrenagem e a altura de todas as telas cheias dentro dela), além do teclado
-escondendo a barra de baixo só quando a área encolhe muito. Os testes das telas que entravam pelas abas (nível, grimório, Mochila, ficha
+escondendo a barra de baixo só quando a área encolhe muito. Um teste a mais
+segura a pílula de tela reaberta acima do campo de texto, com e sem a barra de
+baixo. Os testes das telas que entravam pelas abas (nível, grimório, Mochila, ficha
 do local, do personagem e do herói, missões, mapa, grupo, diário) passaram a
 entrar pelos caminhos novos. Regressões injetadas (missão principal pela ordem
 da lista, contador sem nível pendente, avisos que não chegam, engrenagem
@@ -1320,7 +1325,8 @@ vazia, recolhida esquecida, tudo tratado como D&D, gaveta aberta atrás da
 tela, sem barra de baixo, linha de onde sobreposta, herói abrindo a ficha de
 NPC) foram todas pegas, e também as da área visível: sem o `min-height: 0`,
 gaveta em `85vh`, diário, loja ou engrenagem em `100vh`, teclado que não
-esconde a barra, teclado detectado só pelo foco e barra sem a margem segura.
+esconde a barra, teclado detectado só pelo foco, barra sem a margem segura e pílula sem
+acompanhar a barra de baixo.
 
 ## Tela de nível ("A Ascensão")
 
@@ -2359,7 +2365,10 @@ botões, home indicator —, e a pílula caía por cima da dica "Digite / para v
 os comandos". A posição é medida por `posicionarPilulas()` em `game.js` e vai
 para `--pilula-base`: um valor fixo no CSS não serviria, porque o bloco cresce
 para cima quando a bandeja de dados abre, e o menu de comandos flutua acima
-dele sem entrar na sua altura. Um `ResizeObserver` nos dois reposiciona. No
+dele sem entrar na sua altura. A barra de baixo do celular entra na mesma
+conta: ela nasce vazia e ganha altura quando a barra lateral desenha os botões,
+e some quando o teclado abre, e das duas vezes o bloco de entrada muda de lugar
+sem mudar de tamanho. Um `ResizeObserver` nos três reposiciona. No
 desktop a variável não é definida e vale o padrão de 20px da borda. "Encerrar as compras" manda
 `[COMPRAS RESOLVIDAS NA TELA]` para a IA narrar a saída — o mesmo desenho do
 recap de combate: a tela resolve os números, a narração continua sendo dela.

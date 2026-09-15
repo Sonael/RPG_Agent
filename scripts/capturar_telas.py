@@ -1360,6 +1360,11 @@ def _script_de_semente(nome_campanha: str, tema: str, historico: list,
           Object.keys(localStorage)
             .filter(k => k.startsWith('rpg_telas::'))
             .forEach(k => localStorage.removeItem(k));
+          // A barra recolhida também é lembrada: sem apagar, a captura da
+          // barra recolhida deixava recolhidas todas as capturas seguintes
+          // do desktop, e as que dependem da barra aberta (avisos, missão)
+          // nem chegavam a sair.
+          localStorage.removeItem('rpg_barra_recolhida');
         }}
 
         // A tela de login pula direto para o menu quando encontra um token

@@ -70,10 +70,16 @@ def abrir(app_no_ar, estado):
     with sync_playwright() as pw:
         nav = pw.chromium.launch()
 
-        def _abrir(dados=None, largura=1440, altura=980, esperar="#sb-herois .sb-heroi-vida"):
+        def _abrir(dados=None, largura=1440, altura=980, esperar="#sb-herois .sb-heroi-vida",
+                   limpar_memoria=True):
+            # A semente das capturas apaga a memória das telas e a da barra
+            # recolhida a cada carregamento, porque ali um navegador só tira
+            # todas as capturas. O teste que prova que a barra lembra precisa
+            # dela desligada.
             requests.post(f"{url}/__estado", json=dados or estado, timeout=10)
             ctx = nav.new_context(viewport={"width": largura, "height": altura})
-            ctx.add_init_script(cap._script_de_semente(nome, "pergaminho", cap.HISTORICO))
+            ctx.add_init_script(cap._script_de_semente(nome, "pergaminho", cap.HISTORICO,
+                                                       limpar_memoria_de_telas=limpar_memoria))
             pg = ctx.new_page()
             erros = []
             pg.on("pageerror", lambda e: erros.append(str(e)))
@@ -260,7 +266,7 @@ def test_o_que_saiu_nao_esta_mais_na_pagina_e_a_barra_nao_rola(abrir):
 
 
 def test_recolher_e_lembrar(abrir):
-    pg, erros = abrir()
+    pg, erros = abrir(limpar_memoria=False)
     largura = pg.evaluate("() => document.getElementById('sidebar').getBoundingClientRect().width")
     pg.click("#sb-recolher")
     pg.wait_for_function("() => document.body.classList.contains('barra-recolhida')", timeout=3000)
@@ -439,6 +445,36 @@ def test_celular_teclado_aberto_esconde_a_barra_de_baixo(abrir):
     _encolher_area_visivel(pg, CELULAR["altura"])
     assert pg.is_visible("#barra-inferior")
     assert not erros, erros[:3]
+
+
+def test_celular_a_pilula_fica_acima_do_campo_de_texto(abrir, estado, app_no_ar):
+    # A pílula é medida pelo topo do campo de texto, e a barra de baixo mexe
+    # nesse topo: ela nasce vazia e ganha altura quando a barra desenha os
+    # botões, e some quando o teclado abre. Sem refazer a conta, a pílula fica
+    # com a medida velha e cai por cima do campo.
+    _, _, cap = app_no_ar
+    cap._mesclar(estado, copy.deepcopy(cap.DESCANSO_CURTO))
+    pg, erros = abrir(estado, **CELULAR)
+    pg.wait_for_selector("#rest-overlay:not(.hidden)", timeout=5000)
+    pg.evaluate("() => window.Rest._close()")
+    pg.wait_for_selector("#rst-reopen:not(.hidden)", timeout=5000)
+    pg.wait_for_timeout(300)
+
+    def medir():
+        return pg.evaluate("""() => ({
+            pilula: document.getElementById('rst-reopen').getBoundingClientRect().bottom,
+            campo: document.getElementById('input-area').getBoundingClientRect().top})""")
+
+    com_barra = medir()
+    assert com_barra["campo"] - 40 <= com_barra["pilula"] <= com_barra["campo"] + 1, com_barra
+    # Teclado aberto: a barra de baixo sai e o campo desce; a pílula desce junto.
+    pg.evaluate("() => document.documentElement.classList.add('teclado-aberto')")
+    pg.wait_for_timeout(300)
+    sem_barra = medir()
+    assert sem_barra["campo"] > com_barra["campo"], (com_barra, sem_barra)
+    assert sem_barra["campo"] - 40 <= sem_barra["pilula"] <= sem_barra["campo"] + 1, sem_barra
+    assert not erros, erros[:3]
+
 
 def test_celular_mais_abre_a_gaveta_com_o_relance_e_os_atalhos(abrir):
     pg, erros = abrir(**CELULAR)
