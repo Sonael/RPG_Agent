@@ -8334,12 +8334,123 @@ def _atitude_da_loja(loja: dict) -> dict | None:
     }
 
 
+# ── Pechincha ──────────────────────────────────────────────────────────────
+# Barganhar era conversa solta: o jogador pedia desconto no chat e o mestre
+# decidia de cabeça. Aqui é um teste de Persuasão contra o lojista, UMA vez
+# por visita, e o resultado entra no preço como número.
+_PECHINCHA_CD_BASE = 13
+_PECHINCHA_GANHO = -10     # % no preço quando passa
+_PECHINCHA_OFENSA = 5      # % quando o d20 dá 1 e o lojista se ofende
+
+
+def _pechincha_valida(loja: dict) -> dict | None:
+    """
+    A pechincha desta visita, ou None. Sair do local encerra a conversa: o
+    desconto arrancado na forja não vale quando o grupo volta semanas depois.
+    """
+    p = loja.get("pechincha")
+    if not isinstance(p, dict):
+        return None
+    aqui = _norm_txt(memory.campaign.get("current_location", "") or "")
+    if p.get("visita") != aqui:
+        loja.pop("pechincha", None)
+        return None
+    return p
+
+
+def _fator_de_pechincha(loja: dict) -> float:
+    p = _pechincha_valida(loja)
+    return 1 + (int(p.get("pct", 0) or 0) / 100) if p else 1.0
+
+
+def haggle(char_name: str, shop_name: str = "") -> str:
+    """
+    Pechincha com o lojista: um teste de Persuasão que muda o preço da loja.
+
+    Vale UMA vez por visita ao local. Passando, a loja cobra 10% menos;
+    falhando, o preço fica como está; tirando 1 no dado, o lojista se ofende,
+    cobra 5% a mais e perde um pouco da atitude. A CD sobe ou desce com a
+    relação dele com o grupo, como em qualquer teste social.
+
+    Args:
+        char_name: Quem puxa a conversa.
+        shop_name: Nome da loja (padrão: a loja do local atual).
+    """
+    char, err = _get_char(char_name)
+    if not char:
+        return err
+    lojas = _lojas()
+    loja = lojas.get(_norm_txt(shop_name)) if shop_name else None
+    if not loja:
+        local = _norm_txt(memory.campaign.get("current_location", "") or "")
+        loja = next((l for l in lojas.values()
+                     if local and local in (_norm_txt(l.get("local", "")),
+                                            _norm_txt(l.get("nome", "")))), None)
+    if not loja:
+        return f"Aviso: Loja '{shop_name}' não encontrada."
+
+    if _pechincha_valida(loja):
+        return (f"Nota: já pechincharam em {loja['nome']} nesta visita. "
+                f"O lojista não vai baixar o preço de novo agora.")
+
+    sheet = char["sheet"] or {}
+    prof = int(sheet.get("proficiencia", _proficiency_bonus(int(sheet.get("nivel", 1) or 1))) or 2)
+    mod = _modifier(int(sheet.get("carisma", 10) or 10))
+    proficiente = _proficiente_na_pericia(sheet, "persuasão")
+    bonus = mod + (prof if proficiente else 0)
+
+    dono = _dono_da_loja(loja)
+    ajuste_cd = 0
+    if dono:
+        from rpg.tools import atitude_de as _atitude
+        ajuste_cd = -_passos_de_atitude(_atitude(dono))
+    cd = max(1, _PECHINCHA_CD_BASE + ajuste_cd)
+
+    d20 = random.randint(1, 20)
+    total = d20 + bonus
+    passou = total >= cd
+
+    if d20 == 1:
+        pct = _PECHINCHA_OFENSA
+        fecho = f"o lojista se ofende e sobe {pct}% no preço"
+        if dono:
+            from rpg.tools import adjust_attitude as _mexer
+            _mexer(dono.get("name", ""), -5, f"{char['name']} pechinchou de forma grosseira")
+    elif passou:
+        pct = _PECHINCHA_GANHO
+        fecho = f"o lojista cede: {abs(pct)}% de desconto nesta visita"
+    else:
+        pct = 0
+        fecho = "o lojista não se move do preço"
+
+    if pct:
+        loja["pechincha"] = {"pct": pct, "quem": char["name"],
+                             "visita": _norm_txt(memory.campaign.get("current_location", "") or "")}
+    else:
+        # Falhou, mas a conversa aconteceu: não dá para tentar de novo.
+        loja["pechincha"] = {"pct": 0, "quem": char["name"],
+                             "visita": _norm_txt(memory.campaign.get("current_location", "") or "")}
+    memory.save_campaign()
+
+    prof_tag = f" +{prof}(prof)" if proficiente else ""
+    nota_cd = ""
+    if dono and ajuste_cd:
+        rotulo = ""
+        from rpg.tools import _faixa_atitude, atitude_de as _atitude
+        rotulo, _ = _faixa_atitude(_atitude(dono))
+        nota_cd = f" (base {_PECHINCHA_CD_BASE} {ajuste_cd:+d} — {dono.get('name','')} está {rotulo})"
+    return (f"{char['name']} pechincha em {loja['nome']}: Persuasão d20={d20} "
+            f"{bonus:+d}{prof_tag} = **{total}** vs CD {cd}{nota_cd}\n"
+            f"   {'SUCESSO' if passou and d20 != 1 else 'FALHA'} — {fecho}.")
+
+
 def _preco_com_atitude(preco: int, loja: dict) -> int:
-    """Preço pedido por uma unidade, já com a atitude do dono."""
+    """Preço pedido por uma unidade: a atitude do dono e a pechincha da visita."""
     ajuste = _atitude_da_loja(loja)
-    if not ajuste:
+    fator = (ajuste["compra"] if ajuste else 1.0) * _fator_de_pechincha(loja)
+    if fator == 1.0:
         return int(preco)
-    return max(1, int(round(int(preco) * ajuste["compra"])))
+    return max(1, int(round(int(preco) * fator)))
 
 
 def _ganho_com_atitude(tabela: int, loja: dict) -> int:
@@ -8663,6 +8774,7 @@ def shop_snapshot(shop_name: str = "", buyer: str = "") -> dict:
         "loja_aqui": bool(aqui),
         "dono":      (escolhida or {}).get("dono", ""),
         "atitude":   _atitude_da_loja(escolhida) if escolhida else None,
+        "pechincha": (_pechincha_valida(escolhida) if escolhida else None),
         # TODAS as lojas deste local. Antes a tela só conhecia aqui[0]: com uma
         # forja e um boticário na mesma cidade, o boticário nunca aparecia —
         # nem sozinho, nem pela pílula.
@@ -8712,6 +8824,8 @@ def shop_action(action: str, shop: str = "", char: str = "",
         msg = buy_item(char, shop, item, qtd)
     elif a == "sell":
         msg = sell_item(char, shop, item, qtd)
+    elif a in ("pechinchar", "haggle"):
+        msg = haggle(char, shop)
     else:
         return {"ok": False, "message": f"Ação '{action}' desconhecida.",
                 "snapshot": shop_snapshot(shop, char)}
@@ -13656,6 +13770,7 @@ DND_TOOLS = [
     apply_condition,
     remove_condition,
     reveal_defenses,
+    haggle,
     modify_currency,
     roll_death_save,
     add_item,

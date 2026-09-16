@@ -88,6 +88,8 @@
           <h1 class="shp-title">O Balcão <span id="shp-nome">—</span></h1>
           <div id="shp-local" class="shp-local"></div>
           <div id="shp-atitude" class="shp-atitude hidden"></div>
+          <button id="shp-pechinchar" class="shp-pechinchar"
+                  onclick="window.Shop._pechinchar()">Pechinchar</button>
           <div id="shp-lojas" class="shp-lojas"></div>
         </header>
 
@@ -293,6 +295,21 @@
         + `</select>`
       : '';
 
+    // Pechincha: uma por visita ao local. Feita, o botão vira o resultado.
+    const pech = _last.pechincha;
+    const btn = document.getElementById('shp-pechinchar');
+    if (btn) {
+      const quem = (_last.comprador || {}).nome || '';
+      btn.disabled = !!pech || !quem || !loja.nome;
+      btn.textContent = pech
+        ? (pech.pct < 0 ? `Desconto de ${Math.abs(pech.pct)}% nesta visita`
+           : (pech.pct > 0 ? `O lojista se ofendeu: +${pech.pct}%` : 'O lojista não cedeu'))
+        : 'Pechinchar';
+      btn.title = pech
+        ? 'Só uma pechincha por visita ao local'
+        : (quem ? `${quem} tenta um desconto num teste de Persuasão` : '');
+    }
+
     document.getElementById('shp-aba-comprar')
       .classList.toggle('shp-aba-on', _aba === 'comprar');
     document.getElementById('shp-aba-vender')
@@ -404,7 +421,11 @@
       });
       _busy = false;
       if (res) {
-        mensagem((res.message || '').split('\n')[0], res.ok !== false);
+        const linhas = String(res.message || '').replace(/\*\*/g, '').split('\n');
+        mensagem(action === 'pechinchar'
+                   ? linhas.map(l => l.trim()).filter(Boolean).join(' — ')
+                   : linhas[0],
+                 res.ok !== false);
         if (res.snapshot) render(res.snapshot);
       }
     } catch (_) {
@@ -448,6 +469,9 @@
     _aba: (a) => { _aba = a; render(_last); },
     _trocarLoja: (chave) => { _loja = chave; getState().then(render).catch(() => {}); },
     _quem: (n) => { _quem = n; getState().then(render).catch(() => {}); },
+    // Pechinchar não é sobre um item: é a conversa com o lojista. A rolagem
+    // e a regra são do motor; aqui só o clique.
+    _pechinchar: () => agir('pechinchar', '', 1),
     _comprar: (item, q) => agir('buy', item, q),
     _vender:  (item, q) => agir('sell', item, q),
   };

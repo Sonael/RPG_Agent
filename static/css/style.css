@@ -2413,6 +2413,16 @@ body.shop-on { overflow: hidden; }
 .shp-atitude {
   margin-top: 2px; font-family: 'Lora', serif; font-size: 12px; color: #2f6b4f;
 }
+
+/* Pechinchar: a conversa com o lojista, uma por visita. */
+.shp-pechinchar {
+  margin-top: var(--esp-2); padding: 4px var(--esp-4);
+  font-family: 'Lora', serif; font-size: 12px; cursor: pointer;
+  color: var(--text-main); background: var(--page-right);
+  border: 1px solid var(--page-edge); border-radius: 999px;
+}
+.shp-pechinchar:hover:not(:disabled) { border-color: var(--ink-user); color: var(--ink-user); }
+.shp-pechinchar:disabled { cursor: default; color: var(--text-muted); }
 .shp-atitude.shp-atitude-cara { color: var(--ink-sys); }
 
 /* Bolsa e carga — a informação que torna a compra uma escolha */

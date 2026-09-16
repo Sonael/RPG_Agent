@@ -828,6 +828,14 @@ o próximo passo pendente, e aparecem na barra lateral do jogo.
   capítulo e a consequência que `save_event` grava — e a ficha diz quantas
   existem ao todo. É o que o jogador quer lembrar antes de falar com alguém
   de novo.
+- **Pechincha** (`haggle`, botão na tela do balcão): um teste de Persuasão
+  contra o lojista, UMA vez por visita ao local. Passando, a loja cobra 10%
+  menos até o grupo sair dali; falhando, o preço fica como está; tirando 1 no
+  dado, o lojista se ofende, cobra 5% a mais e perde 5 de atitude. A CD (13)
+  sobe ou desce com a relação, como em qualquer teste social, e a
+  proficiência da classe em Persuasão entra na rolagem. Antes barganhar era
+  conversa solta: o jogador pedia desconto no chat e o mestre decidia de
+  cabeça, sem a perícia do personagem entrar na conta.
 - **Atitude** (`adjust_attitude`, `get_attitude`, `list_attitudes`): o que
   cada NPC sente pelo grupo, de -100 (hostil) a +100 (leal), com histórico
   curto do motivo de cada mudança. Antes isso não existia em lugar nenhum —
