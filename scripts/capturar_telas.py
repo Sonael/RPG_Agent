@@ -943,27 +943,61 @@ TELAS = [
      "exigir": "#wizard-overlay:not(.hidden)",
      "js": "openWizard(); document.getElementById('wz-ai-toggle').click();"},
     {"nome": "menu-wizard-1-preenchido", "pagina": "/menu.html",
-     "exigir": "#wizard-overlay:not(.hidden)",
+     "exigir": "#wizard-overlay:not(.hidden) .wz-loc-card",
      "js": """
         openWizard();
         document.getElementById('wz-name').value = 'A Coroa Partida';
         document.getElementById('wz-type').value = 'dnd';
         onWizardTypeChange();
         document.getElementById('wz-summary').value =
-          'O reino de Oakhaven perdeu seu herdeiro. Tres mercenarios aceitam '
-          + 'escoltar a princesa ate a capital antes que a coroa seja fundida.';
+          'O reino de Oakhaven perdeu seu herdeiro. Três mercenários aceitam '
+          + 'escoltar a princesa até a capital antes que a coroa seja fundida.';
         document.getElementById('wz-scene').value =
-          'Uma taverna encharcada de chuva, na fronteira das Planicies Queimadas.';
-        document.getElementById('wz-location').value = 'Oakhaven';
+          'Uma taverna encharcada de chuva, na fronteira das Planícies Queimadas.';
+        document.getElementById('wz-location').value = 'Taverna do Caldeirão';
+        // Dois lugares, um dentro do outro: é o que mostra o campo novo
+        // "Fica dentro de" e a sugestão de lugares do wizard.
+        addWzLocation();
+        wzLocs[0].name = 'Taverna do Caldeirão';
+        wzLocs[0].dentro_de = 'Oakhaven';
+        wzLocs[0].description = 'Mesas compridas e um caldeirão sempre no fogo.';
+        addWzLocation();
+        wzLocs[1].name = 'Oakhaven';
+        wzLocs[1].description = 'Cidade de muralhas baixas na borda da floresta.';
+        wzRenderLocs();
         wizardValidate();
      """},
     {"nome": "menu-wizard-2-personagens", "pagina": "/menu.html",
-     "exigir": "#wizard-overlay:not(.hidden)",
+     "exigir": "#wizard-overlay:not(.hidden) .cwc",
      "js": """
         openWizard();
         document.getElementById('wz-name').value = 'A Coroa Partida';
+        document.getElementById('wz-type').value = 'dnd';
+        onWizardTypeChange();
+        addWzLocation();
+        wzLocs[0].name = 'Oakhaven';
+        addWzLocation();
+        wzLocs[1].name = 'Forja de Cliviate';
+        wzLocs[1].dentro_de = 'Oakhaven';
+        wzRenderLocs();
         wizardValidate();
         wizardGoTo(2);
+        // Uma heroína e um NPC: a ficha de regras de um lado, e do outro o
+        // "Onde está" e o que o grupo sabe, que não apareciam em captura.
+        addWzChar();
+        wzChars[0].name = 'Helena';
+        wzChars[0].classe = 'clérigo';
+        wzChars[0].raca = 'humano';
+        wzChars[0].description = 'Clériga de mão firme, criada no templo de Oakhaven.';
+        addWzChar();
+        wzChars[1].name = 'Torbin';
+        wzChars[1].isParty = false;
+        wzChars[1].role = 'Ferreiro';
+        wzChars[1].local = 'Forja de Cliviate';
+        wzChars[1].description = 'Ferreiro corpulento, braços cobertos de fuligem.';
+        wzChars[1].conhecido = 'Deve um favor ao grupo desde a noite da emboscada.';
+        wzChars[0]._open = false;
+        wzRenderChars();
      """},
     {"nome": "menu-importar", "pagina": "/menu.html",
      "exigir": "#import-overlay:not(.hidden)",
@@ -973,6 +1007,39 @@ TELAS = [
      "espera": 900, "exigir": "#edit-overlay:not(.hidden)"},
     # Ficha em jogo no editor da campanha: construção travada, com o aviso de
     # qual tela cuida de cada coisa. E a mesma ficha no Modo de correção.
+    # O passo 3 em duas capturas: os lugares no topo e os eventos embaixo —
+    # uma tela só não mostra as duas pontas da lista.
+    {"nome": "menu-editar-locais", "pagina": "/menu.html",
+     "js": """
+        openEditCampaign(new Event('click'), window.__campanha);
+        setTimeout(() => {
+          editGoTo(3);
+          // O palácio fica na cidade: com o "Fica dentro de" preenchido, a
+          // captura mostra o campo fazendo o que ele faz (a hierarquia do
+          // mapa), e não uma caixa vazia.
+          const dentro = edLocs.findIndex(l => /Palácio/i.test(l.name || ''));
+          if (dentro >= 0) edLocs[dentro].dentro_de = 'Luminas';
+          edRenderLocs();
+          
+        }, 400);
+     """,
+     "espera": 1200, "exigir": "#ed-panel-3:not(.hidden) #ed-locs-list input"},
+    {"nome": "menu-editar-eventos", "pagina": "/menu.html",
+     "js": """
+        openEditCampaign(new Event('click'), window.__campanha);
+        setTimeout(() => {
+          editGoTo(3);
+          // O palácio fica na cidade: com o "Fica dentro de" preenchido, a
+          // captura mostra o campo fazendo o que ele faz (a hierarquia do
+          // mapa), e não uma caixa vazia.
+          const dentro = edLocs.findIndex(l => /Palácio/i.test(l.name || ''));
+          if (dentro >= 0) edLocs[dentro].dentro_de = 'Luminas';
+          edRenderLocs();
+          const evts = document.getElementById('ed-evts-list');
+          if (evts) evts.scrollIntoView({ block: 'start' });
+        }, 400);
+     """,
+     "espera": 1200, "exigir": "#ed-panel-3:not(.hidden) #ed-evts-list input"},
     {"nome": "menu-editar-ficha-travada", "pagina": "/menu.html",
      "js": _ABRIR_FICHA_NO_EDITOR_DA_CAMPANHA % "false",
      # Os personagens fechados também têm o aviso, escondido: só o visível serve.
