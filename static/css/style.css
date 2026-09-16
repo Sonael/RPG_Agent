@@ -1929,6 +1929,23 @@ body.combat-on { overflow: hidden; }
   /* scrollIntoView não pode enfiar o seletor debaixo do título grudado. */
   scroll-margin-top: var(--esp-16);
 }
+
+/* Ação Livre dentro da tela: pedido e arbitragem sem fechar o combate. */
+.cbt-livre-texto {
+  width: 100%; margin-top: var(--esp-2); padding: var(--esp-2) var(--esp-3);
+  font-family: 'Lora', serif; font-size: 14px; color: var(--text-main);
+  background: var(--page-right); border: 1px solid var(--page-edge); border-radius: 6px;
+  resize: vertical;
+}
+.cbt-livre-texto:focus { outline: none; border-color: var(--ink-user); }
+.cbt-livre-botoes { display: flex; gap: var(--esp-2); justify-content: flex-end; margin-top: var(--esp-2); }
+.cbt-livre-resposta {
+  margin-top: var(--esp-3); padding: var(--esp-3); max-height: 40vh; overflow-y: auto;
+  font-family: 'Lora', serif; font-size: 14px; line-height: 1.5; color: var(--text-main);
+  background: var(--page-right); border-left: 3px solid var(--ink-user); border-radius: 0 6px 6px 0;
+}
+.cbt-livre-resposta p:first-child { margin-top: 0; }
+.cbt-livre-resposta p:last-child { margin-bottom: 0; }
 .cbt-picker.hidden { display: none; }
 /* Efeito de item (resistência de poção, antitoxina): verde, para não ser lido
    como condição ruim ao lado de Envenenado ou Queimando. */

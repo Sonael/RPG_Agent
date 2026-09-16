@@ -2860,9 +2860,21 @@ benta "sem efeito". Capturas: `combate-itens`, `combate-pocao-alcance` e
 
 - **Defender**, Esquivar (Dodge), Ação.
 - **Fugir**, Ação + encerra turno (sai do combate, status "fugiu").
-- **Ação Livre**, fecha temporariamente o overlay, devolve foco ao chat;
-  o jogador descreve o improviso e a IA arbitra (`make_skill_check`, etc.).
-  O overlay reabre no próximo `sync()` se o combate ainda estiver ativo.
+- **Ação Livre**, no próprio painel: um campo de texto embaixo dos botões, o
+  pedido vai ao mestre e a arbitragem volta ali mesmo, formatada, sem fechar
+  a tela. Enter envia, Shift+Enter quebra linha, Esc fecha; o painel divide o
+  espaço com o seletor de alvo, então abrir um fecha o outro. Antes o botão
+  fechava o overlay e devolvia o foco ao chat: para pedir a manobra que o
+  motor não tem botão — empurrar a mesa, cortar a corda do lustre —, o
+  jogador perdia o campo de batalha de vista.
+  O pedido e a resposta continuam indo para o chat (`appendUser` e
+  `appendMaster`), que é onde a crônica mora; `sendToAgent` ganhou um
+  parâmetro `aoTexto` para entregar a fala também a quem pediu. Terminada a
+  arbitragem, a tela é relida do motor, porque o mestre pode ter aplicado
+  dano, condição ou mudança de zona.
+  `test_combate_acao_livre_navegador.py` (6) cobre o pedido e a resposta com
+  a tela aberta, Enter e Esc, o pedido vazio, o seletor de alvo fechando o
+  painel, a releitura do motor e o caminho inteiro pelo SSE de verdade.
 - **Encerrar Turno**, força avanço sem gastar slot.
 
 O título "O que fará Stelar?" fica grudado no topo do painel de ação, também

@@ -52,6 +52,7 @@
             <div id="cbt-prompt" class="cbt-economy"></div>
             <div id="cbt-buttons" class="cbt-btn-grid"></div>
             <div id="cbt-targets" class="cbt-picker hidden"></div>
+            <div id="cbt-livre" class="cbt-picker hidden"></div>
           </div>
           <div class="cbt-log-panel">
             <div class="cbt-log-title">Diário de Combate</div>
@@ -559,6 +560,9 @@
     if (_busy) return;
     const cur = (_last.combatants || []).find(c => c.is_current);
     const tgtEl = document.getElementById('cbt-targets');
+    // Os dois painéis dividem o mesmo espaço sob os botões: escolher arma ou
+    // alvo tira da tela o pedido de Ação Livre pela metade.
+    _livreFechar();
 
     if (kind === 'attack') {
       const armas = (cur && cur.armas) || [];
@@ -791,15 +795,87 @@
   function _cancel() {
     const t = document.getElementById('cbt-targets');
     if (t) { t.classList.add('hidden'); t.innerHTML = ''; }
+    const l = document.getElementById('cbt-livre');
+    if (l && !l.classList.contains('hidden')) { l.classList.add('hidden'); l.innerHTML = ''; }
     _pick = null;
     acompanharAlturaDaBarra();
   }
+  // ---- Ação Livre, sem sair da luta -------------------------------
+  // Antes este botão FECHAVA a tela e mandava escrever no chat: o jogador
+  // perdia o campo de batalha de vista para pedir uma manobra que o motor
+  // não tem botão. Agora o pedido e a arbitragem acontecem aqui dentro; o
+  // chat continua recebendo os dois, que é onde a crônica mora.
   function _free() {
-    close(false);
-    const inp = document.getElementById('chat-input');
-    if (inp) { inp.focus(); }
-    if (window.showToast)
-      window.showToast('Descreva sua ação livre no chat — o Mestre vai arbitrar.');
+    if (_busy) return;
+    _cancel();
+    const el = document.getElementById('cbt-livre');
+    if (!el) return;
+    el.classList.remove('hidden');
+    el.innerHTML =
+      '<div class="cbt-picker-title">Ação livre — o Mestre arbitra:</div>' +
+      '<textarea id="cbt-livre-texto" class="cbt-livre-texto" rows="2" ' +
+      'placeholder="Ex.: empurro a mesa contra o goblin e salto por cima"></textarea>' +
+      '<div class="cbt-livre-botoes">' +
+      '<button class="cbt-btn" onclick="window.Combat._livreFechar()">Cancelar</button>' +
+      '<button class="cbt-btn cbt-primary" id="cbt-livre-enviar" ' +
+      'onclick="window.Combat._livreEnviar()">Pedir ao Mestre</button></div>' +
+      '<div id="cbt-livre-resposta" class="cbt-livre-resposta hidden"></div>';
+    const ta = document.getElementById('cbt-livre-texto');
+    ta.addEventListener('keydown', ev => {
+      // Enter envia; Shift+Enter quebra linha, como no chat.
+      if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); _livreEnviar(); }
+      if (ev.key === 'Escape') { ev.preventDefault(); _livreFechar(); }
+    });
+    ta.focus();
+    acompanharAlturaDaBarra();
+  }
+
+  function _livreFechar() {
+    const el = document.getElementById('cbt-livre');
+    if (el) { el.classList.add('hidden'); el.innerHTML = ''; }
+    acompanharAlturaDaBarra();
+  }
+
+  async function _livreEnviar() {
+    const ta = document.getElementById('cbt-livre-texto');
+    const resp = document.getElementById('cbt-livre-resposta');
+    if (!ta || !resp || _busy) return;
+    const texto = (ta.value || '').trim();
+    if (!texto) { ta.focus(); return; }
+
+    const botao = document.getElementById('cbt-livre-enviar');
+    if (botao) botao.disabled = true;
+    ta.disabled = true;
+    resp.classList.remove('hidden');
+    resp.textContent = 'O Mestre está arbitrando…';
+    _busy = true;
+    renderActionBar(_last || {});
+
+    let ouviu = false;
+    try {
+      if (typeof window.appendUser === 'function') window.appendUser(texto);
+      await window.sendToAgent(texto, true, '', fala => {
+        ouviu = true;
+        resp.innerHTML = (typeof window.renderMarkdown === 'function')
+          ? window.renderMarkdown(fala) : esc(fala);
+        acompanharAlturaDaBarra();
+        // O painel de ações rola: sem isto a arbitragem nascia abaixo da
+        // dobra e o jogador ficava olhando o campo de texto vazio.
+        resp.scrollIntoView({ block: 'nearest' });
+      });
+      if (!ouviu) resp.textContent = 'O Mestre respondeu no chat.';
+      ta.value = '';
+    } catch (_) {
+      resp.textContent = 'Não foi possível falar com o Mestre.';
+    } finally {
+      _busy = false;
+      ta.disabled = false;
+      if (botao) botao.disabled = false;
+      // O Mestre pode ter mexido no combate (dano, condição, zona): a tela
+      // volta do motor, não de um palpite.
+      await sync();
+      ta.focus();
+    }
   }
 
   // ---- Toggle de modo (sidebar) -----------------------------------
@@ -835,6 +911,7 @@
   window.Combat = {
     sync,
     _sel, _selHab, _selWeapon, _selItem, _target, _mover, _cancel, _free,
+    _livreEnviar, _livreFechar,
     _act: act,
     _continue, _closeOnly, _dismiss, _reopen,
     _close: () => close(false),

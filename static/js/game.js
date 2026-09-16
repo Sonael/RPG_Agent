@@ -202,7 +202,10 @@ async function sendMessage() {
 // não fala do jogador. Fica no histórico como contexto, mas renderHistory não
 // a mostra ao reabrir a campanha — antes o log inteiro do combate aparecia no
 // chat como se o jogador o tivesse escrito.
-async function sendToAgent(text, registrar, interno) {
+// `aoTexto`: quando a fala do Mestre chega, ela também é entregue a quem
+// pediu. É o que deixa a tela de combate mostrar a arbitragem da Ação Livre
+// sem o jogador sair da luta para ler o chat.
+async function sendToAgent(text, registrar, interno, aoTexto) {
   if (waiting) return;
 
   waiting = true;
@@ -278,6 +281,7 @@ async function sendToAgent(text, registrar, interno) {
           }
           removeTyping(typId);
           appendMaster(ev.content);
+          if (typeof aoTexto === 'function') { try { aoTexto(ev.content); } catch (_) {} }
         }
         else if (ev.type === 'retrying') {
           updateTyping(typId, ev.content);
