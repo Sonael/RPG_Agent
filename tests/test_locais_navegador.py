@@ -10,6 +10,7 @@ Depende do Playwright, que não está em requirements-dev.txt. Sem ele o arquivo
 
     pip install playwright && playwright install chromium
 """
+import copy
 import json
 import sys
 from pathlib import Path
@@ -46,7 +47,23 @@ def pagina(app_no_ar):
     import requests
 
     url, nome, cap = app_no_ar
-    requests.post(f"{url}/__estado", json=cap.CIDADE, timeout=10)
+    estado = copy.deepcopy(cap.CIDADE)
+    # A cidade com passado: é o que a ficha do local passou a mostrar.
+    estado["events"] = [
+        {"index": 1, "summary": "O grupo chegou a Cliviate ao anoitecer.",
+         "characters_involved": "Stelar", "location": "Cliviate",
+         "consequence": "A guarda ficou de olho neles.", "chapter": 1},
+        {"index": 2, "summary": "Briga de bêbados na forja.",
+         "characters_involved": "Brom", "location": "Forja de Cliviate",
+         "consequence": "", "chapter": 2},
+    ]
+    estado["quests"] = {
+        "o filho do ferreiro": {
+            "titulo": "O filho do ferreiro", "descricao": "Achar o rapaz.",
+            "status": "ativa", "objetivos": [{"texto": "Procurar na mata", "feito": False}],
+            "quem_deu": "Brom", "recompensa": "", "cap_inicio": 2},
+    }
+    requests.post(f"{url}/__estado", json=estado, timeout=10)
     with sync_playwright() as pw:
         nav = pw.chromium.launch()
         ctx = nav.new_context(viewport={"width": 1440, "height": 980})
@@ -89,6 +106,43 @@ def test_local_do_mapa_abre_a_ficha_com_o_que_fica_dentro(pagina):
     assert "loja" in pg.inner_text(_item("Forja de Cliviate"))
     assert "1 pessoa" in pg.inner_text(_item("Forja de Cliviate"))
     assert not pg.is_visible("#edit-overlay"), "o mapa abriu o editor em vez da ficha"
+    assert not erros, erros[:3]
+
+
+def test_ficha_do_local_conta_o_que_aconteceu_ali(pagina):
+    pg, erros = pagina
+    _abrir_pelo_mapa(pg, "Cliviate")
+
+    cenas = pg.inner_text("#lcl-eventos")
+    assert "O grupo chegou a Cliviate ao anoitecer." in cenas
+    assert "A guarda ficou de olho neles." in cenas
+    # O que aconteceu na forja conta como história da cidade, com o lugar dito.
+    assert "Briga de bêbados na forja." in cenas
+    assert "Forja de Cliviate" in cenas
+    # A mais recente primeiro.
+    assert cenas.index("Briga de bêbados") < cenas.index("O grupo chegou")
+    assert not erros, erros[:3]
+
+
+def test_ficha_do_local_lista_a_missao_daqui_e_leva_a_ela(pagina):
+    pg, erros = pagina
+    _abrir_pelo_mapa(pg, "Cliviate")
+
+    missoes = pg.inner_text("#lcl-missoes")
+    assert "O filho do ferreiro" in missoes
+    assert "Encomendada por Brom" in missoes
+
+    pg.click("#lcl-missoes button:has-text('Ver a missão')")
+    pg.wait_for_selector("#missoes-overlay:not(.hidden)", timeout=5000)
+    assert pg.is_hidden("#local-overlay")
+    assert not erros, erros[:3]
+
+
+def test_lugar_sem_passado_diz_que_nao_ha_nada(pagina):
+    pg, erros = pagina
+    _abrir_pelo_mapa(pg, "Boticário da Mira")
+    assert "Nada registrado aqui ainda." in pg.inner_text("#lcl-eventos")
+    assert "Nenhuma missão ligada a este lugar." in pg.inner_text("#lcl-missoes")
     assert not erros, erros[:3]
 
 

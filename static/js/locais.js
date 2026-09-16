@@ -52,10 +52,14 @@
             <h2 class="lcl-secao">Quem está aqui</h2>
             <div id="lcl-grupo" class="lcl-grupo"></div>
             <div id="lcl-pessoas" class="lcl-lista"></div>
+            <h2 class="lcl-secao">O que aconteceu aqui</h2>
+            <div id="lcl-eventos" class="lcl-lista"></div>
           </section>
           <section class="lcl-corpo-dentro" aria-label="Aqui dentro">
             <h2 class="lcl-secao">Aqui dentro</h2>
             <div id="lcl-dentro" class="lcl-lista"></div>
+            <h2 class="lcl-secao" id="lcl-missoes-titulo">Missões daqui</h2>
+            <div id="lcl-missoes" class="lcl-lista"></div>
           </section>
         </div>
 
@@ -133,6 +137,36 @@
       </div>`;
   }
 
+  // As missões que passam por aqui. O motor diz por que cada uma entrou —
+  // encomendada por quem está no lugar, ou citando o lugar no que pede.
+  function missaoDaqui(m) {
+    const motivo = m.motivo === 'encomendada'
+      ? (m.quem_deu ? `Encomendada por ${esc(m.quem_deu)}, daqui.` : 'Encomendada aqui.')
+      : 'Este lugar aparece na missão.';
+    return `
+      <div class="lcl-item"><div class="lcl-item-cabeca">
+        <span class="lcl-marca">missão</span>
+        <span class="lcl-item-nome">${esc(m.titulo)}</span>
+        ${m.status ? `<span class="lcl-marca">${esc(m.status)}</span>` : ''}</div>
+        <p class="lcl-item-desc">${motivo}</p>
+        <div class="lcl-item-acoes"><button class="lcl-btn lcl-btn-sec"
+          onclick="window.Locais._verMissao('${aspas(m.titulo)}')">Ver a missão</button></div></div>`;
+  }
+
+  // O que aconteceu aqui, do mais recente para trás. O local vem em cada
+  // linha porque a lista inclui o que aconteceu nos lugares de dentro.
+  function acontecimento(e, aqui) {
+    return `
+      <li>
+        <div class="lcl-cena-topo">
+          ${e.capitulo ? `<span class="lcl-cena-cap">cap. ${esc(e.capitulo)}</span>` : ''}
+          ${e.local && e.local !== aqui ? `<span class="lcl-cena-local">${esc(e.local)}</span>` : ''}
+        </div>
+        <p class="lcl-cena-resumo">${esc(e.resumo)}</p>
+        ${e.consequencia ? `<p class="lcl-cena-conseq">${esc(e.consequencia)}</p>` : ''}
+      </li>`;
+  }
+
   function render(f) {
     _last = f || {};
     ensureDom();
@@ -165,6 +199,19 @@
       ? dentro.map(lugarDentro).join('')
       : '<div class="lcl-vazio">Nenhum lugar registrado aqui dentro.</div>';
 
+    const missoes = _last.missoes || [];
+    q('lcl-missoes').innerHTML = missoes.length
+      ? missoes.map(missaoDaqui).join('')
+      : '<div class="lcl-vazio">Nenhuma missão ligada a este lugar.</div>';
+
+    const cenas = _last.eventos || [];
+    const total = _last.acontecimentos || cenas.length;
+    q('lcl-eventos').innerHTML = cenas.length
+      ? `<ul class="lcl-cenas">${cenas.map(e => acontecimento(e, _last.nome)).join('')}</ul>`
+        + (total > cenas.length
+            ? `<p class="lcl-cenas-total">Os ${cenas.length} mais recentes de ${total}.</p>` : '')
+      : '<div class="lcl-vazio">Nada registrado aqui ainda.</div>';
+
     q('lcl-onde').classList.toggle('hidden', !!_last.e_o_local_atual || !_last.local_atual);
     q('lcl-editar').classList.toggle('hidden', !(_last.existe && _last.tipo === 'local'));
     mensagem('');
@@ -175,6 +222,11 @@
     if (!el) return;
     el.textContent = txt || '';
     el.classList.toggle('lcl-msg-erro', !!erro);
+  }
+
+  function verMissao(titulo) {
+    fechar();
+    if (window.Missoes) window.Missoes._abrir(titulo || '');
   }
 
   // ---- Abrir / fechar ----------------------------------------------
@@ -232,6 +284,7 @@
     _editar: editar,
     _verPessoa: (nome) => { fechar(); if (window.Personagens) window.Personagens._abrir(nome); },
     _verNoMapa: () => { const nome = _last.nome || ''; fechar(); if (window.Mapa) window.Mapa._abrir(nome); },
+    _verMissao: verMissao,
     _estado: () => _last,
   };
 

@@ -219,6 +219,80 @@ def normalizar_campanha_editada(novos_locais: dict, antigos_locais: dict,
 _FORA_DE_ALCANCE = ("morto", "desaparecido", "preso", "exilado", "fugiu")
 
 
+MAX_ACONTECIMENTOS = 5
+
+
+def descendentes(nome: str) -> list[str]:
+    """Este lugar e tudo que fica dentro dele, em qualquer profundidade."""
+    raiz = nome_canonico(nome)
+    if not raiz:
+        return []
+    saida, fila, vistos = [], [raiz], {norm(raiz)}
+    while fila:
+        atual = fila.pop(0)
+        saida.append(atual)
+        for f in filhos(atual):
+            chave = norm(f["nome"])
+            if chave not in vistos:
+                vistos.add(chave)
+                fila.append(f["nome"])
+    return saida
+
+
+def acontecimentos(nome: str) -> list[dict]:
+    """
+    Os eventos que aconteceram aqui, do mais recente para trás. Conta também
+    o que aconteceu nos lugares de dentro: a história da cidade inclui a
+    briga na forja dela, e cada linha diz onde foi.
+    """
+    lugares = {norm(x) for x in descendentes(nome)}
+    if not lugares:
+        return []
+    saida = []
+    for e in (memory.campaign.get("events") or []):
+        if not isinstance(e, dict) or norm(e.get("location", "")) not in lugares:
+            continue
+        saida.append({
+            "resumo": e.get("summary", ""),
+            "local": nome_canonico(e.get("location", "")) or e.get("location", ""),
+            "capitulo": e.get("chapter"),
+            "consequencia": e.get("consequence", "") or "",
+            "quem": e.get("characters_involved", "") or "",
+        })
+    return list(reversed(saida))
+
+
+def missoes_daqui(nome: str) -> list[dict]:
+    """
+    As missões ligadas a este lugar, e por quê. Missão não guarda local, então
+    a ligação é achada: quem encomendou está aqui, ou o nome do lugar aparece
+    no que a missão diz. Melhor uma ligação explicada do que um campo novo
+    que o mestre teria de lembrar de preencher.
+    """
+    lugares = {norm(x) for x in descendentes(nome)}
+    if not lugares:
+        return []
+    daqui = {norm(ch.get("name", "")) for ch in (memory.campaign.get("characters") or {}).values()
+             if isinstance(ch, dict) and norm(ch.get("local", "")) in lugares}
+    saida = []
+    for m in (memory.campaign.get("quests") or {}).values():
+        if not isinstance(m, dict):
+            continue
+        motivo = ""
+        if m.get("quem_deu") and norm(m["quem_deu"]) in daqui:
+            motivo = "encomendada"
+        else:
+            texto = norm(" ".join([m.get("titulo", ""), m.get("descricao", "")]
+                                  + [o.get("texto", "") for o in (m.get("objetivos") or [])
+                                     if isinstance(o, dict)]))
+            if any(lugar_norm and lugar_norm in texto for lugar_norm in lugares):
+                motivo = "citada"
+        if motivo:
+            saida.append({"titulo": m.get("titulo", ""), "status": m.get("status", ""),
+                          "quem_deu": m.get("quem_deu", "") or "", "motivo": motivo})
+    return saida
+
+
 def ficha(nome: str = "") -> dict:
     """
     A ficha do local para a tela: o lugar, o caminho até ele, o que fica
@@ -249,6 +323,7 @@ def ficha(nome: str = "") -> dict:
             "pode_falar": bool(alcance_aqui) and status not in _FORA_DE_ALCANCE,
         })
 
+    cenas = acontecimentos(nome_final)
     pai = pai_de(nome_final)
     return {
         "existe": bool(achado),
@@ -266,4 +341,9 @@ def ficha(nome: str = "") -> dict:
                     "pessoas": len(pessoas_em(f["nome"]))}
                    for f in filhos(nome_final)],
         "pessoas": pessoas,
+        # A história do lugar: o que a ficha do personagem faz por gente, aqui
+        # por lugar. Sem isto, a ficha do local só dizia quem está lá AGORA.
+        "eventos": cenas[:MAX_ACONTECIMENTOS],
+        "acontecimentos": len(cenas),
+        "missoes": missoes_daqui(nome_final),
     }

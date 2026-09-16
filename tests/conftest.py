@@ -130,6 +130,10 @@ def campanha():
     # lugar "dentro" de outro no teste seguinte.
     memory.campaign["locations"] = {}
     memory.campaign["current_location"] = ""
+    # Eventos pela mesma razão: agora que a ficha do local e a do personagem
+    # mostram o que aconteceu, um save_event de um teste aparecia na ficha do
+    # teste seguinte.
+    memory.campaign["events"] = []
     memory.campaign.pop("negocios", None)
     memory.campaign.pop("relogio", None)
     memory.campaign.pop("descanso_proposto", None)

@@ -1959,6 +1959,31 @@ A fixture `campanha` dos testes passou a zerar também `locations`,
 `current_location` e `negocios`: um local salvo num teste aparecia como lugar
 "dentro" de outro no teste seguinte.
 
+### O passado do lugar
+
+A ficha dizia quem está lá AGORA, o que fica dentro e o caminho até lá. Tudo
+o que o lugar já viu — a emboscada na estrada, o acordo na taverna — estava
+gravado nos eventos e não aparecia em tela nenhuma; e a missão que o ferreiro
+daquela cidade encomendou só se via na ficha dele.
+
+- **O que aconteceu aqui** (`locais.acontecimentos`): os eventos do lugar, do
+  mais recente para trás, com o capítulo e a consequência que `save_event`
+  grava. Conta também o que aconteceu nos lugares de dentro — a história da
+  cidade inclui a briga na forja dela —, e cada linha diz onde foi quando não
+  é o lugar da ficha. Cinco na tela, com o total ao lado.
+- **Missões daqui** (`locais.missoes_daqui`): missão não guarda local, então a
+  ligação é achada e a ficha diz por quê — *encomendada* por quem está no
+  lugar, ou *citada*, quando o nome do lugar aparece no título, na descrição
+  ou num objetivo. Melhor uma ligação explicada do que um campo novo que o
+  mestre teria de lembrar de preencher em toda missão. As encerradas
+  continuam na lista com o status: o que já foi feito ali é parte da história
+  do lugar. O botão abre a tela de missões nela.
+
+`test_historia_do_local.py` (11) e três casos novos em
+`test_locais_navegador.py`. A fixture `campanha` passou a zerar `events`:
+agora que duas fichas mostram o que aconteceu, um `save_event` de um teste
+aparecia na ficha do teste seguinte.
+
 ## Ficha do personagem
 
 Quase tudo o que o jogo sabe sobre um NPC já estava gravado e não aparecia em
