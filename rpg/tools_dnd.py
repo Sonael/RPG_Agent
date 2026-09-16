@@ -3626,6 +3626,31 @@ def _roll_d20_with_adv(advantage: bool, disadvantage: bool) -> tuple[int, str]:
     return roll, f"d20={roll}"
 
 
+# Habilidades que trocam a conta da CA sem armadura: conceder ou tirar uma
+# delas muda a CA na hora, sem esperar o personagem vestir alguma coisa.
+_HABILIDADES_DE_CA = ("Defesa Sem Armadura", "Resistência Dracônica")
+
+
+def _defesa_sem_armadura(char: dict, dex: int) -> int | None:
+    """
+    CA da Defesa Sem Armadura, que só vale sem armadura equipada.
+
+    Bárbaro: 10 + mod. DES + mod. CON, e pode usar escudo.
+    Monge:   10 + mod. DES + mod. SAB, e a habilidade para de valer com escudo.
+    Outra classe com a habilidade (homebrew do mestre) segue o bárbaro.
+
+    Devolve None quando a habilidade não se aplica.
+    """
+    if not _char_has_feature(char, "Defesa Sem Armadura"):
+        return None
+    s = char["sheet"]
+    if _norm_txt(s.get("classe", "")) == "monge":
+        if (s.get("equipamentos") or {}).get("escudo"):
+            return None
+        return 10 + dex + _modifier(s.get("sabedoria", 10))
+    return 10 + dex + _modifier(s.get("constituicao", 10))
+
+
 def _recalculate_ca(char: dict) -> None:
     """
     Recalcula a CA do personagem com base nos equipamentos ativos.
@@ -3652,12 +3677,17 @@ def _recalculate_ca(char: dict) -> None:
         else:  # "none"
             new_ca = ca_base
     else:
-        # Sem armadura: CA padrão 10 + DES.
-        # Resistência Dracônica (Feiticeiro de Linhagem Dracônica): 13 + DES.
+        # Sem armadura: CA padrão 10 + DES. Duas habilidades põem outra conta
+        # no lugar dela, e nenhuma se soma à outra: fica a maior.
+        # Defesa Sem Armadura (bárbaro, monge) e Resistência Dracônica
+        # (Feiticeiro de Linhagem Dracônica): 13 + DES.
+        contas = [10 + dex]
+        sem_armadura = _defesa_sem_armadura(char, dex)
+        if sem_armadura is not None:
+            contas.append(sem_armadura)
         if _char_has_feature(char, "Resistência Dracônica"):
-            new_ca = 13 + dex
-        else:
-            new_ca = 10 + dex
+            contas.append(13 + dex)
+        new_ca = max(contas)
 
     if shield_data and shield_data["dex_bonus"] == "shield":
         new_ca += shield_data["ca_base"]
@@ -4375,6 +4405,9 @@ def create_character_sheet(
         memory.campaign["protagonist"] = name
 
     kit_str = _dar_kit_inicial(char_obj)
+    # A CA da criação era 10 + DES, tirada antes das habilidades de classe:
+    # bárbaro e monge nasciam sem a Defesa Sem Armadura na conta.
+    _recalculate_ca(char_obj)
 
     memory.save_campaign()
     return (
@@ -5414,6 +5447,8 @@ def learn_ability(
     if "habilidades" not in char:
         char["habilidades"] = []
 
+    mexe_na_ca = any(_norm_txt(ability_name) == _norm_txt(h) for h in _HABILIDADES_DE_CA)
+
     existing = next((h for h in char["habilidades"] if h["nome"].lower() == ability_name.lower()), None)
     if existing:
         existing.update({"descricao": description, "custo_mana": mana_cost, "dado": damage_dice})
@@ -5426,11 +5461,20 @@ def learn_ability(
         "custo_mana": mana_cost,
         "dado":       damage_dice,
     })
+    # Defesa Sem Armadura e Resistência Dracônica entram na CA na mesma hora:
+    # sem isto, a CA só mudava quando o personagem vestisse ou tirasse algo.
+    ca_texto = ""
+    if mexe_na_ca and char.get("sheet"):
+        ca_antes = char["sheet"].get("ca", 10)
+        _recalculate_ca(char)
+        if char["sheet"].get("ca", ca_antes) != ca_antes:
+            ca_texto = f"\n   CA: {ca_antes} → {char['sheet']['ca']}"
+
     memory.save_campaign()
     return (
         f"{char['name']} aprendeu '{ability_name}'!\n"
         f"   Dado: {damage_dice} | Custo: {mana_cost} mana\n"
-        f"   Efeito: {description}"
+        f"   Efeito: {description}{ca_texto}"
     )
 
 
@@ -7205,9 +7249,11 @@ def apply_asi(char_name: str, stat_name: str, points: int = 1) -> str:
             sheet["vida_atual"] = min(_hp_max_efetivo(sheet),
                                       int(sheet.get("vida_atual", 0) or 0) + ganho)
             extra += f"\n   Vida máxima: {ganho:+d} → {sheet['vida_max']}"
-    if chave == "destreza":
+    if chave in ("destreza", "constituicao", "sabedoria"):
+        ca_antes = sheet.get("ca", 10)
         _recalculate_ca(char)
-        extra += f"\n   CA agora: {sheet['ca']}"
+        if sheet.get("ca", ca_antes) != ca_antes:
+            extra += f"\n   CA agora: {sheet['ca']}"
     novo_mana = _max_mana_for(sheet.get("classe", ""), int(sheet.get("nivel", 1) or 1))
     if novo_mana != int(sheet.get("mana_max", 0) or 0):
         ganho_mana = novo_mana - int(sheet.get("mana_max", 0) or 0)
@@ -9427,7 +9473,9 @@ def set_stat(char_name: str, stat_name: str, value: int) -> str:
             s["vida_atual"] = max(0, min(s["vida_max"], s.get("vida_atual", 0) + hp_adj))
             extra += f"\n   Vida máx: {hp_adj:+d} → {s['vida_max']}"
 
-        if key == "destreza":
+        # CON e SAB entram na CA de quem tem Defesa Sem Armadura (bárbaro e
+        # monge), então o recálculo não é mais só da destreza.
+        if key in ("destreza", "constituicao", "sabedoria"):
             ca_antes = s.get("ca", 10)
             _recalculate_ca(char)
             if s.get("ca", ca_antes) != ca_antes:

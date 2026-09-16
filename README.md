@@ -522,6 +522,12 @@ Os call sites usam `from open5e import http as _req`: a resposta expõe
 
 - `add_item`, `remove_item`, `list_inventory`.
 - `equip_item` recalcula CA via `_recalculate_ca`.
+- Sem armadura, a CA é a maior entre 10 + DES e o que as habilidades põem no
+  lugar dela: Defesa Sem Armadura (bárbaro 10 + DES + CON; monge 10 + DES +
+  SAB, e nenhuma delas com armadura vestida) e Resistência Dracônica
+  (13 + DES). O escudo soma +2 depois, e é justamente ele que desliga a do
+  monge. `learn_ability` recalcula quando concede uma dessas duas: antes a CA
+  só mudaria quando o personagem vestisse ou tirasse alguma coisa.
 - `modify_currency(char, "ouro"|"prata"|"cobre", amount)`.
 - `identify_item` busca o item no SRD via Open5e, distingue **mágicos
   canônicos** de **customizados** e marca pra IA não exceder no efeito.
@@ -815,8 +821,9 @@ o próximo passo pendente, e aparecem na barra lateral do jogo.
 - `choose_feat(char, feat_name)`, busca no SRD, valida pré-requisitos
   (ability score mínimo), aplica.
 - `set_stat(char, stat, value)`, usado para ASI (+1/+1 ou +2). Recalcula
-  derivados automaticamente: HP por CON, CA por DES, mana pelo atributo de
-  conjuração.
+  derivados automaticamente: HP por CON, mana pelo atributo de conjuração e
+  a CA por DES — e também por CON ou SAB, que entram nela pela Defesa Sem
+  Armadura. O mesmo vale para `apply_asi`.
 
 ### Subescolhas de habilidade e arquétipos
 
@@ -843,6 +850,9 @@ materializa as novas sub-features do arquétipo.
 - Crítico Aprimorado / Superior (Campeão), faixa de crítico vai a 19-20 / 18-20.
 - Golpe Divino (domínio de clérigo), +1d8 (2d8 no nv. 14) 1×/turno.
 - Resistência Dracônica (feiticeiro), CA sem armadura = 13 + DES.
+- Defesa Sem Armadura (bárbaro e monge), CA sem armadura = 10 + DES + CON
+  (bárbaro, pode usar escudo) ou 10 + DES + SAB (monge, que perde a
+  habilidade se pegar um escudo).
 
 O **modo de alvo** de cada habilidade (`self` / `pool` / `single`) é
 derivado do campo `alcance` que vem do Open5e, não de listas hardcoded.
