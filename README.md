@@ -2856,6 +2856,35 @@ poção só oferecendo a mesma zona, o ácido alcançando a zona vizinha e a ág
 benta "sem efeito". Capturas: `combate-itens`, `combate-pocao-alcance` e
 `combate-agua-benta`.
 
+### Defesas do inimigo como informação conquistada
+
+Resistência, imunidade e vulnerabilidade apareciam no card desde o primeiro
+round: o jogador abria a luta contra o zumbi já sabendo que ele resiste a
+corte e queima com radiante, sem nada no jogo ter pago por isso.
+
+Agora a ficha guarda o que o grupo já viu (`sheet["descobertas"]`, por campo)
+e `_defesas_visiveis` filtra o snapshot: dos inimigos, só o descoberto; dos
+personagens do grupo, tudo — a ficha é do jogador.
+
+Descobre-se de duas formas:
+
+- **Batendo.** `_apply_damage` anota o tipo quando o multiplicador aparece:
+  zero vira imunidade, metade vira resistência, dobro vira vulnerabilidade, e
+  o caso em que as duas se cancelam anota as duas. O texto da rolagem já dizia
+  "Resistente a dano necrotic — dano pela metade": esconder no card depois
+  disso seria mentira.
+- **`reveal_defenses(char_name, damage_types)`.** O mestre chama depois de um
+  teste de conhecimento bem-sucedido, quando alguém do grupo já enfrentou a
+  criatura, ou quando a cena entrega a dica. Sem tipos, revela todas; com
+  tipos, só os pedidos. Diz o que já era sabido e, quando não há defesa
+  daquele tipo, devolve Nota pedindo que o mestre conte isso ao grupo —
+  descobrir que não há fraqueza também é informação.
+
+`test_defesas_descobertas.py` (14) e `test_defesas_descobertas_navegador.py`
+(3) cobrem o card mudo no começo, cada tipo de golpe revelando a sua defesa e
+só ela, o que fica anotado, o grupo continuando aberto, a ferramenta com e sem
+tipos, e o selo aparecendo na tela com o marcador certo.
+
 ### Outros botões
 
 - **Defender**, Esquivar (Dodge), Ação.

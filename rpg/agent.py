@@ -732,6 +732,11 @@ REGRA: Se a ação faria sentido num mundo real coerente, use social_check().
   Nesse caso, certifique-se de que os efeitos são justos para o nível do grupo.
   Nunca ignore o aviso — ajuste ou explique os efeitos ao jogador.
 • Jogador usa magia Identificar ou pede detalhes de item → identify_item().
+• A tela de combate só mostra resistência, imunidade e vulnerabilidade de um
+  inimigo depois que o grupo descobre — levando o golpe daquele tipo, ou por
+  reveal_defenses(). Teste de conhecimento bem-sucedido sobre a criatura,
+  personagem que já a enfrentou, ou a cena entregando a dica: chame
+  reveal_defenses() em vez de só narrar, senão o card continua mudo.
 • Equipamento: o jogador também veste, tira e larga itens na MOCHILA (atalho
   no cartão do personagem); a CA e a carga que você lê na ficha já refletem
   isso. equip_item() recusa item que não reconhece sem slot, armadura que o

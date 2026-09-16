@@ -2676,6 +2676,37 @@ def _bypasses_material_resistance(weapon: str) -> bool:
     return any(_norm_txt(m) in nome for m in _MATERIAIS_ESPECIAIS)
 
 
+# ── Defesas descobertas ────────────────────────────────────────────────────
+# Resistência, imunidade e vulnerabilidade de um INIMIGO são informação de
+# jogo: quem enfrenta um zumbi só sabe que o fogo dói mais nele depois de
+# atear fogo nele (ou de estudar o bicho). A ficha guarda o que o grupo já
+# viu; o card da tela mostra só isso.
+_CAMPOS_DE_DEFESA = ("resistencias", "imunidades", "vulnerabilidades")
+
+
+def _marcar_descoberta(sheet: dict, campo: str, tipo: str) -> None:
+    """Anota que o grupo viu esta defesa. Idempotente."""
+    if not tipo or campo not in _CAMPOS_DE_DEFESA:
+        return
+    desc = sheet.get("descobertas")
+    if not isinstance(desc, dict):
+        desc = {}
+        sheet["descobertas"] = desc
+    lista = desc.get(campo)
+    if not isinstance(lista, list):
+        lista = []
+        desc[campo] = lista
+    if tipo not in lista:
+        lista.append(tipo)
+
+
+def _ja_descoberto(sheet: dict, campo: str, tipo: str) -> bool:
+    desc = sheet.get("descobertas")
+    if not isinstance(desc, dict):
+        return False
+    return tipo in (desc.get(campo) or [])
+
+
 def _damage_multiplier(sheet: dict, tipo: str,
                        arma_magica: bool = False) -> tuple[float, str]:
     """
@@ -2836,6 +2867,16 @@ def _apply_damage(target: dict, amount: int = 0, damage_type: str = "",
             tipo = canon
         mult, nota_tipo = _damage_multiplier(sheet, canon, arma_magica)
         if nota_tipo:
+            # O golpe mostrou a defesa na prática: ela deixa de ser segredo.
+            if mult == 0.0:
+                _marcar_descoberta(sheet, "imunidades", canon)
+            elif mult == 0.5:
+                _marcar_descoberta(sheet, "resistencias", canon)
+            elif mult == 2.0:
+                _marcar_descoberta(sheet, "vulnerabilidades", canon)
+            else:   # resistência e vulnerabilidade se cancelando
+                _marcar_descoberta(sheet, "resistencias", canon)
+                _marcar_descoberta(sheet, "vulnerabilidades", canon)
             if len(components) > 1:
                 nota_tipo += f" ({parcela_bruta} de dano {canon or 'sem tipo'})"
             notas.append(nota_tipo)
@@ -5967,6 +6008,64 @@ def _desequipar_o_que_saiu(char: dict, nome: str) -> str:
 # ---------------------------------------------------------------------------
 # 8. Condições e Status Temporários  (NOVO)
 # ---------------------------------------------------------------------------
+
+def reveal_defenses(char_name: str, damage_types: str = "") -> str:
+    """
+    Revela ao grupo as defesas de uma criatura: resistência, imunidade ou
+    vulnerabilidade a tipos de dano.
+
+    A tela de combate só mostra a defesa de um INIMIGO depois que o grupo a
+    descobre — levando o golpe daquele tipo, ou por esta ferramenta. Chame
+    depois de um teste de conhecimento bem-sucedido (Natureza, Arcanismo,
+    Religião), quando alguém do grupo já enfrentou a criatura antes, ou
+    quando a cena entrega a informação (um livro, um sobrevivente, o cheiro
+    de enxofre). As defesas dos personagens do grupo não precisam disto: a
+    ficha deles é do jogador.
+
+    Args:
+        char_name:    Nome da criatura.
+        damage_types: Tipos a revelar, separados por vírgula (ex.: "fogo,
+                      radiante"). Vazio revela todas as defesas dela.
+    """
+    char, err = _get_char(char_name)
+    if not char:
+        return err
+    sheet = char.get("sheet") or {}
+    if not sheet:
+        return f"Nota: {char.get('name', char_name)} não tem ficha com defesas."
+
+    pedidos = [_norm_damage_type(x.strip()) or x.strip().lower()
+               for x in (damage_types or "").split(",") if x.strip()]
+
+    rotulos = {"resistencias": "Resistente a", "imunidades": "Imune a",
+               "vulnerabilidades": "Vulnerável a"}
+    reveladas, ja_sabidas = [], []
+    for campo in _CAMPOS_DE_DEFESA:
+        tipos = sorted({tp for e in _traits_lookup(sheet, campo)
+                        for tp in e.get("tipos", [])})
+        for tp in tipos:
+            if pedidos and tp not in pedidos:
+                continue
+            if _ja_descoberto(sheet, campo, tp):
+                ja_sabidas.append(f"{rotulos[campo]} {tp}")
+                continue
+            _marcar_descoberta(sheet, campo, tp)
+            reveladas.append(f"{rotulos[campo]} {tp}")
+
+    memory.save_campaign()
+    nome = char.get("name", char_name)
+    if not reveladas and not ja_sabidas:
+        alvo = f" de {', '.join(pedidos)}" if pedidos else ""
+        return (f"Nota: nada a revelar — {nome} não tem resistência, imunidade "
+                f"nem vulnerabilidade{alvo}. Diga isso ao grupo: descobrir que "
+                f"não há fraqueza também é informação.")
+    partes = [f"O grupo agora sabe sobre {nome}:"]
+    if reveladas:
+        partes.append("   " + " | ".join(reveladas))
+    if ja_sabidas:
+        partes.append(f"   (já sabia: {' | '.join(ja_sabidas)})")
+    return "\n".join(partes)
+
 
 def apply_condition(char_name: str, condition: str, duration_turns: int = 0) -> str:
     """
@@ -12643,6 +12742,17 @@ def _combatant_weapons(ch: dict) -> list[dict]:
     return out
 
 
+def _defesas_visiveis(ch: dict, sheet: dict, campo: str) -> list[str]:
+    """
+    Os tipos daquele campo que a tela pode mostrar: todos, nos personagens do
+    grupo (a ficha é do jogador), e só os descobertos nos demais.
+    """
+    tipos = sorted({t for e in _traits_lookup(sheet, campo) for t in e.get("tipos", [])})
+    if memory.is_party_member(ch):
+        return tipos
+    return [t for t in tipos if _ja_descoberto(sheet, campo, t)]
+
+
 def _combatant_snapshot(name: str) -> dict | None:
     ch = memory.campaign["characters"].get(memory.char_key(name))
     if not ch:
@@ -12728,12 +12838,9 @@ def _combatant_snapshot(name: str) -> dict | None:
         "hp_temp":    _temp_hp(s),
         "concentracao": (s.get("concentracao") or {}).get("magia", ""),
         "reacao_disponivel": _reaction_available(ch),
-        "resistencias":     sorted({t for e in _traits_lookup(s, "resistencias")
-                                    for t in e.get("tipos", [])}),
-        "imunidades":       sorted({t for e in _traits_lookup(s, "imunidades")
-                                    for t in e.get("tipos", [])}),
-        "vulnerabilidades": sorted({t for e in _traits_lookup(s, "vulnerabilidades")
-                                    for t in e.get("tipos", [])}),
+        "resistencias":     _defesas_visiveis(ch, s, "resistencias"),
+        "imunidades":       _defesas_visiveis(ch, s, "imunidades"),
+        "vulnerabilidades": _defesas_visiveis(ch, s, "vulnerabilidades"),
         "mp":         int(s.get("mana_atual", 0) or 0),
         "mp_max":     int(s.get("mana_max", 0) or 0),
         "ca":         int(s.get("ca", 10) or 10),
@@ -13299,6 +13406,7 @@ DND_TOOLS = [
     unequip_item,
     apply_condition,
     remove_condition,
+    reveal_defenses,
     modify_currency,
     roll_death_save,
     add_item,

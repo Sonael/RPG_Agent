@@ -214,10 +214,17 @@ def test_snapshot_expoe_reacao_e_defesas(campanha, povoar):
     )
     iniciar_combate(["Heroína", "Golem"])
 
-    snap = T.combat_snapshot()
-    golem = next(c for c in snap["combatants"] if c["name"] == "Golem")
+    def _golem():
+        return next(c for c in T.combat_snapshot()["combatants"] if c["name"] == "Golem")
 
-    assert golem["resistencias"] == ["fire"]
-    assert golem["imunidades"] == ["poison"]
+    golem = _golem()
+    # As defesas do inimigo entram no snapshot conforme o grupo as descobre
+    # (ver test_defesas_descobertas.py): no começo da luta, nenhuma.
+    assert golem["resistencias"] == [] and golem["imunidades"] == []
     assert golem["hp_temp"] == 5
     assert golem["reacao_disponivel"] is True
+
+    T.reveal_defenses("Golem")
+    golem = _golem()
+    assert golem["resistencias"] == ["fire"]
+    assert golem["imunidades"] == ["poison"]

@@ -250,6 +250,8 @@ def _migrate_sheet_fields(char: dict) -> None:
         "resistencias":         [],
         "imunidades":           [],
         "vulnerabilidades":     [],
+        # v4 — o que o grupo já descobriu das defesas desta criatura.
+        "descobertas":          {},
     }
 
     for key, default_val in defaults_v2.items():
