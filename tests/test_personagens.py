@@ -108,9 +108,42 @@ def test_eventos_em_que_aparece_sem_confundir_nomes_parecidos(cliviate):
     tl.save_event("Devolveram o martelo.", "Brom, Lyra", "Forja de Cliviate")
     tl.save_event("Guardas na forja.", "Guarda Tiel; brom")
     tl.save_event("Outro ferreiro chegou.", "Bromwell")
-    eventos = personagens.ficha("Brom")["eventos"]
-    assert [e["resumo"] for e in eventos] == ["Devolveram o martelo.", "Guardas na forja."]
-    assert eventos[0]["local"] == "Forja de Cliviate"
+    f = personagens.ficha("Brom")
+    eventos = f["eventos"]
+    # Da mais recente para trás: é a ordem em que o jogador quer lembrar.
+    assert [e["resumo"] for e in eventos] == ["Guardas na forja.", "Devolveram o martelo."]
+    assert eventos[-1]["local"] == "Forja de Cliviate"
+    assert f["encontros"] == 2
+    assert f["ultima_cena"]["resumo"] == "Guardas na forja."
+
+
+def test_cena_traz_capitulo_e_consequencia(cliviate):
+    """
+    A ficha mostrava só o resumo e o local. O capítulo situa no tempo, e a
+    consequência é o que faz a cena valer a pena lembrar antes de falar com
+    ele de novo.
+    """
+    memory.campaign["chapter"] = 3
+    tl.save_event("Brom fechou a forja mais cedo.", "Brom", "Forja de Cliviate",
+                  "Passou a evitar o grupo.")
+    cena = personagens.ficha("Brom")["eventos"][0]
+    assert cena["capitulo"] == 3
+    assert cena["consequencia"] == "Passou a evitar o grupo."
+
+
+def test_a_ficha_mostra_as_cinco_cenas_mais_recentes(cliviate):
+    for i in range(1, 9):
+        tl.save_event(f"Cena {i} com o ferreiro.", "Brom")
+    f = personagens.ficha("Brom")
+    assert [e["resumo"] for e in f["eventos"]] == [
+        f"Cena {i} com o ferreiro." for i in (8, 7, 6, 5, 4)]
+    # O total continua sendo dito, para a tela poder falar em "5 de 8".
+    assert f["encontros"] == 8
+
+
+def test_sem_cena_nenhuma_a_ficha_nao_inventa(cliviate):
+    f = personagens.ficha("Brom")
+    assert f["eventos"] == [] and f["encontros"] == 0 and f["ultima_cena"] is None
 
 
 # ---------------------------------------------------------------------------

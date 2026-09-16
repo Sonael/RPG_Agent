@@ -99,9 +99,13 @@ def test_cartao_do_indice_abre_a_ficha_completa(pagina):
     assert "O filho dele sumiu na estrada do norte" in pg.inner_text("#psn-sabe")
     ligacoes = pg.inner_text("#psn-ligacoes")
     assert "O filho do ferreiro" in ligacoes
-    assert "devolveu o martelo do avô" in ligacoes
-    assert "Guardas tentaram fechar a forja" in ligacoes
     assert "Trabalha em Forja de Cliviate" in ligacoes
+
+    # As cenas com ele têm bloco próprio, da mais recente para trás.
+    cenas = pg.inner_text("#psn-cenas")
+    assert "devolveu o martelo do avô" in cenas
+    assert "Guardas tentaram fechar a forja" in cenas
+    assert cenas.index("Guardas tentaram fechar a forja") < cenas.index("devolveu o martelo do avô")
     assert not erros, erros[:3]
 
 

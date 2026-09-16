@@ -18,6 +18,7 @@ from rpg import locais, memory
 
 _FORA_DE_ALCANCE = ("morto", "desaparecido", "preso", "exilado", "fugiu")
 MAX_CONHECIDO = 30
+MAX_CENAS = 5
 
 
 def limpar_conhecido(fatos) -> list[str]:
@@ -136,9 +137,15 @@ def ficha(nome: str) -> dict:
         if isinstance(q, dict) and q.get("quem_deu") and locais.norm(q["quem_deu"]) == locais.norm(nome_real):
             missoes.append({"titulo": q.get("titulo", ""), "status": q.get("status", "")})
 
-    eventos = [{"resumo": e.get("summary", ""), "local": e.get("location", "")}
-               for e in (memory.campaign.get("events") or [])
-               if isinstance(e, dict) and _cita(e.get("characters_involved", ""), nome_real)]
+    # As cenas em que ele aparece, da mais recente para trás. Antes a ficha
+    # mostrava oito, das mais antigas para a frente e sem capítulo nem
+    # consequência: o jogador que tinha acabado de conversar com ele lia
+    # primeiro o encontro de três capítulos atrás.
+    cenas = [{"resumo": e.get("summary", ""), "local": e.get("location", ""),
+              "capitulo": e.get("chapter"), "consequencia": e.get("consequence", "") or ""}
+             for e in (memory.campaign.get("events") or [])
+             if isinstance(e, dict) and _cita(e.get("characters_involved", ""), nome_real)]
+    eventos = list(reversed(cenas))
 
     loja = _loja_do_personagem(nome_real, local)
 
@@ -157,7 +164,11 @@ def ficha(nome: str) -> dict:
             "historico": historico, "efeitos": _efeitos_da_atitude(valor),
         },
         "missoes": missoes,
-        "eventos": eventos[-8:],
+        # A lista curta é a da tela; `encontros` diz quantas existem ao todo,
+        # para ela poder dizer "as 5 mais recentes de 12".
+        "eventos": eventos[:MAX_CENAS],
+        "encontros": len(eventos),
+        "ultima_cena": eventos[0] if eventos else None,
         "loja": loja,
         "pode_falar": (not do_grupo and bool(alcance)
                        and status.lower() not in _FORA_DE_ALCANCE),

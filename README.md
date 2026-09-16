@@ -820,6 +820,14 @@ o próximo passo pendente, e aparecem na barra lateral do jogo.
   número — antes ela dizia "leal" e o jogador não sabia o que ganhava com
   isso. `test_atitude_no_preco.py` (14) e
   `test_atitude_no_preco_navegador.py` (5).
+- **As últimas cenas com ele**, bloco próprio na ficha do personagem. Os
+  eventos em que ele aparece já entravam na lista de Ligações, oito de uma
+  vez, das mais antigas para a frente e só com resumo e local: quem tinha
+  acabado de falar com o ferreiro lia primeiro o encontro de três capítulos
+  atrás. Agora são as cinco mais recentes, da última para trás, com o
+  capítulo e a consequência que `save_event` grava — e a ficha diz quantas
+  existem ao todo. É o que o jogador quer lembrar antes de falar com alguém
+  de novo.
 - **Atitude** (`adjust_attitude`, `get_attitude`, `list_attitudes`): o que
   cada NPC sente pelo grupo, de -100 (hostil) a +100 (leal), com histórico
   curto do motivo de cada mudança. Antes isso não existia em lugar nenhum —

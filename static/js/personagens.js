@@ -48,6 +48,8 @@
             </div>
             <h2 class="lcl-secao psn-secao-sabe">O que o grupo sabe</h2>
             <div id="psn-sabe" class="lcl-lista"></div>
+            <h2 class="lcl-secao psn-secao-sabe" id="psn-cenas-titulo">Últimas cenas com ele</h2>
+            <div id="psn-cenas" class="lcl-lista"></div>
           </section>
           <section class="lcl-corpo-dentro" aria-label="Ligações">
             <h2 class="lcl-secao">Ligações</h2>
@@ -123,6 +125,25 @@
       ${hist}`;
   }
 
+  // As cenas em que ele aparece, da mais recente para trás: é o que o jogador
+  // quer lembrar antes de falar com alguém ("o que a gente fez com ele mesmo?").
+  function cenas(f) {
+    const lista = f.eventos || [];
+    if (!lista.length) return '<div class="lcl-vazio">Nenhuma cena registrada ainda.</div>';
+    const total = f.encontros || lista.length;
+    const rodape = total > lista.length
+      ? `<p class="psn-cenas-total">As ${lista.length} mais recentes de ${total}.</p>` : '';
+    return `<ul class="psn-cenas-lista">${lista.map(e => `
+      <li>
+        <div class="psn-cena-topo">
+          ${e.capitulo ? `<span class="psn-cena-cap">cap. ${esc(e.capitulo)}</span>` : ''}
+          ${e.local ? `<span class="psn-cena-local">${esc(e.local)}</span>` : ''}
+        </div>
+        <p class="psn-cena-resumo">${esc(e.resumo)}</p>
+        ${e.consequencia ? `<p class="psn-cena-conseq">${esc(e.consequencia)}</p>` : ''}
+      </li>`).join('')}</ul>${rodape}`;
+  }
+
   function ligacoes(f) {
     const itens = [];
     if (f.loja) {
@@ -147,9 +168,6 @@
         <span class="lcl-item-nome">${esc(m.titulo)}</span>
         ${m.status ? `<span class="lcl-marca">${esc(m.status)}</span>` : ''}</div>
         <p class="lcl-item-desc">Encomendada por ${esc(f.nome)}.</p></div>`));
-    (f.eventos || []).forEach(e => itens.push(`
-      <div class="lcl-item"><div class="lcl-item-cabeca"><span class="lcl-marca">evento</span></div>
-        <p class="lcl-item-desc psn-evento">${esc(e.resumo)}${e.local ? ` <small>— ${esc(e.local)}</small>` : ''}</p></div>`));
     return itens.length ? itens.join('') : '<div class="lcl-vazio">Nenhuma ligação registrada ainda.</div>';
   }
 
@@ -164,6 +182,7 @@
       q('psn-tracos').textContent = '';
       q('psn-relacao-bloco').classList.add('hidden');
       q('psn-sabe').innerHTML = '';
+      q('psn-cenas').innerHTML = '';
       q('psn-ligacoes').innerHTML = '';
       q('psn-editar').classList.add('hidden');
       return;
@@ -180,6 +199,7 @@
     q('psn-sabe').innerHTML = sabe.length
       ? `<ul class="psn-sabe-lista">${sabe.map(s => `<li>${esc(s)}</li>`).join('')}</ul>`
       : '<div class="lcl-vazio">Nada registrado ainda.</div>';
+    q('psn-cenas').innerHTML = cenas(_last);
     q('psn-ligacoes').innerHTML = ligacoes(_last);
     q('psn-editar').classList.remove('hidden');
     mensagem('');
