@@ -117,6 +117,8 @@
         </div>
         <div class="psn-barra-pontas"><span>hostil</span><span>leal</span></div>
         <p class="psn-conduta">${esc(a.conduta)}.</p>
+        ${(a.efeitos || []).length ? `<ul class="psn-efeitos">${
+          a.efeitos.map(e => `<li>${esc(e)}</li>`).join('')}</ul>` : ''}
       </div>
       ${hist}`;
   }
@@ -124,10 +126,21 @@
   function ligacoes(f) {
     const itens = [];
     if (f.loja) {
+      const l = f.loja;
+      // O estoque aqui evita a viagem até a tela da loja, que só abre no
+      // local dela. O preço já é o que ele vai cobrar deste grupo.
+      const estoque = (l.estoque || []).length
+        ? `<ul class="psn-estoque">${l.estoque.map(i => `
+            <li><span class="psn-estoque-nome">${esc(i.nome)}</span>
+                <span class="psn-estoque-preco">${i.preco} po${
+                  i.preco !== i.tabela ? ` <small>(tabela ${i.tabela})</small>` : ''}</span>
+                ${i.qtd < 99 ? `<span class="psn-estoque-qtd">${i.qtd}x</span>` : ''}</li>`).join('')}</ul>`
+        : '<p class="lcl-item-desc">Sem estoque aberto.</p>';
       itens.push(`<div class="lcl-item"><div class="lcl-item-cabeca"><span class="lcl-marca lcl-marca-loja">loja</span>
-        <span class="lcl-item-nome">Trabalha em ${esc(f.loja)}</span></div>
+        <span class="lcl-item-nome">${l.dono ? 'Atende em' : 'Trabalha em'} ${esc(l.nome)}</span></div>
+        ${estoque}
         <div class="lcl-item-acoes"><button class="lcl-btn lcl-btn-sec"
-          onclick="window.Personagens._verLocal('${aspas(f.loja)}')">Ver o lugar</button></div></div>`);
+          onclick="window.Personagens._verLocal('${aspas(l.local || l.nome)}')">Ver o lugar</button></div></div>`);
     }
     (f.missoes || []).forEach(m => itens.push(`
       <div class="lcl-item"><div class="lcl-item-cabeca"><span class="lcl-marca">missão</span>

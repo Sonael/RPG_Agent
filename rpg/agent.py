@@ -564,6 +564,10 @@ SAQUE E COMPRA — o peso faz o saque virar escolha:
   Chamar open_shop de novo na MESMA loja acrescenta ao estoque em vez de
   substituir: use isso para o ferreiro receber mercadoria nova sem apagar o
   resto.
+  Informe `owner` com o nome de quem atende ("Torbin"): a atitude dele passa
+  a mexer no preço (5% a cada 20 pontos, até 25%), e a ficha dele mostra o
+  estoque. Sem dono, a loja cobra a tabela para todo mundo — o ferreiro que
+  deve a vida ao grupo e o que foi roubado por ele.
   Informe `location` com o local ONDE o grupo está: é o que faz a TELA DE
   LOJA abrir sozinha para o jogador. Se o grupo acabou de chegar a outra
   cidade, esse location também muda o local atual dele (o mesmo que

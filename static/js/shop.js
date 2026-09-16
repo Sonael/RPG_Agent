@@ -87,6 +87,7 @@
                   title="Fechar — a loja continua aberta e pode ser revisitada">✕</button>
           <h1 class="shp-title">O Balcão <span id="shp-nome">—</span></h1>
           <div id="shp-local" class="shp-local"></div>
+          <div id="shp-atitude" class="shp-atitude hidden"></div>
           <div id="shp-lojas" class="shp-lojas"></div>
         </header>
 
@@ -205,7 +206,10 @@
         </div>
         ${desc}
         <div class="shp-item-linha">
-          <span class="shp-preco">${i.preco} po</span>
+          <span class="shp-preco">${i.preco} po${
+            i.tabela && i.tabela !== i.preco
+              ? ` <small title="Tabela ${i.tabela} po — o resto é a relação com o lojista">de ${i.tabela}</small>`
+              : ''}</span>
           <span class="shp-peso">${i.peso} kg</span>
           <button class="shp-btn" ${caro ? 'disabled' : ''}
                   title="${caro ? 'Ouro insuficiente' : 'Comprar 1'}"
@@ -265,6 +269,18 @@
     const loja = _last.loja || {};
     document.getElementById('shp-nome').textContent  = loja.nome ? `— ${loja.nome}` : '';
     document.getElementById('shp-local').textContent = loja.local || '';
+
+    // Por que o preço não é o da tabela. Sem isto, o desconto (ou o ágio)
+    // parecia erro do motor.
+    const at = _last.atitude;
+    const aviso = document.getElementById('shp-atitude');
+    if (aviso) {
+      aviso.textContent = at
+        ? `${at.dono} está ${at.rotulo} com o grupo: ${at.pct > 0 ? '+' : ''}${at.pct}% no preço.`
+        : '';
+      aviso.classList.toggle('hidden', !at);
+      aviso.classList.toggle('shp-atitude-cara', !!at && at.pct > 0);
+    }
 
     // Mais de uma loja neste local: seletor. Sem ele a segunda loja da cidade
     // era inalcançável pela tela.

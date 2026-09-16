@@ -45,7 +45,7 @@ def test_ficha_basica(cliviate):
     assert f["tracos"] == "Desconfiado"
     assert f["do_grupo"] is False
     assert f["local"] == {"nome": "Forja de Cliviate", "alcance": "vizinho"}
-    assert f["loja"] == "Forja de Cliviate"
+    assert f["loja"]["nome"] == "Forja de Cliviate" and f["loja"]["dono"] is False
 
 
 def test_notas_do_mestre_nao_entram_na_ficha(cliviate):

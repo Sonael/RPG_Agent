@@ -809,6 +809,17 @@ o próximo passo pendente, e aparecem na barra lateral do jogo.
   passa pelo mesmo `combat_action` da tela do jogador: mesmo dado, mesmo teto
   de exaustão, mesma baixa na unidade. Antes o turno do NPC nunca olhava o
   inventário — um bandido morria com a poção no cinto.
+- **A atitude no balcão.** `open_shop(..., owner="Torbin")` guarda quem
+  atende, e o preço passa pela relação dele com o grupo: a mesma escala do
+  teste social, 5% a cada 20 pontos, teto de 25% para os dois lados. Desconto
+  na compra, ágio na venda; `buy_item` e `sell_item` cobram e pagam por ela, e
+  a tela do balcão mostra o preço pedido com a tabela ao lado e diz de onde
+  vem a diferença. Sem dono, a loja cobra a tabela para todo mundo.
+  A ficha do personagem ganhou o estoque de quem atende (evita a viagem até a
+  tela da loja, que só abre no local dela) e a lista do que a atitude vale em
+  número — antes ela dizia "leal" e o jogador não sabia o que ganhava com
+  isso. `test_atitude_no_preco.py` (14) e
+  `test_atitude_no_preco_navegador.py` (5).
 - **Atitude** (`adjust_attitude`, `get_attitude`, `list_attitudes`): o que
   cada NPC sente pelo grupo, de -100 (hostil) a +100 (leal), com histórico
   curto do motivo de cada mudança. Antes isso não existia em lugar nenhum —

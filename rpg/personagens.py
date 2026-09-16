@@ -56,6 +56,59 @@ def _cita(texto: str, nome: str) -> bool:
     return alvo in partes or f" {alvo} " in f" {locais.norm(texto)} "
 
 
+def _loja_do_personagem(nome: str, local: str) -> dict | None:
+    """
+    A loja em que ele atende, com o estoque: a que tem o nome dele como dono
+    (open_shop(owner=...)) ou, na falta disso, a do lugar onde ele está.
+
+    A ficha dizia só "Trabalha em X" e mandava o jogador até a tela da loja
+    para saber o que havia à venda — quando a tela abre, que é só no local.
+    """
+    from rpg import tools_dnd as td
+
+    lojas = (memory.campaign.get("lojas") or {}).values()
+    escolhida = next((l for l in lojas
+                      if locais.norm(l.get("dono", "") or "") == locais.norm(nome)), None)
+    dono = escolhida is not None
+    if not escolhida and local:
+        lugar = locais.lugar(local)
+        if lugar and lugar.get("tipo") == "loja":
+            escolhida = next((l for l in lojas
+                              if locais.norm(l.get("nome", "")) == locais.norm(lugar["name"])), None)
+            if not escolhida:
+                # A loja existe como LUGAR, mas sem estoque aberto ainda.
+                return {"nome": lugar["name"], "dono": False, "estoque": [], "local": lugar["name"]}
+    if not escolhida:
+        return None
+    return {
+        "nome":  escolhida.get("nome", ""),
+        "dono":  dono,
+        "local": escolhida.get("local", "") or "",
+        "estoque": [{"nome": i.get("nome", ""),
+                     "preco": td._preco_com_atitude(int(i.get("preco", 0) or 0), escolhida),
+                     "tabela": int(i.get("preco", 0) or 0),
+                     "qtd": int(i.get("qtd", 0) or 0)}
+                    for i in (escolhida.get("estoque") or [])],
+    }
+
+
+def _efeitos_da_atitude(valor: int) -> list[str]:
+    """
+    O que a atitude faz na mesa, em número. Ela já mexia na CD dos testes
+    sociais e agora mexe no preço da loja, e nada disso aparecia na ficha:
+    o jogador via "leal" e não sabia o que ganhava com isso.
+    """
+    from rpg import tools_dnd as td
+
+    passos = td._passos_de_atitude(valor)
+    if not passos:
+        return []
+    cd  = -passos
+    pct = -passos * int(td._PASSO_DE_PRECO * 100)
+    return [f"{cd:+d} na CD de testes sociais com ele",
+            f"{pct:+d}% no preço da loja dele"]
+
+
 def ficha(nome: str) -> dict:
     from rpg.tools import _faixa_atitude, atitude_de
 
@@ -87,10 +140,7 @@ def ficha(nome: str) -> dict:
                for e in (memory.campaign.get("events") or [])
                if isinstance(e, dict) and _cita(e.get("characters_involved", ""), nome_real)]
 
-    loja = ""
-    lugar = locais.lugar(local) if local else None
-    if lugar and lugar.get("tipo") == "loja":
-        loja = lugar["name"]
+    loja = _loja_do_personagem(nome_real, local)
 
     return {
         "existe": True,
@@ -104,7 +154,7 @@ def ficha(nome: str) -> dict:
         # Relação só faz sentido para quem não é do grupo.
         "atitude": None if do_grupo else {
             "valor": valor, "rotulo": rotulo, "conduta": conduta,
-            "historico": historico,
+            "historico": historico, "efeitos": _efeitos_da_atitude(valor),
         },
         "missoes": missoes,
         "eventos": eventos[-8:],

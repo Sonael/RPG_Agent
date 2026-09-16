@@ -8287,6 +8287,70 @@ def _lojas() -> dict:
     return memory.campaign.setdefault("lojas", {})
 
 
+# ── Atitude do lojista no preço ────────────────────────────────────────────
+# A atitude já valia 1 de CD social a cada 20 pontos (social_check). No balcão
+# ela não valia nada: o ferreiro que devia a vida ao grupo cobrava do mesmo
+# jeito que o que tinha sido roubado por ele. Mesma escala, mesma ideia: 5% a
+# cada 20 pontos, teto de 25% para os dois lados.
+_PASSO_DE_PRECO = 0.05
+_TETO_DE_PASSOS = 5
+
+
+def _passos_de_atitude(valor: int) -> int:
+    """Quantos degraus de 20 pontos, com teto — o mesmo do social_check."""
+    return max(-_TETO_DE_PASSOS, min(_TETO_DE_PASSOS, int(valor) // 20))
+
+
+def _dono_da_loja(loja: dict) -> dict | None:
+    """O personagem dono da loja, quando ela tem um e ele existe na campanha."""
+    nome = (loja or {}).get("dono", "") or ""
+    if not nome:
+        return None
+    return memory.campaign.get("characters", {}).get(memory.char_key(nome))
+
+
+def _atitude_da_loja(loja: dict) -> dict | None:
+    """
+    {dono, valor, rotulo, pct, compra, venda} ou None quando a loja não tem
+    dono, o dono sumiu ou a atitude dele é neutra o bastante para não mexer
+    em nada. `compra` e `venda` são fatores: preço pedido e preço pago.
+    """
+    dono = _dono_da_loja(loja)
+    if not dono:
+        return None
+    from rpg.tools import _faixa_atitude, atitude_de
+    valor  = atitude_de(dono)
+    passos = _passos_de_atitude(valor)
+    if not passos:
+        return None
+    rotulo, _conduta = _faixa_atitude(valor)
+    return {
+        "dono":   dono.get("name", ""),
+        "valor":  valor,
+        "rotulo": rotulo,
+        "pct":    -passos * int(_PASSO_DE_PRECO * 100),
+        "compra": 1 - passos * _PASSO_DE_PRECO,
+        "venda":  1 + passos * _PASSO_DE_PRECO,
+    }
+
+
+def _preco_com_atitude(preco: int, loja: dict) -> int:
+    """Preço pedido por uma unidade, já com a atitude do dono."""
+    ajuste = _atitude_da_loja(loja)
+    if not ajuste:
+        return int(preco)
+    return max(1, int(round(int(preco) * ajuste["compra"])))
+
+
+def _ganho_com_atitude(tabela: int, loja: dict) -> int:
+    """O que a loja paga por uma unidade: metade da tabela, com a atitude."""
+    base = max(1, int(tabela) // 2)
+    ajuste = _atitude_da_loja(loja)
+    if not ajuste:
+        return base
+    return max(1, int(round(base * ajuste["venda"])))
+
+
 def _preco_do_srd(nome: str) -> int | None:
     """
     Preço em PEÇAS DE OURO vindo do SRD. None quando não há.
@@ -8329,7 +8393,7 @@ def _preco_do_srd(nome: str) -> int | None:
     return None
 
 
-def open_shop(shop_name: str, items: str, location: str = "") -> str:
+def open_shop(shop_name: str, items: str, location: str = "", owner: str = "") -> str:
     """
     Monta uma loja com estoque e preços. Arma e armadura com nome em português
     já saem com o custo oficial do SRD ('Espada Longa' → 15 po); para o resto,
@@ -8355,6 +8419,9 @@ def open_shop(shop_name: str, items: str, location: str = "") -> str:
                    atual). Se for outro local, ele passa a ser o local atual
                    do grupo — é o que faz a tela de loja abrir. Para
                    reabastecer uma loja de outro lugar, não informe.
+        owner:     Nome do personagem que atende ('Torbin'). A atitude dele
+                   mexe no preço: 5% a cada 20 pontos, até 25% para menos ou
+                   para mais, e a ficha dele passa a mostrar o estoque.
     """
     nome_loja = (shop_name or "").strip()
     if not nome_loja:
@@ -8404,8 +8471,10 @@ def open_shop(shop_name: str, items: str, location: str = "") -> str:
     loja  = _lojas().get(chave)
     ja_existia = loja is not None
     if not ja_existia:
-        loja = {"nome": nome_loja, "local": "", "estoque": []}
+        loja = {"nome": nome_loja, "local": "", "dono": "", "estoque": []}
         _lojas()[chave] = loja
+    if owner:
+        loja["dono"] = owner.strip()
     if location or not loja.get("local"):
         loja["local"] = location or memory.campaign.get("current_location", "")
 
@@ -8511,7 +8580,8 @@ def _linha_de_venda(char: dict, item: dict, loja: dict) -> dict | None:
         "nome":    nome,
         "qtd":     int(item.get("qtd", 1) or 1),
         "tabela":  int(tabela),
-        "ganho":   max(1, int(tabela) // 2),      # a loja paga METADE
+        # A loja paga METADE, com o que a atitude do dono muda.
+        "ganho":   _ganho_com_atitude(tabela, loja),
         "peso":    round(_peso_do_item(item), 2),
         "custom":  bool(item.get("custom")),
     }
@@ -8577,7 +8647,10 @@ def shop_snapshot(shop_name: str = "", buyer: str = "") -> dict:
         for i in escolhida.get("estoque", []):
             estoque.append({
                 "nome":      i["nome"],
-                "preco":     int(i["preco"]),
+                # `preco` é o que a tela mostra e o que buy_item cobra: já com
+                # a atitude. `tabela` fica ao lado para a tela explicar.
+                "preco":     _preco_com_atitude(i["preco"], escolhida),
+                "tabela":    int(i["preco"]),
                 "qtd":       int(i["qtd"]),
                 "ilimitado": int(i["qtd"]) >= 99,
                 "descricao": i.get("descricao", ""),
@@ -8588,6 +8661,8 @@ def shop_snapshot(shop_name: str = "", buyer: str = "") -> dict:
     return {
         "tem_loja":  bool(escolhida),
         "loja_aqui": bool(aqui),
+        "dono":      (escolhida or {}).get("dono", ""),
+        "atitude":   _atitude_da_loja(escolhida) if escolhida else None,
         # TODAS as lojas deste local. Antes a tela só conhecia aqui[0]: com uma
         # forja e um boticário na mesma cidade, o boticário nunca aparecia —
         # nem sozinho, nem pela pílula.
@@ -8750,11 +8825,12 @@ def buy_item(char_name: str, shop_name: str, item_name: str, quantity: int = 1) 
         return f"Aviso: {loja['nome']} tem só {linha['qtd']}x {linha['nome']}."
 
     sheet = char["sheet"]
-    custo_cobre = linha["preco"] * 100 * qtd
+    unitario = _preco_com_atitude(linha["preco"], loja)
+    custo_cobre = unitario * 100 * qtd
     if not _pagar(sheet, custo_cobre):
         tem = _cobre_total(sheet)
         return (f"Erro: {char['name']} não tem como pagar: "
-                f"{linha['preco'] * qtd} po pedidos, "
+                f"{unitario * qtd} po pedidos, "
                 f"{tem // 100} po e {(tem % 100) // 10} pp na bolsa.")
 
     linha["qtd"] -= qtd
@@ -8772,8 +8848,13 @@ def buy_item(char_name: str, shop_name: str, item_name: str, quantity: int = 1) 
     if estado != "livre":
         aviso = (f"\n   Carga: {carga:.1f}/{cap:.1f} kg — **{estado}**. "
                  f"Veja check_encumbrance().")
+    ajuste = _atitude_da_loja(loja)
+    nota_atitude = ""
+    if ajuste:
+        nota_atitude = (f" (tabela {linha['preco'] * qtd} po, {ajuste['pct']:+d}% — "
+                        f"{ajuste['dono']} está {ajuste['rotulo']})")
     return (f"{char['name']} comprou {qtd}x {linha['nome']} por "
-            f"{linha['preco'] * qtd} po em {loja['nome']}.\n"
+            f"{unitario * qtd} po em {loja['nome']}{nota_atitude}.\n"
             f"   Bolsa: {sheet['ouro']} po, {sheet['prata']} pp, {sheet['cobre']} pc{aviso}")
 
 
@@ -8817,7 +8898,7 @@ def sell_item(char_name: str, shop_name: str, item_name: str, quantity: int = 1)
         return (f"Aviso: Sem preço de referência para '{item['nome']}'. "
                 f"Ponha o item na loja com open_shop() informando o preço.")
 
-    ganho = max(1, (tabela // 2)) * qtd
+    ganho = _ganho_com_atitude(tabela, loja) * qtd
     sheet = char["sheet"]
     sheet["ouro"] = int(sheet.get("ouro", 0) or 0) + ganho
 
@@ -8830,8 +8911,13 @@ def sell_item(char_name: str, shop_name: str, item_name: str, quantity: int = 1)
     _registrar_negocio("venda", char["name"], loja["nome"], item["nome"], qtd)
     memory.save_campaign()
 
+    # Na venda o sinal se inverte: o lojista que cobra 20% a menos paga 20% a
+    # mais. `pct` é sempre do ponto de vista do preço pedido.
+    ajuste = _atitude_da_loja(loja)
+    nota_atitude = (f", {-ajuste['pct']:+d}% pela relação com {ajuste['dono']}"
+                    if ajuste else "")
     return (f"{char['name']} vendeu {qtd}x {item_name} por {ganho} po "
-            f"(metade da tabela: {tabela} po) em {loja['nome']}.\n"
+            f"(metade da tabela: {tabela} po{nota_atitude}) em {loja['nome']}.\n"
             f"   Bolsa: {sheet['ouro']} po, {sheet.get('prata', 0)} pp, "
             f"{sheet.get('cobre', 0)} pc{nota_equip}")
 
