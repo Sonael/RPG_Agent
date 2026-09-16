@@ -50,6 +50,15 @@ def pagina(app_no_ar):
 
     url, nome, cap = app_no_ar
     estado = copy.deepcopy(cap.GRUPO)
+    # Companheiro recrutado pela narrativa, sem ficha de regras: some das
+    # telas que só conhecem quem tem ficha se ninguém cuidar dele.
+    # O papel vem do próprio personagem: a lista "party" do estado é
+    # substituída inteira pelo /__estado, e trocá-la tiraria os outros três.
+    estado.setdefault("characters", {})["brom"] = {
+        "name": "Brom", "sheet": None, "party_member": True, "status": "vivo",
+        "role": "Ferreiro",
+        "description": "Ferreiro de Oakhaven, veio pela dívida com Stelar.",
+    }
     estado["saque_proposto"] = None
     estado["descanso_proposto"] = None
     estado["combat_state"] = {"is_active": False, "initiative_order": []}
@@ -80,12 +89,40 @@ def _abrir(pg):
     pg.wait_for_selector("#grupo-overlay:not(.hidden) .grp-cartao", timeout=5000)
 
 
+def test_companheiro_sem_ficha_tem_cartao_e_leva_a_ficha_do_personagem(pagina):
+    pg, erros, _ = pagina
+    _abrir(pg)
+    cartao = pg.locator(_cartao("Brom"))
+    assert cartao.count() == 1, "o companheiro sem ficha sumiu da visão geral"
+    texto = cartao.text_content()
+    assert "Ferreiro" in texto and "dívida com Stelar" in texto
+    # Nada de número inventado: sem barra de vida, sem dados de vida.
+    assert cartao.locator(".grp-barra").count() == 0
+
+    cartao.locator("button", has_text="Ficha do personagem").click()
+    pg.wait_for_selector("#pessoa-overlay:not(.hidden)", timeout=5000)
+    assert pg.is_hidden("#grupo-overlay")
+    assert not erros, erros[:3]
+
+
+def test_companheiro_sem_ficha_volta_para_a_barra_lateral(pagina):
+    pg, erros, _ = pagina
+    linha = "#sb-herois .sb-heroi[data-nome='Brom']"
+    pg.wait_for_selector(linha, timeout=5000)
+    assert "Ferreiro" in pg.text_content(linha)
+    pg.click(f"{linha} .sb-heroi-nome")
+    pg.wait_for_selector("#pessoa-overlay:not(.hidden)", timeout=5000)
+    assert not erros, erros[:3]
+
+
 def test_visao_geral_abre_pela_barra_lateral(pagina):
     pg, erros, _ = pagina
     pg.click("#sb-atalho-grupo")
     pg.wait_for_selector("#grupo-overlay:not(.hidden) .grp-cartao", timeout=5000)
     nomes = [el.get_attribute("data-nome") for el in pg.query_selector_all("#grp-cartoes .grp-cartao")]
-    assert set(nomes) == {"Helena", "Stelar", "Natasha"}
+    # Brom entra sem ficha de regras, depois dos três: ver o teste do cartão dele.
+    assert set(nomes) == {"Helena", "Stelar", "Natasha", "Brom"}
+    assert nomes[-1] == "Brom"
     assert "Dia 4, 20h" in pg.inner_text("#grp-hora")
     assert not erros, erros[:3]
 

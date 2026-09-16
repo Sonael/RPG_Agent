@@ -4661,6 +4661,13 @@ body.loot-on { overflow: hidden; }
 }
 .grp-cartao-precisa { border-color: var(--lcl-gold); }
 .grp-cartao-morto { opacity: 0.6; }
+
+/* Companheiro sem ficha de regras: o cartão é só nome, papel e descrição. */
+.grp-cartao-sem-ficha { border-style: dashed; }
+.grp-sem-ficha-desc {
+  margin: var(--esp-2) 0 0; font-family: 'Lora', serif; font-size: 13px;
+  line-height: 1.5; color: var(--text-muted);
+}
 .grp-cartao-cabeca { display: flex; flex-direction: column; gap: 2px; }
 .grp-nome {
   border: none; background: none; padding: 0; cursor: pointer; text-align: left;

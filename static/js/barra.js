@@ -224,6 +224,15 @@
             <button class="sb-heroi-nome" type="button" onclick="window.Barra.verHeroi('${aspas(p.name)}')">${esc(p.name)}</button>
           </div>`);
       } else {
+        // Companheiro sem ficha de regras entra na lista como entra o resto
+        // do grupo: sem números, porque não há de onde tirá-los, e abrindo a
+        // ficha do personagem. Antes ele sumia da barra.
+        const semFicha = ((_grupo && _grupo.sem_ficha) || []).map(p => `
+          <div class="sb-heroi sb-heroi-sem-ficha" data-nome="${esc(p.nome)}">
+            <button class="sb-heroi-nome" type="button" onclick="window.Barra.verHeroi('${aspas(p.nome)}')"
+                    title="Abrir a ficha de ${esc(p.nome)}">${esc(p.nome)}</button>
+            ${p.papel ? `<span class="sb-heroi-papel">${esc(p.papel)}</span>` : ''}
+          </div>`);
         linhas = herois.map(h => `
           <div class="sb-heroi${h.morto ? ' sb-heroi-morto' : ''}" data-nome="${esc(h.nome)}">
             <button class="sb-heroi-nome" type="button" onclick="window.Barra.verHeroi('${aspas(h.nome)}')"
@@ -232,7 +241,7 @@
                   aria-label="Vida ${h.vida.atual} de ${h.vida.max}"><span style="width:${h.vida.pct}%"></span></span>
             <span class="sb-heroi-num">${h.vida.atual}/${h.vida.max}${h.vida.temp ? `<small>+${h.vida.temp}</small>` : ''}</span>
             ${marcasDoHeroi(h) ? `<span class="sb-heroi-marcas">${marcasDoHeroi(h)}</span>` : ''}
-          </div>`);
+          </div>`).concat(semFicha);
       }
     } else {
       linhas = (_mem.party || []).map(p => `

@@ -167,12 +167,39 @@ def _resumo(herois: list[dict], em_combate: bool) -> dict:
     }
 
 
+def _sem_ficha() -> list[dict]:
+    """
+    Quem está no grupo sem ficha de regras: o companheiro que o mestre
+    recrutou pela narrativa e nunca recebeu atributos.
+
+    Numa campanha D&D essa gente sumia da barra lateral e da visão geral, que
+    só conheciam quem tem ficha — como se não estivesse no grupo. Aqui eles
+    voltam com o que existe deles: nome, papel e a descrição.
+    """
+    chars = memory.campaign.get("characters", {}) or {}
+    papeis = {memory.char_key(m.get("name", "")): (m.get("role") or "")
+              for m in (memory.campaign.get("party") or []) if isinstance(m, dict)}
+    fora = []
+    for ch in chars.values():
+        if not memory.is_party_member(ch) or (ch.get("sheet") or {}):
+            continue
+        nome = ch.get("name", "")
+        fora.append({
+            "nome": nome,
+            "papel": papeis.get(memory.char_key(nome), "") or (ch.get("role") or ""),
+            "descricao": (ch.get("description") or "").strip(),
+            "morto": (ch.get("status") or "").lower() == "morto",
+        })
+    return sorted(fora, key=lambda x: x["nome"].lower())
+
+
 def group_snapshot() -> dict:
-    """Os membros do grupo com ficha, lado a lado, e o resumo (JSON-serializável)."""
+    """O grupo lado a lado e o resumo (JSON-serializável)."""
     herois = [_heroi(ch) for ch in td._grupo_com_ficha()]
     em_combate = td._em_combate()
     return {
         "herois": herois,
+        "sem_ficha": _sem_ficha(),
         "em_combate": em_combate,
         "hora": td._hora_legivel(),
         "resumo": _resumo(herois, em_combate),

@@ -107,6 +107,27 @@
     return `<p class="grp-linha grp-descanso">${partes.join(' · ')}</p>`;
   }
 
+  // Companheiro sem ficha de regras: existe na história, não no motor. O
+  // cartão diz o que existe dele e leva à ficha do personagem — barra de vida
+  // e dados de vida seriam números inventados.
+  function cartaoSemFicha(p) {
+    const nome = aspas(p.nome);
+    return `
+      <article class="grp-cartao grp-cartao-sem-ficha${p.morto ? ' grp-cartao-morto' : ''}"
+               data-nome="${esc(p.nome)}">
+        <header class="grp-cartao-cabeca">
+          <button class="grp-nome" onclick="window.Grupo._tela('${nome}','personagem')"
+                  title="Abrir a ficha do personagem">${esc(p.nome)}</button>
+          <span class="grp-sub">${esc(p.papel || 'sem ficha de regras')}</span>
+        </header>
+        ${p.descricao ? `<p class="grp-sem-ficha-desc">${esc(p.descricao)}</p>` : ''}
+        <footer class="grp-acoes">
+          <button class="lcl-btn lcl-btn-sec"
+                  onclick="window.Grupo._tela('${nome}','personagem')">Ficha do personagem</button>
+        </footer>
+      </article>`;
+  }
+
   function cartao(h) {
     const v = h.vida;
     const nome = aspas(h.nome);
@@ -168,11 +189,12 @@
     _last = d || {};
     ensureDom();
     const herois = _last.herois || [];
+    const semFicha = _last.sem_ficha || [];
     q('grp-hora').textContent = [_last.hora, _last.em_combate ? 'em combate' : ''].filter(Boolean).join(' · ');
     q('grp-resumo').innerHTML = herois.length ? resumo(_last) : '';
-    q('grp-cartoes').innerHTML = herois.length
-      ? herois.map(cartao).join('')
-      : '<div class="lcl-vazio">Ninguém do grupo tem ficha ainda.</div>';
+    const cartoes = herois.map(cartao).join('') + semFicha.map(cartaoSemFicha).join('');
+    q('grp-cartoes').innerHTML = cartoes
+      || '<div class="lcl-vazio">Ninguém no grupo ainda.</div>';
     mensagem('');
   }
 
@@ -216,6 +238,7 @@
   function tela(nome, qual) {
     fechar();
     if (qual === 'ficha' && window.Herois) window.Herois._abrir(nome);
+    if (qual === 'personagem' && window.Personagens) window.Personagens._abrir(nome);
     if (qual === 'mochila' && window.Inventory) window.Inventory._abrir(nome);
     if (qual === 'grimorio' && window.Grimoire) window.Grimoire._abrir(nome);
     if (qual === 'nivel' && window.LevelUp) { window.LevelUp._trocar(nome); window.LevelUp._abrir(); }

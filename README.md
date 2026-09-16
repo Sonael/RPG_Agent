@@ -2213,6 +2213,27 @@ ferido, nível abrindo a ficha, curto sem dado de vida, sem aviso de limite,
 morto nas contas, teto da exaustão ignorado) foram todas pegas. Captura nova
 (ainda não gerada): `grupo-visao-geral`.
 
+### Companheiro sem ficha de regras
+
+`group_snapshot` só conhecia quem tem ficha, e a barra lateral desenhava a
+mesma lista. Numa campanha D&D, o companheiro que o mestre recrutou pela
+narrativa e nunca recebeu atributos **sumia das duas telas** — estava no
+grupo para o motor (`is_party_member`), mas não aparecia em lugar nenhum
+onde o jogador olha o grupo.
+
+O snapshot passa a devolver `sem_ficha`: nome, papel (da lista `party` ou do
+próprio personagem), descrição e se está morto. A barra lista essas pessoas
+depois dos heróis, sem números — não há de onde tirá-los —, e a visão geral
+dá a elas um cartão de borda tracejada com o papel, a descrição e um botão
+para a ficha do personagem, que é onde vivem a história e o que o grupo sabe
+delas. Elas não entram no resumo de descanso nem na conta de carga, que
+falam de vida, dados de vida e quilos que elas não têm.
+
+`test_grupo.py` ganhou três casos (a lista própria, o resumo intocado e quem
+tem ficha nunca caindo nela, com um NPC sem ficha fora do grupo para provar
+que a porta não abriu demais) e `test_grupo_navegador.py` mais dois (o cartão
+levando à ficha do personagem e a volta à barra lateral).
+
 ## O diário como livro
 
 O diário era uma lista de entradas na barra lateral que abria um modal de

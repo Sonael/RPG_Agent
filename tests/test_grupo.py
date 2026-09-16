@@ -45,6 +45,45 @@ def test_um_cartao_por_membro_do_grupo_com_ficha(trio, povoar):
     assert snap["em_combate"] is False
 
 
+def test_companheiro_sem_ficha_aparece_numa_lista_propria(trio, povoar):
+    """
+    O companheiro que o mestre recrutou pela narrativa e nunca ficou com
+    atributos sumia da visão geral e da barra lateral, como se não estivesse
+    no grupo. Ele volta numa lista separada, com o que existe dele.
+    """
+    memory.campaign["characters"]["brom"] = {
+        "name": "Brom", "sheet": None, "party_member": True,
+        "description": "Ferreiro de Oakhaven, veio pela dívida com Thorn.",
+        "status": "vivo",
+    }
+    memory.campaign["party"].append({"name": "Brom", "role": "Ferreiro", "notes": ""})
+    povoar(criar_ficha("Goblin"))                     # inimigo não entra
+    # NPC salvo só com save_character: sem ficha, mas também sem ser do grupo.
+    memory.campaign["characters"]["ivo"] = {
+        "name": "Pescador Ivo", "sheet": None, "description": "Conhece a foz."}
+
+    snap = grupo.group_snapshot()
+    assert [h["nome"] for h in snap["herois"]] == ["Thorn", "Lyra", "Helena"]
+    assert snap["sem_ficha"] == [{
+        "nome": "Brom", "papel": "Ferreiro", "morto": False,
+        "descricao": "Ferreiro de Oakhaven, veio pela dívida com Thorn.",
+    }]
+
+
+def test_sem_ficha_nao_entra_no_resumo_de_descanso(trio):
+    """Quem não tem ficha não tem vida nem dado de vida para entrar na conta."""
+    memory.campaign["characters"]["brom"] = {
+        "name": "Brom", "sheet": None, "party_member": True, "status": "vivo"}
+    snap = grupo.group_snapshot()
+    assert "Brom" not in snap["resumo"]["descanso"]
+    assert "Brom" not in (snap["resumo"]["carga"] or "")
+
+
+def test_quem_tem_ficha_nunca_cai_na_lista_sem_ficha(trio):
+    snap = grupo.group_snapshot()
+    assert snap["sem_ficha"] == []
+
+
 def test_vida_mana_e_dados_de_vida(trio):
     helena = _heroi(grupo.group_snapshot(), "Helena")
     assert helena["vida"]["atual"] == 9 and helena["vida"]["max"] == 20
