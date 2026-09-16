@@ -112,6 +112,30 @@ def test_numeros_vem_do_motor(pagina):
     assert "crítico com 19 ou mais" in ataques
 
 
+def test_conjuracao_e_deslocamento_na_tela(pagina):
+    """
+    A CD de magia e o ataque mágico saem do atributo de conjuração da classe
+    — SAB na clériga, FOR no guerreiro, que nesta variante gasta mana em
+    manobras. O deslocamento aparece em metros para todo mundo.
+    """
+    pg, erros = pagina
+    _abrir_pelo_cartao(pg, "Helena")
+    motor = pg.evaluate("() => window.Herois._estado().personagem")
+    # text_content, não inner_text: o rótulo é maiúsculo por CSS.
+    recursos = pg.text_content("#hro-recursos")
+    assert "CD de magia" in recursos and str(motor["conjuracao"]["cd"]) in recursos
+    assert "Ataque mágico" in recursos and motor["conjuracao"]["ataque"] in recursos
+    assert motor["conjuracao"]["sigla"] == "SAB"
+    assert "Deslocamento" in recursos and "9 m" in recursos
+
+    pg.select_option("#hro-sub .hro-quem-sel", "Stelar")
+    _esperar(pg, "Stelar")
+    outro = pg.evaluate("() => window.Herois._estado().personagem")
+    assert outro["conjuracao"]["sigla"] == "FOR"
+    assert str(outro["conjuracao"]["cd"]) in pg.text_content("#hro-recursos")
+    assert not erros, erros[:3]
+
+
 def test_estado_condicoes_e_habilidades(pagina):
     pg, _ = pagina
     _abrir_pelo_cartao(pg, "Helena")

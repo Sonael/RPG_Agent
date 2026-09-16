@@ -2027,6 +2027,18 @@ que resolvem as jogadas, para o número mostrado ser o número usado:
 
 - vida (com PV temporários e o teto da exaustão), mana, CA, iniciativa,
   proficiência, percepção passiva e dados de vida;
+- **CD de magia e ataque mágico** de quem conjura: 8 + proficiência + o
+  atributo de conjuração da classe, e proficiência + o mesmo atributo. O
+  motor não tinha nenhum dos dois — o mestre pedia "role Destreza CD 14" de
+  cabeça e o jogador não sabia a CD das próprias magias. Os números também
+  entram em `get_character_sheet`, que é onde o mestre lê a ficha, e a
+  instrução dele manda usar a do conjurador em vez de chutar;
+- **deslocamento** em metros: 9 m, ou 7,5 m para anão, halfling e gnomo; mais
+  o Movimento Sem Armadura do monge (que cai com armadura ou escudo) e o
+  Movimento Rápido do bárbaro (que cai com armadura pesada); menos o que o
+  motor já modela — exaustão de nível 2 corta pela metade e a de 5 zera,
+  sobrecarga tira 3 m e carga acima do limite prende no lugar. As notas do
+  que somou ou cortou aparecem ao lado do número;
 - atributos com modificador e salvaguarda, que soma a proficiência só nas
   salvaguardas da classe (`CLASS_DATA["saves"]`);
 - perícias com o bônus e a marca de proficiente;
@@ -2051,6 +2063,10 @@ soma a proficiência e mostra "+2(prof)" no resultado. Sem `skill`, continua
 sendo teste de atributo puro.
 
 ### A tela
+
+`test_conjuracao_e_deslocamento.py` (10) cobre as duas contas por classe e
+raça, o que a armadura tira do monge e do bárbaro, exaustão e carga, e as
+linhas na ficha que o mestre lê.
 
 `static/js/herois.js`, `GET /api/heroes/sheet?personagem=`. Mesma moldura das
 fichas do local e do personagem, mais larga. Cabeçalho com seletor de herói,

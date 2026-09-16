@@ -335,6 +335,10 @@ Exemplo — Lyra com Corte Duplo:
 SAVING THROWS INTERATIVOS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+A CD da magia NÃO é chutada: get_character_sheet() traz "CD de magia" e
+"Ataque mágico" de quem conjura (8 + proficiência + atributo da classe). Use
+a do conjurador — a do jogador quando ele lança, a do NPC quando é ele.
+
 Quando inimigo usa magia com saving throw contra o jogador:
   PASSO 1: use_ability(..., saving_throw_stat="destreza", saving_throw_dc=14)
            → Ferramenta PAUSA o combate. Narre e peça: "Role Destreza CD 14!"

@@ -3692,6 +3692,96 @@ def _defesa_sem_armadura(char: dict, dex: int) -> int | None:
     return 10 + dex + _modifier(s.get("constituicao", 10))
 
 
+# ── Conjuração ─────────────────────────────────────────────────────────────
+# CD de magia = 8 + proficiência + mod. do atributo de conjuração da classe;
+# ataque mágico = proficiência + o mesmo mod. O motor não tinha nenhuma das
+# duas: o mestre chutava a CD de cabeça e o jogador não sabia a sua.
+
+def _atributo_de_conjuracao(sheet: dict) -> str:
+    """Atributo de conjuração da classe, ou "" para quem não conjura."""
+    classe = _norm_txt(sheet.get("classe", ""))
+    for nome, dados in CLASS_DATA.items():
+        if _norm_txt(nome) == classe:
+            if not dados.get("mana_per_level"):
+                return ""
+            return dados.get("mana_stat") or ""
+    return ""
+
+
+def _conjuracao(sheet: dict) -> dict | None:
+    """{atributo, sigla, cd, ataque} ou None quando a classe não conjura."""
+    atributo = _atributo_de_conjuracao(sheet)
+    if not atributo:
+        return None
+    prof = int(sheet.get("proficiencia", _proficiency_bonus(int(sheet.get("nivel", 1) or 1))) or 2)
+    mod  = _modifier(int(sheet.get(atributo, 10) or 10))
+    return {"atributo": _ATRIBUTO_PT[atributo], "sigla": _ATRIBUTO_SIGLA[atributo],
+            "cd": 8 + prof + mod, "ataque": _fmt_bonus(prof + mod)}
+
+
+# ── Deslocamento ───────────────────────────────────────────────────────────
+# Em metros, como o resto da mesa. O SRD dá 30 pés (9 m) para quase todo
+# mundo; anões, halflings e gnomos andam 25 pés (7,5 m).
+_DESLOCAMENTO_BASE_M = 9.0
+_DESLOCAMENTO_POR_RACA = {"anao": 7.5, "halfling": 7.5, "gnomo": 7.5}
+
+# Monge, Movimento Sem Armadura: +3 m no 2º nível, subindo até +9 m no 18º.
+_MOVIMENTO_DO_MONGE = ((18, 9.0), (14, 7.5), (10, 6.0), (6, 4.5), (2, 3.0))
+
+
+def _deslocamento(char: dict) -> dict:
+    """
+    {metros, base, notas} — o quanto o personagem anda num turno e por quê.
+
+    Soma o que a classe dá sem armadura (monge) ou sem armadura pesada
+    (bárbaro), e desconta o que o motor já modela: exaustão de nível 2 corta
+    pela metade, de nível 5 zera, e carga acima do limite prende no lugar.
+    """
+    sheet = char.get("sheet") or {}
+    base  = _DESLOCAMENTO_POR_RACA.get(_norm_txt(sheet.get("raca", "")), _DESLOCAMENTO_BASE_M)
+    metros = base
+    notas: list[str] = []
+
+    equip = sheet.get("equipamentos") or {}
+    armadura = _armadura_na_tabela((equip.get("armadura") or "").lower())
+    pesada = bool(armadura and armadura["dex_bonus"] == "none")
+    nivel  = int(sheet.get("nivel", 1) or 1)
+
+    if _char_has_feature(char, "Movimento Sem Armadura") and not equip.get("armadura") \
+            and not equip.get("escudo"):
+        ganho = next((m for lv, m in _MOVIMENTO_DO_MONGE if nivel >= lv), 0.0)
+        if ganho:
+            metros += ganho
+            notas.append(f"+{_metros(ganho)} de Movimento Sem Armadura")
+    if _char_has_feature(char, "Movimento Rápido") and not pesada:
+        metros += 3.0
+        notas.append("+3 m de Movimento Rápido")
+
+    exaustao = _exaustao(sheet)
+    if exaustao >= 5:
+        metros = 0.0
+        notas.append("exaustão 5: não anda")
+    elif exaustao >= 2:
+        metros /= 2
+        notas.append("exaustão 2: metade")
+
+    estado, _carga, _cap = _estado_de_carga(char)
+    if estado == "imovel":
+        metros = 0.0
+        notas.append("carga acima do limite: não anda")
+    elif estado == "sobrecarregado":
+        metros = max(0.0, metros - 3.0)
+        notas.append("-3 m de sobrecarga")
+
+    return {"metros": round(metros, 1), "base": base, "notas": notas}
+
+
+def _metros(v: float) -> str:
+    """9.0 → "9 m"; 7.5 → "7,5 m" (vírgula, como o resto da mesa)."""
+    texto = f"{v:.1f}".rstrip("0").rstrip(".")
+    return texto.replace(".", ",") + " m"
+
+
 def _recalculate_ca(char: dict) -> None:
     """
     Recalcula a CA do personagem com base nos equipamentos ativos.
@@ -4550,12 +4640,23 @@ def get_character_sheet(name: str) -> str:
         + _linha_traits("Vulnerabilidades", "vulnerabilidades")
     )
 
+    # CD de magia e ataque mágico: o mestre pedia "role CD 14" de cabeça.
+    conj = _conjuracao(s)
+    conjuracao_str = (f"  CD de magia: {conj['cd']}   Ataque mágico: {conj['ataque']}"
+                      f"   ({conj['sigla']})\n" if conj else "")
+    desloc = _deslocamento(char)
+    desloc_str = f"  Deslocamento: {_metros(desloc['metros'])}"
+    if desloc["notas"]:
+        desloc_str += f" ({'; '.join(desloc['notas'])})"
+    desloc_str += "\n"
+
     return (
         f"╔══ {char['name']} — {s['classe']} {s['raca']} Nível {nivel} ══╗\n"
         f"  XP: {xp}/{xp_p}\n"
         f"  Vida [{bar}] {s['vida_atual']}/{s['vida_max']}{death_str}\n"
         f"{temp_str}"
         f"  Mana: {s['mana_atual']}/{s['mana_max']}   CA: {s['ca']}   Prof: +{s['proficiencia']}\n"
+        f"{conjuracao_str}{desloc_str}"
         f"{conc_str}{defesas_str}"
         f"  ───────────────────────────────────\n"
         f"  FOR {_mod_str(s['forca'])}  DES {_mod_str(s['destreza'])}  CON {_mod_str(s['constituicao'])}\n"
@@ -7726,6 +7827,8 @@ def hero_snapshot(char_name: str = "") -> dict:
         "mana": {"atual": int(s.get("mana_atual", 0) or 0), "max": int(s.get("mana_max", 0) or 0)},
         "ca": int(s.get("ca", 10) or 10),
         "proficiencia": _fmt_bonus(prof),
+        "conjuracao": _conjuracao(s),
+        "deslocamento": _deslocamento(alvo),
         "iniciativa": _fmt_bonus(_modifier(int(s.get("destreza", 10) or 10))),
         "percepcao_passiva": 10 + percepcao,
         "dados_de_vida": {"restantes": restantes, "max": maximo, "dado": f"d{_dado_de_vida(s)}"},

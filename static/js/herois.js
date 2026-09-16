@@ -107,6 +107,11 @@
     return marcas.join('');
   }
 
+  // 9 → "9 m"; 7.5 → "7,5 m", que é como a mesa fala.
+  function metros(v) {
+    return String(Math.round(Number(v) * 10) / 10).replace('.', ',') + ' m';
+  }
+
   function recurso(rotulo, valor, detalhe, cls) {
     return `<div class="hro-recurso ${cls || ''}">
       <span class="hro-recurso-rotulo">${rotulo}</span>
@@ -128,6 +133,12 @@
       recurso('Iniciativa', p.iniciativa),
       recurso('Proficiência', p.proficiencia),
       recurso('Percepção passiva', p.percepcao_passiva),
+      // Quem conjura precisa dos dois números em toda magia com salvaguarda
+      // ou ataque; quem não conjura não vê linha vazia.
+      p.conjuracao ? recurso('CD de magia', p.conjuracao.cd, p.conjuracao.sigla) : '',
+      p.conjuracao ? recurso('Ataque mágico', esc(p.conjuracao.ataque), p.conjuracao.sigla) : '',
+      recurso('Deslocamento', esc(metros(p.deslocamento.metros)),
+              esc((p.deslocamento.notas || []).join(' · '))),
       recurso('Dados de vida', `${p.dados_de_vida.restantes}/${p.dados_de_vida.max}`, p.dados_de_vida.dado),
     ].join('');
   }
