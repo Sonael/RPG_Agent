@@ -264,15 +264,39 @@ def test_sem_conexao_ainda_confere_o_nivel(campanha, povoar):
 
 def test_catalogo_online_filtra_classe_e_nivel(srd):
     nomes = {s["nome"] for s in td.class_spell_catalog("mago", 1)}
-    assert nomes == {"Fire Bolt", "Light", "Magic Missile", "Shield"}
+    # O nome vem em português quando o motor tem tradução; "Fire Bolt" não
+    # tem, e fica como no SRD.
+    assert nomes == {"Fire Bolt", "Luz", "Míssil Mágico", "Escudo"}
+
+
+def test_catalogo_traduz_o_que_da_e_marca_o_resto(srd):
+    """
+    Nome e escola em português quando o motor tem a tradução; a descrição
+    também, quando ela existe em português na lista da classe. O que fica
+    como veio do SRD se identifica, para a tela poder dizer que é inglês.
+    """
+    por_nome = {s["nome"]: s for s in td.class_spell_catalog("clérigo", 1)}
+
+    cura = por_nome["Cura Ferimentos"]
+    assert cura["nome_srd"] == "Cure Wounds"
+    assert cura["em_ingles"] is False and "magical" not in cura["descricao"]
+
+    bencao = por_nome["Bênção"]
+    assert bencao["escola"] == "Encantamento"
+
+    # "Spare the Dying" não tem tradução no motor: fica como no SRD, marcada.
+    mago = {s["nome"]: s for s in td.class_spell_catalog("mago", 0)}
+    assert "Fire Bolt" in mago and mago["Fire Bolt"]["em_ingles"] is True
 
 
 def test_catalogo_le_sim_e_nao_como_texto(srd):
     """bool("no") é True: toda magia saía marcada como concentração e ritual."""
     por_nome = {s["nome"]: s for s in td.class_spell_catalog("clérigo", 1)}
-    assert por_nome["Bless"]["concentracao"] is True
-    assert por_nome["Cure Wounds"]["concentracao"] is False
-    assert por_nome["Cure Wounds"]["ritual"] is False
+    assert por_nome["Bênção"]["concentracao"] is True
+    assert por_nome["Cura Ferimentos"]["concentracao"] is False
+    assert por_nome["Cura Ferimentos"]["ritual"] is False
+    # O nome do SRD vai junto, para o cartão poder mostrar de onde veio.
+    assert por_nome["Bênção"]["nome_srd"] == "Bless"
 
 
 def test_learn_spell_nao_marca_ritual_que_nao_e(lyra, srd):
@@ -319,9 +343,9 @@ def test_snapshot_marca_ja_conhece_e_limite(irma, srd):
                            _magia("Healing Word", 1), _magia("Light", 0)]
     snap = td.grimoire_snapshot("Irmã Vera")
     por_nome = {s["nome"]: s["bloqueio"] for s in snap["catalogo"]}
-    assert por_nome["Cure Wounds"] == "já conhece"
-    assert por_nome["Bless"] == "limite de magias"
-    assert por_nome["Sacred Flame"] == ""
+    assert por_nome["Cura Ferimentos"] == "já conhece"
+    assert por_nome["Bênção"] == "limite de magias"
+    assert por_nome["Chamas Sagradas"] == ""
     assert snap["personagem"]["vagas"]["truques"] == 2
     assert "Aid" not in por_nome, "magia de 2º círculo para clériga de nível 1"
 

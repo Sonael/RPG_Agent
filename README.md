@@ -2432,6 +2432,33 @@ morto contado como presente, membro morto no grupo) foram todas pegas.
 Capturas novas (ainda não geradas): `personagens-indice` e
 `personagens-aqui`.
 
+## Grimório: o SRD fala inglês
+
+O catálogo vem do Open5e: "Cure Wounds", "Evocation" e a descrição em inglês.
+A mesa é em português, e o jogador escolhia a magia por um nome que não é o
+que ele lê na ficha depois de aprendê-la.
+
+Traduz o que dá sem inventar: o **nome**, pela mesma tabela que o
+`learn_spell` usa para achar a magia no SRD (`SPELL_PT_TO_EN`, invertida), e a
+**escola**, que é um conjunto fechado de oito. A **descrição** fica como veio
+e o cartão a identifica como do SRD — menos a das magias que o motor já
+descreve em português (`DEFAULT_SPELLS_BY_CLASS`). O nome do SRD vai junto no
+snapshot e aparece pequeno ao lado, porque é por ele que se procura a magia em
+qualquer livro.
+
+## A mana era diferente em cada tela
+
+A mesma clériga aparecia com 28 de mana na ficha do herói e 14 no Grimório.
+O motor corrige o pool pela tabela oficial de Pontos de Magia ao carregar a
+campanha (`_migrate_mana_pool`), mas quem semeia estado por outro caminho — o
+harness de capturas e os testes de tela — pulava a correção, e a tela mostrava
+um número que o jogo nunca mostraria.
+
+As correções de carga viraram `memory.normalizar_campanha()`, chamada pelo
+`load_campaign` e por quem semeia estado. `test_mana_e_nomes_do_grimorio.py`
+(6) cobre o pool corrigido, as duas telas dizendo o mesmo, o NPC que não é
+mexido, e a tradução de nome, escola e descrição.
+
 ## Tela de loja ("O Balcão")
 
 A segunda tela do jogo, e a primeira construída depois de perguntar **por que**

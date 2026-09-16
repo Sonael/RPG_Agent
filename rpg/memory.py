@@ -349,6 +349,27 @@ def _migrate_mana_pool() -> None:
         sheet["mana_atual"] = max(0, min(atual, novo_max))
 
 
+def normalizar_campanha() -> None:
+    """
+    As correções que TODA campanha carregada recebe, num lugar só:
+
+      • campos da v2 nas fichas antigas (ouro, condições, etc.);
+      • estrutura do estado de combate;
+      • descrições de magia que ficaram como placeholder;
+      • pool de mana pela tabela oficial de Pontos de Magia.
+
+    Existe separada do load_campaign porque quem semeia campanha por outro
+    caminho (o harness de capturas e os testes de tela) precisa das mesmas —
+    sem elas, a tela mostrava número que o jogo nunca mostraria: a mesma
+    clériga aparecia com 28 de mana numa tela e 14 na outra.
+    """
+    for char in campaign.get("characters", {}).values():
+        _migrate_sheet_fields(char)
+    _migrate_combat_state()
+    _migrate_spell_descriptions()
+    _migrate_mana_pool()
+
+
 def char_key(name: str) -> str:
     """
     Normaliza o nome de um personagem para uso como chave no dict `characters`.
@@ -484,18 +505,7 @@ def load_campaign() -> bool:
         diary = len(campaign["diary"])
         hist  = len(campaign["conversation_history"])
 
-        # Migra fichas antigas para incluir campos da v2 (ouro, condições, etc.)
-        for char in campaign["characters"].values():
-            _migrate_sheet_fields(char)
-
-        # Migra estrutura de estado de combate para campanhas antigas
-        _migrate_combat_state()
-
-        # Substitui descrições placeholder de magias pelos dados reais
-        _migrate_spell_descriptions()
-
-        # Recalcula o pool de mana pela tabela oficial de Pontos de Magia
-        _migrate_mana_pool()
+        normalizar_campanha()
 
         print(
             f"Campanha carregada: {chars} personagens, {locs} locais, "

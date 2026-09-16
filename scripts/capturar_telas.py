@@ -260,6 +260,7 @@ def _subir_servidor(campanha: dict, nome_campanha: str):
         memory.bind(USER_ID, nome_campanha)
         memory.campaign.clear()
         memory.campaign.update(copy.deepcopy(_BASE))
+        memory.normalizar_campanha()
         _REFS += 1
         return _SERVIDOR[0], _soltar_servidor
 
@@ -279,6 +280,9 @@ def _subir_servidor(campanha: dict, nome_campanha: str):
             camp.clear()
             camp.update(copy.deepcopy(_BASE))
             _mesclar(camp, patch)
+            # As mesmas correções do load_campaign: o estado semeado tem de
+            # ser o estado que o jogo teria com essa campanha salva.
+            memory.normalizar_campanha()
             return jsonify({"ok": True})
         _ROTA_REGISTRADA = True
 
@@ -286,6 +290,7 @@ def _subir_servidor(campanha: dict, nome_campanha: str):
     memory.bind(USER_ID, nome_campanha)
     memory.campaign.clear()
     memory.campaign.update(copy.deepcopy(_BASE))
+    memory.normalizar_campanha()
 
     logging.getLogger("werkzeug").setLevel(logging.ERROR)
     server.app.logger.setLevel(logging.ERROR)

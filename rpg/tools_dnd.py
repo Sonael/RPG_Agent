@@ -10654,6 +10654,57 @@ def _resumir(texto: str, limite: int) -> str:
     return corte + "…"
 
 
+# ── O SRD fala inglês ──────────────────────────────────────────────────────
+# O catálogo do Grimório vem do Open5e: "Cure Wounds", "Evocation", e a
+# descrição em inglês. A mesa é em português, e o jogador escolhia magia por
+# um nome que não é o que ele lê na ficha depois de aprendê-la — a ficha usa
+# o nome em português.
+#
+# O que dá para traduzir sem inventar: o NOME, pela mesma tabela que o
+# learn_spell já usa para achar a magia no SRD (SPELL_PT_TO_EN, invertida), e
+# a ESCOLA, que é um conjunto fechado de oito. A DESCRIÇÃO fica como veio, e
+# a tela diz que é do SRD, em inglês — menos a das magias que o motor já
+# descreve em português (DEFAULT_SPELLS_BY_CLASS).
+_MAGIA_EN_PARA_PT = {en.lower(): pt for pt, en in SPELL_PT_TO_EN.items()}
+
+_ESCOLA_PT = {
+    "abjuration": "Abjuração", "conjuration": "Conjuração", "divination": "Adivinhação",
+    "enchantment": "Encantamento", "evocation": "Evocação", "illusion": "Ilusão",
+    "necromancy": "Necromancia", "transmutation": "Transmutação",
+}
+
+
+def _nome_de_magia_pt(nome_srd: str) -> str:
+    """Nome em português da magia do SRD, ou "" quando não há tradução."""
+    pt = _MAGIA_EN_PARA_PT.get((nome_srd or "").lower().strip(), "")
+    return pt.title() if pt else ""
+
+
+def _escola_pt(escola_srd: str) -> str:
+    return _ESCOLA_PT.get((escola_srd or "").lower().strip(), escola_srd or "")
+
+
+def _descricao_pt_da_magia(nome_pt: str) -> str:
+    """
+    Descrição em português que o motor já tem para a magia, quando tem.
+    DEFAULT_SPELLS_BY_CLASS é a lista de reserva das classes: as mesmas magias
+    aparecem no catálogo do SRD, e ali elas já estão descritas em português.
+    """
+    if not nome_pt:
+        return ""
+    alvo = _norm_txt(nome_pt)
+    for lista in DEFAULT_SPELLS_BY_CLASS.values():
+        for sp in lista:
+            if _norm_txt(sp.get("nome", "")) == alvo:
+                texto = sp.get("descricao", "") or ""
+                # A descrição da reserva começa com "[Escola] "; a escola já
+                # tem coluna própria no cartão.
+                if texto.startswith("[") and "]" in texto:
+                    texto = texto[texto.index("]") + 1:].strip()
+                return texto
+    return ""
+
+
 def class_spell_catalog(classe: str, max_level: int = 9, query: str = "",
                         spell_level: int | None = None,
                         _status: dict | None = None) -> list[dict]:
@@ -10729,13 +10780,21 @@ def class_spell_catalog(classe: str, max_level: int = 9, query: str = "",
                 m = re.search(r'\d+d\d+(?:\s*[+\-]\s*\d+)?', s.get("desc", "") or "")
                 if m:
                     dado = m.group(0).replace(" ", "")
+            nome_pt = _nome_de_magia_pt(nome)
+            descricao_pt = _descricao_pt_da_magia(nome_pt)
             spells.append({
-                "nome":         nome,
+                # O nome em português é o nome do jogo: é ele que vai para a
+                # ficha quando a magia é aprendida, e learn_spell sabe achá-lo
+                # no SRD. O nome do SRD vai junto, para o cartão mostrar.
+                "nome":         nome_pt or nome,
+                "nome_srd":     nome,
                 "nivel_magia":  lvl,
-                "escola":       s.get("school", ""),
+                "escola":       _escola_pt(s.get("school", "")),
                 # Corta na palavra e marca o corte: "[:250]" deixava "Completely
                 # covering the objec" no cartão, e parecia defeito.
-                "descricao":    _resumir(" ".join((s.get("desc", "") or "").split()), 250),
+                "descricao":    descricao_pt or _resumir(
+                    " ".join((s.get("desc", "") or "").split()), 250),
+                "em_ingles":    not descricao_pt,
                 "custo_mana":   SPELL_MANA_COST.get(lvl, 4),
                 "dado":         dado,
                 "ritual":       _sim_do_srd(s.get("ritual")),
@@ -10760,8 +10819,9 @@ def class_spell_catalog(classe: str, max_level: int = 9, query: str = "",
                 continue
             escola = texto[1:texto.index("]")] if texto.startswith("[") and "]" in texto else ""
             spells.append({
-                "nome": sp["nome"], "nivel_magia": lvl, "escola": escola,
+                "nome": sp["nome"], "nome_srd": "", "nivel_magia": lvl, "escola": escola,
                 "descricao": texto[texto.index("]") + 1:].strip() if escola else texto,
+                "em_ingles": False,
                 "custo_mana": SPELL_MANA_COST.get(lvl, 4), "dado": sp.get("dado", ""),
                 "ritual": False, "concentracao": "concentra" in texto.lower(), "alcance": "",
             })

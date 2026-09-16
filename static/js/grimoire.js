@@ -178,9 +178,13 @@
       <div class="grm-magia${livre ? '' : ' grm-magia-fora'}" data-nome="${esc(sp.nome)}">
         <div class="grm-magia-cabeca">
           <span class="grm-magia-nome">${esc(sp.nome)}</span>
+          ${sp.nome_srd && sp.nome_srd !== sp.nome
+            ? `<span class="grm-magia-srd" title="Nome no SRD">${esc(sp.nome_srd)}</span>` : ''}
           <span class="grm-magia-marcas">${marcas}</span>
         </div>
-        ${sp.descricao ? `<p class="grm-magia-desc">${esc(sp.descricao)}</p>` : ''}
+        ${sp.descricao ? `<p class="grm-magia-desc${sp.em_ingles ? ' grm-magia-desc-en' : ''}"
+             ${sp.em_ingles ? 'lang="en" title="Descrição como vem do SRD, em inglês"' : ''}
+             >${esc(sp.descricao)}</p>` : ''}
         <div class="grm-magia-linha">
           <span class="grm-magia-custo">${custo}</span>
           <button class="grm-aprender-btn" ${livre ? '' : 'disabled'}

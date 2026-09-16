@@ -3344,6 +3344,14 @@ body.grimoire-on { overflow: hidden; }
 }
 .grm-magia-fora { border-color: var(--grm-line); }
 .grm-magia-fora .grm-magia-nome { color: var(--grm-muted); }
+
+/* O SRD fala inglês: o nome de lá fica ao lado do nome do jogo, e a descrição
+   que não tem versão em português se identifica. */
+.grm-magia-srd {
+  font-family: 'Lora', serif; font-size: 11px; font-style: italic;
+  color: var(--text-muted);
+}
+.grm-magia-desc-en { color: var(--text-muted); }
 .grm-magia-cabeca {
   display: flex; align-items: baseline; justify-content: space-between;
   gap: var(--esp-2); flex-wrap: wrap;
