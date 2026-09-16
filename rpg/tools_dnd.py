@@ -11703,6 +11703,39 @@ def _npc_tentar_curar(npc: dict, npc_name: str) -> str:
     )
 
 
+# Quando o inimigo bebe: metade da vida ou menos, o "ferido" do 5e.
+_NPC_LIMIAR_DE_POCAO = 0.5
+
+
+def _npc_beber_pocao(npc: dict, npc_name: str) -> str:
+    """
+    Poção de cura da mochila do próprio inimigo, na vez dele.
+
+    Passa pelo mesmo caminho do jogador (`combat_action`), que gasta a Ação
+    Bônus, rola o dado, respeita o teto da exaustão e dá baixa na unidade —
+    beber não custa o ataque do turno. Devolve "" quando não há poção, ele
+    não está ferido, ou o motor recusou (bônus já gasto, por exemplo).
+    """
+    sheet = npc.get("sheet") or {}
+    hp     = int(sheet.get("vida_atual", 0) or 0)
+    hp_max = max(1, int(sheet.get("vida_max", 1) or 1))
+    if hp <= 0 or hp / hp_max > _NPC_LIMIAR_DE_POCAO:
+        return ""
+
+    for item in (npc.get("inventario") or []):
+        if not isinstance(item, dict) or int(item.get("qtd", 1) or 1) <= 0:
+            continue
+        ficha = _efeito_de_item(item.get("nome", ""))
+        if not ficha or ficha.get("efeito") != "cura":
+            continue
+        resposta = combat_action("item", actor=npc_name, target=npc_name,
+                                 item=item.get("nome", ""))
+        # Recusa do motor não vira segunda tentativa: o inimigo parte para o
+        # ataque, que é o que ele faria de qualquer jeito.
+        return resposta.get("message", "") if resposta.get("ok") else ""
+    return ""
+
+
 def _npc_poder_de_recarga(npc: dict) -> str:
     """Nome do poder de recarga que está carregado agora (ou "")."""
     for nome, cfg in ((npc.get("sheet") or {}).get("recargas") or {}).items():
@@ -11943,6 +11976,13 @@ def _executar_turno_npc(npc_name: str = "") -> str:
         target = random.choice(targets)
     else:  # suporte ou padrão
         target = min(targets, key=lambda t: t["hp"])
+
+    # 0) POÇÃO DE CURA do próprio inimigo, se ele está ferido. É Ação Bônus:
+    #    entra na lista de avisos e o turno segue para a jogada principal.
+    #    Sem isto, um inimigo com poção na mochila morria com ela na mão.
+    gole = _npc_beber_pocao(npc, npc_name)
+    if gole:
+        avisos_recarga.append(gole)
 
     # ── Repertório: o NPC não é só uma sequência de ataques com arma ────────
     #

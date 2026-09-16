@@ -803,6 +803,12 @@ o próximo passo pendente, e aparecem na barra lateral do jogo.
   aliados com HP < 50%" desde sempre e nunca curou ninguém: caía no `else` e
   atacava. Agora procura a magia de cura na ficha, confere mana e trata o
   aliado mais ferido.
+- **O inimigo abre a própria mochila.** Com metade da vida ou menos, bebe a
+  poção de cura que estiver com ele (`_npc_beber_pocao`) antes da jogada do
+  turno. Beber é Ação Bônus, então o ataque continua acontecendo, e a poção
+  passa pelo mesmo `combat_action` da tela do jogador: mesmo dado, mesmo teto
+  de exaustão, mesma baixa na unidade. Antes o turno do NPC nunca olhava o
+  inventário — um bandido morria com a poção no cinto.
 - **Atitude** (`adjust_attitude`, `get_attitude`, `list_attitudes`): o que
   cada NPC sente pelo grupo, de -100 (hostil) a +100 (leal), com histórico
   curto do motivo de cada mudança. Antes isso não existia em lugar nenhum —
