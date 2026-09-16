@@ -1777,6 +1777,19 @@ a um combate e acaba com `advance_time`) e antitoxina. `test_mochila_navegador.p
 ganhou os botões Beber e Dar a, a cura em outro do grupo, o travado com o
 motivo e o combate.
 
+## O mesmo acontecimento, duas vezes
+
+`save_event` aceitava qualquer resumo, quantas vezes viesse. O mestre narrava
+a emboscada, registrava, e no turno seguinte registrava de novo com outra
+consequência: a ficha do local e a do personagem, que agora mostram o que
+aconteceu, exibiam a cena em dobro, com dois textos que se contradiziam.
+
+Resumo igual — sem caixa, acento nem pontuação — passa a COMPLETAR o evento
+que já existe: os campos vazios dele recebem o que veio agora, o que já
+estava escrito não é trocado, e a ferramenta responde com uma Nota dizendo
+qual evento já registra aquilo. Acontecimento diferente continua entrando
+normalmente. `test_evento_duplicado.py` (6).
+
 ## Ficha do local
 
 Os locais eram uma lista plana: Cliviate, a Forja de Cliviate e o Boticário

@@ -343,6 +343,22 @@ def list_locations() -> str:
 # Eventos
 # ---------------------------------------------------------------------------
 
+def _mesmo_evento(a: str, b: str) -> bool:
+    """
+    Dois resumos que contam a mesma coisa. Compara sem caixa, acento e
+    pontuação — o mestre reescreve "Emboscada de goblins derrotada." como
+    "emboscada de goblins derrotada" e é a mesma cena.
+    """
+    def _limpo(texto: str) -> str:
+        import unicodedata
+        t = unicodedata.normalize("NFD", (texto or "").lower())
+        t = "".join(c for c in t if unicodedata.category(c) != "Mn")
+        return " ".join("".join(c if c.isalnum() or c.isspace() else " " for c in t).split())
+
+    x, y = _limpo(a), _limpo(b)
+    return bool(x) and x == y
+
+
 def save_event(
     summary: str,
     characters_involved: str = "",
@@ -359,6 +375,29 @@ def save_event(
         consequence:         Consequência ou mudança no mundo.
     """
     events = memory.campaign["events"]
+
+    # Mesma cena, duas vezes. O mestre narra a emboscada, chama save_event, e
+    # no turno seguinte chama de novo com o mesmo resumo e outra consequência:
+    # a ficha do local e a do personagem passavam a mostrar o acontecimento
+    # duplicado, com dois textos que se contradizem. Aqui o segundo COMPLETA
+    # o primeiro em vez de virar linha nova.
+    igual = next((e for e in events
+                  if isinstance(e, dict) and _mesmo_evento(e.get("summary", ""), summary)), None)
+    if igual:
+        completados = []
+        for campo, valor in (("characters_involved", characters_involved),
+                             ("location", location), ("consequence", consequence)):
+            if valor and not (igual.get(campo) or "").strip():
+                igual[campo] = valor
+                completados.append(campo)
+        memory.save_campaign()
+        recado = (f"Nota: o evento #{igual.get('index', '?')} já registra isso "
+                  f"(\"{(igual.get('summary') or '')[:60]}\").")
+        if completados:
+            return recado + " Os campos vazios dele foram preenchidos com o que veio agora."
+        return (recado + " Nada foi gravado duas vezes. Se é OUTRO acontecimento, "
+                "escreva um resumo que diga o que mudou.")
+
     event = {
         "index":               len(events) + 1,
         "summary":             summary,
