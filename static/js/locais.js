@@ -69,6 +69,8 @@
                   onclick="window.Locais._abrir('')">Onde o grupo está</button>
           <button id="lcl-editar" class="lcl-btn lcl-btn-sec hidden"
                   onclick="window.Locais._editar()">Editar local</button>
+          <button id="lcl-registrar" class="lcl-btn lcl-btn-pedir hidden"
+                  onclick="window.Locais._registrar()">Pedir ao mestre para registrar</button>
           <button id="lcl-mapa" class="lcl-btn lcl-btn-sec"
                   onclick="window.Locais._verNoMapa()">Ver no mapa</button>
           <button class="lcl-fechar" onclick="window.Locais._fechar()">Fechar</button>
@@ -214,6 +216,10 @@
 
     q('lcl-onde').classList.toggle('hidden', !!_last.e_o_local_atual || !_last.local_atual);
     q('lcl-editar').classList.toggle('hidden', !(_last.existe && _last.tipo === 'local'));
+    // Lugar que o mestre citou na narração mas nunca registrou: a ficha abre
+    // vazia e o jogador não tinha o que fazer com ela. O botão pede o
+    // registro em vez de deixar o buraco na mão dele.
+    q('lcl-registrar').classList.toggle('hidden', !!_last.existe || !_last.nome);
     mensagem('');
   }
 
@@ -222,6 +228,13 @@
     if (!el) return;
     el.textContent = txt || '';
     el.classList.toggle('lcl-msg-erro', !!erro);
+  }
+
+  function registrar() {
+    const nome = (_last && _last.nome) || '';
+    if (!nome) return;
+    enviar(`Registre ${nome} nos locais da campanha: descreva o lugar e diga `
+           + `dentro de onde ele fica.`);
   }
 
   function verMissao(titulo) {
@@ -285,6 +298,7 @@
     _verPessoa: (nome) => { fechar(); if (window.Personagens) window.Personagens._abrir(nome); },
     _verNoMapa: () => { const nome = _last.nome || ''; fechar(); if (window.Mapa) window.Mapa._abrir(nome); },
     _verMissao: verMissao,
+    _registrar: registrar,
     _estado: () => _last,
   };
 

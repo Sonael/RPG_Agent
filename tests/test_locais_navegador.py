@@ -138,6 +138,52 @@ def test_ficha_do_local_lista_a_missao_daqui_e_leva_a_ela(pagina):
     assert not erros, erros[:3]
 
 
+def test_lugar_nao_registrado_pede_o_registro_ao_mestre(pagina):
+    """
+    O mestre cita "a Trilha da Montanha" na narração e nunca chama
+    save_location: a ficha abre dizendo que o lugar não foi registrado, e o
+    jogador não tinha o que fazer com ela. O botão manda o pedido.
+    """
+    pg, erros = pagina
+    pg.evaluate("() => window.Locais._abrir('Trilha da Montanha')")
+    pg.wait_for_selector("#local-overlay:not(.hidden)", timeout=5000)
+    pg.wait_for_function(
+        "() => document.getElementById('lcl-nome').textContent === 'Trilha da Montanha'")
+
+    assert "ainda não foi registrado" in pg.inner_text("#lcl-desc")
+    assert pg.is_hidden("#lcl-editar"), "lugar sem registro não tem o que editar"
+    pg.click("#lcl-registrar")
+
+    enviado = pg.evaluate("() => window.__enviado")
+    assert enviado and "Trilha da Montanha" in enviado
+    assert "Registre" in enviado and "dentro de onde" in enviado
+    # O pedido é fala do jogador: entra na crônica e fecha a ficha.
+    assert "Trilha da Montanha" in pg.inner_text("#chat-history")
+    assert pg.is_hidden("#local-overlay")
+    assert not erros, erros[:3]
+
+
+def test_lugar_registrado_nao_pede_registro(pagina):
+    pg, erros = pagina
+    _abrir_pelo_mapa(pg, "Cliviate")
+    assert pg.is_hidden("#lcl-registrar")
+    assert pg.is_visible("#lcl-editar")
+    assert not erros, erros[:3]
+
+
+def test_mestre_ocupado_nao_recebe_o_pedido_de_registro(pagina):
+    pg, erros = pagina
+    pg.evaluate("() => { waiting = true; }")
+    pg.evaluate("() => window.Locais._abrir('Trilha da Montanha')")
+    pg.wait_for_selector("#local-overlay:not(.hidden) #lcl-registrar", timeout=5000)
+    pg.click("#lcl-registrar")
+    pg.wait_for_timeout(300)
+    assert pg.evaluate("() => window.__enviado") is None
+    assert "Aguarde o mestre" in pg.inner_text("#lcl-msg")
+    pg.evaluate("() => { waiting = false; }")
+    assert not erros, erros[:3]
+
+
 def test_lugar_sem_passado_diz_que_nao_ha_nada(pagina):
     pg, erros = pagina
     _abrir_pelo_mapa(pg, "Boticário da Mira")

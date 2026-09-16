@@ -4178,6 +4178,10 @@ body.local-on, body.pessoa-on, body.heroi-on, body.missoes-on, body.mapa-on, bod
 .lcl-btn-ir { background: var(--lcl-ink); border-color: var(--lcl-ink); color: #fff; }
 .lcl-btn-ir:hover:not(:disabled) { background: #22433a; }
 .lcl-btn-sec { color: var(--lcl-dark); }
+/* Pedir ao mestre: mesma tinta do "Ir até lá", outra classe, porque o
+   .lcl-btn-ir é o botão de andar e a tela é medida por ele. */
+.lcl-btn-pedir { background: var(--lcl-ink); border-color: var(--lcl-ink); color: #fff; }
+.lcl-btn-pedir:hover:not(:disabled) { background: #22433a; }
 .lcl-btn.hidden { display: none; }
 .lcl-vazio { color: var(--lcl-muted); font-style: italic; font-size: 0.88rem; padding: var(--esp-3) 0; }
 

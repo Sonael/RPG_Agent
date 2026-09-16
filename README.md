@@ -1979,7 +1979,19 @@ daquela cidade encomendou só se via na ficha dele.
   continuam na lista com o status: o que já foi feito ali é parte da história
   do lugar. O botão abre a tela de missões nela.
 
-`test_historia_do_local.py` (11) e três casos novos em
+### Lugar que o mestre citou e não registrou
+
+O mestre narra "a trilha da montanha", o grupo vai até lá e o `current_location`
+passa a ser um nome que não existe em `locations`: a ficha abre dizendo que o
+lugar não foi registrado, sem descrição, sem nada dentro e sem "Editar local"
+— não há o que editar. O jogador ficava com o buraco na mão.
+
+O rodapé ganhou **"Pedir ao mestre para registrar"**, que aparece só nesse
+caso e manda a fala do jogador pedindo o registro com descrição e onde o lugar
+fica. Como toda fala da tela, ela entra na crônica, fecha a ficha e respeita o
+mestre ocupado.
+
+`test_historia_do_local.py` (11) e seis casos novos em
 `test_locais_navegador.py`. A fixture `campanha` passou a zerar `events`:
 agora que duas fichas mostram o que aconteceu, um `save_event` de um teste
 aparecia na ficha do teste seguinte.
