@@ -1939,16 +1939,16 @@ body.combat-on { overflow: hidden; }
 /* Ação Livre dentro da tela: pedido e arbitragem sem fechar o combate. */
 .cbt-livre-texto {
   width: 100%; margin-top: var(--esp-2); padding: var(--esp-2) var(--esp-3);
-  font-family: 'Lora', serif; font-size: 14px; color: var(--text-main);
-  background: var(--page-right); border: 1px solid var(--page-edge); border-radius: 6px;
+  font-family: 'Lora', serif; font-size: 14px; color: var(--cbt-text);
+  background: var(--cbt-paper); border: 1px solid var(--cbt-gold); border-radius: 6px;
   resize: vertical;
 }
-.cbt-livre-texto:focus { outline: none; border-color: var(--ink-user); }
+.cbt-livre-texto:focus { outline: none; border-color: var(--cbt-dark); }
 .cbt-livre-botoes { display: flex; gap: var(--esp-2); justify-content: flex-end; margin-top: var(--esp-2); }
 .cbt-livre-resposta {
   margin-top: var(--esp-3); padding: var(--esp-3); max-height: 40vh; overflow-y: auto;
-  font-family: 'Lora', serif; font-size: 14px; line-height: 1.5; color: var(--text-main);
-  background: var(--page-right); border-left: 3px solid var(--ink-user); border-radius: 0 6px 6px 0;
+  font-family: 'Lora', serif; font-size: 14px; line-height: 1.5; color: var(--cbt-text);
+  background: var(--cbt-paper); border-left: 3px solid var(--cbt-dark); border-radius: 0 6px 6px 0;
 }
 .cbt-livre-resposta p:first-child { margin-top: 0; }
 .cbt-livre-resposta p:last-child { margin-bottom: 0; }
@@ -2424,12 +2424,12 @@ body.shop-on { overflow: hidden; }
 .shp-pechinchar {
   margin-top: var(--esp-2); padding: 4px var(--esp-4);
   font-family: 'Lora', serif; font-size: 12px; cursor: pointer;
-  color: var(--text-main); background: var(--page-right);
-  border: 1px solid var(--page-edge); border-radius: 999px;
+  color: var(--shp-text); background: var(--shp-paper);
+  border: 1px solid var(--shp-gold); border-radius: 999px;
 }
-.shp-pechinchar:hover:not(:disabled) { border-color: var(--ink-user); color: var(--ink-user); }
-.shp-pechinchar:disabled { cursor: default; color: var(--text-muted); }
-.shp-atitude.shp-atitude-cara { color: var(--ink-sys); }
+.shp-pechinchar:hover:not(:disabled) { border-color: var(--shp-dark); color: var(--shp-dark); }
+.shp-pechinchar:disabled { cursor: default; color: var(--shp-muted); }
+.shp-atitude.shp-atitude-cara { color: var(--shp-red); }
 
 /* Bolsa e carga — a informação que torna a compra uma escolha */
 .shp-bolsa {
@@ -3365,9 +3365,9 @@ body.grimoire-on { overflow: hidden; }
    que não tem versão em português se identifica. */
 .grm-magia-srd {
   font-family: 'Lora', serif; font-size: 11px; font-style: italic;
-  color: var(--text-muted);
+  color: var(--grm-muted);
 }
-.grm-magia-desc-en { color: var(--text-muted); }
+.grm-magia-desc-en { color: var(--grm-muted); }
 .grm-magia-cabeca {
   display: flex; align-items: baseline; justify-content: space-between;
   gap: var(--esp-2); flex-wrap: wrap;
@@ -4089,12 +4089,30 @@ body.rest-on { overflow: hidden; }
   --lcl-red:   #8b2315;
   --lcl-line:  #e0d5c2;
   --lcl-ink:   #2f5a4a;
+  --lcl-gold-texto: #7d6320;
 
   position: fixed; inset: 0; z-index: 9000;
   background: rgba(20,12,6,0.82); backdrop-filter: blur(4px);
   display: flex; align-items: center; justify-content: center;
   padding: var(--esp-5); box-sizing: border-box;
   font-family: 'Lora', serif;
+}
+
+/* As telas novas seguem o tema escolhido. Sem isto o papel ficava fixo e os
+   textos que já usavam variáveis do tema (claras no Noite de Tinta) sumiam no
+   pergaminho. O pergaminho é o padrão e continua igual; o dourado das
+   molduras é o mesmo em todos os temas, porque lê bem no claro e no escuro. */
+:root[data-theme]:not([data-theme="pergaminho"]) :is(#local-overlay, #pessoa-overlay, #heroi-overlay, #missoes-overlay, #mapa-overlay, #grupo-overlay, #diario-overlay, #elenco-overlay) {
+  --lcl-paper: var(--page-right);
+  --lcl-bg:    var(--page-left);
+  --lcl-dark:  var(--text-main);
+  --lcl-text:  var(--text-main);
+  --lcl-muted: var(--text-muted);
+  --lcl-green: var(--green, #2e7d32);
+  --lcl-red:   var(--ink-sys);
+  --lcl-line:  var(--page-edge);
+  --lcl-ink:   var(--ink-user);
+  --lcl-gold-texto: var(--text-muted);
 }
 #local-overlay.hidden, #pessoa-overlay.hidden, #heroi-overlay.hidden, #missoes-overlay.hidden, #mapa-overlay.hidden, #grupo-overlay.hidden, #diario-overlay.hidden, #elenco-overlay.hidden { display: none; }
 body.local-on, body.pessoa-on, body.heroi-on, body.missoes-on, body.mapa-on, body.grupo-on, body.diario-on, body.elenco-on { overflow: hidden; }
@@ -4126,7 +4144,7 @@ body.local-on, body.pessoa-on, body.heroi-on, body.missoes-on, body.mapa-on, bod
 .lcl-caminho { font-size: 0.82rem; color: var(--lcl-muted); min-height: 1.1em; }
 .lcl-migalha { color: var(--lcl-dark); text-decoration: underline; text-underline-offset: 3px; }
 .lcl-migalha:hover { color: var(--lcl-red); }
-.lcl-sep { margin: 0 var(--esp-1); color: var(--lcl-gold); }
+.lcl-sep { margin: 0 var(--esp-1); color: var(--lcl-gold-texto); }
 .lcl-title {
   font-family: 'Playfair Display', serif; color: var(--lcl-ink);
   font-size: 1.7rem; font-weight: 700; margin: var(--esp-1) 0 0;
@@ -4199,13 +4217,13 @@ body.local-on, body.pessoa-on, body.heroi-on, body.missoes-on, body.mapa-on, bod
 }
 .lcl-btn:hover:not(:disabled) { background: var(--lcl-bg); }
 .lcl-btn:disabled { opacity: .45; cursor: not-allowed; }
-.lcl-btn-ir { background: var(--lcl-ink); border-color: var(--lcl-ink); color: #fff; }
-.lcl-btn-ir:hover:not(:disabled) { background: #22433a; }
+.lcl-btn-ir { background: var(--lcl-ink); border-color: var(--lcl-ink); color: var(--lcl-paper); }
+.lcl-btn-ir:hover:not(:disabled) { background: var(--lcl-ink); filter: brightness(0.82); }
 .lcl-btn-sec { color: var(--lcl-dark); }
 /* Pedir ao mestre: mesma tinta do "Ir até lá", outra classe, porque o
    .lcl-btn-ir é o botão de andar e a tela é medida por ele. */
-.lcl-btn-pedir { background: var(--lcl-ink); border-color: var(--lcl-ink); color: #fff; }
-.lcl-btn-pedir:hover:not(:disabled) { background: #22433a; }
+.lcl-btn-pedir { background: var(--lcl-ink); border-color: var(--lcl-ink); color: var(--lcl-paper); }
+.lcl-btn-pedir:hover:not(:disabled) { background: var(--lcl-ink); filter: brightness(0.82); }
 .lcl-btn.hidden { display: none; }
 .lcl-vazio { color: var(--lcl-muted); font-style: italic; font-size: 0.88rem; padding: var(--esp-3) 0; }
 
@@ -4218,12 +4236,12 @@ body.local-on, body.pessoa-on, body.heroi-on, body.missoes-on, body.mapa-on, bod
 .lcl-msg { flex: 1 1 auto; font-size: 0.88rem; color: var(--lcl-dark); min-height: 1.2em; }
 .lcl-msg-erro { color: var(--lcl-red); font-weight: 700; }
 .lcl-fechar {
-  background: var(--lcl-red); color: #fff;
+  background: var(--lcl-red); color: var(--lcl-paper);
   border: 1px solid var(--lcl-gold); border-radius: 6px;
   font-family: 'Lora', serif; font-weight: 700; font-size: 0.9rem;
   padding: var(--esp-2) var(--esp-5); cursor: pointer; flex: 0 0 auto;
 }
-.lcl-fechar:hover { background: #6b1a0f; }
+.lcl-fechar:hover { filter: brightness(0.82); }
 
 /* O local na barra lateral e nos cartões da Enciclopédia abre a ficha. */
 .local-clicavel { cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
@@ -4272,7 +4290,7 @@ body.local-on, body.pessoa-on, body.heroi-on, body.missoes-on, body.mapa-on, bod
 .psn-faixa-amistoso .psn-atitude-rotulo, .psn-faixa-leal .psn-atitude-rotulo { color: var(--lcl-green); }
 .psn-barra {
   position: relative; height: 8px; margin: var(--esp-2) 0 2px; border-radius: 4px;
-  background: linear-gradient(90deg, rgba(139,35,21,0.55), #e6ded2 50%, rgba(46,125,50,0.55));
+  background: linear-gradient(90deg, rgba(139,35,21,0.55), var(--lcl-line) 50%, rgba(46,125,50,0.55));
 }
 .psn-barra-meio { position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: var(--lcl-muted); }
 .psn-barra-marca {
@@ -4784,7 +4802,7 @@ body.loot-on { overflow: hidden; }
 .grp-barra-rotulo span:last-child { color: var(--lcl-text); font-variant-numeric: tabular-nums; }
 .grp-barra-trilho { position: relative; height: 8px; border-radius: 999px; background: var(--lcl-bg); overflow: hidden; }
 .grp-barra-fill { height: 100%; border-radius: 999px; background: var(--lcl-green); }
-.grp-barra-mana .grp-barra-fill { background: #3b5b9a; }
+.grp-barra-mana .grp-barra-fill { background: var(--lcl-ink); }
 .grp-barra-carga .grp-barra-fill { background: var(--lcl-muted); }
 .grp-barra-alerta .grp-barra-fill { background: var(--lcl-gold); }
 .grp-barra-perigo .grp-barra-fill { background: var(--lcl-red); }
@@ -4840,7 +4858,7 @@ body.loot-on { overflow: hidden; }
 .dia-pagina { overflow-y: auto; padding: var(--esp-5) var(--esp-6); }
 .dia-pagina-cabeca { max-width: 68ch; margin: 0 auto var(--esp-4); text-align: center; }
 .dia-pagina-numero {
-  margin: 0; font-size: 0.78rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--lcl-gold);
+  margin: 0; font-size: 0.78rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--lcl-gold-texto);
 }
 .dia-pagina-titulo { margin: var(--esp-1) 0 0; font-family: 'Playfair Display', serif; font-size: 1.6rem; color: var(--lcl-ink); }
 .dia-entradas, .dia-ligacoes, .dia-pagina > .lcl-desc, .dia-pagina > .dia-eventos { max-width: 68ch; margin-left: auto; margin-right: auto; }
