@@ -947,7 +947,10 @@ TELAS = [
      "js": """
         openWizard();
         document.getElementById('wz-name').value = 'A Coroa Partida';
-        document.getElementById('wz-type').value = 'dnd';
+        // Gênero e regras separados: a captura mostra a combinação que o
+        // seletor antigo não permitia, dark fantasy com as regras de D&D.
+        document.getElementById('wz-type').value = 'dark_fantasy';
+        document.getElementById('wz-regras').value = 'dnd';
         onWizardTypeChange();
         document.getElementById('wz-summary').value =
           'O reino de Oakhaven perdeu seu herdeiro. Três mercenários aceitam '
@@ -972,7 +975,10 @@ TELAS = [
      "js": """
         openWizard();
         document.getElementById('wz-name').value = 'A Coroa Partida';
-        document.getElementById('wz-type').value = 'dnd';
+        // Gênero e regras separados: a captura mostra a combinação que o
+        // seletor antigo não permitia, dark fantasy com as regras de D&D.
+        document.getElementById('wz-type').value = 'dark_fantasy';
+        document.getElementById('wz-regras').value = 'dnd';
         onWizardTypeChange();
         addWzLocation();
         wzLocs[0].name = 'Oakhaven';
