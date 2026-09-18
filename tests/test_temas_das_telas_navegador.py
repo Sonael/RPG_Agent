@@ -2,7 +2,8 @@
 test_temas_das_telas_navegador.py
 
 As telas novas (ficha do local, do personagem, do herói, grupo, missões,
-mapa, diário, elenco) seguem o tema escolhido.
+mapa, diário, elenco), o combate, a loja e o grimório seguem o tema
+escolhido.
 
 Elas tinham a paleta de pergaminho fixa, e os blocos mais recentes já usavam
 as variáveis do tema: no Noite de Tinta o texto ficava claro sobre o papel
@@ -50,7 +51,11 @@ TELAS = [
 # fundo opaco dos ancestrais. Devolve os piores casos.
 MEDIR = """
 (seletor) => {
-  const rgb = (s) => (s.match(/[\\d.]+/g) || []).map(Number);
+  // rgb(...) vem de 0 a 255; o color-mix sai como color(srgb ...), de 0 a 1.
+  const rgb = (s) => {
+    const n = (s.match(/[\\d.]+/g) || []).map(Number);
+    return s.startsWith('color(srgb') ? n.map((v, i) => i < 3 ? v * 255 : v) : n;
+  };
   const lum = ([r, g, b]) => {
     const c = [r, g, b].map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; });
     return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
@@ -165,42 +170,65 @@ def _grimorio_com_nome_do_srd(pg):
       .insertAdjacentHTML('afterend', '<span class="grm-magia-srd" title="Nome no SRD">Sacred Flame</span>')""")
 
 
-def test_blocos_novos_das_telas_de_papel_fixo_no_tema_escuro(app_no_ar):
+# (estado, tela, variável do papel, título, como abrir). O /__estado funde os
+# estados: o grimório vem antes, porque não abre com combate em curso.
+TELAS_DE_REGRA = [
+    ("GRIMORIO", "#grimoire-overlay", "--grm-paper", ".grm-title", _grimorio_com_nome_do_srd),
+    ("LOJA", "#shop-overlay", "--shp-paper", ".shp-title", None),
+    ("COMBATE_ZONAS", "#combat-overlay", "--cbt-paper", ".cbt-title",
+     lambda pg: pg.click("#cbt-buttons button:has-text('Ação Livre')")),
+]
+
+
+@pytest.mark.parametrize("tema", ["noite-tinta", "sangue-dragao", "floresta", "oceano", "pergaminho"])
+def test_combate_loja_e_grimorio_seguem_o_tema(app_no_ar, tema):
     """
-    Combate, loja e grimório não seguem o tema: o papel é sempre claro. Os
-    blocos acrescentados a elas (Ação Livre, Pechinchar, nome do SRD) usavam
-    as variáveis do tema e, no escuro, pintavam texto claro no papel claro.
+    Combate, loja e grimório tinham papel claro fixo e seguem o tema agora,
+    como as telas novas. O combate é aberto com o painel de Ação Livre e o
+    grimório com um nome do SRD, os blocos mais recentes de cada tela.
+
+    No pergaminho só se confere que o papel é o de sempre: lá os separadores
+    dourados (›, →, "Vs.") ficam como sempre foram, decorativos.
     """
     import capturar_telas as cap
+    import requests
 
     try:
-        # (estado, tela, bloco novo, como abrir o bloco). O /__estado funde os
-        # estados: o grimório vem antes, porque não abre com combate em curso.
-        casos = [
-            (cap.GRIMORIO, "#grimoire-overlay", ".grm-magia-srd", _grimorio_com_nome_do_srd),
-            (cap.LOJA, "#shop-overlay", ".shp-pechinchar", None),
-            (cap.COMBATE_ZONAS, "#combat-overlay", "#cbt-livre",
-             lambda pg: pg.click("#cbt-buttons button:has-text('Ação Livre')")),
-        ]
-        for estado, overlay, alvo, preparar in casos:
-            pg, erros, fechar = _abrir_estado(app_no_ar, copy.deepcopy(estado), "noite-tinta")
+        for estado, overlay, papel, titulo, preparar in TELAS_DE_REGRA:
+            pg, erros, fechar = _abrir_estado(app_no_ar, copy.deepcopy(getattr(cap, estado)), tema)
             try:
                 if overlay != "#grimoire-overlay":
                     pg.wait_for_selector(f"{overlay}:not(.hidden)", timeout=10000)
                 if preparar:
                     preparar(pg)
-                pg.wait_for_selector(f"{alvo} >> nth=0", state="attached", timeout=8000)
-                pg.wait_for_timeout(300)
-                # Só o bloco novo: o resto da tela tem a paleta dela, igual em
-                # todo tema, e não é o que este teste mede.
-                r = pg.evaluate(MEDIR, alvo)
-                assert r["medidos"] >= 1, (alvo, r)
-                assert not r["ruins"], f"{alvo} no Noite de Tinta: {r['ruins'][:5]}"
+                pg.wait_for_timeout(500)
+                cor = pg.evaluate(
+                    "([o, v]) => getComputedStyle(document.querySelector(o)).getPropertyValue(v).trim()",
+                    [overlay, papel])
+                if tema == "pergaminho":
+                    assert cor == "#fffbf0", (overlay, cor)
+                    continue
+                assert cor != "#fffbf0", f"{overlay} ignorou o tema {tema}"
+                # O destaque é a tinta do tema nas três telas. O combate e a
+                # loja usavam o vermelho da paleta antiga, que no Floresta virava
+                # marrom e deixava a tela com cara de pergaminho.
+                titulo_cor, tinta = pg.evaluate(
+                    """([o, t]) => {
+                      const i = document.createElement('i');
+                      i.style.color = 'var(--ink-user)';
+                      document.body.append(i);
+                      const tinta = getComputedStyle(i).color;
+                      i.remove();
+                      return [getComputedStyle(document.querySelector(o + ' ' + t)).color, tinta];
+                    }""", [overlay, titulo])
+                assert titulo_cor == tinta, f"{titulo} no tema {tema}: {titulo_cor} e não {tinta}"
+                r = pg.evaluate(MEDIR, overlay)
+                assert r["medidos"] > 10, (overlay, r)
+                assert not r["ruins"], f"{overlay} no tema {tema}: {r['ruins'][:6]}"
                 assert not erros, erros[:3]
             finally:
                 fechar()
     finally:
-        import requests
         requests.post(f"{app_no_ar[0]}/__estado", json=copy.deepcopy(cap.CIDADE), timeout=10)
 
 

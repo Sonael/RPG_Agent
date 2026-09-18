@@ -1366,17 +1366,17 @@ body.combat-on { overflow: hidden; }
   display: flex; align-items: center; justify-content: center;
   background: var(--cbt-paper);
   border: 1px solid var(--cbt-gold);
-  color: var(--cbt-red);
+  color: var(--cbt-acento, var(--cbt-red));
   border-radius: 50%;
   font-size: 0.95rem; font-weight: 700; line-height: 1;
   cursor: pointer; transition: all .15s;
 }
 .cbt-close:hover {
-  background: var(--cbt-red); color: #fff; border-color: var(--cbt-red);
+  background: var(--cbt-acento, var(--cbt-red)); color: var(--cbt-sobre, #fff); border-color: var(--cbt-acento, var(--cbt-red));
 }
 .cbt-title {
   font-family: 'Playfair Display', serif;
-  color: var(--cbt-red);
+  color: var(--cbt-acento, var(--cbt-red));
   font-size: 1.7rem; font-weight: 700;
   margin: 0 0 var(--esp-3);
 }
@@ -1390,18 +1390,18 @@ body.combat-on { overflow: hidden; }
 }
 .cbt-ord {
   padding: var(--esp-1) var(--esp-3);
-  background: rgba(255,255,255,0.55);
+  background: var(--cbt-veu, rgba(255,255,255,0.55));
   border: 1px solid var(--cbt-gold);
   border-radius: 20px;
   color: var(--cbt-muted);
 }
 .cbt-ord.on {
-  background: var(--cbt-red); color: #fff;
-  border-color: var(--cbt-red); font-weight: 700;
+  background: var(--cbt-acento, var(--cbt-red)); color: var(--cbt-sobre, #fff);
+  border-color: var(--cbt-acento, var(--cbt-red)); font-weight: 700;
   box-shadow: 0 0 10px rgba(139,35,21,0.3);
 }
 .cbt-ord.cbt-ord-dead { opacity: 0.5; text-decoration: line-through; }
-.cbt-ord-sep { color: var(--cbt-gold); }
+.cbt-ord-sep { color: var(--cbt-gold-texto, var(--cbt-gold)); }
 
 /* Campo de batalha */
 /* =========================================================
@@ -1653,8 +1653,8 @@ body.combat-on { overflow: hidden; }
 .cbt-zonas.hidden { display: none; }
 .cbt-zona {
   flex: 1 1 0; min-width: 120px;
-  border: 1px solid #dcd3c6; border-radius: 8px;
-  background: rgba(255,255,255,0.55);
+  border: 1px solid var(--cbt-borda, #dcd3c6); border-radius: 8px;
+  background: var(--cbt-veu, rgba(255,255,255,0.55));
   padding: var(--esp-2) var(--esp-2);
 }
 /* A zona de quem está jogando agora — é o que decide o turno. */
@@ -1679,7 +1679,7 @@ body.combat-on { overflow: hidden; }
    lado está, e trocá-la para marcar a vez apagaria essa informação. */
 .cbt-pin-vez { border-color: var(--cbt-dark); font-weight: 700; }
 .cbt-zona-liga {
-  align-self: center; color: var(--cbt-gold);
+  align-self: center; color: var(--cbt-gold-texto, var(--cbt-gold));
   font-size: 1.1rem; flex: 0 0 auto;
 }
 
@@ -1699,7 +1699,7 @@ body.combat-on { overflow: hidden; }
     linear-gradient(rgba(255,255,255,0), var(--cbt-paper) 70%) bottom / 100% 26px no-repeat local,
     radial-gradient(farthest-side at 50% 0, rgba(74,37,17,.20), transparent) top / 100% 12px no-repeat scroll,
     radial-gradient(farthest-side at 50% 100%, rgba(74,37,17,.20), transparent) bottom / 100% 12px no-repeat scroll,
-    radial-gradient(circle at center, rgba(255,255,255,0.85) 0%, transparent 100%);
+    radial-gradient(circle at center, var(--cbt-brilho, rgba(255,255,255,0.85)) 0%, transparent 100%);
 }
 .cbt-team {
   flex: 1; display: flex; flex-direction: column; gap: var(--esp-4);
@@ -1708,7 +1708,7 @@ body.combat-on { overflow: hidden; }
 .cbt-vs {
   font-family: 'Playfair Display', serif;
   font-size: 2.4rem; font-weight: 900; font-style: italic;
-  color: var(--cbt-gold);
+  color: var(--cbt-gold-texto, var(--cbt-gold));
   text-shadow: 2px 2px 0 rgba(0,0,0,0.08);
   flex-shrink: 0;
   align-self: center;
@@ -1721,16 +1721,16 @@ body.combat-on { overflow: hidden; }
 
 /* Card de combatente */
 .cbt-card {
-  background: #fff;
-  border: 1px solid #dcd3c6;
+  background: var(--cbt-card, #fff);
+  border: 1px solid var(--cbt-borda, #dcd3c6);
   border-radius: 6px;
   padding: var(--esp-4);
   box-shadow: 0 4px 6px rgba(0,0,0,0.05);
   transition: transform .2s, box-shadow .2s;
 }
 .cbt-card.cbt-cur {
-  border-color: var(--cbt-red);
-  box-shadow: 0 0 0 2px var(--cbt-red), 0 8px 15px rgba(139,35,21,0.15);
+  border-color: var(--cbt-acento, var(--cbt-red));
+  box-shadow: 0 0 0 2px var(--cbt-acento, var(--cbt-red)), 0 8px 15px rgba(139,35,21,0.15);
   transform: scale(1.02);
 }
 /* Aliado x inimigo. Antes os dois eram cards brancos idênticos e o único
@@ -1739,12 +1739,12 @@ body.combat-on { overflow: hidden; }
 .cbt-card.cbt-aliado  { border-left: 4px solid var(--cbt-mp); }
 .cbt-card.cbt-inimigo {
   border-left: 4px solid var(--cbt-red);
-  background: #fbf6f4;
+  background: var(--cbt-card-inimigo, #fbf6f4);
 }
-.cbt-card.cbt-inimigo .cbt-name { color: #7a2f24; }
+.cbt-card.cbt-inimigo .cbt-name { color: var(--cbt-nome-inimigo, #7a2f24); }
 .cbt-card.cbt-out {
   opacity: 0.6; filter: grayscale(0.8);
-  background: #f0f0f0;
+  background: var(--cbt-card-fora, #f0f0f0);
 }
 .cbt-card.cbt-out .cbt-name { text-decoration: line-through; }
 /* Dormindo (Sleep): esmaecido, mas SEM tachado — não está derrotado. */
@@ -1759,7 +1759,7 @@ body.combat-on { overflow: hidden; }
   font-size: 1.15rem; font-weight: 700;
   color: var(--cbt-dark);
 }
-.cbt-arrow { color: var(--cbt-red); animation: cbt-pulse 1.5s infinite; }
+.cbt-arrow { color: var(--cbt-acento, var(--cbt-red)); animation: cbt-pulse 1.5s infinite; }
 
 .cbt-meta {
   display: flex; justify-content: space-between;
@@ -1776,7 +1776,7 @@ body.combat-on { overflow: hidden; }
 .cbt-bar-label { width: 26px; flex-shrink: 0; color: var(--cbt-muted); }
 .cbt-bar {
   flex: 1; height: 8px;
-  background: #e0d8cc; border-radius: 4px; overflow: hidden;
+  background: var(--cbt-trilho, #e0d8cc); border-radius: 4px; overflow: hidden;
 }
 .cbt-bar-fill { height: 100%; border-radius: 4px; transition: width .3s, background .3s; }
 .cbt-bar-fill.hp { background: var(--cbt-hp); }
@@ -1814,7 +1814,7 @@ body.combat-on { overflow: hidden; }
 .cbt-conds { display: flex; gap: var(--esp-1); margin-top: var(--esp-3); flex-wrap: wrap; }
 .cbt-cond {
   font-size: 0.68rem; padding: 2px var(--esp-2);
-  background: #f0e6d2; border: 1px solid var(--cbt-gold);
+  background: var(--cbt-realce, #f0e6d2); border: 1px solid var(--cbt-gold);
   border-radius: 10px; color: var(--cbt-dark);
   text-transform: uppercase; font-weight: 700;
 }
@@ -1826,7 +1826,7 @@ body.combat-on { overflow: hidden; }
 .cbt-lower {
   display: flex;
   border-top: 2px solid var(--cbt-gold);
-  background: #fff;
+  background: var(--cbt-painel, #fff);
   flex: 0 0 auto;
   min-height: 0;
   /* 48% e não 56%: abrir o seletor de arma/alvo faz este painel crescer, e
@@ -1840,7 +1840,7 @@ body.combat-on { overflow: hidden; }
   /* Sem padding em cima: o título grudado encosta no topo do painel e o
      recuo fica dentro dele (ver .cbt-action-title). */
   padding: 0 var(--esp-6) var(--esp-6);
-  border-right: 1px solid #dcd3c6;
+  border-right: 1px solid var(--cbt-borda, #dcd3c6);
   min-width: 0; min-height: 0;
   overflow-y: auto;
 }
@@ -1853,7 +1853,7 @@ body.combat-on { overflow: hidden; }
   font-size: 1.3rem; color: var(--cbt-dark);
   font-weight: 700;
   position: sticky; top: 0; z-index: 2;
-  background: #fff;
+  background: var(--cbt-painel, #fff);
   margin: 0 calc(-1 * var(--esp-6)) var(--esp-2);
   padding: var(--esp-6) var(--esp-6) var(--esp-2);
   transition: box-shadow .15s ease;
@@ -1904,7 +1904,7 @@ body.combat-on { overflow: hidden; }
   transition: all .2s; text-align: left;
 }
 .cbt-btn:hover:not(:disabled) {
-  background: #f0e6d2; border-color: var(--cbt-dark);
+  background: var(--cbt-realce, #f0e6d2); border-color: var(--cbt-dark);
   transform: translateY(-2px);
 }
 .cbt-btn:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -1918,11 +1918,11 @@ body.combat-on { overflow: hidden; }
 .cbt-eco-tag.eco-bonus { background: rgba(46,125,50,0.14); color: var(--cbt-green); }
 
 .cbt-btn.cbt-primary {
-  background: var(--cbt-red); color: #fff;
-  border-color: var(--cbt-red); text-align: center;
+  background: var(--cbt-acento, var(--cbt-red)); color: var(--cbt-sobre, #fff);
+  border-color: var(--cbt-acento, var(--cbt-red)); text-align: center;
   grid-column: 1 / -1; margin-top: var(--esp-1);
 }
-.cbt-btn.cbt-primary:hover:not(:disabled) { background: #6b1a0f; }
+.cbt-btn.cbt-primary:hover:not(:disabled) { background: var(--cbt-red-escuro, #6b1a0f); }
 
 /* Picker (sub-painel de alvo/arma/habilidade) — cap próprio + scroll para
    não estourar quando há muitas magias/itens. */
@@ -1955,7 +1955,7 @@ body.combat-on { overflow: hidden; }
 .cbt-picker.hidden { display: none; }
 /* Efeito de item (resistência de poção, antitoxina): verde, para não ser lido
    como condição ruim ao lado de Envenenado ou Queimando. */
-.cbt-cond.cbt-efeito { background: rgba(46,125,50,0.12); color: #2e7d32; border-color: rgba(46,125,50,0.35); }
+.cbt-cond.cbt-efeito { background: rgba(46,125,50,0.12); color: var(--cbt-green); border-color: rgba(46,125,50,0.35); }
 .cbt-item-desconhecido small { font-style: italic; }
 .cbt-tgt-title {
   font-size: 0.88rem; font-weight: 700;
@@ -1964,23 +1964,23 @@ body.combat-on { overflow: hidden; }
 .cbt-picker-btns { display: flex; gap: var(--esp-2); flex-wrap: wrap; }
 .cbt-picker-btns .cbt-btn { width: auto; text-align: center; }
 .cbt-btn.cbt-cancel {
-  background: #eee; border-color: #ccc; color: var(--cbt-muted);
+  background: var(--cbt-cancelar, #eee); border-color: var(--cbt-cancelar-borda, #ccc); color: var(--cbt-muted);
 }
 .cbt-btn.cbt-cancel:hover:not(:disabled) {
-  background: #e0d8cc; border-color: var(--cbt-muted);
+  background: var(--cbt-trilho, #e0d8cc); border-color: var(--cbt-muted);
 }
 
 /* Log */
 .cbt-log-panel {
   flex: 1; padding: var(--esp-5) var(--esp-5);
-  background: #faf6f0;
+  background: var(--cbt-diario, #faf6f0);
   display: flex; flex-direction: column;
   min-width: 0; min-height: 0;
 }
 .cbt-log-title {
   font-family: 'Playfair Display', serif;
   font-size: 1.05rem; color: var(--cbt-dark); font-weight: 700;
-  border-bottom: 1px solid #dcd3c6;
+  border-bottom: 1px solid var(--cbt-borda, #dcd3c6);
   padding-bottom: var(--esp-2); margin-bottom: var(--esp-3);
 }
 .cbt-log-content {
@@ -1990,7 +1990,7 @@ body.combat-on { overflow: hidden; }
   padding-right: var(--esp-2);
 }
 .cbt-log-content::-webkit-scrollbar { width: 6px; }
-.cbt-log-content::-webkit-scrollbar-track { background: #e0d8cc; border-radius: 3px; }
+.cbt-log-content::-webkit-scrollbar-track { background: var(--cbt-trilho, #e0d8cc); border-radius: 3px; }
 .cbt-log-content::-webkit-scrollbar-thumb { background: var(--cbt-gold); border-radius: 3px; }
 .cbt-logline { color: var(--cbt-text); }
 
@@ -2022,13 +2022,13 @@ body.combat-on { overflow: hidden; }
   display: flex; gap: var(--esp-4); margin-bottom: var(--esp-6); text-align: left;
 }
 .cbt-end-col {
-  flex: 1; background: #fff; padding: var(--esp-4);
-  border: 1px solid #dcd3c6; border-radius: 6px;
+  flex: 1; background: var(--cbt-card, #fff); padding: var(--esp-4);
+  border: 1px solid var(--cbt-borda, #dcd3c6); border-radius: 6px;
 }
 .cbt-end-col h3 {
   font-family: 'Playfair Display', serif;
   font-size: 1.05rem; color: var(--cbt-dark);
-  border-bottom: 1px solid #dcd3c6;
+  border-bottom: 1px solid var(--cbt-borda, #dcd3c6);
   padding-bottom: var(--esp-1); margin: 0 0 var(--esp-3);
 }
 .cbt-end-col-foe h3 { color: var(--cbt-red); }
@@ -2116,20 +2116,20 @@ body.combat-on { overflow: hidden; }
        (AÇÃO / BÔNUS / REAÇÃO) ao meio. Sem pista nenhuma isso parece
        defeito de renderização em vez de conteúdo rolado. */
     background:
-      linear-gradient(rgba(255,255,255,0), #fff 70%) bottom / 100% 24px no-repeat local,
+      linear-gradient(transparent, var(--cbt-painel, #fff) 70%) bottom / 100% 24px no-repeat local,
       radial-gradient(farthest-side at 50% 100%, rgba(74,37,17,.18), transparent)
         bottom / 100% 10px no-repeat scroll,
-      #fff;
+      var(--cbt-painel, #fff);
   }
   /* O título é a única coisa que diz de quem é o turno dentro da barra, e era
      a primeira a sair de vista ao rolar. Grudado no topo ele vira cabeçalho:
      os selos passam POR BAIXO dele, que é uma leitura óbvia de rolagem. */
   .cbt-action-title {
     position: sticky; top: 0; z-index: 2;
-    background: #fff;
+    background: var(--cbt-painel, #fff);
     margin: 0 -24px 6px;
     padding: var(--esp-5) var(--esp-6) var(--esp-2);
-    border-bottom: 1px solid #e6ded2;
+    border-bottom: 1px solid var(--cbt-linha, #e6ded2);
     /* A sombra é o que faz a fileira cortada logo abaixo ser lida como
        "passando por baixo" e não como recorte. Só a linha do border não
        bastava: os botões têm contorno próprio e se confundiam com ela. */
@@ -2399,10 +2399,10 @@ body.shop-on { overflow: hidden; }
   color: var(--shp-muted); font-size: 1.4rem; line-height: 1;
   padding: var(--esp-1) var(--esp-2); border-radius: 6px;
 }
-.shp-close:hover { color: var(--shp-red); background: var(--shp-bg); }
+.shp-close:hover { color: var(--shp-acento, var(--shp-red)); background: var(--shp-bg); }
 .shp-title {
   font-family: 'Playfair Display', serif;
-  color: var(--shp-red);
+  color: var(--shp-acento, var(--shp-red));
   font-size: 1.7rem; font-weight: 700;
   margin: 0;
 }
@@ -2417,7 +2417,7 @@ body.shop-on { overflow: hidden; }
 
 /* Por que o preço difere da tabela: a relação com o lojista. */
 .shp-atitude {
-  margin-top: 2px; font-family: 'Lora', serif; font-size: 12px; color: #2f6b4f;
+  margin-top: 2px; font-family: 'Lora', serif; font-size: 12px; color: var(--shp-efeito, #2f6b4f);
 }
 
 /* Pechinchar: a conversa com o lojista, uma por visita. */
@@ -2475,7 +2475,7 @@ body.shop-on { overflow: hidden; }
 .shp-carga-num { font-variant-numeric: tabular-nums; }
 .shp-carga-barra {
   position: relative; height: 8px; border-radius: 4px;
-  background: #e6ded2; overflow: hidden;
+  background: var(--shp-trilho, #e6ded2); overflow: hidden;
 }
 .shp-carga-fill {
   height: 100%; background: var(--shp-green);
@@ -2504,7 +2504,7 @@ body.shop-on { overflow: hidden; }
 }
 .shp-aba:hover { color: var(--shp-dark); }
 .shp-aba.shp-aba-on {
-  color: var(--shp-red); background: var(--shp-bg);
+  color: var(--shp-acento, var(--shp-red)); background: var(--shp-bg);
   border-color: var(--shp-gold);
 }
 
@@ -2527,7 +2527,7 @@ body.shop-on { overflow: hidden; }
 }
 
 .shp-item {
-  border: 1px solid #e0d5c2; border-radius: 8px;
+  border: 1px solid var(--shp-borda, #e0d5c2); border-radius: 8px;
   padding: var(--esp-3) var(--esp-4);
   background: var(--shp-paper);
 }
@@ -2570,10 +2570,10 @@ body.shop-on { overflow: hidden; }
   padding: var(--esp-2) var(--esp-5);
   border-radius: 6px; cursor: pointer; transition: all .15s;
 }
-.shp-btn:hover:not(:disabled) { background: var(--shp-gold); color: #fff; }
+.shp-btn:hover:not(:disabled) { background: var(--shp-gold); color: var(--shp-sobre, #fff); }
 .shp-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .shp-btn-vender:hover:not(:disabled) {
-  background: var(--shp-green); border-color: var(--shp-green); color: #fff;
+  background: var(--shp-green); border-color: var(--shp-green); color: var(--shp-sobre, #fff);
 }
 
 .shp-vazio {
@@ -2595,13 +2595,13 @@ body.shop-on { overflow: hidden; }
 }
 .shp-msg-erro { color: var(--shp-red); font-weight: 700; }
 .shp-sair {
-  background: var(--shp-red); color: #fff;
+  background: var(--shp-red); color: var(--shp-sobre, #fff);
   border: 1px solid var(--shp-gold); border-radius: 6px;
   font-family: 'Lora', serif; font-weight: 700; font-size: 0.9rem;
   padding: var(--esp-2) var(--esp-5); cursor: pointer;
   flex: 0 0 auto;
 }
-.shp-sair:hover { background: #6b1a0f; }
+.shp-sair:hover { background: var(--shp-red-escuro, #6b1a0f); }
 
 #shp-reopen {
   position: fixed; right: 20px; z-index: 8999;
@@ -3314,7 +3314,7 @@ body.grimoire-on { overflow: hidden; }
   border: 1px solid var(--grm-line); border-radius: 20px;
   background: var(--grm-paper); font-size: 0.84rem;
 }
-.grm-vaga-livre { border-color: var(--grm-ink); background: #f1edf8; }
+.grm-vaga-livre { border-color: var(--grm-ink); background: var(--grm-vaga, #f1edf8); }
 .grm-vaga-rotulo { color: var(--grm-muted); }
 .grm-vaga-num { font-weight: 700; font-variant-numeric: tabular-nums; }
 .grm-vaga-falta { color: var(--grm-ink); font-weight: 700; font-size: 0.78rem; }
@@ -3346,7 +3346,7 @@ body.grimoire-on { overflow: hidden; }
   padding: 2px var(--esp-3); cursor: pointer;
 }
 .grm-filtro:hover { border-color: var(--grm-gold); }
-.grm-filtro-on { background: var(--grm-ink); border-color: var(--grm-ink); color: #fff; font-weight: 700; }
+.grm-filtro-on { background: var(--grm-ink); border-color: var(--grm-ink); color: var(--grm-sobre, #fff); font-weight: 700; }
 
 .grm-lista {
   flex: 1 1 auto; overflow-y: auto;
@@ -3377,7 +3377,7 @@ body.grimoire-on { overflow: hidden; }
 .grm-circulo, .grm-escola, .grm-marca {
   font-size: 0.7rem; border-radius: 10px; padding: 1px var(--esp-2);
 }
-.grm-circulo { background: var(--grm-ink); color: #fff; font-weight: 700; }
+.grm-circulo { background: var(--grm-ink); color: var(--grm-sobre, #fff); font-weight: 700; }
 .grm-escola  { background: var(--grm-bg); color: var(--grm-muted); }
 .grm-marca   { border: 1px solid var(--grm-line); color: var(--grm-muted); }
 .grm-magia-desc {
@@ -3391,7 +3391,7 @@ body.grimoire-on { overflow: hidden; }
 .grm-aprender-btn {
   flex: 0 0 auto;
   font-family: 'Lora', serif; font-weight: 700; font-size: 0.86rem;
-  background: var(--grm-ink); color: #fff;
+  background: var(--grm-ink); color: var(--grm-sobre, #fff);
   border: 1px solid var(--grm-ink); border-radius: 6px;
   padding: var(--esp-1) var(--esp-4); cursor: pointer;
 }
@@ -3436,12 +3436,12 @@ body.grimoire-on { overflow: hidden; }
 .grm-msg { flex: 1 1 auto; font-size: 0.88rem; color: var(--grm-dark); min-height: 1.2em; }
 .grm-msg-erro { color: var(--grm-red); font-weight: 700; }
 .grm-concluir {
-  background: var(--grm-red); color: #fff;
+  background: var(--grm-red); color: var(--grm-sobre, #fff);
   border: 1px solid var(--grm-gold); border-radius: 6px;
   font-family: 'Lora', serif; font-weight: 700; font-size: 0.9rem;
   padding: var(--esp-2) var(--esp-5); cursor: pointer; flex: 0 0 auto;
 }
-.grm-concluir:hover { background: #6b1a0f; }
+.grm-concluir:hover { background: var(--grm-red-escuro, #6b1a0f); }
 
 #grm-reopen {
   position: fixed; right: 20px; z-index: 8999;
@@ -4113,6 +4113,95 @@ body.rest-on { overflow: hidden; }
   --lcl-line:  var(--page-edge);
   --lcl-ink:   var(--ink-user);
   --lcl-gold-texto: var(--text-muted);
+}
+
+/* Combate, loja e grimório seguem o tema escolhido, como as telas novas. O
+   pergaminho é o padrão e continua igual: as cores fixas dessas telas viraram
+   variáveis com o valor de sempre, e aqui cada uma recebe o equivalente do
+   tema. O dourado das molduras e as cores das barras (vida, mana) ficam, porque
+   leem bem no claro e no escuro. */
+:root[data-theme]:not([data-theme="pergaminho"]) #combat-overlay {
+  --cbt-bg:     var(--page-left);
+  --cbt-paper:  var(--page-right);
+  --cbt-dark:   var(--text-main);
+  --cbt-red:    var(--ink-sys);
+  --cbt-text:   var(--text-main);
+  --cbt-muted:  var(--text-muted);
+  --cbt-green:  var(--green, #2e7d32);
+  --cbt-sobre:  var(--page-right);
+  --cbt-red-escuro: color-mix(in srgb, var(--ink-sys) 80%, #000);
+  --cbt-card:   var(--page-left);
+  --cbt-card-inimigo: color-mix(in srgb, var(--ink-sys) 7%, var(--page-left));
+  --cbt-card-fora: var(--page-left);
+  --cbt-nome-inimigo: var(--ink-sys);
+  --cbt-borda:  var(--page-edge);
+  --cbt-linha:  var(--page-edge);
+  --cbt-trilho: var(--page-edge);
+  --cbt-realce: color-mix(in srgb, var(--cbt-gold) 18%, var(--page-right));
+  --cbt-painel: var(--page-right);
+  --cbt-diario: var(--page-left);
+  --cbt-veu:    var(--page-left);
+  --cbt-brilho: transparent;
+  --cbt-cancelar: var(--page-left);
+  --cbt-cancelar-borda: var(--page-edge);
+  --cbt-gold-texto: var(--text-muted);
+  --cbt-acento: var(--ink-user);
+}
+:root[data-theme]:not([data-theme="pergaminho"]) #combat-overlay :is(
+  .cbt-pin-aliado, .cbt-pin-inimigo, .cbt-def-imu, .cbt-def-res, .cbt-def-vul,
+  .cbt-conc, .cbt-slot.livre, .cbt-slot.gasto, .cbt-cond-out) {
+  background: color-mix(in srgb, var(--chip, var(--text-muted)) 20%, var(--page-left));
+  border-color: color-mix(in srgb, var(--chip, var(--text-muted)) 55%, var(--page-left));
+  color: var(--text-main);
+}
+:root[data-theme]:not([data-theme="pergaminho"]) #combat-overlay :is(.cbt-pin-aliado, .cbt-def-imu) { --chip: var(--cbt-mp); }
+:root[data-theme]:not([data-theme="pergaminho"]) #combat-overlay :is(.cbt-pin-inimigo, .cbt-def-vul) { --chip: var(--ink-sys); }
+:root[data-theme]:not([data-theme="pergaminho"]) #combat-overlay :is(.cbt-def-res, .cbt-slot.livre) { --chip: var(--green, #2e7d32); }
+:root[data-theme]:not([data-theme="pergaminho"]) #combat-overlay .cbt-conc { --chip: var(--ink-user); }
+:root[data-theme]:not([data-theme="pergaminho"]) #combat-overlay .cbt-slot.gasto { color: var(--text-muted); }
+:root[data-theme]:not([data-theme="pergaminho"]) #combat-overlay .cbt-pin-vez { border-color: var(--text-main); }
+:root[data-theme]:not([data-theme="pergaminho"]) #combat-overlay .cbt-header { background: var(--page-left); }
+:root[data-theme]:not([data-theme="pergaminho"]) #combat-overlay .cbt-zona-aqui {
+  border-color: var(--ink-user);
+  background: color-mix(in srgb, var(--ink-user) 10%, var(--page-left));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink-user) 35%, transparent);
+}
+:root[data-theme]:not([data-theme="pergaminho"]) #combat-overlay .cbt-picker {
+  background: color-mix(in srgb, var(--ink-user) 6%, var(--page-right));
+  border-color: color-mix(in srgb, var(--ink-user) 45%, var(--page-right));
+}
+:root[data-theme]:not([data-theme="pergaminho"]) #combat-overlay .cbt-card.cbt-cur {
+  box-shadow: 0 0 0 2px var(--ink-user), 0 8px 15px color-mix(in srgb, var(--ink-user) 20%, transparent);
+}
+
+:root[data-theme]:not([data-theme="pergaminho"]) #shop-overlay {
+  --shp-paper: var(--page-right);
+  --shp-bg:    var(--page-left);
+  --shp-dark:  var(--text-main);
+  --shp-text:  var(--text-main);
+  --shp-muted: var(--text-muted);
+  --shp-green: var(--green, #2e7d32);
+  --shp-red:   var(--ink-sys);
+  --shp-sobre: var(--page-right);
+  --shp-red-escuro: color-mix(in srgb, var(--ink-sys) 80%, #000);
+  --shp-efeito: var(--green, #2e7d32);
+  --shp-trilho: var(--page-edge);
+  --shp-borda:  var(--page-edge);
+  --shp-acento: var(--ink-user);
+}
+
+:root[data-theme]:not([data-theme="pergaminho"]) #grimoire-overlay {
+  --grm-paper: var(--page-right);
+  --grm-bg:    var(--page-left);
+  --grm-dark:  var(--text-main);
+  --grm-text:  var(--text-main);
+  --grm-muted: var(--text-muted);
+  --grm-ink:   var(--ink-user);
+  --grm-red:   var(--ink-sys);
+  --grm-line:  var(--page-edge);
+  --grm-sobre: var(--page-right);
+  --grm-red-escuro: color-mix(in srgb, var(--ink-sys) 80%, #000);
+  --grm-vaga:  color-mix(in srgb, var(--ink-user) 12%, var(--page-right));
 }
 #local-overlay.hidden, #pessoa-overlay.hidden, #heroi-overlay.hidden, #missoes-overlay.hidden, #mapa-overlay.hidden, #grupo-overlay.hidden, #diario-overlay.hidden, #elenco-overlay.hidden { display: none; }
 body.local-on, body.pessoa-on, body.heroi-on, body.missoes-on, body.mapa-on, body.grupo-on, body.diario-on, body.elenco-on { overflow: hidden; }
