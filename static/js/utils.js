@@ -928,7 +928,7 @@ function openGuide() {
   const mem = (typeof window !== 'undefined') ? window._lastMem : null;
   const banner = document.getElementById('guide-mode-banner');
   const STYLE_LABELS = {
-    dnd: 'Regras D&D', fantasia: 'Fantasia', romance: 'Romance',
+    fantasia: 'Fantasia', dark_fantasy: 'Dark Fantasy', romance: 'Romance',
     horror: 'Horror', misterio: 'Mistério', scifi: 'Ficção Científica',
     faroeste: 'Faroeste'
   };
@@ -941,7 +941,8 @@ function openGuide() {
     } else {
       banner.style.display = '';
       const isDnd = mem.dnd_mode === true || mem.campaign_type === 'dnd';
-      const label = STYLE_LABELS[mem.campaign_type] || (isDnd ? 'Regras D&D' : 'Narrativo');
+      const genero = STYLE_LABELS[mem.campaign_type] || 'Fantasia';
+      const label = isDnd ? `${genero} com regras de D&D` : genero;
       if (isDnd) {
         banner.className = 'guide-banner is-dnd';
         banner.innerHTML = `Esta é uma campanha de <b>${label}</b>. Tudo abaixo se aplica, <b>incluindo a seção do Modo D&D</b> (fichas, dados e combate por turnos).`;

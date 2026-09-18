@@ -608,6 +608,12 @@ fieldset.ed-trava button { opacity: 0.62; cursor: not-allowed; }
 .close-btn:hover { color: var(--ink-sys); }
 
 .import-tabs { display: flex; gap: var(--esp-1); overflow-x: auto; margin-bottom: var(--esp-4); border-bottom: 1px solid var(--page-edge); padding-bottom: var(--esp-1); }
+
+/* As regras de D&D são uma caixa à parte do gênero, na importação também. */
+.import-regras {
+  display: flex; align-items: center; gap: var(--esp-2); margin: var(--esp-2) 0 var(--esp-3);
+  font-family: 'Lora', serif; font-size: 13px; color: var(--text-muted); cursor: pointer;
+}
 .import-tab { background: transparent; border: none; font-family: 'Lora', serif; font-size: 14px; color: var(--text-muted); padding: var(--esp-1) var(--esp-3); cursor: pointer; }
 .import-tab.active { color: var(--text-main); font-weight: 600; border-bottom: 2px solid var(--text-main); }
 

@@ -83,7 +83,7 @@ abre o loop **percepção → deliberação → ação → verificação** em de
 
 1. [Visão geral](#visão-geral)
 2. [Como a IA é usada como agente](#como-a-ia-é-usada-como-agente)
-3. [Estilos de campanha](#estilos-de-campanha)
+3. [Gênero e regras](#gênero-e-regras)
 4. [Sistema de memória (estado por sessão)](#sistema-de-memória-estado-por-sessão)
 5. [Persistência (Supabase) e autenticação](#persistência-supabase-e-autenticação)
 6. [Modo D&D, mecânicas](#modo-dd-mecânicas)
@@ -259,23 +259,62 @@ Para Ollama/Gemma, o sistema injeta automaticamente um wrapper
 
 ---
 
-## Estilos de campanha
+## Gênero e regras
 
-`agent.py:CAMPAIGN_CONFIGS` e `_STYLE_INSTRUCTIONS`, cada estilo muda a
-instrução do mestre e as labels da UI:
+Uma campanha tem dois campos independentes:
 
-| Estilo | Label da UI | Foco da instrução |
+- **Gênero** (`campaign_type`) — o tom do mundo: `fantasia`, `dark_fantasy`,
+  `romance`, `horror`, `misterio`, `scifi`, `faroeste`.
+- **Regras** (`dnd_mode`) — com D&D 5e ligado, a campanha tem fichas, combate
+  tático, loja, grimório e as demais telas de regra; sem, a narrativa é livre,
+  com memória estruturada.
+
+Qualquer gênero combina com qualquer modo: dark fantasy com fichas, horror com
+combate tático, romance sem regra nenhuma.
+
+Antes, `dnd` era um valor de `campaign_type`, no mesmo seletor dos gêneros.
+Quem escolhia D&D ganhava uma instrução quase toda mecânica, sem direção de
+atmosfera nenhuma; quem escolhia um gênero perdia o motor. `memory.regras_e_genero`
+converte o formato antigo (`campaign_type: "dnd"` vira `fantasia` com as
+regras ligadas) e roda em toda campanha carregada, em toda campanha criada ou
+editada pelo menu e na geração de lore.
+
+### A instrução do mestre é composta
+
+`agent.instrucao_da_campanha(genero, dnd_mode)` junta três blocos:
+
+1. **O gênero** — o tom, de `_STYLE_INSTRUCTIONS`.
+2. **O tom vale para toda cena** — combate, romance, investigação, viagem,
+   descanso. Uma cena íntima numa campanha sombria é íntima *e* sombria: o
+   afeto acontece apesar do mundo, e o mundo continua lá. O ritmo e o foco
+   mudam com a cena; o tom, não. Sem isto, cada gênero só sabia narrar o
+   próprio tipo de cena.
+3. **As regras de D&D**, quando ligadas — e elas avisam que não mudam o tom:
+   as regras dizem o que acontece, o gênero diz como isso é contado.
+
+`create_agent` recebe os dois campos. Ele fazia `dnd_mode = (campaign_type ==
+"dnd")`, o que desligaria o motor de uma campanha de horror com fichas assim
+que ela fosse aberta.
+
+| Gênero | Rótulo do grupo | Foco da instrução |
 |---|---|---|
-| `dnd` | Grupo de Aventureiros | Mecânica rigorosa, combate por turnos, classes/raças, XP |
 | `fantasia` | Grupo de Aventureiros | Aventura ampla, mundo rico, magia narrativa |
+| `dark_fantasy` | Companhia | Mundo que fere, poder com custo, moral cinzenta, violência com peso |
 | `romance` | Pessoas Próximas | Emoções, diálogo, subtexto, flags emocionais |
 | `horror` | Sobreviventes | Tensão, ritmo lento, vulnerabilidade real, trauma |
 | `misterio` | Aliados | Pistas, dedução, suspeitos com álibis |
 | `scifi` | Tripulação | Tech consistente, dilemas morais, facções |
 | `faroeste` | Comparsas | Reputação, duelo, lei frágil |
 
-O modo D&D é o único com mecânicas D&D 5e completas (ficha, combate em
-turnos, etc.). Os outros são puramente narrativos com memória estruturada.
+Com as regras ligadas, o rótulo de papel vira "Classe" e o nome ganha "· D&D"
+(`get_campaign_config(genero, dnd_mode)`).
+
+No menu, o wizard e o editor têm os dois seletores, e a importação tem as
+abas de gênero e uma caixa de regras. Os campos de um personagem seguem a
+REGRA: com D&D, ficha; sem, os campos do gênero (o dark fantasy usa os do
+fantasia, com outro nome — o que muda é o tom, e o tom é do mestre).
+
+`test_genero_e_regras.py` (16) e `test_genero_e_regras_navegador.py` (6).
 
 ---
 
@@ -321,8 +360,8 @@ memory.load_campaign() / memory.save_campaign()
 ```python
 {
   "name":                 str,
-  "campaign_type":        "dnd" | "fantasia" | ...,
-  "dnd_mode":             bool,
+  "campaign_type":        "fantasia" | "dark_fantasy" | ...,   # gênero
+  "dnd_mode":             bool,                             # regras
   "combat_mode":          "narrado" | "tela",
   "protagonist":          str,
   "characters":           {char_key: {...}},

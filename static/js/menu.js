@@ -230,7 +230,8 @@ async function startSession() {
     localStorage.setItem('rpg_session', JSON.stringify({
       campaign:      data.campaign,
       model:         data.model_label,
-      campaign_type: payload.campaign_type,
+      campaign_type: data.campaign_type || payload.campaign_type,
+      dnd_mode:      !!data.dnd_mode,
       has_history:   data.has_history,
       opening:       data.opening,
       campaign_config: data.campaign_config || null,
@@ -430,13 +431,14 @@ function onModelChange() {
 // ═══════════════════════════════════════
 //  Modal de importação
 // ═══════════════════════════════════════
-let currentImportTheme = 'dnd';
+let currentImportTheme = 'fantasia';
 
 function getImportPrompt(theme) {
-  const isDnd = theme === 'dnd';
+  // As regras são uma caixa à parte: dá para importar D&D de qualquer gênero.
+  const isDnd = !!document.getElementById('import-dnd')?.checked;
   const themeFocus = {
-    dnd:      "focando nas mecânicas de combate, itens, magias e progressão de aventura",
     fantasia: "focando na magia do mundo, facções e feitos heroicos",
+    dark_fantasy: "focando na atmosfera sombria, nos preços que o poder cobrou, nas cicatrizes e na moral cinzenta de cada escolha",
     romance:  "focando intensamente nos sentimentos, intimidade, segredos e no estado atual dos relacionamentos",
     horror:   "focando na tensão, nos traumas adquiridos, na sanidade e nos medos",
     misterio: "focando nas pistas coletadas, suspeitos, álibis e na linha investigativa",
@@ -444,7 +446,8 @@ function getImportPrompt(theme) {
     faroeste: "focando na reputação, alianças, recompensas e na moralidade crua",
   };
 
-  let prompt = `Analise meticulosamente toda a nossa conversa até agora. Você deve agir como um Arquivista de Mundos, extraindo não apenas fatos, mas a atmosfera, as nuances psicológicas e as ramificações de cada escolha. Extraia o máximo de detalhes possível para garantir a continuidade perfeita da narrativa, ${themeFocus[theme]}.\n\nGere um JSON com EXATAMENTE esta estrutura:\n\n{\n`;
+  const foco = themeFocus[theme] + (isDnd ? ', e nas mecânicas de combate, itens, magias e progressão' : '');
+  let prompt = `Analise meticulosamente toda a nossa conversa até agora. Você deve agir como um Arquivista de Mundos, extraindo não apenas fatos, mas a atmosfera, as nuances psicológicas e as ramificações de cada escolha. Extraia o máximo de detalhes possível para garantir a continuidade perfeita da narrativa, ${foco}.\n\nGere um JSON com EXATAMENTE esta estrutura:\n\n{\n`;
   prompt += `  "campaign_type": "${theme}",\n`;
   prompt += `  "dnd_mode": ${isDnd},\n`;
   prompt += `  "protagonist": "<nome exato do personagem principal do jogador>",
@@ -1548,7 +1551,8 @@ function openWizard() {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
-  document.getElementById('wz-type').value = 'dnd';
+  document.getElementById('wz-type').value = 'fantasia';
+  document.getElementById('wz-regras').value = 'dnd';
   document.getElementById('wz-ai-toggle').checked = false;
   document.getElementById('wz-ai-section').classList.add('hidden');
   document.getElementById('wz-ai-hint').classList.remove('hidden');
@@ -1608,7 +1612,7 @@ function wzRenderStep() {
   });
 
   if (wzStep === 2) {
-    const isDnd = document.getElementById('wz-type').value === 'dnd';
+    const isDnd = wzIsDnd();
     document.getElementById('wz-char-mode-hint').textContent =
       isDnd ? 'Modo D&D: campos de ficha completa disponíveis.' : 'Modo narrativo: campos básicos.';
     wzRenderChars();
@@ -1642,7 +1646,7 @@ async function generateLore() {
   try {
     const keys  = typeof window.getApiKeys === 'function' ? window.getApiKeys() : {};
     const model = document.getElementById('model-select')?.value || 'gemini-2.0-flash';
-    const campaignType = document.getElementById('wz-type')?.value || 'fantasia';
+    const campaignType = wzGenero();
     const res = await authFetch(`${API}/api/campaigns/generate-lore`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1650,6 +1654,7 @@ async function generateLore() {
         prompt,
         model,
         campaign_type:    campaignType,
+        dnd_mode:         wzIsDnd(),
         google_api_key:   keys.google_api_key   || '',
         deepseek_api_key: keys.deepseek_api_key  || '',
       }),
@@ -1861,9 +1866,16 @@ function wzRenderEvts() {
 }
 
 // ── Personagens ────────────────────────────────────────────
+// Gênero e regras são dois seletores. O que muda os CAMPOS de um personagem
+// é a regra: com D&D ele tem ficha; sem, os campos do gênero. wzTema() é essa
+// chave única, que as funções de campo já usavam quando "dnd" era gênero.
+function wzGenero() { return document.getElementById('wz-type')?.value || 'fantasia'; }
+function wzIsDnd()  { return document.getElementById('wz-regras')?.value === 'dnd'; }
+function wzTema()   { return wzIsDnd() ? 'dnd' : wzGenero(); }
+
 function onWizardTypeChange() {
   if (wzStep === 2) {
-    const isDnd = document.getElementById('wz-type').value === 'dnd';
+    const isDnd = wzIsDnd();
     document.getElementById('wz-char-mode-hint').textContent =
       isDnd ? 'Modo D&D: campos de ficha completa disponíveis.' : 'Modo narrativo: campos básicos.';
     wzRenderChars();
@@ -1928,7 +1940,7 @@ function wzMaxMana(classe, nivel) {
 }
 
 function wzCalcSheet(char) {
-  const isDnd = document.getElementById('wz-type').value === 'dnd';
+  const isDnd = wzIsDnd();
   if (!isDnd) return null;
   const hitDie = Regras.dadoDeVida(char.classe) || Regras.dadoDeVida('guerreiro') || 8;
   const stats  = char.stats;
@@ -2430,7 +2442,7 @@ function wzRemoveFeat(i, nome) {
 
 // ── Wizard: seção D&D completa (refrescável parcialmente) ────────────────────
 function wzBuildDndSectionHtml(i) {
-  const isDnd = document.getElementById('wz-type').value === 'dnd';
+  const isDnd = wzIsDnd();
   const char  = wzChars[i];
   if (!isDnd || !char) return '';
   const nivel  = Math.max(1, parseInt(char.nivel) || 1);
@@ -2741,8 +2753,17 @@ const THEME_CHAR_FIELDS = {
 // Rótulos do "grupo" por estilo de campanha. Espelha CAMPAIGN_CONFIGS
 // (agent.py) para que o wizard e o editor não usem termos de aventura/D&D
 // ("Membro do Grupo", "GRUPO") em campanhas narrativas como romance.
+// O dark fantasy tem os mesmos campos de personagem do fantasia, com outro
+// nome: o que muda é o tom, e o tom é do mestre.
+THEME_CHAR_FIELDS.dark_fantasy = {
+  ...THEME_CHAR_FIELDS.fantasia,
+  label: 'Dark Fantasy — Arquétipo & Juramento',
+  color: 'rgba(120,40,40,0.08)', border: 'rgba(120,40,40,0.25)',
+};
+
 const THEME_PARTY_META = {
   fantasia: { member: 'Membro do Grupo',  badge: 'GRUPO',      role: 'Classe / Função',       hint: 'Ex: Guerreira, Mago, Ladino...' },
+  dark_fantasy: { member: 'Membro da Companhia', badge: 'COMPANHIA', role: 'Ofício / Juramento', hint: 'Ex: Mercenária, Caçador de bruxas, Clérigo renegado...' },
   romance:  { member: 'Pessoa Próxima',   badge: 'PRÓXIMO',    role: 'Relacionamento',        hint: 'Ex: Interesse romântico, Melhor amigo, Rival...' },
   horror:   { member: 'Sobrevivente',     badge: 'GRUPO',      role: 'Papel no Grupo',        hint: 'Ex: Líder, Cético, Especialista...' },
   misterio: { member: 'Aliado',           badge: 'ALIADO',     role: 'Papel na Investigação', hint: 'Ex: Detetive, Informante, Testemunha...' },
@@ -2801,8 +2822,8 @@ function wzRenderChars() {
   if (!Regras.pronto()) {
     Regras.carregar().then(() => { if (Regras.pronto()) wzRenderChars(); });
   }
-  const theme   = document.getElementById('wz-type').value;
-  const isDnd   = theme === 'dnd';
+  const theme   = wzTema();
+  const isDnd   = wzIsDnd();
   const meta    = partyMeta(theme);
   const list    = document.getElementById('wz-chars-list');
   const empty   = document.getElementById('wz-chars-empty');
@@ -2819,7 +2840,7 @@ function wzRenderChars() {
             ${char.name || `Personagem ${i+1}`}
           </span>
           ${char.isParty ? `<span class="cwc-selo">${meta.badge}</span>` : ''}
-          ${isDnd && char.classe ? `<span class="cwc-classe">${CLASS_DATA_WZ[char.classe]?.label||''}${char.nivel>1?` Nv.${char.nivel}`:''}</span>` : wzExtraBadge(char, document.getElementById('wz-type').value)}
+          ${isDnd && char.classe ? `<span class="cwc-classe">${CLASS_DATA_WZ[char.classe]?.label||''}${char.nivel>1?` Nv.${char.nivel}`:''}</span>` : wzExtraBadge(char, wzTema())}
         </div>
         <button onclick="event.stopPropagation();removeWzChar(${i})" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:16px;padding:2px 6px;">✕</button>
       </div>
@@ -2866,7 +2887,7 @@ function wzRenderChars() {
           <span class="cwc-label">Notas</span>
           <textarea rows="2" onchange="wzChars[${i}].notes=this.value" placeholder="Informações adicionais, objetivos secretos...">${escHtml(char.notes)}</textarea>
         </div>
-        ${wzRenderThemeExtras(i, document.getElementById('wz-type').value, char)}
+        ${wzRenderThemeExtras(i, wzTema(), char)}
         <div id="wz-dnd-${i}">${wzBuildDndSectionHtml(i)}</div>
       </div>
     </div>`;
@@ -2969,8 +2990,8 @@ async function createCampaignFromWizard() {
   if (!wzValidateStep1()) { document.getElementById('wz-err').textContent = 'Verifique o nome da campanha.'; return; }
 
   const name         = document.getElementById('wz-name').value.trim();
-  const campaign_type = document.getElementById('wz-type').value;
-  const isDnd        = campaign_type === 'dnd';
+  const campaign_type = wzGenero();
+  const isDnd        = wzIsDnd();
 
   // Monta characters dict e party array
   const characters = {};
@@ -2994,10 +3015,10 @@ async function createCampaignFromWizard() {
 
     // Processa campos específicos do tema e mescla nos campos padrão
     const ext = char.extras || {};
-    const theme = campaign_type;
+    const theme = wzTema();
     if (theme !== 'dnd') {
       // role: usa o campo primário do tema (arquetipo, papel, especialidade, tipo)
-      const THEME_PRIMARY = {fantasia:'arquetipo',romance:'papel',horror:'tipo',misterio:'papel',scifi:'especialidade',faroeste:'arquetipo'};
+      const THEME_PRIMARY = {fantasia:'arquetipo',dark_fantasy:'arquetipo',romance:'papel',horror:'tipo',misterio:'papel',scifi:'especialidade',faroeste:'arquetipo'};
       const primary = ext[THEME_PRIMARY[theme]];
       if (primary && !charObj.role) charObj.role = primary;
 
@@ -3028,7 +3049,7 @@ async function createCampaignFromWizard() {
       charObj.notes = noteParts.join(' | ');
 
       // inventario: itens físicos específicos do tema
-      if (theme === 'fantasia' && ext.habilidade) {
+      if ((theme === 'fantasia' || theme === 'dark_fantasy') && ext.habilidade) {
         charObj.habilidades = [{nome: ext.habilidade, descricao: 'Habilidade especial do personagem.', custo_mana: 0, dado: ''}];
       }
       if (theme === 'scifi' && ext.implantes) {
@@ -3040,7 +3061,7 @@ async function createCampaignFromWizard() {
       if (theme === 'faroeste' && ext.recompensa && ext.recompensa > 0) {
         charObj.inventario.push({nome: 'Ficha de Procurado', qtd: 1, descricao: `Recompensa: $${ext.recompensa}. ${ext.lado_lei || ''}`});
       }
-      if (theme === 'fantasia' && ext.raca) {
+      if ((theme === 'fantasia' || theme === 'dark_fantasy') && ext.raca) {
         charObj.description = `[${ext.raca}] ` + (charObj.description || '');
       }
     }
@@ -3278,7 +3299,9 @@ let edLojasNomes = [];
 let edEvts  = [];
 let edFlags = [];
 
-function edIsDnd() { return document.getElementById('ed-type')?.value === 'dnd'; }
+function edIsDnd()  { return document.getElementById('ed-regras')?.value === 'dnd'; }
+function edGenero() { return document.getElementById('ed-type')?.value || 'fantasia'; }
+function edTema()   { return edIsDnd() ? 'dnd' : edGenero(); }
 
 function edBlankSheet() {
   return {
@@ -3665,7 +3688,10 @@ async function openEditCampaign(e, name) {
 
     const c = data.campaign;
     document.getElementById('ed-name').value        = c.name             || name;
-    document.getElementById('ed-type').value        = c.campaign_type    || 'fantasia';
+    // "dnd" era gênero em campanha antiga: vira fantasia com as regras.
+    const antigaDnd = c.campaign_type === 'dnd';
+    document.getElementById('ed-type').value        = antigaDnd ? 'fantasia' : (c.campaign_type || 'fantasia');
+    document.getElementById('ed-regras').value      = (antigaDnd || c.dnd_mode) ? 'dnd' : 'livre';
     document.getElementById('ed-summary').value     = c.story_summary    || '';
     document.getElementById('ed-scene').value       = c.current_scene    || '';
     document.getElementById('ed-location').value    = c.current_location || '';
@@ -4423,7 +4449,7 @@ function edRenderChars() {
   }
   empty.style.display = 'none';
   const isDnd = edIsDnd();
-  const meta  = partyMeta(document.getElementById('ed-type')?.value || 'fantasia');
+  const meta  = partyMeta(edTema());
   container.innerHTML = edChars.map((ch, i) => {
     const sh = ch.sheet;
     const classeLabel = isDnd && sh ? (CLASS_DATA_WZ[sh.classe]?.label || sh.classe || '') : '';
@@ -4664,7 +4690,7 @@ async function saveEditedCampaign() {
   const payload = {
     campaign: {
       name:             newName,
-      campaign_type:    document.getElementById('ed-type').value,
+      campaign_type:    edGenero(),
       dnd_mode:         isDnd,
       story_summary:    document.getElementById('ed-summary').value,
       current_scene:    document.getElementById('ed-scene').value,

@@ -111,7 +111,9 @@ def wizard(app_no_ar):
         cap._sanear(pg)
         pg.evaluate("() => openWizard()")
         pg.fill("#wz-name", "Desaparecimentos")
-        pg.select_option("#wz-type", "dnd")
+        # Regras e gênero são dois seletores: D&D é regra, não gênero.
+        pg.select_option("#wz-type", "fantasia")
+        pg.select_option("#wz-regras", "dnd")
         pg.evaluate("() => { onWizardTypeChange(); wizardValidate(); }")
         pg.check("#wz-ai-toggle")
         pg.fill("#wz-ai-prompt", "Desaparecimentos em Cliviate")

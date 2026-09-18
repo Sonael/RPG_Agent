@@ -155,7 +155,11 @@ def _defaults() -> dict:
     return {
         "name":                 "",
         "campaign_type":        "fantasia",
-        "dnd_mode":             False,   # True quando o estilo for "dnd"
+        # Regras e gênero são coisas diferentes: dnd_mode liga fichas,
+        # combate tático e as telas de regra; campaign_type é o GÊNERO (o
+        # tom do mundo). "dnd" já foi um valor de campaign_type — ver
+        # regras_e_genero.
+        "dnd_mode":             False,
         "protagonist":          "",      # Nome do personagem principal do jogador
         "characters":           {},
         "locations":            {},
@@ -349,11 +353,38 @@ def _migrate_mana_pool() -> None:
         sheet["mana_atual"] = max(0, min(atual, novo_max))
 
 
+# Gêneros: o tom do mundo, combinável com qualquer modo de regras.
+GENEROS = ("fantasia", "dark_fantasy", "romance", "horror", "misterio", "scifi", "faroeste")
+
+
+def regras_e_genero(campaign_type, dnd_mode) -> tuple[str, bool]:
+    """
+    (gênero, usa as regras de D&D) a partir do que a campanha guarda.
+
+    "dnd" era um valor de campaign_type, no mesmo seletor dos gêneros: quem
+    queria fichas e combate tático tinha de abrir mão do tom, e quem queria
+    horror ou romance perdia o motor. D&D é modo de jogar, não gênero — uma
+    campanha "dnd" antiga vira fantasia com as regras ligadas, que é o que
+    ela era de fato. Gênero desconhecido vira fantasia.
+    """
+    genero = (campaign_type or "fantasia").strip().lower()
+    if genero == "dnd":
+        return "fantasia", True
+    return (genero if genero in GENEROS else "fantasia"), bool(dnd_mode)
+
+
+def _migrate_regras_e_genero() -> None:
+    genero, dnd = regras_e_genero(campaign.get("campaign_type"), campaign.get("dnd_mode"))
+    campaign["campaign_type"] = genero
+    campaign["dnd_mode"] = dnd
+
+
 def normalizar_campanha() -> None:
     """
     As correções que TODA campanha carregada recebe, num lugar só:
 
       • campos da v2 nas fichas antigas (ouro, condições, etc.);
+      • gênero e regras em campos separados ("dnd" deixou de ser gênero);
       • estrutura do estado de combate;
       • descrições de magia que ficaram como placeholder;
       • pool de mana pela tabela oficial de Pontos de Magia.
@@ -365,6 +396,7 @@ def normalizar_campanha() -> None:
     """
     for char in campaign.get("characters", {}).values():
         _migrate_sheet_fields(char)
+    _migrate_regras_e_genero()
     _migrate_combat_state()
     _migrate_spell_descriptions()
     _migrate_mana_pool()

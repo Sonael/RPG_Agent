@@ -24,7 +24,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;600&family=Lora:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Playfair+Display:ital,wght@0,500;0,700;1,500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/css/style.css?v=68">
+  <link rel="stylesheet" href="/static/css/style.css?v=69">
 </head>
 <body>
   <div class="scene">
@@ -165,14 +165,18 @@
       </div>
       
       <div class="import-tabs">
-        <button class="import-tab active" data-theme="dnd" onclick="setImportTheme('dnd')">D&D</button>
-        <button class="import-tab" data-theme="fantasia" onclick="setImportTheme('fantasia')">Fantasia</button>
+        <button class="import-tab active" data-theme="fantasia" onclick="setImportTheme('fantasia')">Fantasia</button>
+        <button class="import-tab" data-theme="dark_fantasy" onclick="setImportTheme('dark_fantasy')">Dark Fantasy</button>
         <button class="import-tab" data-theme="romance" onclick="setImportTheme('romance')">Romance</button>
         <button class="import-tab" data-theme="horror" onclick="setImportTheme('horror')">Horror</button>
         <button class="import-tab" data-theme="misterio" onclick="setImportTheme('misterio')">Mistério</button>
         <button class="import-tab" data-theme="scifi" onclick="setImportTheme('scifi')">Sci-Fi</button>
         <button class="import-tab" data-theme="faroeste" onclick="setImportTheme('faroeste')">Faroeste</button>
       </div>
+      <label class="import-regras">
+        <input type="checkbox" id="import-dnd" checked onchange="setImportTheme(currentImportTheme)">
+        Com regras de D&D 5e (fichas, inventário e habilidades no JSON)
+      </label>
 
       <div class="field-group">
         <label>Passo 1: Copie o prompt e use na sua IA anterior</label>
@@ -235,15 +239,24 @@
               <input type="text" id="wz-name" placeholder="Ex: A Maldição..." oninput="wizardValidate()">
             </div>
             <div class="field-group rente">
-              <label>Estilo de RPG *</label>
-              <select id="wz-type" onchange="onWizardTypeChange()">
-                <option value="dnd">D&D / Estruturado</option>
+              <label>Gênero *</label>
+              <select id="wz-type" onchange="onWizardTypeChange()"
+                      title="O tom do mundo — vale para toda cena, do combate ao romance">
                 <option value="fantasia">Fantasia / Aventura</option>
+                <option value="dark_fantasy">Dark Fantasy</option>
                 <option value="romance">Romance / Drama</option>
                 <option value="horror">Horror / Suspense</option>
                 <option value="misterio">Mistério / Investigação</option>
                 <option value="scifi">Sci-Fi / Cyberpunk</option>
                 <option value="faroeste">Faroeste</option>
+              </select>
+            </div>
+            <div class="field-group rente">
+              <label>Regras</label>
+              <select id="wz-regras" onchange="onWizardTypeChange()"
+                      title="Independe do gênero: dá para jogar D&D em qualquer um">
+                <option value="dnd">D&D 5e — fichas, combate tático, loja</option>
+                <option value="livre">Narrativa livre — sem fichas</option>
               </select>
             </div>
           </div>
@@ -338,15 +351,24 @@
               <input type="text" id="ed-name" placeholder="Nome da campanha">
             </div>
             <div class="field-group rente">
-              <label>Estilo de RPG</label>
-              <select id="ed-type" onchange="edRenderChars()">
-                <option value="dnd">D&D / Estruturado</option>
+              <label>Gênero</label>
+              <select id="ed-type" onchange="edRenderChars()"
+                      title="O tom do mundo — vale para toda cena, do combate ao romance">
                 <option value="fantasia">Fantasia / Aventura</option>
+                <option value="dark_fantasy">Dark Fantasy</option>
                 <option value="romance">Romance / Drama</option>
                 <option value="horror">Horror / Suspense</option>
                 <option value="misterio">Mistério / Investigação</option>
                 <option value="scifi">Sci-Fi / Cyberpunk</option>
                 <option value="faroeste">Faroeste</option>
+              </select>
+            </div>
+            <div class="field-group rente">
+              <label>Regras</label>
+              <select id="ed-regras" onchange="edRenderChars()"
+                      title="Independe do gênero: dá para jogar D&D em qualquer um">
+                <option value="dnd">D&D 5e — fichas, combate tático, loja</option>
+                <option value="livre">Narrativa livre — sem fichas</option>
               </select>
             </div>
           </div>
@@ -444,8 +466,8 @@
     </div>
   </div>
 
-  <script src="/static/js/utils.js?v=14"></script>
-  <script src="/static/js/menu.js?v=50"></script>
+  <script src="/static/js/utils.js?v=15"></script>
+  <script src="/static/js/menu.js?v=51"></script>
   <script>
     // Animação de volta para a capa quando carregado da cache
     window.addEventListener('pageshow', function(event) {

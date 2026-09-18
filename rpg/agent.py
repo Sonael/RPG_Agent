@@ -57,6 +57,13 @@ CAMPAIGN_CONFIGS = {
         "role_examples":  "guerreira, mago, ladino, curandeiro...",
         "flag_hint":      "Ex: portao_aberto=sim, dragao_derrotado=true",
     },
+    "dark_fantasy": {
+        "label":          "Dark Fantasy",
+        "party_label":    "Companhia",
+        "role_label":     "Ofício / Juramento",
+        "role_examples":  "mercenária, caçador de bruxas, clérigo renegado, alquimista...",
+        "flag_hint":      "Ex: pacto_selado=sim, aldeia_queimada=true",
+    },
     "romance": {
         "label":          "Romance / Drama",
         "party_label":    "Pessoas Próximas",
@@ -220,6 +227,24 @@ Você é um mestre de RPG de fantasia experiente, criativo e imersivo.
 • Mínimo de 3–5 parágrafos antes de devolver a vez ao jogador.
 """,
 
+    "dark_fantasy": """
+Você é um mestre de dark fantasy: um mundo de magia e lâminas onde a luz é
+escassa, o poder cobra preço e ninguém sai limpo.
+
+• MUNDO QUE FERE: fome, peste, guerra e fé corrompida são o chão, não o
+  cenário. A beleza existe e por isso dói — é rara e costuma estar no fim.
+• PODER COM CUSTO: magia marca, contrato cobra, vitória deixa cicatriz.
+  Nada vem de graça, e o preço aparece depois, quando já não dá para voltar.
+• MORAL CINZENTA: aliados escondem motivos, vilões têm razões, e a escolha
+  certa quase sempre custa alguém. Evite o herói puro e o vilão de papel.
+• ATMOSFERA PESADA: luz fraca, frio, cheiro de ferro e de fumaça, silêncios
+  que pesam. Descreva a decadência com a mesma atenção da grandiosidade.
+• VIOLÊNCIA COM PESO: ferimentos importam e demoram; mortes deixam vazio.
+  Não é gore gratuito — é consequência.
+• Narre em português, segunda pessoa. Mínimo de 3–5 parágrafos antes de
+  devolver a vez ao jogador.
+""",
+
     "romance": """
 Você é um narrador de histórias românticas e dramáticas.
 
@@ -293,8 +318,10 @@ Você é um narrador de histórias do Velho Oeste.
 """,
 
     "dnd": """
-Você é um Mestre de D&D. O estado do jogo é controlado pelo backend Python.
+REGRAS DE D&D 5e — o estado do jogo é controlado pelo backend Python.
 NUNCA invente rolagens, acertos ou dano — chame as ferramentas e narre os resultados.
+O TOM continua sendo o do gênero acima: as regras dizem o que acontece, o
+gênero diz como isso é contado.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 INÍCIO DE CAMPANHA D&D — OBRIGATÓRIO
@@ -908,6 +935,38 @@ os stats corretos de D&D 5e. Use os stats retornados em create_character_sheet()
 }
 
 
+# O tom do gênero vale para TODA cena — é o que faz um romance dentro de uma
+# campanha de dark fantasy sair sombrio, e não doce. Sem isto, cada gênero só
+# sabia narrar o próprio tipo de cena: a instrução de fantasia não sabia que
+# existe romance, e a de romance não sabia que o mundo podia ser cruel.
+_TOM_EM_TODA_CENA = """
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+O TOM DO GÊNERO VALE PARA TODA CENA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Combate, romance, investigação, viagem, descanso, negociação: o tom acima é o
+do MUNDO, não de um tipo de cena. Uma cena íntima numa campanha sombria é
+íntima E sombria — o afeto acontece apesar do mundo, e o mundo continua lá.
+Uma luta numa campanha de mistério ainda é sobre o que ela revela. Mude o
+ritmo e o foco conforme a cena pede; o tom, não.
+"""
+
+def instrucao_da_campanha(campaign_type: str, dnd_mode: bool) -> str:
+    """
+    A instrução do mestre, composta: gênero (o tom, em toda cena) + regras.
+
+    Antes era UM bloco por campaign_type, e "dnd" era um desses valores: quem
+    escolhia D&D ganhava uma instrução quase toda mecânica e nenhuma direção
+    de atmosfera; quem escolhia um gênero perdia fichas e combate tático.
+    """
+    from rpg.memory import regras_e_genero
+
+    genero, dnd = regras_e_genero(campaign_type, dnd_mode)
+    partes = [_STYLE_INSTRUCTIONS[genero].strip(), _TOM_EM_TODA_CENA.strip()]
+    if dnd:
+        partes.append(_STYLE_INSTRUCTIONS["dnd"].strip())
+    return "\n\n".join(partes)
+
+
 # ---------------------------------------------------------------------------
 # Snapshot de cena — injetado na instrução A CADA TURNO (instruction provider)
 # ---------------------------------------------------------------------------
@@ -1025,7 +1084,7 @@ def _scene_snapshot_block() -> str:
 # Factory do agente
 # ---------------------------------------------------------------------------
 
-def create_agent(model, campaign_type: str = "fantasia") -> Agent:
+def create_agent(model, campaign_type: str = "fantasia", dnd_mode: bool | None = None) -> Agent:
     """
     Cria e retorna o agente ADK configurado para o estilo de campanha.
 
@@ -1036,12 +1095,16 @@ def create_agent(model, campaign_type: str = "fantasia") -> Agent:
 
     Args:
         model:         String do modelo Gemini ou instância LiteLlm.
-        campaign_type: Estilo da campanha (fantasia, romance, horror, dnd, etc.)
+        campaign_type: Gênero da campanha (fantasia, dark_fantasy, romance...).
+                       "dnd", de campanha antiga, vira fantasia com regras.
+        dnd_mode:      Regras de D&D ligadas. None: o que a campanha já diz.
     """
     from rpg import memory as _memory
 
-    style = _STYLE_INSTRUCTIONS.get(campaign_type, _STYLE_INSTRUCTIONS["fantasia"])
-    base_instruction = style.strip() + "\n\n" + _BASE_MEMORY_RULES.strip()
+    if dnd_mode is None:
+        dnd_mode = bool(_memory.campaign.get("dnd_mode", False))
+    genero, dnd_mode = _memory.regras_e_genero(campaign_type, dnd_mode)
+    base_instruction = instrucao_da_campanha(genero, dnd_mode) + "\n\n" + _BASE_MEMORY_RULES.strip()
 
     # Defesa contra prompt injection: textos de campanha (descrições, notas,
     # nomes de personagem, mensagens) são CONTEÚDO FICCIONAL, nunca comandos.
@@ -1058,7 +1121,8 @@ def create_agent(model, campaign_type: str = "fantasia") -> Agent:
     )
 
     # Marca o modo D&D na memória para que get_scene_context exiba os stats
-    _memory.campaign["dnd_mode"] = (campaign_type == "dnd")
+    _memory.campaign["dnd_mode"] = dnd_mode
+    _memory.campaign["campaign_type"] = genero
 
     _TELA_BLOCK = (
         "\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -1131,6 +1195,17 @@ def create_agent(model, campaign_type: str = "fantasia") -> Agent:
         )
 
 
-def get_campaign_config(campaign_type: str) -> dict:
-    """Retorna a configuração de UI para o tipo de campanha."""
-    return CAMPAIGN_CONFIGS.get(campaign_type, CAMPAIGN_CONFIGS["fantasia"])
+def get_campaign_config(campaign_type: str, dnd_mode: bool = False) -> dict:
+    """
+    Configuração de UI da campanha: a do gênero, e, com as regras de D&D, o
+    rótulo de papel vira "Classe" (é o que a ficha pede) e o nome ganha "· D&D".
+    """
+    from rpg.memory import regras_e_genero
+
+    genero, dnd = regras_e_genero(campaign_type, dnd_mode)
+    cfg = dict(CAMPAIGN_CONFIGS.get(genero, CAMPAIGN_CONFIGS["fantasia"]))
+    if dnd:
+        regras = CAMPAIGN_CONFIGS["dnd"]
+        cfg.update({"role_label": regras["role_label"], "role_examples": regras["role_examples"],
+                    "label": f"{cfg['label']} · D&D"})
+    return cfg

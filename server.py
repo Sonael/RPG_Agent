@@ -999,8 +999,10 @@ def _payload_de_campanha(name: str, dados: dict, personagens: dict) -> dict:
         raise ValueError(erro)
     return {
         "name":                 name,
-        "campaign_type":        dados.get("campaign_type", "fantasia"),
-        "dnd_mode":             dados.get("dnd_mode", False),
+        # Gênero e regras separados; JSON antigo com campaign_type "dnd" vira
+        # fantasia com as regras ligadas (memory.regras_e_genero).
+        "campaign_type":        memory.regras_e_genero(dados.get("campaign_type"), dados.get("dnd_mode"))[0],
+        "dnd_mode":             memory.regras_e_genero(dados.get("campaign_type"), dados.get("dnd_mode"))[1],
         # Preferência de como o combate é jogado ("narrado" ou "tela"). Não
         # estava aqui: quem importava uma campanha do modo tela caía no
         # narrado sem entender por quê.
@@ -1150,8 +1152,12 @@ def update_campaign(name):
     payload = dict(existing)
     payload.update({
         "name":             new_name,
-        "campaign_type":    campaign_data.get("campaign_type", existing.get("campaign_type", "fantasia")),
-        "dnd_mode":         campaign_data.get("dnd_mode", existing.get("dnd_mode", False)),
+        "campaign_type":    memory.regras_e_genero(
+            campaign_data.get("campaign_type", existing.get("campaign_type")),
+            campaign_data.get("dnd_mode", existing.get("dnd_mode", False)))[0],
+        "dnd_mode":         memory.regras_e_genero(
+            campaign_data.get("campaign_type", existing.get("campaign_type")),
+            campaign_data.get("dnd_mode", existing.get("dnd_mode", False)))[1],
         "protagonist":      campaign_data.get("protagonist", existing.get("protagonist", "")),
         "story_summary":    campaign_data.get("story_summary", existing.get("story_summary", "")),
         "current_scene":    campaign_data.get("current_scene", existing.get("current_scene", "")),
@@ -1613,10 +1619,14 @@ def start_session():
     memory.campaign["name"] = campaign_name
 
     if not has_history:
-        memory.campaign["campaign_type"] = campaign_type
+        genero, dnd = memory.regras_e_genero(
+            memory.campaign.get("campaign_type") or campaign_type,
+            memory.campaign.get("dnd_mode", data.get("dnd_mode", False)))
+        memory.campaign["campaign_type"] = genero
+        memory.campaign["dnd_mode"] = dnd
         memory.save_campaign()
-    else:
-        campaign_type = memory.campaign.get("campaign_type", campaign_type)
+    campaign_type = memory.campaign.get("campaign_type", campaign_type)
+    dnd_mode = bool(memory.campaign.get("dnd_mode", False))
 
     if model_id.startswith("ollama:"):
         from google.adk.models.lite_llm import LiteLlm
@@ -1647,11 +1657,11 @@ def start_session():
     _dbg("[MENU] Iniciando sessão de jogo — montando o agente")
     _dbg(f"   • Usuário ............ {user_id}")
     _dbg(f"   • Campanha ........... {campaign_name}")
-    _dbg(f"   • Estilo (instrução) . {campaign_type}  (define a 'política' do agente)")
+    _dbg(f"   • Gênero (tom) ....... {campaign_type}  |  Regras D&D: {'sim' if dnd_mode else 'não'}")
     _dbg(f"   • Modelo (LLM) ....... {model_label}")
     _dbg(f"   • Histórico salvo? ... {'sim — vai gerar recap' if has_history else 'não — campanha nova'}")
 
-    agent = create_agent(model, campaign_type)
+    agent = create_agent(model, campaign_type, dnd_mode)
     runner, session_service = create_runner(agent)
     _n_tools = len(getattr(agent, "tools", []) or [])
     _dbg(f"   Agente '{getattr(agent, 'name', 'rpg_master_agent')}' criado "
@@ -1736,7 +1746,8 @@ def start_session():
         "model_label":          model_label,
         "campaign":             campaign_name,
         "campaign_type":        campaign_type,
-        "campaign_config":      get_campaign_config(campaign_type),
+        "dnd_mode":             dnd_mode,
+        "campaign_config":      get_campaign_config(campaign_type, dnd_mode),
         "model_limits": limits,
         "conversation_history": _historico_para_a_tela(
             memory.campaign.get("conversation_history", [])),
@@ -2418,7 +2429,7 @@ def generate_lore():
     data            = request.get_json()
     user_prompt     = data.get("prompt", "").strip()
     model           = data.get("model", "").strip()
-    campaign_type   = data.get("campaign_type", "fantasia").strip()
+    campaign_type, is_dnd = memory.regras_e_genero(data.get("campaign_type"), data.get("dnd_mode"))
     api_key         = data.get("google_api_key", "").strip()  or os.environ.get("GOOGLE_API_KEY", "")
     ds_key          = data.get("deepseek_api_key", "").strip() or os.environ.get("DEEPSEEK_API_KEY", "")
 
@@ -2433,7 +2444,6 @@ def generate_lore():
     if not is_deepseek and not is_ollama and not api_key:
         return jsonify({"error": "Chave Google API não encontrada. Salve-a nas configurações."}), 400
 
-    is_dnd = campaign_type == "dnd"
 
     # Lista curada de slugs SRD (Open5e) — usada como enum mecânico de "raca"
     # para NPCs/inimigos. O nome do personagem ("name") continua livre em
@@ -2539,7 +2549,8 @@ def generate_lore():
         "Responda APENAS com JSON válido, sem markdown, sem comentários."
     )
     
-    full_prompt = f"{system}\n\nIdeia: {user_prompt}\n\nTipo de campanha: {campaign_type}"
+    full_prompt = (f"{system}\n\nIdeia: {user_prompt}\n\nGênero (tom do mundo): {campaign_type}"
+                   f"\nRegras: {'D&D 5e' if is_dnd else 'narrativa livre'}")
 
     _route = "DeepSeek" if is_deepseek else ("Ollama" if is_ollama else "Gemini")
     _dbg("\n" + "=" * 70)

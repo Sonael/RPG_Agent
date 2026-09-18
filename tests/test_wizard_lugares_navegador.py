@@ -72,7 +72,9 @@ def wizard(app_no_ar):
         pg.evaluate("() => openWizard()")
         pg.wait_for_selector("#wizard-overlay:not(.hidden)", timeout=5000)
         pg.fill("#wz-name", "Teste de Lugares")
+        # Fantasia sem regras: o que "fantasia" queria dizer quando D&D era gênero.
         pg.select_option("#wz-type", "fantasia")
+        pg.select_option("#wz-regras", "livre")
         pg.evaluate("() => { onWizardTypeChange(); wizardValidate(); }")
         yield pg, erros, enviado
         nav.close()
