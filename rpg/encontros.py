@@ -151,8 +151,17 @@ def resumo_para_o_mestre() -> str:
 
 
 def importar(valor) -> list:
-    """Os encontros de um JSON importado: dia e hora inteiros, estado válido, ids."""
-    saida = []
+    """
+    Os encontros de um JSON importado ou do editor da campanha: dia e hora
+    inteiros, estado válido.
+
+    O id de cada um fica, se for um inteiro que ninguém mais usa (o editor
+    manda de volta os que carregou); só o que não tem ganha um novo, depois
+    do maior. Antes todos eram renumerados, e apagar um no editor mudava o
+    número dos seguintes. O motivo e o capítulo de um encontro já resolvido
+    também ficam: a normalização os jogava fora.
+    """
+    itens = []
     for e in (valor or []) if isinstance(valor, list) else []:
         if not isinstance(e, dict) or not str(e.get("com") or "").strip():
             continue
@@ -162,10 +171,31 @@ def importar(valor) -> list:
             continue
         if not 0 <= hora <= 23:
             continue
+        itens.append((e, dia, hora))
+    itens = itens[-MAX_ENCONTROS:]
+
+    usados, ids = set(), []
+    for e, _, _ in itens:
+        i = e.get("id")
+        valido = isinstance(i, int) and not isinstance(i, bool) and i > 0 and i not in usados
+        if valido:
+            usados.add(i)
+        ids.append(i if valido else None)
+    proximo = max(usados, default=0) + 1
+    saida = []
+    for (e, dia, hora), ident in zip(itens, ids):
+        if ident is None:
+            ident, proximo = proximo, proximo + 1
         estado = locais.norm(e.get("estado") or "marcado")
-        saida.append({"id": len(saida) + 1, "com": " ".join(str(e["com"]).split()), "dia": dia, "hora": hora,
-                      "onde": " ".join(str(e.get("onde") or "").split()),
-                      "o_que": " ".join(str(e.get("o_que") or "").split()) or "encontro",
-                      "estado": estado if estado in ESTADOS + ("marcado",) else "marcado",
-                      "cap": e.get("cap") or 1})
-    return saida[-MAX_ENCONTROS:]
+        novo = {"id": ident, "com": " ".join(str(e["com"]).split()), "dia": dia, "hora": hora,
+                "onde": " ".join(str(e.get("onde") or "").split()),
+                "o_que": " ".join(str(e.get("o_que") or "").split()) or "encontro",
+                "estado": estado if estado in ESTADOS + ("marcado",) else "marcado",
+                "cap": e.get("cap") or 1}
+        if novo["estado"] != "marcado":
+            if e.get("motivo"):
+                novo["motivo"] = " ".join(str(e["motivo"]).split())
+            if e.get("cap_resolvido"):
+                novo["cap_resolvido"] = e["cap_resolvido"]
+        saida.append(novo)
+    return saida

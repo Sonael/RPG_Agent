@@ -136,3 +136,25 @@ def test_instrucao_do_romance_ensina_gestos_e_encontros():
     texto = agent.instrucao_da_campanha("romance", False)
     assert "marcar_encontro(com, dia, hora, onde,\n  o_que)" in texto
     assert "Nem todo convite é aceito" in texto
+
+
+
+def test_importar_mantem_o_numero_e_o_que_foi_resolvido():
+    """
+    O editor manda de volta os encontros que carregou: o número de cada um
+    fica (antes todos eram renumerados, e apagar um mudava os seguintes), e o
+    motivo e o capítulo de um encontro resolvido também.
+    """
+    from rpg import encontros
+    saida = encontros.importar([
+        {"id": 2, "com": "Lucas", "dia": 3, "hora": 20, "estado": "aconteceu", "motivo": "  beijo  ", "cap_resolvido": 4},
+        {"id": 5, "com": "Helena", "dia": 4, "hora": 18},
+        {"id": 5, "com": "Rafa", "dia": 5, "hora": 19},                  # repetido: ganha outro
+        {"com": "Bia", "dia": 6, "hora": 9},                              # sem número
+        {"id": True, "com": "Caio", "dia": 7, "hora": 9},                 # booleano não é número
+        {"id": 9, "com": "Duda", "dia": 8, "hora": 9, "motivo": "x"},     # marcado: sem motivo
+    ])
+    assert [(e["com"], e["id"]) for e in saida] == [("Lucas", 2), ("Helena", 5), ("Rafa", 10), ("Bia", 11),
+                                                    ("Caio", 12), ("Duda", 9)]
+    assert (saida[0]["motivo"], saida[0]["cap_resolvido"]) == ("beijo", 4)
+    assert "motivo" not in saida[-1]
