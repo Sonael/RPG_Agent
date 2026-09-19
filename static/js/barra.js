@@ -313,13 +313,26 @@
 
   // Romance: o próximo encontro marcado, com quanto falta. Avisa (cor) quando
   // está perto ou passou da hora. O motor diz tudo (/api/memory "encontro").
+  let _encontroAntes;             // undefined: a barra ainda não desenhou nenhum
   function renderEncontro() {
     const botao = q('sb-encontro');
     if (!botao) return;
     const e = _mem.encontro;
     botao.classList.toggle('hidden', !e);
-    if (!e) { botao.innerHTML = ''; return; }
-    botao.classList.toggle('sb-encontro-alerta', !!(e.em_breve || e.atrasado));
+    if (!e) { botao.innerHTML = ''; _encontroAntes = null; return; }
+    const alerta = !!(e.em_breve || e.atrasado);
+    botao.classList.toggle('sb-encontro-alerta', alerta);
+    // O encontro pulsa quando fica perto (ou já está perto ao chegar); um
+    // encontro novo entra deslizando. Só na mudança, não a cada turno.
+    const qual = `${e.com}|${e.o_que}|${e.quando}`;
+    if (window.destacar) {
+      if (alerta && !(_encontroAntes && _encontroAntes.alerta && _encontroAntes.qual === qual)) {
+        window.destacar(botao, 'sb-encontro-chegando');
+      } else if (_encontroAntes !== undefined && (!_encontroAntes || _encontroAntes.qual !== qual)) {
+        window.destacar(botao, 'sb-encontro-novo');
+      }
+    }
+    _encontroAntes = { qual, alerta };
     botao.dataset.com = e.com;
     botao.title = `Abrir a ficha de ${e.com}`;
     botao.innerHTML = `

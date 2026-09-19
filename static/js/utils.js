@@ -249,13 +249,14 @@ window.frase = frase;
 // segmentos, cheia até onde a relação está. No rompimento a barra fica
 // apagada até onde ela chegou e o nome diz "rompimento". Vem pronto de
 // rpg/relacoes.py; aqui é só desenho.
-function escadaDaRelacao(e) {
+// Com `chave`, os segmentos entram em animarNumeros: o degrau novo acende.
+function escadaDaRelacao(e, chave) {
   if (!e || !e.escada) return '';
   const esc = window.escapeHtml;
   const rompeu = e.atual === 'rompimento';
   const ate = e.escada.indexOf(rompeu ? e.chegou_a : e.atual);
   const segmentos = e.escada.map((d, i) =>
-    `<span class="rel-segmento${i <= ate ? ' rel-segmento-cheio' : ''}" title="${esc(d)}"></span>`).join('');
+    `<span class="rel-segmento${i <= ate ? ' rel-segmento-cheio' : ''}${i === ate ? ' rel-segmento-atual' : ''}" title="${esc(d)}"></span>`).join('');
   const nome = rompeu
     ? `rompimento${e.chegou_a ? `<small> (chegaram a ${esc(e.chegou_a)})</small>` : ''}`
     : esc(e.atual);
@@ -265,19 +266,23 @@ function escadaDaRelacao(e) {
         <span class="rel-eixo">Estágio</span>
         <span class="rel-estagio">${nome}</span>
       </div>
-      <div class="rel-segmentos" role="img" aria-label="Estágio da relação: ${esc(e.atual)}">${segmentos}</div>
+      <div class="rel-segmentos" role="img" aria-label="Estágio da relação: ${esc(e.atual)}"${
+        chave ? ` data-num="${esc(chave)}" data-valor="${rompeu ? -1 : ate}"` : ''}>${segmentos}</div>
     </div>`;
 }
 window.escadaDaRelacao = escadaDaRelacao;
 
 // Os momentos marcantes, do mais recente para trás. Os que marcam uma
 // mudança de estágio ("Começaram a namorar") têm um destaque próprio.
-function linhaDoTempo(momentos, limite) {
+// Com `dono`, cada momento leva data-novo (marcarNovos): o que acabou de
+// acontecer ganha destaque.
+function linhaDoTempo(momentos, limite, dono) {
   const esc = window.escapeHtml;
   const lista = (momentos || []).slice(0, limite || undefined);
   if (!lista.length) return '';
   return `<ol class="rel-momentos">${lista.map(m => `
-    <li class="rel-momento${m.tipo === 'estagio' ? ' rel-momento-estagio' : ''}${m.tipo === 'segredo' ? ' rel-momento-segredo' : ''}${m.tipo === 'encontro' ? ' rel-momento-encontro' : ''}">
+    <li class="rel-momento${m.tipo === 'estagio' ? ' rel-momento-estagio' : ''}${m.tipo === 'segredo' ? ' rel-momento-segredo' : ''}${m.tipo === 'encontro' ? ' rel-momento-encontro' : ''}"${
+      dono ? ` data-novo="${esc(`mom:${dono}:${m.titulo}:${m.capitulo || ''}`)}"` : ''}>
       <span class="rel-momento-titulo">${esc(m.titulo)}</span>
       ${m.capitulo ? `<small class="rel-momento-cap">cap. ${esc(m.capitulo)}</small>` : ''}
       ${m.descricao ? `<span class="rel-momento-desc">${esc(m.descricao)}</span>` : ''}
@@ -287,13 +292,16 @@ window.linhaDoTempo = linhaDoTempo;
 
 // Os segredos que tocam uma pessoa, como o protagonista os vê: o que ele
 // esconde dela, o que ela já sabe dele e o que ele sabe dela.
-function segredosDaPessoa(s) {
+// Com `dono`, cada linha leva data-novo: o segredo que acabou de ser
+// revelado quebra um selo de cera (marcarNovos).
+function segredosDaPessoa(s, dono) {
   const esc = window.escapeHtml;
   if (!s) return '';
+  const novo = (tipo, t) => dono ? ` data-novo="${esc(`seg:${dono}:${tipo}:${t}`)}"` : '';
   const itens = [
-    ...(s.voce_esconde || []).map(t => `<li class="rel-seg rel-seg-esconde"><span>Você esconde</span> ${esc(t)}</li>`),
-    ...(s.sabe_dos_seus || []).map(t => `<li class="rel-seg"><span>Sabe do seu</span> ${esc(t)}</li>`),
-    ...(s.voce_sabe_dele || []).map(x => `<li class="rel-seg rel-seg-sabe"><span>Você sabe</span> ${esc(x.titulo)}${
+    ...(s.voce_esconde || []).map(t => `<li class="rel-seg rel-seg-esconde"${novo('esconde', t)}><span>Você esconde</span> ${esc(t)}</li>`),
+    ...(s.sabe_dos_seus || []).map(t => `<li class="rel-seg rel-seg-revelado"${novo('sabe', t)}><span>Sabe do seu</span> ${esc(t)}</li>`),
+    ...(s.voce_sabe_dele || []).map(x => `<li class="rel-seg rel-seg-sabe rel-seg-revelado"${novo('dele', x.titulo)}><span>Você sabe</span> ${esc(x.titulo)}${
       x.dono_sabe ? '' : ' <em>(não sabe que você sabe)</em>'}</li>`),
   ];
   return itens.length ? `<ul class="rel-segs">${itens.join('')}</ul>` : '';
@@ -618,12 +626,15 @@ const _valoresAntes = new Map();
 function _contar(el, de, ate, ms = 650) {
   const final = el.textContent;
   const casas = (String(ate).split('.')[1] || '').length;
+  // "+35" (afeto, reputação) conta com o sinal: "+12", "+20"...
+  const mais = final.trim().startsWith('+');
+  const texto = (v) => `${mais && v > 0 ? '+' : ''}${v.toFixed(casas)}`;
   const inicio = performance.now();
   const passo = (agora) => {
     const k = Math.min(1, (agora - inicio) / ms);
     const suave = 1 - Math.pow(1 - k, 3);
     if (!el.isConnected) return;
-    el.textContent = k < 1 ? (de + (ate - de) * suave).toFixed(casas) : final;
+    el.textContent = k < 1 ? texto(de + (ate - de) * suave) : final;
     if (k < 1) requestAnimationFrame(passo);
   };
   requestAnimationFrame(passo);
@@ -645,17 +656,41 @@ function animarNumeros(raiz) {
     void el.offsetWidth;
     el.classList.add(valor > antes ? 'num-subiu' : 'num-desceu');
   });
+  // A barra desliza na largura; com data-prop="left", é a marca que anda
+  // (afeto, confiança, reputação: a posição num eixo de -100 a 100).
   raiz.querySelectorAll('[data-barra]').forEach(el => {
+    const prop = el.dataset.prop === 'left' ? 'left' : 'width';
     const chave = `barra:${el.dataset.barra}`;
-    const alvo = el.style.width;
+    const alvo = el.style[prop];
     const antes = _valoresAntes.get(chave);
     _valoresAntes.set(chave, alvo);
     if (!ligado || antes === undefined || antes === alvo) return;
-    el.style.width = antes;
-    requestAnimationFrame(() => requestAnimationFrame(() => { el.style.width = alvo; }));
+    el.style[prop] = antes;
+    requestAnimationFrame(() => requestAnimationFrame(() => { el.style[prop] = alvo; }));
   });
 }
 window.animarNumeros = animarNumeros;
+
+// O que chegou numa lista desde o último desenho dela (um segredo revelado,
+// um título, um fragmento de lenda, um momento): cada peça tem
+// data-novo="chave" e ganha item-novo se a chave não estava lá. O primeiro
+// desenho de um grupo só guarda, mesmo vazio: o que já existia ao abrir a
+// tela não é novidade. Sem animações, também só guarda.
+const _vistos = new Map();
+
+function marcarNovos(raiz, grupo) {
+  if (!raiz) return;
+  const antes = _vistos.get(grupo);
+  const agora = new Set(antes || []);
+  const ligado = animacoesLigadas();
+  raiz.querySelectorAll('[data-novo]').forEach(el => {
+    const chave = el.dataset.novo;
+    if (antes && ligado && !antes.has(chave)) el.classList.add('item-novo');
+    agora.add(chave);
+  });
+  _vistos.set(grupo, agora);
+}
+window.marcarNovos = marcarNovos;
 
 // Um destaque de uma vez (brilho, pulso): a classe sai quando a animação
 // acaba, para poder voltar na próxima.

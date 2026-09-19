@@ -347,8 +347,10 @@ html.anim-on .cbt-end-overlay:not(.hidden) .cbt-crista { animation: cristaAparec
 /* Progressão e recompensas (utils.js, animarNumeros e destacar). Um número
    que mudou conta até o novo e pulsa: verde ao subir, vermelho ao descer.
    O cartão de quem leva o saque pulsa quando ganha um item. */
-html.anim-on .num-subiu:not(.lot-cartao):not(.rst-pips) { display: inline-block; animation: numSobe .7s ease-out; }
-html.anim-on .num-desceu:not(.lot-cartao):not(.rst-pips) { display: inline-block; animation: numDesce .7s ease-out; }
+/* Só o número escrito pulsa assim; com data-valor (cartão do saque, dados de
+   vida, degraus da relação) cada peça tem a sua animação. */
+html.anim-on .num-subiu:not([data-valor]) { display: inline-block; animation: numSobe .7s ease-out; }
+html.anim-on .num-desceu:not([data-valor]) { display: inline-block; animation: numDesce .7s ease-out; }
 @keyframes numSobe {
   0% { transform: none; }
   30% { transform: scale(1.35); color: var(--green, #2e7d32); }
@@ -406,6 +408,110 @@ html.anim-on .rst-brasas i:nth-child(6) { animation-delay: 1s; }
   15%  { opacity: .9; }
   100% { opacity: 0; transform: translate(10px, -90px) scale(.4); }
 }
+
+/* Romance e fantasia (relacoes.js, mundo.js, barra.js). A marca do afeto,
+   da confiança, da reputação e da lealdade desliza até a nova posição, e o
+   número ganha uma seta que sobe ou desce e some. */
+html.anim-on .psn-barra-marca[data-barra] { transition: left .8s cubic-bezier(.3,.9,.4,1); }
+html.anim-on .rel-intensidade > span[data-barra] { transition: width .8s ease-out; }
+.rel-valor.num-subiu::after, .rel-valor.num-desceu::after {
+  display: inline-block; margin-left: 3px; font-size: .8em; opacity: 0;
+}
+.rel-valor.num-subiu::after { content: "\2191"; color: var(--lcl-green, #2e7d32); }
+.rel-valor.num-desceu::after { content: "\2193"; color: var(--lcl-red, #8b2315); }
+html.anim-on .rel-valor.num-subiu::after { animation: setaSobe 1.6s ease-out; }
+html.anim-on .rel-valor.num-desceu::after { animation: setaDesce 1.6s ease-out; }
+@keyframes setaSobe {
+  0% { opacity: 0; transform: translateY(6px); } 20%, 70% { opacity: 1; transform: none; }
+  100% { opacity: 0; transform: translateY(-6px); }
+}
+@keyframes setaDesce {
+  0% { opacity: 0; transform: translateY(-6px); } 20%, 70% { opacity: 1; transform: none; }
+  100% { opacity: 0; transform: translateY(6px); }
+}
+/* O degrau da relação que acabou de ser alcançado acende. */
+html.anim-on .rel-segmentos.num-subiu .rel-segmento-atual { animation: degrauAcende 1.3s ease-out; }
+@keyframes degrauAcende {
+  0%   { transform: scaleY(1); box-shadow: 0 0 0 0 rgba(184,153,71,0); }
+  25%  { transform: scaleY(1.9); box-shadow: 0 0 10px 2px rgba(184,153,71,.8); background: var(--lcl-gold, #b89947); }
+  100% { transform: scaleY(1); box-shadow: 0 0 0 0 rgba(184,153,71,0); }
+}
+/* Um momento que acabou de acontecer chega com um brilho dourado. */
+html.anim-on .rel-momento.item-novo { animation: momentoNovo 1.6s ease-out; }
+@keyframes momentoNovo {
+  0%   { opacity: 0; transform: translateX(-10px); background: rgba(184,153,71,.3); }
+  30%  { opacity: 1; transform: none; background: rgba(184,153,71,.25); }
+  100% { background: transparent; }
+}
+/* Segredo revelado: um selo de cera aparece sobre ele e se parte em dois.
+   As metades são os pseudo-elementos; sem a animação, não aparecem. */
+.rel-segredo-revelado.item-novo, .rel-seg-revelado.item-novo { position: relative; }
+.rel-segredo-revelado.item-novo::before, .rel-segredo-revelado.item-novo::after,
+.rel-seg-revelado.item-novo::before, .rel-seg-revelado.item-novo::after {
+  content: ""; position: absolute; top: 50%; width: 17px; height: 34px; margin-top: -17px; opacity: 0;
+  background: radial-gradient(circle at 100% 40%, #b0302a, #7a1712 70%);
+  box-shadow: inset 0 0 0 2px rgba(0,0,0,.12); pointer-events: none;
+}
+.rel-segredo-revelado.item-novo::before, .rel-seg-revelado.item-novo::before {
+  right: 32px; border-radius: 17px 0 0 17px;
+}
+.rel-segredo-revelado.item-novo::after, .rel-seg-revelado.item-novo::after {
+  right: 15px; border-radius: 0 17px 17px 0;
+  background: radial-gradient(circle at 0% 40%, #b0302a, #7a1712 70%);
+}
+/* Na linha do cartão da pessoa, um selo menor. */
+.rel-seg-revelado.item-novo::before, .rel-seg-revelado.item-novo::after { width: 10px; height: 20px; margin-top: -10px; }
+.rel-seg-revelado.item-novo::before { right: 18px; border-radius: 10px 0 0 10px; }
+.rel-seg-revelado.item-novo::after { right: 8px; border-radius: 0 10px 10px 0; }
+html.anim-on .rel-segredo-revelado.item-novo::before, html.anim-on .rel-seg-revelado.item-novo::before {
+  animation: seloQuebraEsq 1.5s ease-in both;
+}
+html.anim-on .rel-segredo-revelado.item-novo::after, html.anim-on .rel-seg-revelado.item-novo::after {
+  animation: seloQuebraDir 1.5s ease-in both;
+}
+html.anim-on .rel-segredo-revelado.item-novo { animation: segredoAbre 1.5s ease-out; }
+@keyframes seloQuebraEsq {
+  0%   { opacity: 0; transform: scale(1.5); }
+  15%, 45% { opacity: 1; transform: none; }
+  52%  { opacity: 1; transform: rotate(-4deg); }
+  100% { opacity: 0; transform: translate(-14px, 22px) rotate(-35deg); }
+}
+@keyframes seloQuebraDir {
+  0%   { opacity: 0; transform: scale(1.5); }
+  15%, 45% { opacity: 1; transform: none; }
+  52%  { opacity: 1; transform: rotate(4deg); }
+  100% { opacity: 0; transform: translate(14px, 26px) rotate(40deg); }
+}
+@keyframes segredoAbre {
+  0%, 45% { box-shadow: 0 0 0 0 rgba(139,35,21,0); }
+  60%  { box-shadow: 0 0 0 3px rgba(139,35,21,.35), 0 0 18px rgba(139,35,21,.25); }
+  100% { box-shadow: 0 0 0 0 rgba(139,35,21,0); }
+}
+/* Título novo: cai como um selo carimbado, com brilho dourado. */
+html.anim-on .mnd-titulo-item.item-novo { animation: tituloCarimba .9s cubic-bezier(.2,1.4,.4,1) both; }
+@keyframes tituloCarimba {
+  0%   { opacity: 0; transform: scale(1.5) rotate(-5deg); }
+  55%  { opacity: 1; transform: scale(.97) rotate(1deg); box-shadow: 0 0 0 4px rgba(184,153,71,.5), 0 0 26px rgba(184,153,71,.45); }
+  100% { transform: none; box-shadow: 0 0 0 0 rgba(184,153,71,0); }
+}
+/* Lenda: a lenda nova surge; o fragmento novo chega de lado e se encaixa. */
+html.anim-on .mnd-lenda.item-novo { animation: telaPousa .7s ease-out both; }
+html.anim-on .mnd-lenda .rel-momento.item-novo { animation: fragmentoEncaixa 1.1s cubic-bezier(.3,1.3,.5,1) both; }
+@keyframes fragmentoEncaixa {
+  0%   { opacity: 0; transform: translate(26px, -8px) rotate(5deg); }
+  65%  { opacity: 1; transform: translate(-3px, 1px) rotate(-1deg); background: rgba(184,153,71,.25); }
+  100% { transform: none; background: transparent; }
+}
+/* Uma aba que ganhou algo novo (outra que não a aberta) pulsa a contagem. */
+html.anim-on .elc-filtro-conta.num-subiu { animation: numSobe .7s ease-out 2; }
+/* O encontro na barra: pulsa quando fica perto; um encontro novo entra. */
+html.anim-on #sb-encontro.sb-encontro-chegando { animation: encontroPulsa 1s ease-in-out 3; }
+html.anim-on #sb-encontro.sb-encontro-novo { animation: encontroEntra .6s ease-out; }
+@keyframes encontroPulsa {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(139,35,21,0); }
+  50% { box-shadow: 0 0 0 4px rgba(139,35,21,.25), 0 0 16px rgba(139,35,21,.3); transform: scale(1.02); }
+}
+@keyframes encontroEntra { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: none; } }
 
 /* Menos movimento: pelo aparelho (prefers-reduced-motion, se a escolha for
    "Seguir o sistema") ou pela escolha "Desligadas" nas configurações. Tudo

@@ -67,11 +67,13 @@
 
   // ---- Peças -------------------------------------------------------
   // -100..100 vira 0..100% na barra; o traço do meio é o neutro.
-  function barraCentrada(valor, rotulo, pontas) {
+  // `chave` liga a marca a animarNumeros (utils.js): ela desliza de onde estava.
+  function barraCentrada(valor, rotulo, pontas, chave) {
     const pos = Math.max(0, Math.min(100, (valor + 100) / 2));
     return `
       <div class="psn-barra" role="img" aria-label="${rotulo} ${valor} de -100 a 100">
-        <div class="psn-barra-meio"></div><div class="psn-barra-marca" style="left:${pos}%"></div></div>
+        <div class="psn-barra-meio"></div><div class="psn-barra-marca" data-barra="${esc(chave)}" data-prop="left"
+             style="left:${pos}%"></div></div>
       <div class="psn-barra-pontas"><span>${pontas[0]}</span><span>${pontas[1]}</span></div>`;
   }
 
@@ -92,9 +94,9 @@
     const fama = `
       <article class="lcl-item mnd-renome">
         <div class="rel-medidor-topo"><span class="rel-eixo">Renome</span>
-          <span class="rel-faixa">${esc(r.faixa)}</span><span class="rel-valor">${r.valor}</span></div>
+          <span class="rel-faixa">${esc(r.faixa)}</span><span class="rel-valor" data-num="mnd:renome">${r.valor}</span></div>
         <div class="rel-intensidade mnd-fama" role="img" aria-label="Renome ${r.valor} de 100">
-          <span style="width:${Math.max(0, Math.min(100, r.valor))}%"></span></div>
+          <span data-barra="mnd:renome" style="width:${Math.max(0, Math.min(100, r.valor))}%"></span></div>
         ${historico(r.historico)}
       </article>`;
     const faccoes = (_last.faccoes || []).map(f => `
@@ -103,12 +105,12 @@
           <span class="lcl-marca">${esc(f.tipo)}</span></div>
         ${f.descricao ? `<p class="lcl-item-desc">${esc(f.descricao)}</p>` : ''}
         <div class="rel-medidor-topo"><span class="rel-faixa">${esc(f.faixa)}</span>
-          <span class="rel-valor">${sinal(f.reputacao)}</span></div>
-        ${barraCentrada(f.reputacao, 'Reputação', ['inimigos', 'heróis'])}
+          <span class="rel-valor" data-num="${esc(`mnd:fac:${f.nome}`)}">${sinal(f.reputacao)}</span></div>
+        ${barraCentrada(f.reputacao, 'Reputação', ['inimigos', 'heróis'], `mnd:fac:${f.nome}`)}
         ${historico(f.historico)}
       </article>`).join('');
     const titulos = (_last.titulos || []).map(t => `
-      <article class="lcl-item mnd-titulo-item">
+      <article class="lcl-item mnd-titulo-item" data-titulo="${esc(t.titulo)}" data-novo="${esc(`tit:${t.quem}:${t.titulo}`)}">
         <div class="lcl-item-cabeca"><span class="lcl-item-nome">${esc(t.titulo)}</span>
           <span class="lcl-marca">${esc(t.quem)}</span></div>
         ${t.motivo ? `<p class="lcl-item-desc">${esc(t.motivo)}${cap(t.capitulo)}</p>` : ''}
@@ -135,8 +137,8 @@
           <div class="lcl-item-cabeca"><button class="rel-nome" type="button"
             onclick="window.Mundo._ver('${aspas(c.nome)}')">${esc(c.nome)}</button></div>
           <div class="rel-medidor-topo"><span class="rel-eixo">Lealdade</span>
-            <span class="rel-faixa">${esc(c.lealdade.faixa)}</span><span class="rel-valor">${sinal(c.lealdade.valor)}</span></div>
-          ${barraCentrada(c.lealdade.valor, 'Lealdade', ['partir', 'até o fim'])}
+            <span class="rel-faixa">${esc(c.lealdade.faixa)}</span><span class="rel-valor" data-num="${esc(`mnd:leal:${c.nome}`)}">${sinal(c.lealdade.valor)}</span></div>
+          ${barraCentrada(c.lealdade.valor, 'Lealdade', ['partir', 'até o fim'], `mnd:leal:${c.nome}`)}
           ${c.objetivo ? `<p class="rel-seg-linha"><span>Quer</span> ${esc(c.objetivo)}</p>` : ''}
           ${arco}
           ${historico(c.historico)}
@@ -149,12 +151,13 @@
     const lista = _last.lendas || [];
     if (!lista.length) return vazio('O grupo ainda não ouviu nenhuma lenda.');
     return grade(lista.map(l => `
-      <article class="lcl-item mnd-lenda${l.desfecho ? ' mnd-lenda-resolvida' : ''}" data-titulo="${esc(l.titulo)}">
+      <article class="lcl-item mnd-lenda${l.desfecho ? ' mnd-lenda-resolvida' : ''}" data-titulo="${esc(l.titulo)}"
+               data-novo="${esc(`lenda:${l.titulo}`)}">
         <div class="lcl-item-cabeca"><span class="lcl-item-nome">${esc(l.titulo)}</span>
           <span class="lcl-marca">${esc(l.tipo)}</span>
           ${l.desfecho ? '<span class="lcl-marca lcl-marca-grupo">resolvida</span>' : ''}</div>
         ${l.fragmentos.length ? `<ol class="rel-momentos">${l.fragmentos.map(f => `
-          <li class="rel-momento"><span class="rel-momento-desc">${esc(f.texto)}</span>
+          <li class="rel-momento" data-novo="${esc(`frag:${l.titulo}:${f.texto}`)}"><span class="rel-momento-desc">${esc(f.texto)}</span>
             ${f.fonte ? `<small class="rel-momento-cap">${esc(f.fonte)}</small>` : ''}${cap(f.capitulo)}</li>`).join('')}</ol>` : ''}
         ${l.desfecho ? `<p class="rel-seg-linha mnd-desfecho"><span>Desfecho</span> ${esc(l.desfecho)}${cap(l.capitulo_desfecho)}</p>` : ''}
       </article>`).join(''));
@@ -205,8 +208,12 @@
     q('mnd-abas').innerHTML = ABAS.map(([id, rotulo]) => `
       <button class="elc-filtro${id === _aba ? ' elc-filtro-ativo' : ''}" data-aba="${id}" role="tab"
               aria-selected="${id === _aba}" onclick="window.Mundo._aba('${id}')">
-        ${rotulo} <span class="elc-filtro-conta">${contagem(id)}</span></button>`).join('');
+        ${rotulo} <span class="elc-filtro-conta" data-num="mnd:aba:${id}">${contagem(id)}</span></button>`).join('');
     q('mnd-lista').innerHTML = ABA_HTML[_aba]();
+    // O que mudou desde o último desenho (utils.js): renome e reputação
+    // contam e deslizam; título novo cai como selo, fragmento se encaixa.
+    if (window.animarNumeros) window.animarNumeros(q('mundo-overlay'));
+    if (window.marcarNovos) window.marcarNovos(q('mnd-lista'), `mnd:${_aba}`);
   }
 
   function mensagem(txt, erro) {

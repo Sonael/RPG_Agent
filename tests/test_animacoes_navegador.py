@@ -710,3 +710,199 @@ def test_loja_as_moedas_descem_ao_comprar(app_no_ar, abrir):
         assert not erros, erros[:3]
     finally:
         voltar()
+
+
+
+# --- Romance e fantasia -------------------------------------------------------
+# utils.js, marcarNovos: o que chegou desde o último desenho de uma lista ganha
+# item-novo (o segredo quebra o selo, o título cai como selo, o fragmento se
+# encaixa). Relações e Mundo marcam; aqui, a mudança de verdade entre dois turnos.
+
+def test_novos_so_depois_do_primeiro_desenho_e_sem_animacoes_nada(abrir):
+    pg, erros = abrir("/game.html")
+    r = pg.evaluate("""() => {
+        const d = document.createElement('div'); document.body.appendChild(d);
+        const lista = (...k) => { d.innerHTML = k.map(x => `<p data-novo="${x}">${x}</p>`).join(''); };
+        lista();
+        marcarNovos(d, 't:vazia');
+        lista('a');
+        marcarNovos(d, 't:vazia');
+        const primeiro = d.querySelector('p').className;
+        lista('a', 'b');
+        marcarNovos(d, 't:vazia');
+        const segundo = [...d.querySelectorAll('p')].map(p => p.className);
+        lista('x');
+        marcarNovos(d, 't:outra');
+        const outra = d.querySelector('p').className;
+        applyAnimacoes('desligadas');
+        lista('a', 'b', 'c');
+        marcarNovos(d, 't:vazia');
+        return [primeiro, ...segundo, outra, d.querySelector('p:last-child').className];
+    }""")
+    assert r == ["item-novo", "", "item-novo", "", ""], r
+    assert not erros, erros[:3]
+
+
+def _romance(app_no_ar, abrir, estado, pagina="/game.html"):
+    import requests
+    url, _, cap = app_no_ar
+    requests.post(f"{url}/__estado", json=copy.deepcopy(estado), timeout=10)
+    pg, erros = abrir(pagina)
+
+    def trocar(novo):
+        requests.post(f"{url}/__estado", json=copy.deepcopy(novo), timeout=10)
+
+    return pg, erros, trocar, lambda: trocar(cap.DIARIO)
+
+
+def _romance_depois():
+    from test_relacoes_navegador import ROMANCE
+    antes = copy.deepcopy(ROMANCE)
+    depois = copy.deepcopy(ROMANCE)
+    lucas = depois["characters"]["lucas"]
+    lucas["atitude"] = 65
+    lucas["confianca"] = -40
+    lucas["estagio"] = "namoro"
+    lucas["momentos"].append({"titulo": "O primeiro beijo", "descricao": "Na escada", "tipo": "momento", "cap": 3})
+    depois["segredos"]["o anel guardado"].update(revelado=True, como="descobriu", dono_sabe=False, cap_revelado=3)
+    return antes, depois
+
+
+def test_relacao_afeto_desliza_com_seta_estagio_acende_e_momento_novo(app_no_ar, abrir):
+    antes, depois = _romance_depois()
+    pg, erros, trocar, voltar = _romance(app_no_ar, abrir, antes)
+    try:
+        pg.evaluate("() => window.Relacoes._abrir('pessoas')")
+        pg.wait_for_selector("#relacoes-overlay .rel-cartao[data-nome='Lucas']", timeout=8000)
+        trocar(depois)
+        marca = pg.evaluate("""async () => {
+            await window.Relacoes.sync();
+            const c = document.querySelector(".rel-cartao[data-nome='Lucas']");
+            const m = c.querySelector('.rel-afeto .psn-barra-marca');
+            return [m.style.left, c.querySelector('.rel-afeto .rel-valor').className,
+                    c.querySelector('.rel-confianca .rel-valor').className,
+                    c.querySelector('.rel-segmentos').className,
+                    !!c.querySelector('.rel-segmento-atual'),
+                    c.querySelector('.rel-ultimo .rel-momento').className];
+        }""")
+        # A marca parte de onde estava (45 -> 72,5%) e desliza até 82,5%.
+        assert marca[0] == "72.5%", marca
+        assert "num-subiu" in marca[1] and "num-desceu" in marca[2], marca
+        assert "num-subiu" in marca[3] and marca[4], marca
+        assert "item-novo" in marca[5], marca
+        # Conta com o sinal ("+49") e termina no texto de verdade.
+        vistos = pg.evaluate("""async () => {
+            const el = document.querySelector(".rel-cartao[data-nome='Lucas'] .rel-afeto .rel-valor");
+            const v = new Set(); const fim = performance.now() + 900;
+            while (performance.now() < fim) { v.add(el.textContent.trim()); await new Promise(r => requestAnimationFrame(r)); }
+            return [...v];
+        }""")
+        assert len(vistos) > 2 and all(t.startswith("+") for t in vistos), vistos
+        pg.wait_for_function("""() => document.querySelector(".rel-cartao[data-nome='Lucas'] .rel-afeto .psn-barra-marca")
+                                   .style.left === '82.5%'""", timeout=3000)
+        seta = pg.evaluate("""() => getComputedStyle(document.querySelector(
+            ".rel-cartao[data-nome='Lucas'] .rel-afeto .rel-valor"), '::after').content""")
+        assert "2191" in seta or "↑" in seta, seta
+        pg.wait_for_function("""() => document.querySelector(".rel-cartao[data-nome='Lucas'] .rel-afeto .rel-valor")
+                                   .textContent.trim() === '+65'""", timeout=3000)
+        assert not erros, erros[:3]
+    finally:
+        voltar()
+
+
+def test_segredo_revelado_quebra_o_selo_e_a_aba_pulsa(app_no_ar, abrir):
+    antes, depois = _romance_depois()
+    pg, erros, trocar, voltar = _romance(app_no_ar, abrir, antes)
+    try:
+        pg.evaluate("() => window.Relacoes._abrir('segredos')")
+        pg.wait_for_selector("#relacoes-overlay .rel-segredo", timeout=8000)
+        trocar(depois)
+        r = pg.evaluate("""async () => {
+            await window.Relacoes.sync();
+            const novos = [...document.querySelectorAll('#rel-lista .rel-segredo.item-novo')].map(e => e.dataset.titulo);
+            const velhos = [...document.querySelectorAll('#rel-lista .rel-segredo:not(.item-novo)')].map(e => e.dataset.titulo);
+            const aba = document.querySelector("#rel-abas [data-aba='segredos'] .elc-filtro-conta").className;
+            const selo = document.querySelector('#rel-lista .rel-segredo.item-novo');
+            const anims = selo.getAnimations({subtree: true}).map(a => a.animationName);
+            return [novos, velhos, aba, anims];
+        }""")
+        assert r[0] == ["O anel guardado"], r
+        assert "O irmão na prisão" in r[1], r
+        assert "num-subiu" in r[2], r
+        assert "seloQuebraEsq" in r[3] and "seloQuebraDir" in r[3], r
+        assert not erros, erros[:3]
+    finally:
+        voltar()
+
+
+def test_encontro_proximo_faz_a_barra_pulsar(app_no_ar, abrir):
+    from test_relacoes_navegador import ROMANCE
+    longe = copy.deepcopy(ROMANCE)
+    longe["relogio"] = {"dia": 2, "hora": 8}
+    perto = copy.deepcopy(ROMANCE)
+    perto["relogio"] = {"dia": 3, "hora": 17}
+    pg, erros, trocar, voltar = _romance(app_no_ar, abrir, longe)
+    try:
+        pg.wait_for_selector("#sb-encontro:not(.hidden)", timeout=8000)
+        assert "sb-encontro-chegando" not in pg.get_attribute("#sb-encontro", "class")
+        trocar(perto)
+        pg.evaluate("() => refreshMemory()")
+        pg.wait_for_function("() => document.getElementById('sb-encontro').classList.contains('sb-encontro-chegando')",
+                             timeout=5000)
+        assert not erros, erros[:3]
+    finally:
+        voltar()
+
+
+def _fantasia_depois():
+    from test_mundo_navegador import FANTASIA
+    antes = copy.deepcopy(FANTASIA)
+    depois = copy.deepcopy(FANTASIA)
+    depois["renome"] = {"valor": 50, "historico": depois["renome"]["historico"]
+                        + [{"delta": 15, "motivo": "Salvaram a caravana", "cap": 4}]}
+    depois["faccoes"]["casa vael"]["reputacao"] = 20
+    depois["titulos"].append({"titulo": "Matadora de Wyrms", "quem": "Aria", "motivo": "O wyrm de Cinza", "cap": 4})
+    depois["lendas"]["a coroa afogada"]["fragmentos"].append(
+        {"texto": "A coroa brilha nas noites sem lua", "fonte": "uma criança", "cap": 4})
+    return antes, depois
+
+
+def test_renome_sobe_reputacao_desce_titulo_cai_como_selo(app_no_ar, abrir):
+    antes, depois = _fantasia_depois()
+    pg, erros, trocar, voltar = _romance(app_no_ar, abrir, antes)
+    try:
+        pg.evaluate("() => window.Mundo._abrir('renome')")
+        pg.wait_for_selector("#mundo-overlay .mnd-renome", timeout=8000)
+        trocar(depois)
+        r = pg.evaluate("""async () => {
+            await window.Mundo.sync();
+            const fac = document.querySelector(".mnd-faccao[data-nome='Casa Vael']");
+            return [document.querySelector('.mnd-renome .rel-valor').className,
+                    document.querySelector('.mnd-fama > span').style.width,
+                    fac.querySelector('.rel-valor').className,
+                    fac.querySelector('.psn-barra-marca').style.left,
+                    [...document.querySelectorAll('.mnd-titulo-item.item-novo')].map(e => e.dataset.titulo)];
+        }""")
+        assert "num-subiu" in r[0] and r[1] == "35%", r
+        assert "num-desceu" in r[2] and r[3] == "70%", r
+        assert r[4] == ["Matadora de Wyrms"], r
+        assert not erros, erros[:3]
+    finally:
+        voltar()
+
+
+def test_fragmento_novo_de_lenda_se_encaixa(app_no_ar, abrir):
+    antes, depois = _fantasia_depois()
+    pg, erros, trocar, voltar = _romance(app_no_ar, abrir, antes)
+    try:
+        pg.evaluate("() => window.Mundo._abrir('lendas')")
+        pg.wait_for_selector("#mundo-overlay .mnd-lenda", timeout=8000)
+        trocar(depois)
+        r = pg.evaluate("""async () => {
+            await window.Mundo.sync();
+            return [...document.querySelectorAll('.mnd-lenda .rel-momento')].map(e => e.classList.contains('item-novo'));
+        }""")
+        assert r == [False, True], r
+        assert not erros, erros[:3]
+    finally:
+        voltar()

@@ -68,18 +68,20 @@
 
   // ---- Render ------------------------------------------------------
   // -100..100 vira 0..100% na barra; o traço do meio é o neutro.
-  function medidor(id, rotulo, eixo, pontas) {
+  // `chave` (quem:eixo) liga o medidor a animarNumeros: a marca desliza de
+  // onde estava e o número conta, com uma seta de subida ou descida.
+  function medidor(id, rotulo, eixo, pontas, chave) {
     const pos = Math.max(0, Math.min(100, (eixo.valor + 100) / 2));
     return `
       <div class="rel-medidor rel-${id}${eixo.valor < 0 ? ' rel-negativo' : ''}">
         <div class="rel-medidor-topo">
           <span class="rel-eixo">${rotulo}</span>
           <span class="rel-faixa">${esc(eixo.rotulo)}</span>
-          <span class="rel-valor">${sinal(eixo.valor)}</span>
+          <span class="rel-valor" data-num="${esc(chave)}">${sinal(eixo.valor)}</span>
         </div>
         <div class="psn-barra rel-barra" role="img" aria-label="${rotulo} ${eixo.valor} de -100 a 100">
           <div class="psn-barra-meio"></div>
-          <div class="psn-barra-marca" style="left:${pos}%"></div>
+          <div class="psn-barra-marca" data-barra="${esc(chave)}" data-prop="left" style="left:${pos}%"></div>
         </div>
         <div class="psn-barra-pontas"><span>${pontas[0]}</span><span>${pontas[1]}</span></div>
       </div>`;
@@ -109,16 +111,16 @@
           <button class="rel-nome" type="button" onclick="window.Relacoes._ver('${aspas(p.nome)}')"
                   title="Abrir a ficha de ${esc(p.nome)}">${esc(p.nome)}</button>${marcas}
         </div>
-        ${window.escadaDaRelacao(p.estagio)}
+        ${window.escadaDaRelacao(p.estagio, `rel:${p.nome}:estagio`)}
         ${window.encontrosDaPessoa(p.encontros)}
-        ${medidor('afeto', 'Afeto', p.afeto, ['aversão', 'devoção'])}
-        ${medidor('confianca', 'Confiança', p.confianca, ['desconfia', 'confia'])}
+        ${medidor('afeto', 'Afeto', p.afeto, ['aversão', 'devoção'], `rel:${p.nome}:afeto`)}
+        ${medidor('confianca', 'Confiança', p.confianca, ['desconfia', 'confia'], `rel:${p.nome}:confianca`)}
         ${(p.momentos || []).length ? `
           <div class="rel-ultimo">
             <span class="rel-ultimo-rotulo">Último momento${p.momentos.length > 1 ? ` de ${p.momentos.length}` : ''}</span>
-            ${window.linhaDoTempo(p.momentos, 1)}
+            ${window.linhaDoTempo(p.momentos, 1, p.nome)}
           </div>` : ''}
-        ${window.segredosDaPessoa(p.segredos)}
+        ${window.segredosDaPessoa(p.segredos, p.nome)}
         ${window.tensoesDaPessoa(p.tensoes)}
         ${historico(p)}
       </article>`;
@@ -131,8 +133,11 @@
     const hist = (s.historico || []).map(h => `
       <li>${esc(h.quem)} ${h.acao === 'contou' ? '— você contou' : 'descobriu'}${
         h.capitulo ? ` <small>cap. ${esc(h.capitulo)}</small>` : ''}</li>`).join('');
+    // A chave muda quando mais alguém fica sabendo: o selo quebra de novo.
     return `
-      <article class="lcl-item rel-segredo${s.escondido_de.length ? ' rel-segredo-escondido' : ''}" data-titulo="${esc(s.titulo)}">
+      <article class="lcl-item rel-segredo${s.escondido_de.length ? ' rel-segredo-escondido' : ''}${
+        s.sabem.length ? ' rel-segredo-revelado' : ''}" data-titulo="${esc(s.titulo)}"
+               data-novo="${esc(`seu:${s.titulo}:${s.sabem.length}`)}">
         <div class="lcl-item-cabeca"><span class="lcl-item-nome">${esc(s.titulo)}</span></div>
         ${s.descricao ? `<p class="lcl-item-desc">${esc(s.descricao)}</p>` : ''}
         ${s.escondido_de.length ? `<p class="rel-seg-linha rel-seg-esconde"><span>Escondido de</span> ${esc(s.escondido_de.join(', '))}</p>` : ''}
@@ -146,7 +151,8 @@
       ? `${esc(s.dono)} contou a você`
       : `você descobriu${s.dono_sabe ? '' : ` — ${esc(s.dono)} não sabe que você sabe`}`;
     return `
-      <article class="lcl-item rel-segredo" data-titulo="${esc(s.titulo)}">
+      <article class="lcl-item rel-segredo rel-segredo-revelado" data-titulo="${esc(s.titulo)}"
+               data-novo="${esc(`outro:${s.dono}:${s.titulo}`)}">
         <div class="lcl-item-cabeca"><span class="lcl-item-nome">${esc(s.titulo)}</span>
           <span class="lcl-marca">de ${esc(s.dono)}</span></div>
         ${s.descricao ? `<p class="lcl-item-desc">${esc(s.descricao)}</p>` : ''}
@@ -166,9 +172,9 @@
         <div class="lcl-item-cabeca"><span class="lcl-item-nome">${esc(t.a)} × ${esc(t.b)}</span>
           <span class="lcl-marca">${esc(t.tipo)}</span></div>
         <div class="rel-medidor-topo"><span class="rel-faixa">${esc(t.faixa)}</span>
-          <span class="rel-valor">${t.intensidade}</span></div>
+          <span class="rel-valor" data-num="${esc(`ten:${t.a}:${t.b}`)}">${t.intensidade}</span></div>
         <div class="rel-intensidade" role="img" aria-label="Intensidade ${t.intensidade} de 100">
-          <span style="width:${Math.max(0, Math.min(100, t.intensidade))}%"></span></div>
+          <span data-barra="${esc(`ten:${t.a}:${t.b}`)}" style="width:${Math.max(0, Math.min(100, t.intensidade))}%"></span></div>
         ${hist ? `<ul class="psn-historico rel-historico">${hist}</ul>` : ''}
       </article>`;
   }
@@ -220,20 +226,22 @@
       .map(([id, rotulo, n]) => `
         <button class="elc-filtro${id === _aba ? ' elc-filtro-ativo' : ''}" data-aba="${id}" role="tab"
                 aria-selected="${id === _aba}" onclick="window.Relacoes._aba('${id}')">
-          ${rotulo} <span class="elc-filtro-conta">${n}</span></button>`).join('');
+          ${rotulo} <span class="elc-filtro-conta" data-num="rel:aba:${id}">${n}</span></button>`).join('');
     q('rel-lista').classList.toggle('rel-lista-segredos', _aba !== 'pessoas');
     if (_aba === 'segredos') {
       q('rel-lista').innerHTML = listaDeSegredos();
-      return;
-    }
-    if (_aba === 'tensoes') {
+    } else if (_aba === 'tensoes') {
       q('rel-lista').innerHTML = listaDeTensoes();
-      return;
+    } else {
+      q('rel-lista').innerHTML = pessoas.length
+        ? pessoas.map(cartao).join('')
+        : `<div class="lcl-vazio">Ninguém marcou você ainda. Quando algo mudar entre você e alguém,
+             o mestre registra aqui, com o porquê.</div>`;
     }
-    q('rel-lista').innerHTML = pessoas.length
-      ? pessoas.map(cartao).join('')
-      : `<div class="lcl-vazio">Ninguém marcou você ainda. Quando algo mudar entre você e alguém,
-           o mestre registra aqui, com o porquê.</div>`;
+    // O que mudou desde o último desenho (utils.js): marcas que deslizam,
+    // números que contam, o degrau que acende; segredos, momentos novos.
+    if (window.animarNumeros) window.animarNumeros(q('relacoes-overlay'));
+    if (window.marcarNovos) window.marcarNovos(q('rel-lista'), `rel:${_aba}`);
   }
 
   function mensagem(txt, erro) {
