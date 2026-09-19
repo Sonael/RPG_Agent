@@ -93,3 +93,33 @@ def resumo_para_o_mestre() -> str:
         linhas.append(f"• {l['titulo']} ({l.get('tipo')}; {estado})"
                       + (f" — verdade: {l['verdade']}" if l.get("verdade") else ""))
     return "\n".join(linhas)
+
+
+def importar(valor) -> dict:
+    """
+    As lendas de um JSON importado: lista ou dicionário, chave pelo título, tipo
+    válido, fragmentos em texto ou em lista. Sem "conhecida", vale o que os
+    fragmentos dizem: quem já tem fragmento o grupo conhece.
+    """
+    itens = valor.values() if isinstance(valor, dict) else (valor or [])
+    saida = {}
+    for l in itens:
+        if not isinstance(l, dict) or not _texto(l.get("titulo")) or locais.norm(l["titulo"]) in saida:
+            continue
+        tipo = next((t for t in TIPOS if locais.norm(t) == locais.norm(l.get("tipo") or "lenda")), "lenda")
+        frags = []
+        for f in l.get("fragmentos") or []:
+            if isinstance(f, str) and _texto(f):
+                frags.append({"texto": _texto(f), "fonte": "", "cap": 1})
+            elif isinstance(f, dict) and _texto(f.get("texto")):
+                frags.append({"texto": _texto(f["texto"]), "fonte": _texto(f.get("fonte")), "cap": f.get("cap") or 1})
+        conhecida = l.get("conhecida")
+        saida[locais.norm(l["titulo"])] = {
+            "titulo": _texto(l["titulo"]), "tipo": tipo, "verdade": _texto(l.get("verdade")),
+            "fragmentos": frags[-MAX_FRAGMENTOS:],
+            "conhecida": bool(frags) if conhecida is None else bool(conhecida) or bool(frags),
+            "desfecho": _texto(l.get("desfecho")), "cap": l.get("cap") or 1,
+        }
+        if len(saida) >= MAX_LENDAS:
+            break
+    return saida

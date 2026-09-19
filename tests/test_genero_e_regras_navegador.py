@@ -269,3 +269,25 @@ def test_prompt_de_importacao_do_romance_pede_o_que_o_romance_tem(menu):
     assert '"segredos"' not in texto and '"confianca"' not in texto
     assert "o que ESTE personagem sente pelo grupo" in texto
     assert not erros, erros[:3]
+
+
+
+def test_prompt_de_importacao_da_fantasia_pede_o_mundo(menu):
+    pg, erros, _ = menu
+    pg.evaluate("() => openImportModal()")
+    pg.wait_for_selector("#import-overlay:not(.hidden)", timeout=5000)
+    for genero in ("fantasia", "dark_fantasy"):
+        pg.click(f".import-tab[data-theme='{genero}']")
+        texto = pg.inner_text("#import-prompt-text")
+        for campo in ('"lealdade"', '"objetivo"', '"arco"', '"mudancas"', '"renome"', '"faccoes"',
+                      '"titulos"', '"lendas"', '"verdade"', '"fragmentos"', '"bestiario"', '"fraquezas"'):
+            assert campo in texto, (genero, campo)
+        # Com as regras de D&D a ficha continua no JSON.
+        assert '"sheet"' in texto, genero
+        assert texto.rstrip().endswith("sem blocos de código markdown."), genero
+    # No romance e no horror, nada do mundo da fantasia.
+    for genero in ("romance", "horror"):
+        pg.click(f".import-tab[data-theme='{genero}']")
+        texto = pg.inner_text("#import-prompt-text")
+        assert '"faccoes"' not in texto and '"lealdade"' not in texto, genero
+    assert not erros, erros[:3]

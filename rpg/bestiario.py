@@ -87,3 +87,38 @@ def resumo_para_o_mestre() -> str:
         if c["fraquezas"]:
             linhas.append(f"• {c['nome']}: o grupo sabe das fraquezas — {'; '.join(c['fraquezas'])}")
     return "\n".join(linhas)
+
+
+def importar(valor) -> dict:
+    """O bestiário de um JSON importado: lista ou dicionário, chave pelo nome, notas em texto ou lista."""
+    def notas(lista):
+        # Um texto solto (outra IA mandou "fatos": "caça à noite") é um fato só.
+        if isinstance(lista, str):
+            lista = [lista]
+        saida = []
+        for n in lista or []:
+            texto = n.get("texto") if isinstance(n, dict) else n
+            if _texto(texto) and locais.norm(texto) not in {locais.norm(x["texto"]) for x in saida}:
+                saida.append({"texto": _texto(texto), "cap": (n.get("cap") if isinstance(n, dict) else None) or 1})
+        return saida[-MAX_NOTAS:]
+
+    def inteiro(v):
+        try:
+            return max(0, int(v or 0))
+        except (TypeError, ValueError):
+            return 0
+
+    itens = valor.values() if isinstance(valor, dict) else (valor or [])
+    saida = {}
+    for c in itens:
+        if not isinstance(c, dict) or not _texto(c.get("nome")) or locais.norm(c["nome"]) in saida:
+            continue
+        saida[locais.norm(c["nome"])] = {
+            "nome": _texto(c["nome"]), "tipo": _texto(c.get("tipo")), "descricao": _texto(c.get("descricao")),
+            "fatos": notas(c.get("fatos")), "fraquezas": notas(c.get("fraquezas")),
+            "encontros": inteiro(c.get("encontros")), "derrotadas": inteiro(c.get("derrotadas")),
+            "cap": c.get("cap") or 1,
+        }
+        if len(saida) >= MAX_CRIATURAS:
+            break
+    return saida

@@ -272,3 +272,30 @@ def test_importar_o_mundo_da_fantasia():
     assert p["faccoes"]["o olho cinzento"]["conhecida"] is False
     assert [t["titulo"] for t in p["titulos"]] == ["O Juramentado"]
     assert "a coroa" in p["lendas"] and "carnical" in p["bestiario"]
+
+
+
+def test_importar_lendas_e_bestiario_como_outra_ia_devolveria():
+    """Listas no lugar de dicionários, fragmentos em texto, notas repetidas, tipo inventado."""
+    import server
+
+    dados = {"campaign_type": "fantasia",
+             "lendas": [{"titulo": "A Coroa Afogada", "tipo": "artefato perdido", "verdade": "No lago",
+                         "fragmentos": ["Um rei jogou a coroa na água", {"texto": "O lago brilha à noite",
+                                                                         "fonte": "um pescador"}]},
+                        {"titulo": "O Sétimo Filho", "tipo": "boato"},
+                        {"titulo": "a coroa afogada"}, {"verdade": "sem título"}],
+             "bestiario": [{"nome": "Carniçal", "fraquezas": ["Sol", "sol", {"texto": "Prata"}],
+                            "fatos": "Caça à noite", "encontros": "dois"}]}
+    p = server._payload_de_campanha("Vale", dados, {})
+    coroa = p["lendas"]["a coroa afogada"]
+    assert [f["texto"] for f in coroa["fragmentos"]] == ["Um rei jogou a coroa na água", "O lago brilha à noite"]
+    assert coroa["conhecida"] is True and coroa["verdade"] == "No lago"
+    # Sem fragmento e sem "conhecida": o grupo ainda não ouviu falar. Tipo inventado vira lenda.
+    setimo = p["lendas"]["o setimo filho"]
+    assert (setimo["conhecida"], setimo["tipo"]) == (False, "lenda")
+    assert len(p["lendas"]) == 2
+    carnical = p["bestiario"]["carnical"]
+    assert [n["texto"] for n in carnical["fraquezas"]] == ["Sol", "Prata"]
+    # Texto solto vira um fato; número por extenso não é número.
+    assert carnical["encontros"] == 0 and [n["texto"] for n in carnical["fatos"]] == ["Caça à noite"]
