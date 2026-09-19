@@ -961,6 +961,39 @@ async function refreshMemory() {
   } catch (_) { }
 }
 
+function _romano(n) {
+  const tabela = [[1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'], [100, 'C'], [90, 'XC'],
+                  [50, 'L'], [40, 'XL'], [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']];
+  let s = '';
+  for (const [v, r] of tabela) while (n >= v) { s += r; n -= v; }
+  return s || String(n);
+}
+
+// Um capítulo novo é uma página nova: um cartão com o número e o título (o do
+// diário, se o mestre já escreveu; senão, o lugar) pousa sobre a narração e
+// vira pela lombada. Clicar tira antes. Sem animações, nada: o capítulo já
+// aparece na barra.
+function anunciarCapitulo(mem) {
+  if (typeof animacoesLigadas === 'function' && !animacoesLigadas()) return;
+  const area = document.getElementById('chat-area');
+  if (!area) return;
+  document.querySelector('.capitulo-novo')?.remove();
+  const n = Number(mem.chapter) || 1;
+  const titulo = (mem.diary || []).filter(d => Number(d.chapter) === n).map(d => d.title).find(Boolean)
+              || mem.current_location || '';
+  const cartao = document.createElement('div');
+  cartao.className = 'capitulo-novo';
+  cartao.setAttribute('role', 'status');
+  cartao.innerHTML = `<div class="capitulo-novo-folha">
+      <div class="capitulo-novo-rotulo">Capítulo</div>
+      <div class="capitulo-novo-num">${_romano(n)}</div>
+      ${titulo ? `<div class="capitulo-novo-titulo">${escapeHtml(titulo)}</div>` : ''}
+    </div>`;
+  cartao.addEventListener('click', () => cartao.remove());
+  cartao.addEventListener('animationend', (e) => { if (e.target === cartao) cartao.remove(); });
+  area.appendChild(cartao);
+}
+
 function renderMemory(mem) {
   // Normaliza campos que podem faltar em dados antigos/parciais — sem isso,
   // um Object.keys(undefined) abortaria toda a renderização da sidebar.
@@ -970,6 +1003,10 @@ function renderMemory(mem) {
   mem.diary       = mem.diary       || [];
   mem.locations   = mem.locations   || [];
   mem.events      = mem.events      || [];
+  // Capítulo novo: a página vira (anunciarCapitulo). Só quando sobe durante
+  // o jogo, não na primeira carga.
+  const capituloAntes = window._lastMem ? Number(window._lastMem.chapter) || 1 : null;
+  if (capituloAntes !== null && (Number(mem.chapter) || 1) > capituloAntes) anunciarCapitulo(mem);
   window._lastMem = mem;
 
   renderTurnTracker(mem.combat_state);

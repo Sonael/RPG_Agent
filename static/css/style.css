@@ -90,7 +90,9 @@ button:disabled { opacity: 0.4; cursor: not-allowed !important; }
    ========================================================= */
 .scene {
   width: 100%; min-height: 100vh; display: flex; justify-content: center; align-items: center;
-  perspective: 2000px; padding: var(--esp-5); box-sizing: border-box;
+  /* Longa o bastante para a capa e as folhas (1300px de livro) virarem sem
+     vir para cima da câmera; com 2000px a borda crescia quase três vezes. */
+  perspective: 6000px; padding: var(--esp-5); box-sizing: border-box;
 }
 
 .tome {
@@ -109,10 +111,96 @@ button:disabled { opacity: 0.4; cursor: not-allowed !important; }
 .tome-cover h1 { font-family: var(--font-menu); font-size: 52px; color: var(--cover-text); font-weight: 500; letter-spacing: 2px; margin: 0; text-align: center; }
 .tome-cover p { color: var(--cover-text); font-family: 'Lora', serif; font-size: 18px; font-style: italic; opacity: 0.7; margin-top: var(--esp-5); }
 
-.animate-open { animation: openTomeCover 1s cubic-bezier(0.645, 0.045, 0.355, 1) forwards; }
-.animate-close { animation: closeTomeCover 1s cubic-bezier(0.645, 0.045, 0.355, 1) forwards; }
-@keyframes openTomeCover { 0% { transform: rotateY(0deg); opacity: 1; } 100% { transform: rotateY(-110deg); opacity: 0; visibility: hidden; } }
-@keyframes closeTomeCover { 0% { transform: rotateY(-110deg); opacity: 0; visibility: visible; } 100% { transform: rotateY(0deg); opacity: 1; } }
+/* A capa gira de verdade: passa dos 90° mostrando o forro (o verso, no
+   ::before) e só some no fim, quando já está deitada à esquerda. Antes girava
+   110° e sumia pela transparência no meio do caminho: parecia desbotar, não
+   abrir. A sombra que ela projeta nas páginas acompanha (::after). */
+/* O verso da capa é o próprio elemento visto por trás (backface visível), com
+   a cor escurecendo para o forro; o título e o subtítulo escondem as costas. */
+.tome-cover.animate-open, .tome-cover.animate-close { backface-visibility: visible; }
+.tome-cover > * { backface-visibility: hidden; }
+.animate-open { animation: openTomeCover 1.25s cubic-bezier(0.55, 0.08, 0.3, 1) forwards; }
+.animate-close { animation: closeTomeCover 1.1s cubic-bezier(0.55, 0.08, 0.3, 1) forwards; }
+@keyframes openTomeCover {
+  0%   { transform: rotateY(0deg); opacity: 1; box-shadow: 20px 20px 40px rgba(0,0,0,0.6); filter: brightness(1); }
+  50%  { box-shadow: 40px 20px 60px rgba(0,0,0,0.4); filter: brightness(.8); }
+  85%  { opacity: 1; filter: brightness(.6); }
+  100% { transform: rotateY(-172deg); opacity: 0; visibility: hidden; box-shadow: 0 0 0 rgba(0,0,0,0); filter: brightness(.55); }
+}
+@keyframes closeTomeCover {
+  0%   { transform: rotateY(-172deg); opacity: 0; visibility: visible; box-shadow: 0 0 0 rgba(0,0,0,0); filter: brightness(.55); }
+  15%  { opacity: 1; filter: brightness(.6); }
+  50%  { box-shadow: 40px 20px 60px rgba(0,0,0,0.4); filter: brightness(.8); }
+  100% { transform: rotateY(0deg); opacity: 1; box-shadow: 20px 20px 40px rgba(0,0,0,0.6); filter: brightness(1); }
+}
+
+/* Chegou virando a página (menu e jogo são páginas do mesmo livro): a capa
+   não abre de novo, e o conteúdo novo aparece enquanto a folha assenta. */
+html.chegou-virando .tome-cover { display: none; }
+html.chegou-virando .tome > .page-left > *,
+html.chegou-virando .tome > .page-right > * { animation: paginaAssenta .45s ease-out both; }
+@keyframes paginaAssenta { from { opacity: 0; } to { opacity: 1; } }
+
+/* A folha que vira (utils.js, virarPagina e virarParaOutraPagina): frente e
+   verso do mesmo papel, girando em volta da lombada. */
+.folha-virando {
+  position: absolute; z-index: 60; pointer-events: none;
+  transform-style: preserve-3d; will-change: transform;
+}
+.folha-virando > .folha-face { position: absolute; inset: 0; overflow: hidden; backface-visibility: hidden; }
+.folha-virando > .folha-verso { transform: rotateY(180deg); box-shadow: inset 0 0 40px rgba(0,0,0,.08); }
+.folha-virando > .folha-sombra { position: absolute; inset: 0; opacity: 0; pointer-events: none; }
+.folha-do-livro { z-index: 90; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+
+/* Capítulo novo (game.js, anunciarCapitulo): uma página com o número e o
+   título pousa sobre a narração, fica um instante e vira pela lombada. */
+.capitulo-novo {
+  position: absolute; inset: 0; z-index: 70; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--page-right); border-radius: inherit;
+  transform-origin: left center; backface-visibility: hidden;
+  box-shadow: inset 15px 0 25px -15px rgba(0,0,0,0.08);
+  animation: capituloVira 3.2s cubic-bezier(.42,.12,.28,1) forwards;
+}
+.capitulo-novo-folha { text-align: center; animation: capituloSurge .9s ease-out both; }
+.capitulo-novo-rotulo {
+  font-family: 'Lora', serif; font-size: 13px; letter-spacing: .35em; text-transform: uppercase;
+  color: var(--text-muted);
+}
+.capitulo-novo-num {
+  font-family: var(--font-menu); font-size: 72px; line-height: 1.1; color: var(--ink-sys);
+  margin: var(--esp-2) 0;
+}
+.capitulo-novo-titulo {
+  font-family: var(--font-master, 'Lora'), serif; font-style: italic; font-size: 22px; color: var(--text-main);
+  padding-top: var(--esp-3); border-top: 1px solid var(--gold, #b89947); display: inline-block;
+}
+@keyframes capituloVira {
+  0%   { opacity: 0; transform: perspective(2200px) rotateY(0deg); }
+  10%  { opacity: 1; }
+  74%  { transform: perspective(2200px) rotateY(0deg); }
+  100% { opacity: 1; transform: perspective(2200px) rotateY(-180deg); }
+}
+@keyframes capituloSurge {
+  from { opacity: 0; transform: translateY(8px); letter-spacing: .02em; }
+  to   { opacity: 1; transform: translateY(0); }
+}
+/* Sem transição: "transition: all" (o botão Iniciar) atrasava o sumiço. */
+.pagina-em-branco * { visibility: hidden !important; transition: none !important; }
+
+/* Menos movimento: pelo aparelho (prefers-reduced-motion, se a escolha for
+   "Seguir o sistema") ou pela escolha "Desligadas" nas configurações. Tudo
+   troca na hora; o que é comandado pelo JS pergunta a animacoesLigadas(). */
+:root[data-animacoes="desligadas"] *, :root[data-animacoes="desligadas"] *::before, :root[data-animacoes="desligadas"] *::after {
+  animation-duration: .01ms !important; animation-iteration-count: 1 !important; animation-delay: 0s !important;
+  transition-duration: .01ms !important; transition-delay: 0s !important; scroll-behavior: auto !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-animacoes="ligadas"]) *, :root:not([data-animacoes="ligadas"]) *::before, :root:not([data-animacoes="ligadas"]) *::after {
+    animation-duration: .01ms !important; animation-iteration-count: 1 !important; animation-delay: 0s !important;
+    transition-duration: .01ms !important; transition-delay: 0s !important; scroll-behavior: auto !important;
+  }
+}
 
 .tome-spine {
   position: absolute; top: 0; bottom: 0; left: 320px; width: 50px; transform: translateX(-50%);

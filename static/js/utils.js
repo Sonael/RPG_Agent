@@ -410,6 +410,188 @@ function loadTheme() {
 }
 
 // ═══════════════════════════════════════
+//  Animações
+// ═══════════════════════════════════════
+// Três escolhas. "Seguir o sistema" (o padrão) liga, a menos que o aparelho
+// peça menos movimento (prefers-reduced-motion). O CSS desliga as animações e
+// transições pelo atributo data-animacoes; o que é comandado pelo JS (virar a
+// página, contar um número) pergunta a animacoesLigadas() antes.
+const ANIMACOES = [
+  { id: 'sistema',    label: 'Seguir o sistema', desc: 'Ligadas, a menos que o aparelho peça menos movimento' },
+  { id: 'ligadas',    label: 'Ligadas',          desc: 'Páginas virando, telas pousando, dados rolando' },
+  { id: 'desligadas', label: 'Desligadas',       desc: 'Tudo troca na hora' },
+];
+
+function preferenciaDeAnimacoes() {
+  try {
+    const v = localStorage.getItem('rpg_animacoes');
+    return ANIMACOES.some(a => a.id === v) ? v : 'sistema';
+  } catch (_) { return 'sistema'; }
+}
+
+function loadAnimacoes() {
+  document.documentElement.dataset.animacoes = preferenciaDeAnimacoes();
+}
+
+function applyAnimacoes(id) {
+  try { localStorage.setItem('rpg_animacoes', id); } catch (_) {}
+  document.documentElement.dataset.animacoes = id;
+  document.querySelectorAll('.settings-anim-option').forEach(el =>
+    el.classList.toggle('active', el.dataset.anim === id));
+}
+
+function animacoesLigadas() {
+  const v = document.documentElement.dataset.animacoes || preferenciaDeAnimacoes();
+  if (v === 'desligadas') return false;
+  if (v === 'ligadas') return true;
+  return !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+}
+window.animacoesLigadas = animacoesLigadas;
+
+// O fundo que está de fato atrás de um elemento (o primeiro ancestral opaco):
+// a cópia de uma página, fora do lugar dela, precisa levá-lo junto.
+function _fundoAtras(el) {
+  for (let e = el; e && e !== document.documentElement; e = e.parentElement) {
+    const cs = getComputedStyle(e);
+    const c = cs.backgroundColor;
+    if (c && c !== 'transparent' && !/rgba\([^)]*,\s*0\)$/.test(c)) return cs.backgroundColor;
+  }
+  return getComputedStyle(document.body).backgroundColor;
+}
+
+// Uma cópia de `el` para virar como folha: com o que está digitado (o clone
+// só leva o HTML) e sem roubar os botões de rádio do original. Fica depois do
+// original no documento, então getElementById continua achando o de verdade.
+function _copiaDaPagina(el) {
+  const c = el.cloneNode(true);
+  const orig = el.querySelectorAll('input, textarea, select');
+  const copia = c.querySelectorAll('input, textarea, select');
+  copia.forEach((d, i) => {
+    const o = orig[i];
+    if (d.type === 'radio') d.name = `${d.name || 'r'}-folha`;
+    if (!o) return;
+    if (d.type === 'checkbox' || d.type === 'radio') d.checked = o.checked;
+    else d.value = o.value;
+  });
+  c.setAttribute('aria-hidden', 'true');
+  c.inert = true;
+  return c;
+}
+
+// A folha: frente (a página) e verso (o outro lado do papel), girando em
+// volta da lombada. `origem` é o lado da lombada: 'left' ou 'right'.
+function _folha(el, frente, origem, fundoVerso) {
+  const pai = el.parentElement;
+  const rp = pai.getBoundingClientRect(), re = el.getBoundingClientRect();
+  const folha = document.createElement('div');
+  folha.className = 'folha-virando';
+  Object.assign(folha.style, {
+    top: `${re.top - rp.top + pai.scrollTop - pai.clientTop}px`,
+    left: `${re.left - rp.left + pai.scrollLeft - pai.clientLeft}px`,
+    width: `${re.width}px`, height: `${re.height}px`,
+    transformOrigin: `${origem} center`,
+  });
+  const fundo = _fundoAtras(el);
+  frente.classList.add('folha-face', 'folha-frente');
+  Object.assign(frente.style, { position: 'absolute', inset: '0', margin: '0', width: '100%', height: '100%',
+                                background: fundo, boxSizing: 'border-box' });
+  const verso = document.createElement('div');
+  verso.className = 'folha-face folha-verso';
+  verso.style.background = fundoVerso || fundo;
+  const sombra = document.createElement('div');
+  sombra.className = 'folha-sombra';
+  sombra.style.background = `linear-gradient(to ${origem === 'left' ? 'right' : 'left'}, rgba(0,0,0,.28), rgba(0,0,0,0) 55%)`;
+  folha.append(frente, verso, sombra);
+  return folha;
+}
+
+function _prenderPai(pai) {
+  if (getComputedStyle(pai).position !== 'static') return () => {};
+  pai.style.position = 'relative';
+  return () => { pai.style.position = ''; };
+}
+
+const _VIRAR_MS = 640;
+const _VIRAR_CURVA = 'cubic-bezier(.42,.12,.28,1)';
+
+// `perspectiva`: a das telas (que não têm uma); no livro, a da cena já vale
+// (somar as duas fazia a folha crescer para cima da câmera).
+function _girar(folha, de, ate, perspectiva = 'perspective(2200px) ') {
+  const sombra = folha.querySelector('.folha-sombra');
+  sombra?.animate([{ opacity: 0 }, { opacity: 1, offset: 0.5 }, { opacity: 0 }],
+                  { duration: _VIRAR_MS, easing: _VIRAR_CURVA });
+  return folha.animate([
+    { transform: `${perspectiva}rotateY(${de}deg)` },
+    { transform: `${perspectiva}rotateY(${ate}deg)` },
+  ], { duration: _VIRAR_MS, easing: _VIRAR_CURVA, fill: 'forwards' }).finished.catch(() => {});
+}
+
+// Vira a página de `el`: para a frente (direcao > 0), a página de agora se
+// levanta pela lombada (esquerda) e vira, mostrando a nova embaixo; para trás,
+// a nova vem virando por cima da de agora. `trocar` põe o conteúdo novo em el
+// e roda na hora: o documento já está certo durante a animação, que é só uma
+// cópia por cima. Sem animações, só troca.
+async function virarPagina(el, direcao, trocar) {
+  const troca = async () => { if (trocar) await trocar(); };
+  if (!el || !el.parentElement || !animacoesLigadas() || !el.animate) { await troca(); return; }
+  const pai = el.parentElement;
+  const soltar = _prenderPai(pai);
+  const rolagem = el.scrollTop;
+  const velha = _folha(el, _copiaDaPagina(el), 'left');
+  pai.insertBefore(velha, el.nextSibling);
+  velha.querySelector('.folha-frente').scrollTop = rolagem;
+  try {
+    if (direcao > 0) {
+      await troca();
+      await _girar(velha, 0, -180);
+    } else {
+      // A cópia da de agora fica parada por cima; a nova vem virando.
+      await troca();
+      const nova = _folha(el, _copiaDaPagina(el), 'left');
+      pai.insertBefore(nova, velha.nextSibling);
+      await _girar(nova, -180, 0);
+      nova.remove();
+    }
+  } finally {
+    velha.remove();
+    soltar();
+  }
+}
+window.virarPagina = virarPagina;
+
+// Passagem entre páginas do livro (menu e jogo são páginas diferentes):
+// para a frente, a página da direita vira para a esquerda; para trás, a da
+// esquerda vira para a direita. Depois navega. A página seguinte sabe que
+// chegou virando (sessionStorage) e não abre a capa de novo: antes o livro
+// fechava e reabria a cada passagem.
+async function virarParaOutraPagina(url, direcao) {
+  try { sessionStorage.setItem('rpg_chegou_virando', direcao > 0 ? 'frente' : 'tras'); } catch (_) {}
+  // No celular a barra (a página da esquerda) é uma folha escondida: vira a
+  // página que está à vista.
+  const aVista = (el) => el && el.getClientRects().length && el.getBoundingClientRect().width > 100
+                      && getComputedStyle(el).visibility !== 'hidden';
+  let pagina = document.querySelector(direcao > 0 ? '.tome > .page-right' : '.tome > .page-left');
+  if (!aVista(pagina)) pagina = document.querySelector('.tome > .page-right');
+  if (!aVista(pagina) || !animacoesLigadas() || !pagina.animate) { window.location.href = url; return; }
+  const origem = direcao > 0 ? 'left' : 'right';
+  const soltar = _prenderPai(pagina.parentElement);
+  const outro = getComputedStyle(document.documentElement)
+    .getPropertyValue(direcao > 0 ? '--page-left' : '--page-right').trim();
+  const folha = _folha(pagina, _copiaDaPagina(pagina), origem, outro || undefined);
+  folha.classList.add('folha-do-livro');
+  pagina.parentElement.insertBefore(folha, pagina.nextSibling);
+  // A página de baixo é a próxima: em branco até a outra carregar.
+  pagina.classList.add('pagina-em-branco');
+  // Sem a perspectiva da cena (celular: o livro é plano), a folha leva a dela.
+  const cena = pagina.closest('.scene');
+  const perspectiva = cena && getComputedStyle(cena).perspective !== 'none' ? '' : 'perspective(1600px) ';
+  await _girar(folha, 0, direcao > 0 ? -180 : 180, perspectiva);
+  soltar();
+  window.location.href = url;
+}
+window.virarParaOutraPagina = virarParaOutraPagina;
+
+// ═══════════════════════════════════════
 //  Sistema de Fontes
 // ═══════════════════════════════════════
 const FONT_CATEGORIES = [
@@ -556,6 +738,15 @@ function _injectSettingsPanel() {
       <div class="settings-section">
         <div class="settings-section-title">Aparência</div>
         ${themesHtml}
+      </div>
+      <div class="settings-section">
+        <div class="settings-section-title">Animações</div>
+        ${ANIMACOES.map(a => `
+          <button class="settings-font-option settings-anim-option${a.id === preferenciaDeAnimacoes() ? ' active' : ''}"
+                  data-anim="${a.id}" onclick="applyAnimacoes('${a.id}')">
+            <span class="settings-font-name">${a.label}</span>
+            <span class="settings-font-desc">${a.desc}</span>
+          </button>`).join('')}
       </div>
       <div class="settings-section">
         <div class="settings-section-title">Tipografia</div>
@@ -1187,8 +1378,10 @@ function _refreshInstallSection() {
   if (ios)     ios.style.display     = isIOS ? '' : 'none';
 }
 
+loadAnimacoes();
 document.addEventListener('DOMContentLoaded', () => {
   loadTheme();
+  loadAnimacoes();
   loadFonts();
   _injectSettingsPanel();
   _injectGuide();

@@ -289,11 +289,23 @@
     render(_last);
   }
 
+  const ordem = () => ['resumo', ...capitulos().map(c => c.numero),
+                       ...((_last.eventos_sem_capitulo || []).length ? ['sem'] : [])];
+
+  // Ir a outra página folheando: para a frente se ela vem depois, para trás
+  // se vem antes (utils.js, virarPagina). Antes a página trocava de uma vez.
+  function irVirando(numero) {
+    const alvo = numero === 'sem' || numero === 'resumo' ? numero : parseInt(numero, 10);
+    if (alvo === _pagina || typeof window.virarPagina !== 'function') { ir(numero); return; }
+    const paginas = ordem();
+    const passo = paginas.indexOf(alvo) >= paginas.indexOf(_pagina) ? 1 : -1;
+    window.virarPagina(q('dia-pagina'), passo, () => ir(numero));
+  }
+
   function virar(passo) {
-    const paginas = ['resumo', ...capitulos().map(c => c.numero),
-                     ...((_last.eventos_sem_capitulo || []).length ? ['sem'] : [])];
+    const paginas = ordem();
     const i = paginas.indexOf(_pagina) + passo;
-    if (i >= 0 && i < paginas.length) ir(paginas[i]);
+    if (i >= 0 && i < paginas.length) irVirando(paginas[i]);
   }
 
   function editarMundo() {
@@ -338,7 +350,7 @@
     sync,
     _abrir: abrir,
     _fechar: fechar,
-    _ir: ir,
+    _ir: irVirando,
     _virar: virar,
     _editar: editar,
     _nova: nova,

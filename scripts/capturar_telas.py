@@ -1428,6 +1428,9 @@ def _script_de_semente(nome_campanha: str, tema: str, historico: list,
     return f"""
       try {{
         localStorage.setItem('rpg_theme', {json.dumps(tema)});
+        // Sem animações: o print e os testes pegam o estado final, não o meio
+        // de uma página virando. Os testes das animações ligam de novo.
+        localStorage.setItem('rpg_animacoes', 'desligadas');
         window.__campanha = {json.dumps(nome_campanha)};
 
         // As telas de loja e nível lembram "já abri" no localStorage, e o

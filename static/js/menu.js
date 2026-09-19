@@ -239,16 +239,9 @@ async function startSession() {
       conversation_history: data.conversation_history || [],
     }));
 
-    // Anima a virada de página antes de navegar
-    const cover = document.querySelector('.tome-cover');
-    if (cover) {
-      cover.classList.remove('animate-open');
-      void cover.offsetWidth;
-      cover.classList.add('animate-close');
-      setTimeout(() => { window.location.href = '/game.html'; }, 900);
-    } else {
-      window.location.href = '/game.html';
-    }
+    // O jogo é a próxima página do livro: vira a folha, em vez de fechar a
+    // capa e abrir de novo.
+    await virarParaOutraPagina('/game.html', 1);
 
   } catch (e) {
     btn.disabled    = false;
@@ -1622,27 +1615,29 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ── Navegação ─────────────────────────────────────────────
+// Mudar de passo folheia: para a frente ou para trás (utils.js, virarPagina).
+function wzPassoVirando(novo) {
+  const antes = wzStep;
+  const aplicar = () => { wzStep = novo; wzRenderStep(); };
+  if (novo === antes || typeof virarPagina !== 'function') { aplicar(); return; }
+  virarPagina(document.getElementById('wizard-scroll'), novo > antes ? 1 : -1, aplicar);
+}
+
 function wizardGoTo(step) {
   if (step > 1 && wzStep === 1) { if (!wzValidateStep1()) return; }
-  wzStep = step;
-  wzRenderStep();
+  wzPassoVirando(step);
 }
 
 // O passo 3 (o mundo do gênero) só existe no romance e na fantasia.
 function wzUltimoPasso() { return ED_MUNDO[wzGenero()] ? 3 : 2; }
 
 function wizardNext() {
-  if (wzStep === 1) {
-    if (!wzValidateStep1()) return;
-    wzStep = 2;
-  } else if (wzStep < wzUltimoPasso()) {
-    wzStep++;
-  }
-  wzRenderStep();
+  if (wzStep === 1 && !wzValidateStep1()) return;
+  if (wzStep < wzUltimoPasso()) wzPassoVirando(wzStep + 1);
 }
 
 function wizardBack() {
-  if (wzStep > 1) { wzStep--; wzRenderStep(); }
+  if (wzStep > 1) wzPassoVirando(wzStep - 1);
 }
 
 function wzRenderStep() {
@@ -3609,7 +3604,7 @@ async function createCampaignFromWizard() {
       model_limits:    sesData.model_limits,
       conversation_history: sesData.conversation_history || [],
     }));
-    window.location.href = '/game.html';
+    await virarParaOutraPagina('/game.html', 1);
 
   } catch (e) {
     document.getElementById('wz-err').textContent = e.message;
@@ -4122,23 +4117,28 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ── Navegação entre passos ─────────────────────────────────────────
+function edPassoVirando(novo) {
+  const antes = edStep;
+  const aplicar = () => { edStep = novo; edRenderStep(); };
+  if (novo === antes || typeof virarPagina !== 'function') { aplicar(); return; }
+  virarPagina(document.getElementById('edit-scroll'), novo > antes ? 1 : -1, aplicar);
+}
+
 function editGoTo(step) {
   if (step > edStep && edStep === 1 && !edValidateStep1()) return;
-  edStep = step;
-  edRenderStep();
+  edPassoVirando(step);
 }
 
 // O passo 4 (o mundo do gênero) só existe no romance e na fantasia.
 function edUltimoPasso() { return ED_MUNDO[edGenero()] ? 4 : 3; }
 
 function editNext() {
-  if (edStep === 1) { if (!edValidateStep1()) return; edStep = 2; }
-  else if (edStep < edUltimoPasso()) { edStep++; }
-  edRenderStep();
+  if (edStep === 1 && !edValidateStep1()) return;
+  if (edStep < edUltimoPasso()) edPassoVirando(edStep + 1);
 }
 
 function editBack() {
-  if (edStep > 1) { edStep--; edRenderStep(); }
+  if (edStep > 1) edPassoVirando(edStep - 1);
 }
 
 function edRenderStep() {
