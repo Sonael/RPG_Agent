@@ -222,6 +222,67 @@ html.anim-on :is(#grm-reopen, #lvl-reopen, #rst-reopen, #lot-reopen, #shp-reopen
 }
 @keyframes pilulaSobe { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
 
+/* O chat (game.js). Só o que chega agora anima; o histórico carregado não. */
+/* A resposta do mestre: cada parágrafo surge como tinta secando, um depois
+   do outro. */
+html.anim-on .tinta-nova > * {
+  animation: tintaSeca .75s ease-out backwards;
+  animation-delay: calc(var(--i, 0) * 110ms);
+}
+@keyframes tintaSeca {
+  from { opacity: 0; filter: blur(2.5px); transform: translateY(3px); }
+  to   { opacity: 1; filter: none; transform: none; }
+}
+/* A fala do jogador: escrita à mão, da esquerda para a direita. */
+html.anim-on .escrita-nova { animation: escritaAMao var(--escrita, .8s) cubic-bezier(.3,.1,.4,1) backwards; }
+@keyframes escritaAMao {
+  from { clip-path: inset(-20% 100% -20% -4%); }
+  to   { clip-path: inset(-20% -4% -20% -4%); }
+}
+/* Mensagens do sistema (rolagens, avisos, comandos): entram deslizando. */
+html.anim-on .msg-row.system.msg-nova { animation: sistemaEntra .35s ease-out backwards; }
+@keyframes sistemaEntra { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+/* "O mestre está escrevendo": a pena risca uma linha de tinta. */
+.pena-escrevendo { display: flex; align-items: center; gap: var(--esp-2); color: var(--ink-user); }
+.pena-svg { width: 20px; height: 20px; transform-origin: 20% 90%; }
+.linha-de-tinta {
+  display: inline-block; width: 64px; height: 2px; border-radius: 2px; opacity: .55;
+  background: linear-gradient(to right, currentColor, transparent); transform-origin: left center;
+}
+.pena-msg { font-size: 11px; color: var(--text-muted); margin-left: var(--esp-1); }
+html.anim-on .pena-svg { animation: penaEscreve 1.2s ease-in-out infinite; }
+html.anim-on .linha-de-tinta { animation: linhaDeTinta 1.2s ease-in-out infinite; }
+@keyframes penaEscreve {
+  0%, 100% { transform: translateX(0) rotate(0deg); }
+  25% { transform: translateX(4px) rotate(-10deg); }
+  50% { transform: translateX(8px) rotate(0deg); }
+  75% { transform: translateX(12px) rotate(-10deg); }
+}
+@keyframes linhaDeTinta {
+  0% { transform: scaleX(0); opacity: .55; }
+  70% { transform: scaleX(1); opacity: .55; }
+  100% { transform: scaleX(1); opacity: 0; }
+}
+/* Os dados: o número troca enquanto rola (o resto só aparece quando cai),
+   cai com um pulo, brilha no crítico e treme na falha crítica. */
+.dado-rolando .dado-resto { visibility: hidden; }
+html.anim-on .dado-rolando .dado-numero { display: inline-block; animation: dadoSacode .11s linear infinite alternate; }
+html.anim-on .dado-caiu .sys-number { display: inline-block; animation: dadoCai .4s cubic-bezier(.2,1.6,.4,1) backwards; }
+html.anim-on .dado-critico { animation: dadoBrilha 1.4s ease-out; }
+html.anim-on .dado-falha { animation: dadoTreme .5s ease-in-out; }
+@keyframes dadoSacode { from { transform: translateY(-2px) rotate(-12deg); } to { transform: translateY(2px) rotate(12deg); } }
+@keyframes dadoCai { from { transform: scale(1.7); opacity: .4; } to { transform: none; opacity: 1; } }
+@keyframes dadoBrilha {
+  0%   { box-shadow: 0 0 0 0 rgba(212,175,55,.0); }
+  25%  { box-shadow: 0 0 0 6px rgba(212,175,55,.45), 0 0 28px rgba(212,175,55,.55); }
+  100% { box-shadow: 0 0 0 0 rgba(212,175,55,0); }
+}
+@keyframes dadoTreme {
+  0%, 100% { transform: none; }
+  20% { transform: translateX(-6px); } 40% { transform: translateX(5px); }
+  60% { transform: translateX(-3px); } 80% { transform: translateX(2px); }
+}
+
 /* Menos movimento: pelo aparelho (prefers-reduced-motion, se a escolha for
    "Seguir o sistema") ou pela escolha "Desligadas" nas configurações. Tudo
    troca na hora; o que é comandado pelo JS pergunta a animacoesLigadas(). */

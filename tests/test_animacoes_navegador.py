@@ -354,3 +354,101 @@ def test_escolher_ligadas_liga_as_de_entrada_na_hora(abrir):
     pg.evaluate("() => applyAnimacoes('desligadas')")
     assert not pg.evaluate("() => document.documentElement.classList.contains('anim-on')")
     assert not erros, erros[:3]
+
+
+# --- Chat e dados ----------------------------------------------------------------
+# Só o que chega agora anima; o histórico carregado ao abrir, não.
+
+def test_resposta_do_mestre_surge_paragrafo_a_paragrafo(abrir):
+    pg, erros = abrir("/game.html")
+    _terminar(pg)
+    r = pg.evaluate("""() => { const row = appendMaster(['Primeiro.', 'Segundo.', 'Terceiro.'].join(String.fromCharCode(10, 10)));
+        const b = row.querySelector('.msg-bubble');
+        return [b.classList.contains('tinta-nova'), [...b.children].map(c => c.style.getPropertyValue('--i')),
+                getComputedStyle(b.children[2]).animationName, b.style.opacity]; }""")
+    assert r == [True, ["0", "1", "2"], "tintaSeca", ""], r
+    assert not erros, erros[:3]
+
+
+def test_fala_do_jogador_e_escrita_a_mao_e_o_historico_nao_anima(abrir):
+    pg, erros = abrir("/game.html")
+    _terminar(pg)
+    nova = pg.evaluate("() => { const b = appendUser('Pergunto o preço.').querySelector('.msg-bubble');"
+                       " return [b.classList.contains('escrita-nova'), b.style.getPropertyValue('--escrita')]; }")
+    assert nova[0] and nova[1].endswith("ms"), nova
+    antigas = pg.evaluate("""() => { const h = document.getElementById('chat-history');
+        const antes = h.children.length;
+        renderHistory([{role: 'user', text: 'antiga'}, {role: 'assistant', text: 'Resposta antiga.'},
+                       {role: 'user', interno: 'dado', text: '[DADO] rolei 5'}]);
+        return [...h.children].slice(antes).map(r => r.querySelector('.escrita-nova, .tinta-nova')
+                                                   || r.classList.contains('msg-nova')); }""")
+    assert antigas == [False, False, False], antigas
+    assert not erros, erros[:3]
+
+
+def test_pena_no_lugar_dos_tres_pontos(abrir):
+    pg, erros = abrir("/game.html")
+    _terminar(pg)
+    r = pg.evaluate("""() => { const id = appendTyping(); const el = document.getElementById(id);
+        const antes = [!!el.querySelector('.pena-escrevendo .pena-svg'), !!el.querySelector('.linha-de-tinta'),
+                       getComputedStyle(el.querySelector('.pena-svg')).animationName];
+        updateTyping(id, 'rolando dado');
+        const depois = [!!el.querySelector('.pena-svg'), el.querySelector('.pena-msg')?.textContent];
+        removeTyping(id); return [antes, depois]; }""")
+    assert r == [[True, True, "penaEscreve"], [True, "rolando dado"]], r
+    assert not erros, erros[:3]
+
+
+def test_mensagem_do_sistema_entra_deslizando(abrir):
+    pg, erros = abrir("/game.html")
+    _terminar(pg)
+    r = pg.evaluate("() => { const row = appendSystem('<p>Aviso.</p>');"
+                    " return [row.classList.contains('msg-nova'), getComputedStyle(row).animationName]; }")
+    assert r == [True, "sistemaEntra"], r
+    assert not erros, erros[:3]
+
+
+def _rolar(pg, aleatorio):
+    pg.evaluate(f"() => {{ window.sendToAgent = () => {{}}; Math.random = () => {aleatorio}; rollPlayerDie(20); }}")
+    return pg.locator("#chat-history .msg-row.system .sys-card").last
+
+
+def test_dado_rola_e_cai_no_critico(abrir):
+    pg, erros = abrir("/game.html")
+    _terminar(pg)
+    cartao = _rolar(pg, 0.999)                     # 20 natural
+    assert "dado-rolando" in cartao.get_attribute("class")
+    assert not cartao.locator(".dado-resto").is_visible(), "o total apareceu antes de o dado cair"
+    pg.wait_for_function("() => [...document.querySelectorAll('.sys-card')].pop().classList.contains('dado-caiu')",
+                         timeout=3000)
+    classes = cartao.get_attribute("class")
+    assert "dado-critico" in classes and "dado-rolando" not in classes
+    assert cartao.locator(".dado-numero").inner_text() == "20"
+    assert cartao.locator(".dado-resto").is_visible()
+    assert not erros, erros[:3]
+
+
+def test_dado_treme_na_falha(abrir):
+    pg, erros = abrir("/game.html")
+    _terminar(pg)
+    cartao = _rolar(pg, 0.0)                       # 1 natural
+    pg.wait_for_function("() => [...document.querySelectorAll('.sys-card')].pop().classList.contains('dado-caiu')",
+                         timeout=3000)
+    assert "dado-falha" in cartao.get_attribute("class")
+    assert cartao.locator(".dado-numero").inner_text() == "1"
+    assert not erros, erros[:3]
+
+
+def test_sem_animacoes_o_chat_aparece_direto(abrir):
+    pg, erros = abrir("/game.html", "desligadas")
+    r = pg.evaluate("""() => { window.sendToAgent = () => {}; Math.random = () => 0.5;
+        const m = appendMaster('Texto.').querySelector('.msg-bubble');
+        const u = appendUser('Oi').querySelector('.msg-bubble');
+        const s = appendSystem('<p>Aviso.</p>');
+        rollPlayerDie(20);
+        const d = [...document.querySelectorAll('.sys-card')].pop();
+        return [m.classList.contains('tinta-nova'), u.classList.contains('escrita-nova'),
+                s.classList.contains('msg-nova'), d.classList.contains('dado-rolando'),
+                d.classList.contains('dado-caiu'), d.querySelector('.dado-numero').textContent]; }""")
+    assert r == [False, False, False, False, True, "11"], r
+    assert not erros, erros[:3]

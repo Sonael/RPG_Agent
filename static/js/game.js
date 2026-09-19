@@ -762,8 +762,41 @@ function appendDiceResultLog(toolName, content) {
       <div class="sys-card-body">${body}</div>
     </div>`;
 
+  // O resultado do mestre também cai, brilha ou treme (sem o giro: ele já
+  // vem calculado no texto).
+  _marcarNova(row);
+  if (_animaChat()) {
+    const cartao = row.querySelector('.sys-card');
+    cartao.classList.add('dado-caiu');
+    if (/CRÍTICO NATURAL/i.test(content)) cartao.classList.add('dado-critico');
+    if (/FALHA CRÍTICA/i.test(content)) cartao.classList.add('dado-falha');
+  }
   document.getElementById('chat-history').appendChild(row);
   scrollDown();
+}
+
+// O dado rola antes de mostrar: o número troca por alguns instantes e cai no
+// resultado, que brilha no crítico e treme na falha crítica. O total e o
+// resto só aparecem quando ele cai. Sem animações, o resultado direto.
+function _rolarDado(cartao, lados, resultado, critico, falha) {
+  const num = cartao?.querySelector('.dado-numero');
+  const marcar = () => {
+    cartao.classList.remove('dado-rolando');
+    cartao.classList.add('dado-caiu');
+    if (critico) cartao.classList.add('dado-critico');
+    if (falha) cartao.classList.add('dado-falha');
+  };
+  if (!num || !_animaChat()) { if (cartao) marcar(); return; }
+  cartao.classList.add('dado-rolando');
+  let giros = 0;
+  const giro = setInterval(() => {
+    num.textContent = 1 + Math.floor(Math.random() * lados);
+    if (++giros >= 12) {
+      clearInterval(giro);
+      num.textContent = resultado;
+      marcar();
+    }
+  }, 55);
 }
 
 function toggleDiceTray() {
@@ -793,19 +826,30 @@ function rollPlayerDie(sides) {
     <div class="sys-card">
       <div class="sys-card-badge" style="color:var(--ink-user); border-color:var(--ink-user);">Sua Rolagem: 1d${sides}${modStr}</div>
       <div class="sys-card-body">
-        <span class="sys-number">${rawRoll}</span>${modStr ? ` <em>(${modStr})</em>` : ''} = <strong>${total}</strong>${statusLabel}
+        <span class="sys-number dado-numero">${rawRoll}</span><span class="dado-resto">${modStr ? ` <em>(${modStr})</em>` : ''} = <strong>${total}</strong>${statusLabel}</span>
       </div>
       <div style="font-family:'Lora',serif; font-size:11px; color:var(--text-dim); margin-top:10px; text-align:center; font-style:italic;">
         Enviado ao Oráculo
       </div>
     </div>`;
+  _marcarNova(row);
   document.getElementById('chat-history').appendChild(row); scrollDown();
+  _rolarDado(row.querySelector('.sys-card'), sides, rawRoll, isCrit, isFumble);
 
   const msg = `[DADO DO JOGADOR — rolado pelo sistema, não editável] 1d${sides}${modStr}: rolei ${rawRoll}, total ${total}`;
   sendToAgent(msg, true, 'dado');
 }
 
+// Enquanto o histórico é montado, nada anima: só o que chega agora.
+var _montandoHistorico = false;
+function _animaChat() {
+  return !_montandoHistorico && typeof animacoesLigadas === 'function' && animacoesLigadas();
+}
+function _marcarNova(row) { if (_animaChat()) row.classList.add('msg-nova'); return row; }
+
 function renderHistory(history) {
+  _montandoHistorico = true;
+  try {
   history.forEach(e => {
     if (e.role === 'user' && e.interno) {
       // A rolagem é do jogador e ele a viu como cartão; volta como uma linha.
@@ -825,12 +869,20 @@ function renderHistory(history) {
       document.getElementById('chat-history').appendChild(row);
     }
   });
+  } finally { _montandoHistorico = false; }
   scrollDown();
 }
 
 function appendUser(text) {
   const row = document.createElement('div'); row.className = 'msg-row user';
   row.innerHTML = `<div class="msg-label">Você</div><div class="msg-bubble">${escapeHtml(text).replace(/\n/g, '<br>')}</div>`;
+  // A fala nova aparece como escrita à mão, da esquerda para a direita, no
+  // tempo de escrever (mais longa, mais lenta, até um limite).
+  if (_animaChat()) {
+    const b = row.querySelector('.msg-bubble');
+    b.classList.add('escrita-nova');
+    b.style.setProperty('--escrita', `${Math.min(1400, 320 + String(text).length * 16)}ms`);
+  }
   document.getElementById('chat-history').appendChild(row); scrollDown(); return row;
 }
 
@@ -854,18 +906,25 @@ function appendSystem(text) {
     ? DOMPurify.sanitize(_raw, { USE_PROFILES: { html: true } })
     : _raw;
   row.appendChild(b);
+  _marcarNova(row);
   document.getElementById('chat-history').appendChild(row); scrollDown(); return row;
+}
+
+// "O mestre está escrevendo": uma pena riscando uma linha de tinta, no lugar
+// dos três pontos. Sem animações, a pena parada.
+function _penaEscrevendo(msg) {
+  return `<div class="typing-dots pena-escrevendo" role="status" aria-label="O mestre está escrevendo"><svg class="pena-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z"/><line x1="16" y1="8" x2="2" y2="22"/><line x1="17.5" y1="15" x2="9" y2="15"/></svg><span class="linha-de-tinta"></span>${msg ? `<span class="pena-msg">${msg}</span>` : ''}</div>`;
 }
 
 function appendTyping() {
   const id = 'typ-' + Date.now(); const row = document.createElement('div'); row.className = 'msg-row master'; row.id = id;
-  row.innerHTML = `<div class="msg-label">Mestre</div><div class="typing-dots"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div>`;
+  row.innerHTML = `<div class="msg-label">Mestre</div>${_penaEscrevendo('')}`;
   document.getElementById('chat-history').appendChild(row); scrollDown(); return id;
 }
 
 function updateTyping(id, msg) {
   const el = document.getElementById(id); if (!el) return;
-  el.innerHTML = `<div class="msg-label">Mestre</div><div class="typing-dots"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div><span style="font-size:11px;color:var(--text-muted);margin-left:4px;">${msg}</span></div>`;
+  el.innerHTML = `<div class="msg-label">Mestre</div>${_penaEscrevendo(msg)}`;
   scrollDown();
 }
 
@@ -897,11 +956,15 @@ function renderMarkdown(text) {
   return escapeHtml(text || '').replace(/\n/g, '<br>');
 }
 
+// A resposta do mestre surge como tinta secando, um parágrafo depois do
+// outro. Antes desbotava a resposta inteira de uma vez, num setInterval.
 async function typewriter(el, text) {
   el.innerHTML = renderMarkdown(text);
-  el.style.opacity = '0';
-  let op = 0;
-  const t = setInterval(() => { op = Math.min(1, op + 0.08); el.style.opacity = op; scrollDown(); if (op >= 1) clearInterval(t); }, 20);
+  if (_animaChat()) {
+    [...el.children].forEach((bloco, i) => bloco.style.setProperty('--i', Math.min(i, 12)));
+    el.classList.add('tinta-nova');
+  }
+  scrollDown();
 }
 
 // Avisos do verificador: um botão discreto no relance, só quando há algum
