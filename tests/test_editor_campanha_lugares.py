@@ -176,3 +176,32 @@ def test_rota_grava_observacoes_e_cliente_antigo_nao_apaga(rota):
     sem_campo.pop("quest_flags")
     assert put(sem_campo).status_code == 200
     assert gravado["quest_flags"] == {"ponte_caiu": "sim"}
+
+
+def test_ficha_mochila_e_habilidades_que_o_editor_nao_manda_ficam(rota):
+    """
+    Sem as regras de D&D o editor não manda ficha, mochila nem habilidades.
+    A normalização punha listas vazias no lugar das ausentes, e salvar uma
+    campanha narrativa apagava a mochila de todos (os créditos do sci-fi, a
+    habilidade especial da fantasia, o que o mestre deu no jogo).
+    """
+    antiga, put, gravado = rota
+    antiga["characters"]["brom"]["inventario"] = [{"nome": "Martelo", "qtd": 1, "descricao": ""}]
+    antiga["characters"]["brom"]["habilidades"] = [{"nome": "Forjar", "descricao": ""}]
+    editada = copy.deepcopy(antiga)
+    for campo in ("inventario", "habilidades", "sheet"):
+        editada["characters"]["brom"].pop(campo, None)
+        editada["characters"]["alden"].pop(campo, None)
+
+    assert put(editada).status_code == 200
+    brom, alden = gravado["characters"]["brom"], gravado["characters"]["alden"]
+    assert brom["inventario"] == [{"nome": "Martelo", "qtd": 1, "descricao": ""}]
+    assert brom["habilidades"] == [{"nome": "Forjar", "descricao": ""}]
+    ficha = antiga["characters"]["alden"]["sheet"]
+    assert {k: alden["sheet"][k] for k in ficha} == ficha      # a normalização só acrescenta padrões
+
+    # Mandados, valem: é o editor com as regras, que mostra os três.
+    gravado.clear()
+    editada["characters"]["brom"]["inventario"] = []
+    assert put(editada).status_code == 200
+    assert gravado["characters"]["brom"]["inventario"] == []

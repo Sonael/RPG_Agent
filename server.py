@@ -7,6 +7,7 @@ Acesse em:  http://localhost:5000
 
 import asyncio
 import collections
+import copy
 import json
 import queue
 import re
@@ -1135,6 +1136,14 @@ def update_campaign(name):
             if isinstance(_ch, dict):
                 correcao = bool(_ch.get("correcao_manual"))
                 antigo = antigos.get(_key) or antigos.get(str(_ch.get("name", "")).lower().strip())
+                # Ficha, mochila e habilidades que o editor não mandou (ele só
+                # as manda com as regras de D&D) ficam como estavam. Sem isto
+                # a normalização logo abaixo punha listas vazias no lugar, e
+                # salvar uma campanha narrativa apagava a mochila de todos.
+                if isinstance(antigo, dict):
+                    for _campo in ("sheet", "inventario", "habilidades"):
+                        if _campo not in _ch and _campo in antigo:
+                            _ch[_campo] = copy.deepcopy(antigo[_campo])
                 mantidos = normalize_edited_character(_ch, antigo, correcao)
                 if mantidos:
                     mantidos_por_personagem[_ch.get("name", _key)] = mantidos
