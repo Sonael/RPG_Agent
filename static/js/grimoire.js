@@ -205,11 +205,20 @@
       <div class="grm-conhecidas-grupo">
         <div class="grm-conhecidas-titulo">${n == 0 ? 'Truques' : `${n}º círculo`}</div>
         ${grupos[n].map(m => `
-          <div class="grm-conhecida" title="${esc(m.descricao)}">
+          <div class="grm-conhecida" data-nome="${esc(m.nome)}" title="${esc(m.descricao)}">
             <span class="grm-conhecida-nome">${esc(m.nome)}</span>
             <span class="grm-conhecida-custo">${m.custo_mana ? `${m.custo_mana} mana` : ''}${m.dado ? ` · ${esc(m.dado)}` : ''}</span>
           </div>`).join('')}
       </div>`).join('');
+  }
+
+  // A magia recém-aprendida e até quando ela brilha (aprender, abaixo).
+  let _brilho = null;
+  function brilharAprendida() {
+    if (!_brilho || Date.now() > _brilho.ate || !window.destacar) return;
+    const el = [...document.querySelectorAll('#grimoire-overlay .grm-conhecida')]
+      .find(e => e.dataset.nome === _brilho.nome);
+    if (el && !el.classList.contains('grm-aprendeu')) window.destacar(el, 'grm-aprendeu');
   }
 
   function render(snap) {
@@ -262,6 +271,7 @@
       ? cat.map(cartao).join('')
       : `<div class="grm-vazio">${esc(motivo)}</div>`;
     q('grm-conhecidas-lista').innerHTML = conhecidas(p);
+    brilharAprendida();
 
     // Mesmo desenho do rodapé da tela de nível: se outro do grupo ainda tem
     // vaga, o botão leva a ele em vez de encerrar a cena.
@@ -380,6 +390,13 @@
         // A vaga que sobrou já foi vista: é a que está na tela agora.
         marcarVista(res.snapshot.assinatura || '');
         render(res.snapshot);
+      }
+      // A magia aprendida brilha ao chegar à lista das conhecidas. Guardada
+      // por um instante: a memória recarrega logo depois e redesenha a lista,
+      // e o brilho iria embora com o elemento antigo.
+      if (res.ok !== false) {
+        _brilho = { nome, ate: Date.now() + 1400 };
+        brilharAprendida();
       }
       if (res.ok !== false && typeof window.refreshMemory === 'function') window.refreshMemory();
     } catch (_) {

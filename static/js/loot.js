@@ -118,7 +118,7 @@
       <div class="lot-item${it.sobra > 0 ? '' : ' lot-item-dado'}" data-id="${esc(it.id)}" data-nome="${esc(it.nome)}">
         <div class="lot-item-cabeca">
           <span class="lot-item-nome">${esc(it.nome)}</span>
-          <span class="lot-item-qtd">${it.sobra} de ${it.qtd} no chão</span>
+          <span class="lot-item-qtd"><span data-num="lot:chao:${esc(it.id)}">${it.sobra}</span> de ${it.qtd} no chão</span>
           <span class="lot-item-peso">${kg(it.peso)} cada</span>
         </div>
         ${it.custom ? '<span class="lot-marca" title="Fora do SRD — item próprio da campanha">próprio da campanha</span>' : ''}
@@ -158,7 +158,8 @@
           <button class="lot-btn lot-btn-devolver" title="Devolver uma unidade ao chão"
                   onclick="window.Loot._devolver('${aspas(r.id)}','${aspas(p.nome)}')">Devolver</button></li>`).join('');
     return `
-      <div class="lot-cartao${p.morto ? ' lot-cartao-fora' : ''}" data-nome="${esc(p.nome)}">
+      <div class="lot-cartao${p.morto ? ' lot-cartao-fora' : ''}" data-nome="${esc(p.nome)}"
+           data-num="lot:leva:${esc(p.nome)}" data-valor="${(p.recebe || []).reduce((s, r) => s + (Number(r.qtd) || 1), 0)}">
         <div class="lot-cartao-cabeca">
           <span class="lot-nome">${esc(p.nome)}</span>
           <span class="lot-classe">${esc(p.classe)} · FOR ${p.forca}</span>
@@ -171,7 +172,7 @@
           </div>
           <div class="lot-carga-barra">
             <div class="lot-carga-atual" style="width:${pct(c.kg)}%"></div>
-            <div class="lot-carga-prevista${cls}" style="left:${pct(c.kg)}%;width:${Math.max(0, pct(c.kg_previsto) - pct(c.kg))}%"></div>
+            <div class="lot-carga-prevista${cls}" data-barra="lot:${esc(p.nome)}:previsto" style="left:${pct(c.kg)}%;width:${Math.max(0, pct(c.kg_previsto) - pct(c.kg))}%"></div>
             <div class="lot-carga-meio" style="left:50%" title="Metade da capacidade (${kg(c.metade)}): acima daqui, desvantagem"></div>
           </div>
           <div class="lot-estado${piora ? ' lot-estado-piora' : ''}">${piora
@@ -213,6 +214,8 @@
       ? `Concluir (${s.sobrando} ${s.sobrando === 1 ? 'fica' : 'ficam'} para trás)`
       : 'Concluir divisão';
     q('lot-deixar').disabled = _busy;
+    // Dar um item: o cartão de quem leva pulsa, o que sobra no chão conta.
+    if (window.animarNumeros) window.animarNumeros(q('loot-overlay'));
   }
 
   // ---- Sincronia ---------------------------------------------------

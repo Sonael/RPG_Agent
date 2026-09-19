@@ -76,12 +76,14 @@
   }
 
   // ---- Render ------------------------------------------------------
-  function moedas(m) {
+  // `dono` marca cada moeda para contar quando muda (utils.js, animarNumeros).
+  function moedas(m, dono = '') {
+    const b = (k, v) => `<b${dono ? ` data-num="${esc(dono)}:${k}"` : ''}>${v}</b>`;
     const p = [];
-    if (m.ouro)  p.push(`<b>${m.ouro}</b> po`);
-    if (m.prata) p.push(`<b>${m.prata}</b> pp`);
-    if (m.cobre) p.push(`<b>${m.cobre}</b> pc`);
-    return p.length ? p.join(' · ') : '<b>0</b> po';
+    if (m.ouro)  p.push(`${b('ouro', m.ouro)} po`);
+    if (m.prata) p.push(`${b('prata', m.prata)} pp`);
+    if (m.cobre) p.push(`${b('cobre', m.cobre)} pc`);
+    return p.length ? p.join(' · ') : `${b('ouro', 0)} po`;
   }
 
   function resumo(p) {
@@ -93,20 +95,20 @@
               : (c.estado === 'sobrecarregado' ? ' inv-carga-cheia' : '');
     return `
       <div class="inv-ca" title="Classe de Armadura">
-        <span class="inv-ca-num" id="inv-ca-num">${p.ca}</span><span class="inv-ca-rotulo">CA</span>
+        <span class="inv-ca-num" id="inv-ca-num" data-num="inv:${esc(p.nome)}:ca">${p.ca}</span><span class="inv-ca-rotulo">CA</span>
       </div>
       <div class="inv-carga">
         <div class="inv-carga-topo">
           <span>Carga</span>
-          <span class="inv-num">${c.kg} / ${c.capacidade} kg — ${esc(c.estado)}</span>
+          <span class="inv-num"><span data-num="inv:${esc(p.nome)}:kg">${c.kg}</span> / ${c.capacidade} kg — ${esc(c.estado)}</span>
         </div>
         <div class="inv-carga-barra">
-          <div class="inv-carga-fill${cls}" style="width:${pct}%"></div>
+          <div class="inv-carga-fill${cls}" data-barra="inv:${esc(p.nome)}:carga" style="width:${pct}%"></div>
           <div class="inv-carga-meio" style="left:50%"
                title="Metade da capacidade (${c.metade} kg): acima daqui, desvantagem"></div>
         </div>
       </div>
-      <div class="inv-moedas">${moedas(p.moedas)}</div>`;
+      <div class="inv-moedas">${moedas(p.moedas, `inv:${p.nome}`)}</div>`;
   }
 
   function slot(e) {
@@ -212,6 +214,8 @@
     // Um redesenho vindo da fila (o mestre mexeu no inventário) no meio de
     // uma ação não pode reabilitar os botões antes da resposta chegar.
     ocupar(_busy);
+    // A CA, a carga e as moedas contam até o valor novo ao equipar, usar, dar.
+    if (window.animarNumeros) window.animarNumeros(q('inventory-overlay'));
   }
 
   // ---- Sincronia ---------------------------------------------------

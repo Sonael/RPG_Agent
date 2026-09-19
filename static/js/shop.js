@@ -144,12 +144,14 @@
   }
 
   // ---- Render ------------------------------------------------------
-  function moedas(c) {
+  // `dono` marca cada moeda para contar quando muda (utils.js, animarNumeros).
+  function moedas(c, dono = '') {
+    const b = (k, v) => `<b${dono ? ` data-num="${esc(dono)}:${k}"` : ''}>${v}</b>`;
     const p = [];
-    if (c.ouro)  p.push(`<b>${c.ouro}</b> po`);
-    if (c.prata) p.push(`<b>${c.prata}</b> pp`);
-    if (c.cobre) p.push(`<b>${c.cobre}</b> pc`);
-    return p.length ? p.join(' · ') : '<b>0</b> po';
+    if (c.ouro)  p.push(`${b('ouro', c.ouro)} po`);
+    if (c.prata) p.push(`${b('prata', c.prata)} pp`);
+    if (c.cobre) p.push(`${b('cobre', c.cobre)} pc`);
+    return p.length ? p.join(' · ') : `${b('ouro', 0)} po`;
   }
 
   function bolsa(snap) {
@@ -178,18 +180,20 @@
 
     el.innerHTML = `
       <div class="shp-bolsa-quem">${troca}</div>
-      <div class="shp-bolsa-moedas">${moedas(c)}</div>
+      <div class="shp-bolsa-moedas">${moedas(c, `shp:${c.nome}`)}</div>
       <div class="shp-carga">
         <div class="shp-carga-topo">
           <span>Carga</span>
-          <span class="shp-carga-num">${c.carga} / ${c.capacidade} kg — ${esc(rotulo)}</span>
+          <span class="shp-carga-num"><span data-num="shp:${esc(c.nome)}:kg">${c.carga}</span> / ${c.capacidade} kg — ${esc(rotulo)}</span>
         </div>
         <div class="shp-carga-barra">
-          <div class="shp-carga-fill${cls}" style="width:${pct}%"></div>
+          <div class="shp-carga-fill${cls}" data-barra="shp:${esc(c.nome)}:carga" style="width:${pct}%"></div>
           <div class="shp-carga-meio" style="left:${meio}%"
                title="Metade da capacidade: acima daqui, desvantagem"></div>
         </div>
       </div>`;
+    // Comprar e vender: as moedas contam, a carga desliza.
+    if (window.animarNumeros) window.animarNumeros(el);
   }
 
   function cartaoCompra(i, c) {

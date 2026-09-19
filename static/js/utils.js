@@ -605,6 +605,73 @@ async function virarParaOutraPagina(url, direcao) {
 }
 window.virarParaOutraPagina = virarParaOutraPagina;
 
+// Números e barras que mudam entre dois desenhos de uma tela. As telas
+// redesenham tudo a cada ação, então a mudança só aparece comparando com o
+// desenho anterior: marcados com data-num="chave" (o número é o texto do
+// elemento, ou data-valor quando o elemento não é só o número) e
+// data-barra="chave" (a largura). O número conta até o novo e pulsa
+// (num-subiu, num-desceu); a barra desliza do valor antigo. A chave leva o
+// dono (o nome do personagem): trocar de personagem não conta de um para o
+// outro. Sem animações, só guarda os valores.
+const _valoresAntes = new Map();
+
+function _contar(el, de, ate, ms = 650) {
+  const final = el.textContent;
+  const casas = (String(ate).split('.')[1] || '').length;
+  const inicio = performance.now();
+  const passo = (agora) => {
+    const k = Math.min(1, (agora - inicio) / ms);
+    const suave = 1 - Math.pow(1 - k, 3);
+    if (!el.isConnected) return;
+    el.textContent = k < 1 ? (de + (ate - de) * suave).toFixed(casas) : final;
+    if (k < 1) requestAnimationFrame(passo);
+  };
+  requestAnimationFrame(passo);
+}
+
+function animarNumeros(raiz) {
+  if (!raiz) return;
+  const ligado = animacoesLigadas();
+  raiz.querySelectorAll('[data-num]').forEach(el => {
+    const soValor = el.dataset.valor !== undefined;
+    const valor = Number(soValor ? el.dataset.valor : el.textContent.replace(',', '.').replace(/[^\d.-]/g, ''));
+    if (!Number.isFinite(valor)) return;
+    const chave = `num:${el.dataset.num}`;
+    const antes = _valoresAntes.get(chave);
+    _valoresAntes.set(chave, valor);
+    if (!ligado || antes === undefined || antes === valor) return;
+    if (!soValor) _contar(el, antes, valor);
+    el.classList.remove('num-subiu', 'num-desceu');
+    void el.offsetWidth;
+    el.classList.add(valor > antes ? 'num-subiu' : 'num-desceu');
+  });
+  raiz.querySelectorAll('[data-barra]').forEach(el => {
+    const chave = `barra:${el.dataset.barra}`;
+    const alvo = el.style.width;
+    const antes = _valoresAntes.get(chave);
+    _valoresAntes.set(chave, alvo);
+    if (!ligado || antes === undefined || antes === alvo) return;
+    el.style.width = antes;
+    requestAnimationFrame(() => requestAnimationFrame(() => { el.style.width = alvo; }));
+  });
+}
+window.animarNumeros = animarNumeros;
+
+// Um destaque de uma vez (brilho, pulso): a classe sai quando a animação
+// acaba, para poder voltar na próxima.
+function destacar(el, classe) {
+  if (!el || !animacoesLigadas()) return;
+  el.classList.remove(classe);
+  void el.offsetWidth;
+  el.classList.add(classe);
+  el.addEventListener('animationend', function tirar(e) {
+    if (e.target !== el) return;
+    el.classList.remove(classe);
+    el.removeEventListener('animationend', tirar);
+  });
+}
+window.destacar = destacar;
+
 // Fechar uma tela por cima: ela some na hora (display: none), e quem
 // pergunta se está aberta ouve a verdade. O que se vê sair é uma cópia, por
 // cima, que desbota e é removida. Um observador só, para todas as telas: não

@@ -121,7 +121,7 @@
       <div class="lvl-attr">
         <span class="lvl-attr-nome">${esc(a.nome)}</span>
         <span class="lvl-attr-sigla">${esc(a.sigla || a.nome)}</span>
-        <span class="lvl-attr-valor">${a.valor}</span>
+        <span class="lvl-attr-valor" data-num="lvl:${esc(p.nome)}:${esc(a.sigla || a.nome)}">${a.valor}</span>
         <span class="lvl-attr-mod">${a.mod >= 0 ? '+' : ''}${a.mod}</span>
       </div>`).join('');
   }
@@ -251,6 +251,8 @@
       </section>`;
   }
 
+  const _pendenciasAntes = {};
+
   function render(snap) {
     _last = snap || {};
     ensureDom();
@@ -273,7 +275,7 @@
                          + `${esc(n)}${(_last.devendo || []).includes(n) ? ' (pendente)' : ''}</option>`).join('')
           + `</select>`
         : '')
-      + `<span class="lvl-classe">${esc(p.classe)} · nível <b>${p.nivel}</b>`
+      + `<span class="lvl-classe">${esc(p.classe)} · nível <b data-num="lvl:${esc(p.nome)}:nivel">${p.nivel}</b>`
       + ` · CA ${p.ca} · PV ${p.vida_max} · prof. +${p.proficiencia}</span>`;
 
     q('lvl-xp-fill').style.width = `${p.xp_pct}%`;
@@ -284,6 +286,12 @@
     atributos(p);
 
     const pend = _last.pendencias || [];
+    // Uma escolha feita (a pendência sumiu): a tela brilha. Os atributos
+    // que subiram contam até o valor novo.
+    const antes = _pendenciasAntes[p.nome];
+    _pendenciasAntes[p.nome] = pend.length;
+    if (antes !== undefined && pend.length < antes && window.destacar) window.destacar(q('lvl-frame'), 'lvl-escolha-feita');
+    if (window.animarNumeros) window.animarNumeros(q('levelup-overlay'));
 
     // Sem incremento pendente, o rascunho não pode sobreviver. Depois de
     // confirmar, o bloco some e rascunhoPara() não roda mais — sem esta linha

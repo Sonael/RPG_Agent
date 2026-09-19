@@ -59,6 +59,7 @@
                   aria-label="Fechar"
                   title="Fechar — o descanso continua aberto">✕</button>
           <h1 class="rst-title">A Fogueira <span id="rst-tipo"></span></h1>
+          <div class="rst-brasas" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div>
           <div id="rst-sub" class="rst-sub"></div>
         </header>
 
@@ -112,11 +113,11 @@
       <div class="rst-vida">
         <div class="rst-vida-topo">
           <span>Vida</span>
-          <span class="rst-num">${p.vida_atual} / ${p.vida_max}${
+          <span class="rst-num"><span data-num="rst:${esc(p.nome)}:vida">${p.vida_atual}</span> / ${p.vida_max}${
             p.teto < p.vida_max ? ` <small>teto ${p.teto}</small>` : ''}</span>
         </div>
         <div class="rst-vida-barra">
-          <div class="rst-vida-fill" style="width:${pct(p.vida_atual, p.vida_max)}%"></div>
+          <div class="rst-vida-fill" data-barra="rst:${esc(p.nome)}:vida" style="width:${pct(p.vida_atual, p.vida_max)}%"></div>
           ${marca}
         </div>
       </div>`;
@@ -129,7 +130,8 @@
     for (let i = 0; i < p.dados_max; i++) {
       h += `<span class="rst-pip${i < p.dados_restantes ? ' rst-pip-cheio' : ''}"></span>`;
     }
-    return `<span class="rst-pips" aria-label="${p.dados_restantes} de ${p.dados_max} dados">${h}</span>`;
+    return `<span class="rst-pips" data-num="rst:${esc(p.nome)}:pips" data-valor="${p.dados_restantes}"
+                  aria-label="${p.dados_restantes} de ${p.dados_max} dados">${h}</span>`;
   }
 
   const MOTIVO_BLOQUEIO = {
@@ -150,7 +152,7 @@
         <div class="rst-dados">
           <div class="rst-dados-topo">
             <span>Dados de vida</span>
-            <span class="rst-num">${p.dados_restantes} / ${p.dados_max}</span>
+            <span class="rst-num"><span data-num="rst:${esc(p.nome)}:dados">${p.dados_restantes}</span> / ${p.dados_max}</span>
           </div>
           ${pips(p)}
           <div class="rst-dados-regra">1d${p.dado} ${sinal(p.con_mod)} por dado</div>
@@ -243,6 +245,8 @@
       concluir.disabled = aptos === 0;
       concluir.textContent = aptos ? 'Dormir 8 horas' : 'Ninguém pode dormir ainda';
     }
+    // Gastar um dado: a vida enche e conta, o marcador do dado se esvazia.
+    if (window.animarNumeros) window.animarNumeros(q('rest-overlay'));
   }
 
   // ---- Sincronia ---------------------------------------------------

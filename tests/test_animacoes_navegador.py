@@ -575,3 +575,138 @@ def test_sem_animacoes_o_combate_so_redesenha(app_no_ar, abrir):
     finally:
         import requests
         requests.post(f"{url}/__estado", json=copy.deepcopy(cap.DIARIO), timeout=10)
+
+
+# --- Progressão e recompensas -------------------------------------------------
+# utils.js, animarNumeros: o que mudou entre dois desenhos conta e pulsa, e a
+# barra desliza. Cada tela marca os seus números; aqui, a ação de verdade.
+
+def test_numero_conta_pulsa_e_a_barra_desliza(abrir):
+    pg, erros = abrir("/game.html")
+    r = pg.evaluate("""async () => {
+        const d = document.createElement('div');
+        d.innerHTML = '<span data-num="t:ca">10</span><div data-barra="t:carga" style="width:20%"></div>';
+        document.body.appendChild(d);
+        animarNumeros(d);
+        d.innerHTML = '<span data-num="t:ca">15</span><div data-barra="t:carga" style="width:60%"></div>';
+        animarNumeros(d);
+        const num = d.querySelector('[data-num]'), barra = d.querySelector('[data-barra]');
+        const logo = [num.classList.contains('num-subiu'), barra.style.width];
+        // No caminho, o texto passa pelos números entre um e outro.
+        const vistos = new Set();
+        const fim = performance.now() + 900;
+        while (performance.now() < fim) {
+            vistos.add(num.textContent);
+            await new Promise(r => requestAnimationFrame(r));
+        }
+        const meio = [...vistos].some(v => Number(v) > 10 && Number(v) < 15);
+        return [...logo, meio, num.textContent, barra.style.width];
+    }""")
+    assert r == [True, "20%", True, "15", "60%"], r
+    assert not erros, erros[:3]
+
+
+def test_outra_chave_nao_conta_e_sem_animacoes_so_guarda(abrir):
+    pg, erros = abrir("/game.html", "desligadas")
+    r = pg.evaluate("""() => {
+        const d = document.createElement('div'); document.body.appendChild(d);
+        d.innerHTML = '<span data-num="t:a">10</span><div data-barra="t:b" style="width:20%"></div>';
+        animarNumeros(d);
+        d.innerHTML = '<span data-num="t:a">15</span><div data-barra="t:b" style="width:60%"></div>';
+        animarNumeros(d);
+        destacar(d.querySelector('div'), 'brilho-teste');
+        const sem = [d.querySelector('span').className, d.querySelector('div').style.width,
+                     d.querySelector('div').className];
+        applyAnimacoes('ligadas');
+        d.innerHTML = '<span data-num="t:outra">99</span>';
+        animarNumeros(d);
+        return [...sem, d.querySelector('span').className];
+    }""")
+    assert r == ["", "60%", "", ""], r
+    assert not erros, erros[:3]
+
+
+def _na_tela(app_no_ar, abrir, estado):
+    import requests
+    url, _, cap = app_no_ar
+    requests.post(f"{url}/__estado", json=copy.deepcopy(getattr(cap, estado)), timeout=10)
+    pg, erros = abrir("/game.html")
+    return pg, erros, lambda: requests.post(f"{url}/__estado", json=copy.deepcopy(cap.DIARIO), timeout=10)
+
+
+def test_mochila_a_ca_conta_ao_vestir(app_no_ar, abrir):
+    pg, erros, voltar = _na_tela(app_no_ar, abrir, "MOCHILA")
+    try:
+        pg.evaluate("() => window.Inventory._abrir('Stelar')")
+        pg.wait_for_selector("#inventory-overlay:not(.hidden) .inv-item", timeout=8000)
+        pg.evaluate("() => window.Inventory._equipar('Cota de Malha', 'armadura')")
+        pg.wait_for_selector("#inv-msg:not(:empty)", timeout=8000)
+        assert "num-subiu" in pg.get_attribute("#inv-ca-num", "class")
+        assert not erros, erros[:3]
+    finally:
+        voltar()
+
+
+def test_descanso_a_vida_sobe_e_o_dado_se_esvazia(app_no_ar, abrir):
+    pg, erros, voltar = _na_tela(app_no_ar, abrir, "DESCANSO_CURTO")
+    try:
+        pg.wait_for_selector("#rest-overlay:not(.hidden) .rst-card[data-nome='Helena']", timeout=8000)
+        assert pg.locator("#rest-overlay .rst-brasas i").count() == 6
+        pg.evaluate("() => window.Rest._dado('Helena')")
+        pg.wait_for_selector(".rst-card[data-nome='Helena'] .rst-gastos:not(:empty)", timeout=8000)
+        cartao = pg.locator(".rst-card[data-nome='Helena']")
+        assert "num-subiu" in cartao.locator("[data-num$=':vida']").get_attribute("class")
+        assert "num-desceu" in cartao.locator(".rst-pips").get_attribute("class")
+        assert not erros, erros[:3]
+    finally:
+        voltar()
+
+
+def test_saque_o_cartao_de_quem_leva_pulsa(app_no_ar, abrir):
+    pg, erros, voltar = _na_tela(app_no_ar, abrir, "SAQUE")
+    try:
+        pg.wait_for_selector("#loot-overlay:not(.hidden) .lot-item:not(.lot-item-dado)", timeout=8000)
+        item = pg.get_attribute("#loot-overlay .lot-item:not(.lot-item-dado)", "data-id")
+        pg.evaluate("(i) => window.Loot._dar(i, 'Natasha')", item)
+        pg.wait_for_function("() => document.querySelector(\".lot-cartao[data-nome='Natasha'] .lot-recebe\")",
+                             timeout=8000)
+        assert "num-subiu" in pg.get_attribute(".lot-cartao[data-nome='Natasha']", "class")
+        assert not erros, erros[:3]
+    finally:
+        voltar()
+
+
+def test_nivel_escolha_feita_brilha(app_no_ar, abrir):
+    pg, erros, voltar = _na_tela(app_no_ar, abrir, "NIVEL")
+    try:
+        pg.wait_for_selector("#levelup-overlay:not(.hidden) .lvl-opcao", timeout=8000)
+        pg.click("#levelup-overlay .lvl-opcao >> nth=0")
+        pg.wait_for_function("() => document.getElementById('lvl-frame').classList.contains('lvl-escolha-feita')",
+                             timeout=5000)
+        assert not erros, erros[:3]
+    finally:
+        voltar()
+
+
+def test_grimorio_a_magia_aprendida_brilha(app_no_ar, abrir):
+    pg, erros, voltar = _na_tela(app_no_ar, abrir, "GRIMORIO")
+    try:
+        pg.evaluate("() => window.Grimoire._abrir()")
+        pg.wait_for_selector("#grimoire-overlay .grm-aprender-btn:not([disabled])", timeout=8000)
+        pg.click("#grimoire-overlay .grm-aprender-btn:not([disabled]) >> nth=0")
+        pg.wait_for_function("() => document.querySelector('#grimoire-overlay .grm-conhecida.grm-aprendeu')",
+                             timeout=5000)
+        assert not erros, erros[:3]
+    finally:
+        voltar()
+
+
+def test_loja_as_moedas_descem_ao_comprar(app_no_ar, abrir):
+    pg, erros, voltar = _na_tela(app_no_ar, abrir, "LOJA")
+    try:
+        pg.wait_for_selector("#shop-overlay:not(.hidden) .shp-btn:not([disabled])", timeout=8000)
+        pg.click("#shop-overlay .shp-btn:not([disabled]) >> nth=0")
+        pg.wait_for_function("() => document.querySelector('#shp-bolsa [data-num].num-desceu')", timeout=5000)
+        assert not erros, erros[:3]
+    finally:
+        voltar()
