@@ -269,8 +269,17 @@ Uma campanha tem dois campos independentes:
   tático, loja, grimório e as demais telas de regra; sem, a narrativa é livre,
   com memória estruturada.
 
-Qualquer gênero combina com qualquer modo: dark fantasy com fichas, horror com
-combate tático, romance sem regra nenhuma.
+As regras de D&D valem em fantasia, dark fantasy, horror e mistério
+(`memory.GENEROS_COM_REGRAS`). O D&D 5e não é um sistema genérico: o catálogo
+é de fantasia medieval (espada longa, bola de fogo, peça de ouro, guerreiro e
+mago), e serve ao horror gótico e ao mistério num mundo de fantasia. Romance,
+sci-fi e faroeste são sempre narrativos: numa nave ou num saloon a loja de
+espadas e o grimório não fecham, e num romance o combate tático atrapalha.
+`regras_e_genero` desliga as regras nesses gêneros em toda campanha criada,
+editada ou carregada; no menu, o seletor de regras trava em "Narrativa livre"
+com uma dica do porquê, e a caixa da importação também. O romance dentro de
+uma aventura continua possível: fantasia ou dark fantasy com D&D, e as cenas
+românticas narradas no registro do gênero (abaixo).
 
 Antes, `dnd` era um valor de `campaign_type`, no mesmo seletor dos gêneros.
 Quem escolhia D&D ganhava uma instrução quase toda mecânica, sem direção de

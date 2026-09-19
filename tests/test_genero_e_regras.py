@@ -32,6 +32,35 @@ def test_genero_e_regras_se_combinam_livremente():
     assert memory.regras_e_genero("romance", False) == ("romance", False)
 
 
+def test_regras_de_d_e_d_so_nos_generos_em_que_fazem_sentido():
+    """
+    O D&D 5e é fantasia medieval: loja de espadas, grimório, peça de ouro.
+    Serve a fantasia, dark fantasy, horror e mistério; romance, sci-fi e
+    faroeste são sempre narrativos.
+    """
+    for genero in ("fantasia", "dark_fantasy", "horror", "misterio"):
+        assert memory.regras_e_genero(genero, True) == (genero, True), genero
+    for genero in ("romance", "scifi", "faroeste"):
+        assert memory.regras_e_genero(genero, True) == (genero, False), genero
+    assert set(memory.GENEROS_COM_REGRAS) <= set(memory.GENEROS)
+
+
+def test_campanha_criada_com_regras_num_genero_narrativo_fica_sem_regras():
+    import server
+
+    romance = server._payload_de_campanha("Cartas", {"campaign_type": "romance",
+                                                     "dnd_mode": True}, {})
+    assert (romance["campaign_type"], romance["dnd_mode"]) == ("romance", False)
+
+
+def test_campanha_carregada_num_genero_narrativo_perde_as_regras(campanha):
+    memory.campaign["campaign_type"] = "scifi"
+    memory.campaign["dnd_mode"] = True
+    memory.normalizar_campanha()
+    assert memory.campaign["dnd_mode"] is False
+    assert "REGRAS DE D&D 5e" not in agent.instrucao_da_campanha("scifi", True)
+
+
 def test_genero_desconhecido_vira_fantasia_sem_mexer_nas_regras():
     assert memory.regras_e_genero("steampunk", True) == ("fantasia", True)
     assert memory.regras_e_genero(None, None) == ("fantasia", False)

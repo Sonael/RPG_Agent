@@ -128,6 +128,60 @@ def test_dark_fantasy_sem_regras_tem_os_campos_do_genero(menu):
     assert not erros, erros[:3]
 
 
+def test_romance_scifi_e_faroeste_travam_as_regras(menu):
+    """O D&D 5e é fantasia medieval: nesses gêneros o seletor trava em narrativa."""
+    pg, erros, _ = menu
+    pg.evaluate("() => openWizard()")
+    pg.wait_for_selector("#wizard-overlay:not(.hidden)", timeout=5000)
+    for genero in ("romance", "scifi", "faroeste"):
+        pg.select_option("#wz-type", genero)
+        assert pg.input_value("#wz-regras") == "livre", genero
+        assert pg.is_disabled("#wz-regras"), genero
+        assert pg.is_visible("#wz-regras-dica"), genero
+    for genero in ("fantasia", "dark_fantasy", "horror", "misterio"):
+        pg.select_option("#wz-type", genero)
+        assert not pg.is_disabled("#wz-regras"), genero
+        assert not pg.is_visible("#wz-regras-dica"), genero
+    # Reabrir o assistente depois de um romance volta à fantasia destravada.
+    pg.select_option("#wz-type", "romance")
+    pg.evaluate("() => openWizard()")
+    assert pg.input_value("#wz-type") == "fantasia"
+    assert not pg.is_disabled("#wz-regras") and pg.input_value("#wz-regras") == "dnd"
+    assert not erros, erros[:3]
+
+
+def test_romance_criado_vai_sem_regras_mesmo_com_d_e_d_escolhido_antes(menu):
+    pg, erros, enviado = menu
+    # Escolhe D&D numa fantasia e depois troca o gênero para romance.
+    _wizard(pg, "fantasia", "dnd")
+    pg.evaluate("() => wizardGoTo(1)")
+    pg.select_option("#wz-type", "romance")
+    pg.evaluate("() => { wizardGoTo(2); }")
+    pg.wait_for_selector("#wz-chars-list .cwc", timeout=5000)
+    assert "Modo narrativo" in pg.inner_text("#wz-char-mode-hint")
+    _nome(pg, "Lucas")
+    pg.evaluate("() => { createCampaignFromWizard(); }")
+    pg.wait_for_function("() => document.getElementById('wz-err').textContent.length > 0", timeout=8000)
+    camp = enviado["campaign"]
+    assert (camp["campaign_type"], camp["dnd_mode"]) == ("romance", False)
+    assert not camp["characters"]["lucas"].get("sheet")
+    assert not erros, erros[:3]
+
+
+def test_importar_romance_desliga_a_caixa_e_volta_na_fantasia(menu):
+    pg, erros, _ = menu
+    pg.evaluate("() => openImportModal()")
+    pg.wait_for_selector("#import-overlay:not(.hidden)", timeout=5000)
+    assert pg.is_checked("#import-dnd")
+    pg.click(".import-tab[data-theme='romance']")
+    assert pg.is_disabled("#import-dnd") and not pg.is_checked("#import-dnd")
+    assert '"dnd_mode": false' in pg.inner_text("#import-prompt-text")
+    # Ver o prompt do romance não desliga as regras da fantasia.
+    pg.click(".import-tab[data-theme='fantasia']")
+    assert not pg.is_disabled("#import-dnd") and pg.is_checked("#import-dnd")
+    assert not erros, erros[:3]
+
+
 def test_gerar_com_ia_manda_genero_e_regras(menu):
     pg, erros, _ = menu
     pedido = {}

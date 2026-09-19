@@ -473,6 +473,17 @@ function getImportPrompt(theme) {
 
 function setImportTheme(theme) {
   currentImportTheme = theme;
+  const caixa = document.getElementById('import-dnd');
+  if (caixa) {
+    const pode = generoTemRegras(theme);
+    // Guarda a escolha ao travar e devolve ao destravar: trocar de aba para
+    // ver o prompt do romance não pode desligar as regras da fantasia.
+    if (!pode && !caixa.disabled) caixa.dataset.antes = caixa.checked ? '1' : '';
+    if (pode && caixa.disabled) caixa.checked = caixa.dataset.antes === '1';
+    if (!pode) caixa.checked = false;
+    caixa.disabled = !pode;
+    document.getElementById('import-regras-dica')?.classList.toggle('hidden', pode);
+  }
   document.querySelectorAll('.import-tab').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.theme === theme);
   });
@@ -489,8 +500,10 @@ function openImportModal() {
   document.getElementById('import-confirm-btn').disabled    = true;
   document.getElementById('import-confirm-btn').style.opacity = '0.4';
   document.getElementById('import-overlay').classList.remove('hidden');
-  // Preenche prompt com o tema padrão (D&D) e reseta abas
-  setImportTheme('dnd');
+  // Preenche prompt com o gênero padrão (fantasia, com a caixa de regras de
+  // D&D marcada) e reseta abas. Era 'dnd', de quando D&D era uma aba de
+  // gênero: nenhuma aba ficava ativa.
+  setImportTheme('fantasia');
 }
 
 function closeImportModal() {
@@ -1553,6 +1566,7 @@ function openWizard() {
   });
   document.getElementById('wz-type').value = 'fantasia';
   document.getElementById('wz-regras').value = 'dnd';
+  ajustarRegrasAoGenero('wz-type', 'wz-regras', 'wz-regras-dica');
   document.getElementById('wz-ai-toggle').checked = false;
   document.getElementById('wz-ai-section').classList.add('hidden');
   document.getElementById('wz-ai-hint').classList.remove('hidden');
@@ -1869,11 +1883,27 @@ function wzRenderEvts() {
 // Gênero e regras são dois seletores. O que muda os CAMPOS de um personagem
 // é a regra: com D&D ele tem ficha; sem, os campos do gênero. wzTema() é essa
 // chave única, que as funções de campo já usavam quando "dnd" era gênero.
+// As regras de D&D só nos gêneros em que elas fazem sentido (o mesmo
+// memory.GENEROS_COM_REGRAS do servidor, que é quem decide de fato). Nos
+// outros, o seletor fica travado em "Narrativa livre" e uma dica diz por quê.
+const GENEROS_COM_REGRAS = ['fantasia', 'dark_fantasy', 'horror', 'misterio'];
+const generoTemRegras = (g) => GENEROS_COM_REGRAS.includes(g);
+
+function ajustarRegrasAoGenero(idGenero, idRegras, idDica) {
+  const sel = document.getElementById(idRegras);
+  if (!sel) return;
+  const pode = generoTemRegras(document.getElementById(idGenero)?.value || 'fantasia');
+  if (!pode) sel.value = 'livre';
+  sel.disabled = !pode;
+  document.getElementById(idDica)?.classList.toggle('hidden', pode);
+}
+
 function wzGenero() { return document.getElementById('wz-type')?.value || 'fantasia'; }
-function wzIsDnd()  { return document.getElementById('wz-regras')?.value === 'dnd'; }
+function wzIsDnd()  { return generoTemRegras(wzGenero()) && document.getElementById('wz-regras')?.value === 'dnd'; }
 function wzTema()   { return wzIsDnd() ? 'dnd' : wzGenero(); }
 
 function onWizardTypeChange() {
+  ajustarRegrasAoGenero('wz-type', 'wz-regras', 'wz-regras-dica');
   if (wzStep === 2) {
     const isDnd = wzIsDnd();
     document.getElementById('wz-char-mode-hint').textContent =
@@ -3299,7 +3329,7 @@ let edLojasNomes = [];
 let edEvts  = [];
 let edFlags = [];
 
-function edIsDnd()  { return document.getElementById('ed-regras')?.value === 'dnd'; }
+function edIsDnd()  { return generoTemRegras(edGenero()) && document.getElementById('ed-regras')?.value === 'dnd'; }
 function edGenero() { return document.getElementById('ed-type')?.value || 'fantasia'; }
 function edTema()   { return edIsDnd() ? 'dnd' : edGenero(); }
 
@@ -4435,6 +4465,7 @@ function edRenderStatGridEdit(i) {
 
 // ── Renderiza lista de personagens ────────────────────────────────
 function edRenderChars() {
+  ajustarRegrasAoGenero('ed-type', 'ed-regras', 'ed-regras-dica');
   const container = document.getElementById('ed-chars-list');
   const empty     = document.getElementById('ed-chars-empty');
   // Garante que o cache de FEATURE_VARIANTS esteja populado — disparo

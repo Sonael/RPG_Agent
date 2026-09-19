@@ -356,6 +356,13 @@ def _migrate_mana_pool() -> None:
 # Gêneros: o tom do mundo, combinável com qualquer modo de regras.
 GENEROS = ("fantasia", "dark_fantasy", "romance", "horror", "misterio", "scifi", "faroeste")
 
+# Os gêneros em que as regras de D&D fazem sentido. O D&D 5e não é um sistema
+# genérico: o catálogo é de fantasia medieval (espada longa, bola de fogo, peça
+# de ouro, guerreiro e mago). Serve a fantasia e dark fantasy, ao horror gótico
+# e ao mistério num mundo de fantasia; numa nave, num faroeste ou num romance,
+# a loja de espadas e o grimório não fecham, e o combate tático atrapalha.
+GENEROS_COM_REGRAS = ("fantasia", "dark_fantasy", "horror", "misterio")
+
 
 def regras_e_genero(campaign_type, dnd_mode) -> tuple[str, bool]:
     """
@@ -366,11 +373,15 @@ def regras_e_genero(campaign_type, dnd_mode) -> tuple[str, bool]:
     horror ou romance perdia o motor. D&D é modo de jogar, não gênero — uma
     campanha "dnd" antiga vira fantasia com as regras ligadas, que é o que
     ela era de fato. Gênero desconhecido vira fantasia.
+
+    As regras só valem nos GENEROS_COM_REGRAS: romance, sci-fi e faroeste são
+    sempre narrativos.
     """
     genero = (campaign_type or "fantasia").strip().lower()
     if genero == "dnd":
         return "fantasia", True
-    return (genero if genero in GENEROS else "fantasia"), bool(dnd_mode)
+    genero = genero if genero in GENEROS else "fantasia"
+    return genero, bool(dnd_mode) and genero in GENEROS_COM_REGRAS
 
 
 def _migrate_regras_e_genero() -> None:

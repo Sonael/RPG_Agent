@@ -609,6 +609,10 @@ fieldset.ed-trava button { opacity: 0.62; cursor: not-allowed; }
 
 .import-tabs { display: flex; gap: var(--esp-1); overflow-x: auto; margin-bottom: var(--esp-4); border-bottom: 1px solid var(--page-edge); padding-bottom: var(--esp-1); }
 
+/* Nos gêneros sem regras de D&D, o seletor trava e esta dica diz por quê. */
+.regras-dica { display: block; margin-top: var(--esp-1); font-size: 12px; line-height: 1.35; color: var(--text-muted); }
+.regras-dica.hidden { display: none; }
+
 /* As regras de D&D são uma caixa à parte do gênero, na importação também. */
 .import-regras {
   display: flex; align-items: center; gap: var(--esp-2); margin: var(--esp-2) 0 var(--esp-3);

@@ -24,7 +24,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;600&family=Lora:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Playfair+Display:ital,wght@0,500;0,700;1,500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/css/style.css?v=71">
+  <link rel="stylesheet" href="/static/css/style.css?v=72">
 </head>
 <body>
   <div class="scene">
@@ -177,6 +177,7 @@
         <input type="checkbox" id="import-dnd" checked onchange="setImportTheme(currentImportTheme)">
         Com regras de D&D 5e (fichas, inventário e habilidades no JSON)
       </label>
+      <small class="regras-dica hidden" id="import-regras-dica">Romance, sci-fi e faroeste são sempre narrativos: as regras de D&amp;D são de fantasia medieval.</small>
 
       <div class="field-group">
         <label>Passo 1: Copie o prompt e use na sua IA anterior</label>
@@ -254,10 +255,11 @@
             <div class="field-group rente">
               <label>Regras</label>
               <select id="wz-regras" onchange="onWizardTypeChange()"
-                      title="Independe do gênero: dá para jogar D&D em qualquer um">
+                      title="D&D 5e em fantasia, dark fantasy, horror e mistério">
                 <option value="dnd">D&D 5e — fichas, combate tático, loja</option>
                 <option value="livre">Narrativa livre — sem fichas</option>
               </select>
+              <small class="regras-dica hidden" id="wz-regras-dica">Romance, sci-fi e faroeste são sempre narrativos: as regras de D&amp;D são de fantasia medieval.</small>
             </div>
           </div>
 
@@ -366,10 +368,11 @@
             <div class="field-group rente">
               <label>Regras</label>
               <select id="ed-regras" onchange="edRenderChars()"
-                      title="Independe do gênero: dá para jogar D&D em qualquer um">
+                      title="D&D 5e em fantasia, dark fantasy, horror e mistério">
                 <option value="dnd">D&D 5e — fichas, combate tático, loja</option>
                 <option value="livre">Narrativa livre — sem fichas</option>
               </select>
+              <small class="regras-dica hidden" id="ed-regras-dica">Romance, sci-fi e faroeste são sempre narrativos: as regras de D&amp;D são de fantasia medieval.</small>
             </div>
           </div>
           <div class="field-group">
@@ -466,8 +469,8 @@
     </div>
   </div>
 
-  <script src="/static/js/utils.js?v=15"></script>
-  <script src="/static/js/menu.js?v=51"></script>
+  <script src="/static/js/utils.js?v=16"></script>
+  <script src="/static/js/menu.js?v=52"></script>
   <script>
     // Animação de volta para a capa quando carregado da cache
     window.addEventListener('pageshow', function(event) {
