@@ -390,10 +390,8 @@
                  os locais do passo 3 e as lojas da campanha. -->
             <datalist id="ed-lugares"></datalist>
           </div>
-          <div class="field-group">
-            <label>Protagonista</label>
-            <input type="text" id="ed-protagonist" placeholder="Nome do protagonista principal">
-          </div>
+          <!-- O protagonista é marcado no cartão do personagem (passo 2),
+               como no wizard: "É você (protagonista)". -->
           <!-- Observações do mestre (quest_flags): fatos do mundo que o mestre
                guarda ("a ponte caiu"). Saíram da barra lateral do jogo, onde
                ocupavam espaço do jogador; aqui ficam para quem cuida da campanha. -->
@@ -470,7 +468,7 @@
   </div>
 
   <script src="/static/js/utils.js?v=17"></script>
-  <script src="/static/js/menu.js?v=54"></script>
+  <script src="/static/js/menu.js?v=55"></script>
   <script>
     // Animação de volta para a capa quando carregado da cache
     window.addEventListener('pageshow', function(event) {

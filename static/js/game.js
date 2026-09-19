@@ -1932,12 +1932,16 @@ function gameAbrirTela(qual, nome) {
 function buildEditFields(type, data) {
   switch (type) {
     case 'character': {
+      // O papel no gênero ("Relacionamento" no romance). Com D&D o rótulo do
+      // gênero vira "Classe", que é a ficha, não este campo.
+      const cfg = window._campaignConfig || {};
+      const papel = cfg.role_label && cfg.role_label !== 'Classe' ? cfg.role_label : 'Função no Grupo';
       let html = field('name', 'Nome', data.name);
-      if (data.role !== undefined) html += field('role', 'Função no Grupo', data.role);
+      if (data.role !== undefined) html += field('role', papel, data.role);
       html += field('description', 'Descrição', data.description, 'textarea')
         + field('traits', 'Traços', data.traits, 'textarea', { rows: 2 })
         + field('status', 'Status', data.status, 'select', { options: ['vivo', 'morto', 'ferido', 'desaparecido', 'preso', 'aliado', 'inimigo', 'exilado'] })
-        + field('conhecido', 'O que o grupo sabe (um fato por linha; aparece na ficha)',
+        + field('conhecido', `${window.frase('sabe', 'O que o grupo sabe')} (um fato por linha; aparece na ficha)`,
             (Array.isArray(data.conhecido) ? data.conhecido : []).join('\n'), 'textarea', { rows: 3 })
         + field('notes', 'Notas do mestre (segredos; não aparecem na ficha)', data.notes, 'textarea', { rows: 2 });
       // O grupo está sempre no local atual; "onde está" é para os demais.

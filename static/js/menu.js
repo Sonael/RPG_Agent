@@ -2961,6 +2961,45 @@ function wzMecanicasDoChar(char, genero) {
   return cfg;
 }
 
+// As mecânicas do cartão nos campos que o jogo lê (relacoes.py, lacos.py). O
+// wizard e o editor usam a mesma: `antes` é o personagem já gravado (editor),
+// de onde o arco guarda o estado e os passos — o cartão só edita o título.
+// Campo vazio não vai: o servidor mantém o que estava gravado.
+function wzMecanicasNoPersonagem(charObj, char, genero, antes = {}) {
+  if (!wzMecanicasDoChar(char, genero)) return;
+  const mec = char.mec || {};
+  const numero = v => (v === undefined || v === '' || !Number.isFinite(Number(v)))
+    ? undefined : Math.max(-100, Math.min(100, Math.round(Number(v))));
+  if (genero === 'romance') {
+    if (numero(mec.afeto) !== undefined)     charObj.atitude   = numero(mec.afeto);
+    if (numero(mec.confianca) !== undefined) charObj.confianca = numero(mec.confianca);
+    if (mec.estagio) charObj.estagio = mec.estagio.toLowerCase();
+  } else {
+    if (numero(mec.lealdade) !== undefined) charObj.lealdade = numero(mec.lealdade);
+    if ((mec.objetivo || '').trim()) charObj.objetivo = mec.objetivo.trim();
+    if ((mec.arco || '').trim()) {
+      const arco = antes.arco && typeof antes.arco === 'object' ? antes.arco : {};
+      charObj.arco = { estado: 'em curso', passos: [], ...arco, titulo: mec.arco.trim() };
+    }
+  }
+}
+
+// O que o gravado já tem de mecânica, no formato dos campos do cartão.
+function wzMecanicasDoGravado(ch, genero) {
+  const cfg = MECANICAS_DO_PERSONAGEM[genero];
+  if (!cfg) return {};
+  const arco = ch.arco && typeof ch.arco === 'object' ? ch.arco.titulo : ch.arco;
+  return wzCamposDaIa({ afeto: ch.atitude, confianca: ch.confianca, estagio: ch.estagio,
+                        lealdade: ch.lealdade, objetivo: ch.objetivo, arco }, cfg.fields);
+}
+
+// Frases do menu que mudam com o gênero. No romance não há "grupo" (as telas
+// do jogo já falam assim: CAMPAIGN_CONFIGS["romance"]["frases"]).
+const FRASES_DO_MENU = {
+  romance: { sabe: 'O que você sabe', fica_no_local: 'fica com você no Local Atual' },
+};
+function fraseDoMenu(genero, chave, padrao) { return FRASES_DO_MENU[genero]?.[chave] || padrao; }
+
 const THEME_PARTY_META = {
   fantasia: { member: 'Membro do Grupo',  badge: 'GRUPO',      role: 'Classe / Função',       hint: 'Ex: Guerreira, Mago, Ladino...' },
   dark_fantasy: { member: 'Membro da Companhia', badge: 'COMPANHIA', role: 'Ofício / Juramento', hint: 'Ex: Mercenária, Caçador de bruxas, Clérigo renegado...' },
@@ -2988,7 +3027,8 @@ function wzRenderThemeExtras(i, theme, char) {
 // Os campos de um grupo (os do gênero em "extras", as mecânicas em "mec"),
 // com o valor de char[bolsa]. Lista sem valor mostra "—": antes mostrava a
 // primeira opção, que não era gravada (o "Protagonista" aparecia em todo mundo).
-function wzRenderCampos(i, cfg, valores, bolsa) {
+// `lista` é o array global dos cartões: wzChars no wizard, edChars no editor.
+function wzRenderCampos(i, cfg, valores, bolsa, lista = 'wzChars') {
   if (!cfg) return '';
   const extras = valores || {};
 
@@ -2999,7 +3039,7 @@ function wzRenderCampos(i, cfg, valores, bolsa) {
 
   cfg.fields.forEach(f => {
     const val = extras[f.id];
-    const onChange = `wzChars[${i}].${bolsa}=wzChars[${i}].${bolsa}||{};wzChars[${i}].${bolsa}['${f.id}']=this.${f.type === 'number' ? 'valueAsNumber||0' : 'value'}`;
+    const onChange = `${lista}[${i}].${bolsa}=${lista}[${i}].${bolsa}||{};${lista}[${i}].${bolsa}['${f.id}']=this.${f.type === 'number' ? 'valueAsNumber||0' : 'value'}`;
     html += `<div style="margin-bottom:10px;" data-campo="${f.id}"><span class="cwc-label">${f.label}</span>`;
 
     if (f.type === 'select') {
@@ -3083,7 +3123,7 @@ function wzRenderChars() {
           <span class="cwc-label">Onde está</span>
           <input class="wz-onde-esta" value="${escHtml(char.local || '')}" list="wz-lugares"
             onchange="wzChars[${i}].local=this.value"
-            placeholder="${char.isParty ? 'o grupo fica no Local Atual' : 'Ex: Forja de Cliviate (um dos locais do passo 1)'}">
+            placeholder="${char.isParty ? fraseDoMenu(wzGenero(), 'fica_no_local', 'o grupo fica no Local Atual') : 'Ex: Forja de Cliviate (um dos locais do passo 1)'}">
         </div>
         <div>
           <span class="cwc-label">Descrição</span>
@@ -3094,8 +3134,12 @@ function wzRenderChars() {
           <textarea rows="2" onchange="wzChars[${i}].traits=this.value" placeholder="Motivações, medos, maneirismo...">${escHtml(char.traits)}</textarea>
         </div>
         <div>
-          <span class="cwc-label">Notas</span>
-          <textarea rows="2" onchange="wzChars[${i}].notes=this.value" placeholder="Informações adicionais, objetivos secretos...">${escHtml(char.notes)}</textarea>
+          <span class="cwc-label">${fraseDoMenu(wzGenero(), 'sabe', 'O que o grupo sabe')} <small>(um fato por linha; aparece na ficha do personagem)</small></span>
+          <textarea class="wz-conhecido" rows="2" onchange="wzChars[${i}].conhecido=this.value" placeholder="Ex: Perdeu o filho para os bandidos da estrada">${escHtml(char.conhecido || '')}</textarea>
+        </div>
+        <div>
+          <span class="cwc-label">Notas do mestre <small>(segredos; não aparecem na ficha)</small></span>
+          <textarea rows="2" onchange="wzChars[${i}].notes=this.value" placeholder="Planos, segredos, o que ainda não se descobriu...">${escHtml(char.notes)}</textarea>
         </div>
         ${wzRenderThemeExtras(i, wzTema(), char)}
         ${wzRenderCampos(i, wzMecanicasDoChar(char, wzGenero()), char.mec, 'mec')}
@@ -3396,20 +3440,10 @@ async function createCampaignFromWizard() {
       }
     }
 
-    // As mecânicas do gênero, nos campos que o jogo lê (relacoes.py, lacos.py).
-    const mecCfg = wzMecanicasDoChar(char, campaign_type);
-    const mec = mecCfg ? (char.mec || {}) : {};
-    const numero = v => (v === undefined || v === '' || !Number.isFinite(Number(v)))
-      ? undefined : Math.max(-100, Math.min(100, Math.round(Number(v))));
-    if (campaign_type === 'romance') {
-      if (numero(mec.afeto) !== undefined)     charObj.atitude   = numero(mec.afeto);
-      if (numero(mec.confianca) !== undefined) charObj.confianca = numero(mec.confianca);
-      if (mec.estagio) charObj.estagio = mec.estagio.toLowerCase();
-    } else if (mecCfg) {
-      if (numero(mec.lealdade) !== undefined) charObj.lealdade = numero(mec.lealdade);
-      if ((mec.objetivo || '').trim()) charObj.objetivo = mec.objetivo.trim();
-      if ((mec.arco || '').trim()) charObj.arco = { titulo: mec.arco.trim(), estado: 'em curso', passos: [] };
-    }
+    wzMecanicasNoPersonagem(charObj, char, campaign_type);
+    // O que você sabe da pessoa (aparece na ficha), um fato por linha.
+    const conhecido = String(char.conhecido || '').split('\n').map(s => s.trim()).filter(Boolean);
+    if (conhecido.length) charObj.conhecido = conhecido;
 
     characters[key] = charObj;
 
@@ -3536,6 +3570,9 @@ let edLocs  = [];
 let edLojasNomes = [];
 let edEvts  = [];
 let edFlags = [];
+// O protagonista como estava gravado: vale se nenhum cartão tiver o nome (a
+// campanha antiga podia ter um protagonista sem personagem).
+let edProtagonistaGravado = '';
 
 function edIsDnd()  { return generoTemRegras(edGenero()) && document.getElementById('ed-regras')?.value === 'dnd'; }
 function edGenero() { return document.getElementById('ed-type')?.value || 'fantasia'; }
@@ -3906,7 +3943,7 @@ async function openEditCampaign(e, name) {
   const overlay = document.getElementById('edit-overlay');
   overlay.classList.remove('hidden');
 
-  ['ed-name','ed-summary','ed-scene','ed-location','ed-protagonist'].forEach(id => {
+  ['ed-name','ed-summary','ed-scene','ed-location'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
@@ -3933,9 +3970,13 @@ async function openEditCampaign(e, name) {
     document.getElementById('ed-summary').value     = c.story_summary    || '';
     document.getElementById('ed-scene').value       = c.current_scene    || '';
     document.getElementById('ed-location').value    = c.current_location || '';
-    document.getElementById('ed-protagonist').value = c.protagonist      || '';
+    // Quem é você: marcado no cartão (edChars[].protagonista), como no wizard.
+    // Era um campo de texto livre, que aceitava um nome que não existe.
+    edProtagonistaGravado = c.protagonist || '';
 
     // Personagens — carrega todos os campos incluindo ficha D&D
+    const genero = document.getElementById('ed-type').value;
+    const protagonista = (c.protagonist || '').toLowerCase().trim();
     edChars = Object.entries(c.characters || {}).map(([key, ch]) => ({
       key,
       name:        ch.name        || key,
@@ -3943,10 +3984,19 @@ async function openEditCampaign(e, name) {
       traits:      ch.traits      || '',
       status:      ch.status      || 'vivo',
       notes:       ch.notes       || '',
-      role:        ch.role        || '',
+      // No romance, o "Relacionamento" do cartão é o vínculo que as Relações
+      // mostram (o mestre o grava em "vinculo"; "role" é o de antes).
+      role:        (genero === 'romance' && ch.vinculo) || ch.role || '',
       local:       ch.local       || '',
       conhecido:   Array.isArray(ch.conhecido) ? ch.conhecido.join('\n') : '',
-      isParty:     (c.party||[]).some(p => p.name?.toLowerCase() === (ch.name||key).toLowerCase()),
+      protagonista: !!protagonista && (ch.name || key).toLowerCase().trim() === protagonista,
+      // Do grupo: na lista party ou recrutado no jogo (party_member). Antes só
+      // a lista contava, e quem foi recrutado aparecia fora do grupo.
+      isParty:     (c.party||[]).some(p => p.name?.toLowerCase() === (ch.name||key).toLowerCase())
+                   || !!ch.party_member
+                   || (!!protagonista && (ch.name || key).toLowerCase().trim() === protagonista),
+      mec:         wzMecanicasDoGravado(ch, genero),
+      _gravado:    ch,
       sheet:       ch.sheet ? Object.assign(edBlankSheet(), ch.sheet) : edBlankSheet(),
       inventario:  Array.isArray(ch.inventario)  ? ch.inventario.map(it => ({...it}))  : [],
       habilidades: Array.isArray(ch.habilidades) ? ch.habilidades.map(h  => ({...h})) : [],
@@ -4047,6 +4097,9 @@ function addEditChar() {
   edChars.push({
     key:'', name:'', description:'', traits:'', status:'vivo',
     notes:'', role:'', isParty:true,
+    // Numa campanha sem ninguém marcado, o primeiro personagem é você.
+    protagonista: !edChars.some(c => c.protagonista) && !edProtagonistaGravado,
+    mec: {},
     sheet: isDnd ? edBlankSheet() : null,
     inventario: [], habilidades: [],
     _open: true,
@@ -4059,6 +4112,13 @@ function addEditChar() {
 }
 
 function removeEditChar(i) { edChars.splice(i, 1); edRenderChars(); }
+
+// Marca quem é você no cartão do editor (um só). Você é sempre do grupo.
+function edMarcarProtagonista(i) {
+  edChars.forEach((c, j) => { c.protagonista = j === i; });
+  edChars[i].isParty = true;
+  edRenderChars();
+}
 
 function toggleEditChar(i) {
   edChars[i]._open = !edChars[i]._open;
@@ -4689,6 +4749,7 @@ function edRenderChars() {
   empty.style.display = 'none';
   const isDnd = edIsDnd();
   const meta  = partyMeta(edTema());
+  const genero = edGenero();
   container.innerHTML = edChars.map((ch, i) => {
     const sh = ch.sheet;
     const classeLabel = isDnd && sh ? (CLASS_DATA_WZ[sh.classe]?.label || sh.classe || '') : '';
@@ -4699,7 +4760,7 @@ function edRenderChars() {
           <span id="ed-ca-${i}" class="cwc-seta">${ch._open?'▾':'▸'}</span>
           <span class="cwc-nome" id="ed-cname-${i}">${escHtml(ch.name) || `Personagem ${i+1}`}</span>
           ${classeLabel ? `<span class="cwc-classe">${classeLabel}</span>` : ''}
-          ${ch.isParty ? `<span class="cwc-selo">${meta.badge}</span>` : ''}
+          ${ch.protagonista ? `<span class="cwc-selo cwc-voce">VOCÊ</span>` : (ch.isParty ? `<span class="cwc-selo">${meta.badge}</span>` : '')}
         </div>
         <button onclick="event.stopPropagation();removeEditChar(${i})" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:16px;padding:2px 6px;">✕</button>
       </div>
@@ -4725,12 +4786,16 @@ function edRenderChars() {
           <div>
             <span class="cwc-label">Onde está</span>
             <input class="ed-onde-esta" value="${escHtml(ch.local || '')}" list="ed-lugares"
-              onchange="edChars[${i}].local=this.value" placeholder="${ch.isParty ? 'o grupo fica no Local Atual' : 'Ex: Forja de Cliviate'}">
+              onchange="edChars[${i}].local=this.value" placeholder="${ch.isParty ? fraseDoMenu(genero, 'fica_no_local', 'o grupo fica no Local Atual') : 'Ex: Forja de Cliviate'}">
           </div>
         </div>
-        <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:4px;">
           <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text-muted);">
-            <input type="checkbox" ${ch.isParty?'checked':''} onchange="edChars[${i}].isParty=this.checked">
+            <input type="radio" name="ed-protagonista" class="ed-protagonista" ${ch.protagonista?'checked':''} onchange="edMarcarProtagonista(${i})">
+            É você (protagonista)
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text-muted);">
+            <input type="checkbox" class="ed-no-grupo" ${ch.isParty?'checked':''} ${ch.protagonista?'disabled':''} onchange="edChars[${i}].isParty=this.checked;edRenderChars()">
             ${meta.member}
           </label>
         </div>
@@ -4743,13 +4808,14 @@ function edRenderChars() {
           <textarea rows="2" onchange="edChars[${i}].traits=this.value" placeholder="Motivações, medos...">${escHtml(ch.traits)}</textarea>
         </div>
         <div>
-          <span class="cwc-label">O que o grupo sabe <small>(um fato por linha; aparece na ficha do personagem)</small></span>
+          <span class="cwc-label">${fraseDoMenu(genero, 'sabe', 'O que o grupo sabe')} <small>(um fato por linha; aparece na ficha do personagem)</small></span>
           <textarea class="ed-conhecido" rows="2" onchange="edChars[${i}].conhecido=this.value" placeholder="Ex: Perdeu o filho para os bandidos da estrada">${escHtml(ch.conhecido || '')}</textarea>
         </div>
         <div>
           <span class="cwc-label">Notas do mestre <small>(segredos; não aparecem na ficha)</small></span>
-          <textarea class="ed-notas" rows="2" onchange="edChars[${i}].notes=this.value" placeholder="Planos, segredos, o que o grupo ainda não descobriu...">${escHtml(ch.notes)}</textarea>
+          <textarea class="ed-notas" rows="2" onchange="edChars[${i}].notes=this.value" placeholder="Planos, segredos, o que ainda não se descobriu...">${escHtml(ch.notes)}</textarea>
         </div>
+        ${wzRenderCampos(i, wzMecanicasDoChar(ch, genero), ch.mec, 'mec', 'edChars')}
         ${isDnd ? `<div id="ed-dnd-sections-${i}">${edBuildDndSections(i)}</div>` : ''}
       </div>
     </div>`;
@@ -4792,8 +4858,15 @@ function edRenderLocs() {
             onchange="edLocs[${i}].dentro_de=this.value" placeholder="Ex: Cliviate (vazio se não fica em outro lugar)">
         </div>
       </div>
-      <div style="margin-bottom:8px;"><span class="cwc-label">Detalhes</span>
-        <input value="${escHtml(loc.details)}" onchange="edLocs[${i}].details=this.value" placeholder="Pontos específicos...">
+      <div class="cwc-row2" style="margin-bottom:8px;">
+        <div><span class="cwc-label">Detalhes</span>
+          <input value="${escHtml(loc.details)}" onchange="edLocs[${i}].details=this.value" placeholder="Pontos específicos...">
+        </div>
+        <div><span class="cwc-label">Notas do mestre</span>
+          <!-- Eram gravadas e devolvidas sem aparecer: não dava para ler nem
+               corrigir o segredo do lugar que a IA ou o mestre anotou. -->
+          <input class="ed-loc-notas" value="${escHtml(loc.notes || '')}" onchange="edLocs[${i}].notes=this.value" placeholder="Segredos, história do lugar...">
+        </div>
       </div>
       <span class="cwc-label">Descrição</span>
       <textarea rows="2" onchange="edLocs[${i}].description=this.value" placeholder="Descrição sensorial...">${escHtml(loc.description)}</textarea>
@@ -4868,6 +4941,7 @@ async function saveEditedCampaign() {
 
   const newName = document.getElementById('ed-name').value.trim();
   const isDnd   = edIsDnd();
+  const genero  = edGenero();
 
   // Reconstrói characters dict
   const characters = {};
@@ -4885,13 +4959,22 @@ async function saveEditedCampaign() {
       // Vazio apaga o paradeiro; o servidor grava com o nome do lugar salvo.
       local:       (ch.local || '').trim(),
       conhecido:   String(ch.conhecido || '').split('\n').map(s => s.trim()).filter(Boolean),
-      sheet:       isDnd && ch.sheet ? ch.sheet : null,
-      inventario:  isDnd ? (ch.inventario || []) : [],
-      habilidades: isDnd ? (ch.habilidades || []) : [],
       // Sem isto o servidor mantém nível, atributos, CA, equipamento e
       // magias como estavam (ver edTravado).
       correcao_manual: !!ch.freeMode,
     };
+    // Ficha, mochila e habilidades só vão com as regras, que é quando o
+    // editor as mostra. Sem as regras iam vazias e apagavam o que havia: os
+    // créditos e implantes do sci-fi, a habilidade especial da fantasia, o
+    // que o mestre deu no jogo. Sem a chave, o servidor mantém o gravado.
+    if (isDnd) {
+      charObj.sheet       = ch.sheet || null;
+      charObj.inventario  = ch.inventario || [];
+      charObj.habilidades = ch.habilidades || [];
+    }
+    // No romance o "Relacionamento" é o vínculo das Relações.
+    if (genero === 'romance' && (ch._gravado?.vinculo || '') !== '') charObj.vinculo = ch.role;
+    wzMecanicasNoPersonagem(charObj, ch, genero, ch._gravado || {});
     characters[key] = charObj;
     if (ch.isParty) party.push({ name: ch.name, role: ch.role||'', notes: ch.notes||'' });
   }
@@ -4934,7 +5017,8 @@ async function saveEditedCampaign() {
       story_summary:    document.getElementById('ed-summary').value,
       current_scene:    document.getElementById('ed-scene').value,
       current_location: document.getElementById('ed-location').value,
-      protagonist:      document.getElementById('ed-protagonist').value,
+      // O marcado no cartão; sem ninguém marcado, o que estava gravado.
+      protagonist:      (edChars.find(c => c.protagonista && c.name.trim())?.name.trim()) || edProtagonistaGravado,
       characters,
       locations,
       events,

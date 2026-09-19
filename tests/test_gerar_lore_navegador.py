@@ -363,3 +363,30 @@ def test_protagonista_a_mao_e_um_so(wizard):
     pg.evaluate("() => removeWzChar(1)")
     assert pg.evaluate("() => wzChars.map(c => c.protagonista)") == [True]
     assert not erros, erros[:3]
+
+
+def test_romance_a_mao_fala_de_voce_e_grava_o_que_voce_sabe(wizard):
+    pg, erros, estado = wizard
+    _genero(pg, "romance")
+    pg.evaluate("() => wizardGoTo(2)")
+    pg.evaluate("() => { addWzChar(); addWzChar(); wzChars[0].name = 'Ana'; wzChars[1].name = 'Beto'; wzRenderChars(); }")
+    beto = pg.locator("#wz-chars-list .cwc").nth(1)
+    assert "O que você sabe" in beto.inner_text() and "grupo sabe" not in beto.inner_text()
+    assert "Notas do mestre" in beto.inner_text()
+    assert beto.locator(".wz-onde-esta").get_attribute("placeholder") == "fica com você no Local Atual"
+    campo = beto.locator(".wz-conhecido")
+    campo.fill("Toca violão\n\n  Mora sozinho  ")
+    campo.dispatch_event("change")
+
+    camp = _criar(pg, estado)
+    assert camp["characters"]["beto"]["conhecido"] == ["Toca violão", "Mora sozinho"]
+    assert "conhecido" not in camp["characters"]["ana"]
+    assert not erros, erros[:3]
+
+
+def test_fora_do_romance_o_wizard_continua_falando_do_grupo(wizard):
+    pg, _, _ = wizard                   # fantasia com D&D
+    pg.evaluate("() => { wizardGoTo(2); addWzChar(); }")
+    cartao = pg.locator("#wz-chars-list .cwc").nth(0)
+    assert "O que o grupo sabe" in cartao.inner_text()
+    assert cartao.locator(".wz-onde-esta").get_attribute("placeholder") == "o grupo fica no Local Atual"

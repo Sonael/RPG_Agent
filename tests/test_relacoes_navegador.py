@@ -382,6 +382,10 @@ def test_no_romance_as_telas_falam_de_voce_e_nao_do_grupo(jogo):
     pg.wait_for_selector(".rel-cartao[data-nome='Lucas'] .lcl-marca-grupo", timeout=8000)
     assert pg.inner_text(".rel-cartao[data-nome='Lucas'] .lcl-marca-grupo") == "seu círculo"
     assert "grupo" not in pg.inner_text("#relacoes-overlay").lower()
+    # O "Editar" da ficha também: era "Função no Grupo" e "O que o grupo sabe".
+    campos = pg.evaluate("() => buildEditFields('character', {name: 'Lucas', role: '', conhecido: []})")
+    assert "Relacionamento" in campos and "O que você sabe" in campos
+    assert "Função no Grupo" not in campos and "grupo sabe" not in campos
     assert not erros, erros[:3]
 
 
@@ -394,6 +398,10 @@ def test_fora_do_romance_as_frases_continuam(jogo, app_no_ar):
     pg.wait_for_function("() => document.getElementById('psn-nome')?.textContent === 'Brom'", timeout=8000)
     assert pg.inner_text("#psn-sabe-titulo") == "O que o grupo sabe"
     assert pg.inner_text("#psn-cenas-titulo") == "Últimas cenas com Brom"
+    # Com D&D o rótulo do gênero é "Classe", que é a ficha: o campo continua
+    # sendo a função no grupo.
+    campos = pg.evaluate("() => buildEditFields('character', {name: 'Brom', role: '', conhecido: []})")
+    assert "Função no Grupo" in campos and "O que o grupo sabe" in campos
     assert not erros, erros[:3]
 
 
