@@ -5075,6 +5075,26 @@ body.loot-on { overflow: hidden; }
    ("com um pé atrás"), que capitalizada vira "Com Um Pé Atrás". */
 .psn-romance .psn-atitude-rotulo { color: var(--lcl-green); text-transform: none; }
 .psn-romance-negativo .psn-atitude-rotulo { color: var(--lcl-red); }
+/* O estágio: o nome e cinco segmentos, cheios até onde a relação está. */
+.rel-estagio { flex: 1 1 auto; font-style: italic; color: var(--lcl-ink); }
+.rel-segmentos { display: flex; gap: 3px; margin-top: var(--esp-1); }
+.rel-segmento { flex: 1 1 0; height: 6px; border-radius: 3px; background: var(--lcl-line); }
+.rel-segmento-cheio { background: var(--lcl-ink); }
+.rel-escada-rompida .rel-estagio { color: var(--lcl-red); }
+.rel-escada-rompida .rel-segmento-cheio { background: var(--lcl-muted); opacity: .45; }
+/* Momentos marcantes: a memória da relação. */
+.rel-ultimo-rotulo { display: block; font-size: 0.74rem; color: var(--lcl-muted); text-transform: uppercase; letter-spacing: .04em; }
+.rel-momentos { list-style: none; margin: var(--esp-1) 0 0; padding: 0; display: flex; flex-direction: column; gap: var(--esp-2); }
+.rel-momento { position: relative; padding-left: var(--esp-4); }
+.rel-momento::before {
+  content: ""; position: absolute; left: 2px; top: .45em; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--lcl-gold);
+}
+.rel-momento-estagio::before { background: var(--lcl-ink); }
+.rel-momento-titulo { font-weight: 700; color: var(--lcl-dark); }
+.rel-momento-cap { margin-left: var(--esp-1); color: var(--lcl-muted); }
+.rel-momento-desc { display: block; font-size: 0.86rem; color: var(--lcl-text); }
+.psn-subsecao { margin: var(--esp-3) 0 var(--esp-1); font-family: 'Playfair Display', serif; font-size: 0.95rem; color: var(--lcl-dark); }
 .rel-sem-historia { margin: 0; font-size: 0.84rem; font-style: italic; color: var(--lcl-muted); }
 @media (max-width: 760px) {
   .rel-corpo { padding: var(--esp-3); }

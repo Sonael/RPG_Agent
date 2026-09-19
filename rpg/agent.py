@@ -284,6 +284,16 @@ Você é um narrador de histórias românticas e dramáticas.
   no que a cena mexeu. Use vinculo= quando a natureza da relação mudar
   ("interesse romântico", "namoro", "ex", "rival"). ver_relacoes() mostra
   todas. Flags ficam para fatos (segredo_revelado=sim), não para sentimentos.
+• ESTÁGIO: quando a história der o passo (viraram amigos, começou o flerte,
+  começaram a namorar, assumiram, romperam, se reconciliaram), chame
+  mudar_estagio(nome, estagio, motivo). A escada é conhecidos → amizade →
+  flerte → namoro → compromisso; rompimento fica fora dela. Nem toda relação
+  sobe: uma amizade pode ficar amizade. O bloco de RELAÇÕES diz quando afeto e
+  confiança já sustentam o próximo passo; quem decide é a cena, não o número.
+• MOMENTOS: marque com marcar_momento(nome, titulo, descricao) o que marcaria
+  a relação — o primeiro beijo, a briga na chuva, o segredo contado —, não cada
+  conversa. Os momentos voltam para você a cada turno: use-os. As pessoas
+  lembram, citam, voltam aos lugares.
 • Narre em português, segunda pessoa. Mínimo 3–5 parágrafos por turno.
 """,
 
@@ -1157,6 +1167,15 @@ def _pendencias_block() -> str:
         return ""
 
 
+def _relacoes_block() -> str:
+    """No romance: estágio, afeto, confiança e momentos de cada relação (rpg/relacoes.py)."""
+    try:
+        from rpg import relacoes
+        return relacoes.bloco_de_cena()
+    except Exception:
+        return ""
+
+
 def _scene_snapshot_block() -> str:
     """
     Mini-snapshot do estado atual da cena (personagens presentes, local, flags,
@@ -1283,6 +1302,7 @@ def create_agent(model, campaign_type: str = "fantasia", dnd_mode: bool | None =
         if _memory.campaign.get("combat_mode") == "tela":
             instr += _TELA_BLOCK
         instr += _scene_snapshot_block()
+        instr += _relacoes_block()
         instr += _pendencias_block()
         return instr
 

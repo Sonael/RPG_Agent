@@ -236,6 +236,46 @@ function nomeDaTela(chave, padrao) {
   return telas[chave] || padrao;
 }
 window.nomeDaTela = nomeDaTela;
+
+// O estágio da relação (romance): o nome do degrau e uma barra em cinco
+// segmentos, cheia até onde a relação está. No rompimento a barra fica
+// apagada até onde ela chegou e o nome diz "rompimento". Vem pronto de
+// rpg/relacoes.py; aqui é só desenho.
+function escadaDaRelacao(e) {
+  if (!e || !e.escada) return '';
+  const esc = window.escapeHtml;
+  const rompeu = e.atual === 'rompimento';
+  const ate = e.escada.indexOf(rompeu ? e.chegou_a : e.atual);
+  const segmentos = e.escada.map((d, i) =>
+    `<span class="rel-segmento${i <= ate ? ' rel-segmento-cheio' : ''}" title="${esc(d)}"></span>`).join('');
+  const nome = rompeu
+    ? `rompimento${e.chegou_a ? `<small> (chegaram a ${esc(e.chegou_a)})</small>` : ''}`
+    : esc(e.atual);
+  return `
+    <div class="rel-escada${rompeu ? ' rel-escada-rompida' : ''}">
+      <div class="rel-medidor-topo">
+        <span class="rel-eixo">Estágio</span>
+        <span class="rel-estagio">${nome}</span>
+      </div>
+      <div class="rel-segmentos" role="img" aria-label="Estágio da relação: ${esc(e.atual)}">${segmentos}</div>
+    </div>`;
+}
+window.escadaDaRelacao = escadaDaRelacao;
+
+// Os momentos marcantes, do mais recente para trás. Os que marcam uma
+// mudança de estágio ("Começaram a namorar") têm um destaque próprio.
+function linhaDoTempo(momentos, limite) {
+  const esc = window.escapeHtml;
+  const lista = (momentos || []).slice(0, limite || undefined);
+  if (!lista.length) return '';
+  return `<ol class="rel-momentos">${lista.map(m => `
+    <li class="rel-momento${m.tipo === 'estagio' ? ' rel-momento-estagio' : ''}">
+      <span class="rel-momento-titulo">${esc(m.titulo)}</span>
+      ${m.capitulo ? `<small class="rel-momento-cap">cap. ${esc(m.capitulo)}</small>` : ''}
+      ${m.descricao ? `<span class="rel-momento-desc">${esc(m.descricao)}</span>` : ''}
+    </li>`).join('')}</ol>`;
+}
+window.linhaDoTempo = linhaDoTempo;
 window.alternarChaveVisivel = alternarCampoSecreto;
 window.alternarSenhaVisivel = alternarCampoSecreto;
 

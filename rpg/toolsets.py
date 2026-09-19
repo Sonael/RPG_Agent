@@ -88,7 +88,7 @@ _CARVE_OUT_GENERICAS = frozenset({"roll_dice", "advance_time", "get_world_time"}
 # As ferramentas das relações (afeto e confiança) são do romance. Nos outros
 # gêneros a atitude das fichas (adjust_attitude) já cobre o que importa, e
 # duas escalas para a mesma coisa só confundiriam o mestre.
-FERRAMENTAS_SO_DO_ROMANCE = frozenset({"ajustar_relacao", "ver_relacoes"})
+FERRAMENTAS_SO_DO_ROMANCE = frozenset({"ajustar_relacao", "mudar_estagio", "marcar_momento", "ver_relacoes"})
 
 
 def _nomes_das_ferramentas_dnd() -> frozenset:

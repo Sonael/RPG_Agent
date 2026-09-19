@@ -366,21 +366,44 @@ testes sociais do D&D. Agora cada pessoa tem:
   "rival"), que começa pelo papel da pessoa no grupo.
 - **O porquê**: as últimas 12 mudanças, com o eixo, o motivo e o capítulo.
 
-O mestre usa `ajustar_relacao(nome, afeto, confianca, motivo, vinculo)` e
-`ver_relacoes()`; as duas só entram no conjunto de ferramentas do romance
-(`toolsets.FERRAMENTAS_SO_DO_ROMANCE`). A instrução do romance manda usá-las,
-e deixa as flags para fatos, não para sentimentos.
+- **Estágio**: onde a relação está numa escada — conhecidos, amizade, flerte,
+  namoro, compromisso — ou fora dela, no rompimento, que guarda até onde ela
+  chegou ("rompimento, chegaram a namoro"). Sem registro, quem é próximo está
+  na amizade e o resto em conhecidos. Uma amizade pode ficar na amizade: a
+  escada não obriga ninguém a virar romance. Afeto e confiança dizem ao
+  MESTRE quando o próximo degrau está maduro (flerte pede afeto +35; namoro,
+  +55 e confiança +20; compromisso, +75 e +50); a tela não mostra isso, para
+  não virar placar. Passo cedo demais não é recusado, só avisado: amor à
+  primeira vista existe.
+- **Momentos marcantes**: a memória da relação — o primeiro beijo, a briga na
+  chuva, o segredo contado —, uma linha do tempo por pessoa (até 20), com
+  título, descrição e capítulo. Toda mudança de estágio vira um momento
+  sozinha ("Começaram a namorar", "Reconciliação: viraram amigos").
+
+O mestre usa `ajustar_relacao(nome, afeto, confianca, motivo, vinculo)`,
+`mudar_estagio(nome, estagio, motivo)`, `marcar_momento(nome, titulo,
+descricao)` e `ver_relacoes()`; as quatro só entram no conjunto de
+ferramentas do romance (`toolsets.FERRAMENTAS_SO_DO_ROMANCE`). A instrução do
+romance manda usá-las, e deixa as flags para fatos, não para sentimentos.
+
+No romance, o bloco de cena de cada turno ganha as RELAÇÕES
+(`relacoes.bloco_de_cena`): estágio, afeto e confiança de cada pessoa, se o
+próximo passo está maduro e os dois momentos mais recentes. Sem isso o
+mestre só sabia deles chamando `ver_relacoes()`, e não chamava: o primeiro
+beijo do capítulo 2 não voltava na conversa do capítulo 5.
 
 No romance o atalho do grupo abre a tela de Relações (`static/js/relacoes.js`):
 um cartão por pessoa, as próximas primeiro e do afeto maior para o menor, com
-os dois medidores, o vínculo e as últimas mudanças; o nome abre a ficha do
-personagem, que no romance mostra "Relação com você" (os dois eixos, para
-todos, inclusive quem é do grupo) no lugar da atitude. Fora do D&D a ficha
+o estágio (cinco segmentos, cheios até onde a relação está), os dois
+medidores, o vínculo, o último momento e as últimas mudanças; o nome abre a
+ficha do personagem, que no romance mostra "Relação com você" (o estágio, os
+dois eixos e a linha do tempo inteira, para todos, inclusive quem é do grupo)
+no lugar da atitude. Fora do D&D a ficha
 também deixou de prometer os efeitos da atitude na CD e no preço da loja, que
 são regras de D&D.
 
 `test_genero_e_regras.py` (27), `test_genero_e_regras_navegador.py` (9),
-`test_relacoes.py` (13) e `test_relacoes_navegador.py` (7).
+`test_relacoes.py` (28) e `test_relacoes_navegador.py` (10).
 
 ---
 

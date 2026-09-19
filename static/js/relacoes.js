@@ -5,7 +5,9 @@
 //  relação ao protagonista. Dois eixos por pessoa, AFETO e CONFIANÇA, porque o
 //  drama mora na diferença entre eles (dá para amar quem não se confia), o
 //  VÍNCULO (interesse romântico, amizade, ex, rival) e o porquê das últimas
-//  mudanças, com o capítulo.
+//  mudanças, com o capítulo. E o ESTÁGIO (conhecidos, amizade, flerte,
+//  namoro, compromisso, ou o rompimento) e o último MOMENTO marcante; a linha
+//  do tempo inteira fica na ficha, que o nome abre.
 //
 //  REGRA DE OURO, a mesma das outras telas: nenhuma regra aqui. As faixas
 //  ("devoção", "com um pé atrás"), a ordem e quem entra na lista vêm do motor
@@ -76,7 +78,8 @@
   function historico(p) {
     if (!(p.historico || []).length) return '<p class="rel-sem-historia">Nada mudou entre vocês ainda.</p>';
     const resto = p.mudancas > p.historico.length ? `<p class="psn-cenas-total">As ${p.historico.length} mais recentes de ${p.mudancas}.</p>` : '';
-    return `<ul class="psn-historico rel-historico">${p.historico.map(h => `
+    return `<span class="rel-ultimo-rotulo">Mudanças</span>
+      <ul class="psn-historico rel-historico">${p.historico.map(h => `
       <li><span class="psn-delta ${h.delta >= 0 ? 'psn-sobe' : 'psn-desce'}">${sinal(h.delta)}</span>
           <span class="rel-historico-eixo">${EIXO[h.eixo] || esc(h.eixo)}</span>
           ${esc(h.motivo)}${h.capitulo ? ` <small>cap. ${esc(h.capitulo)}</small>` : ''}</li>`).join('')}</ul>${resto}`;
@@ -95,8 +98,14 @@
           <button class="rel-nome" type="button" onclick="window.Relacoes._ver('${aspas(p.nome)}')"
                   title="Abrir a ficha de ${esc(p.nome)}">${esc(p.nome)}</button>${marcas}
         </div>
+        ${window.escadaDaRelacao(p.estagio)}
         ${medidor('afeto', 'Afeto', p.afeto, ['aversão', 'devoção'])}
         ${medidor('confianca', 'Confiança', p.confianca, ['desconfia', 'confia'])}
+        ${(p.momentos || []).length ? `
+          <div class="rel-ultimo">
+            <span class="rel-ultimo-rotulo">Último momento${p.momentos.length > 1 ? ` de ${p.momentos.length}` : ''}</span>
+            ${window.linhaDoTempo(p.momentos, 1)}
+          </div>` : ''}
         ${historico(p)}
       </article>`;
   }

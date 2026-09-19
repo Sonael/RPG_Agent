@@ -150,9 +150,15 @@
               <span class="rel-historico-eixo">${eixo[h.eixo] || esc(h.eixo)}</span>
               ${esc(h.motivo)}${h.capitulo ? ` <small>cap. ${esc(h.capitulo)}</small>` : ''}</li>`).join('')}</ul>`
       : '<div class="lcl-vazio">Nada mudou entre vocês ainda.</div>';
+    const momentos = (r.momentos || []).length
+      ? `<h3 class="psn-subsecao">Momentos</h3>${window.linhaDoTempo(r.momentos)}`
+      : '';
     return `${r.vinculo ? `<p class="psn-vinculo">${esc(r.vinculo)}</p>` : ''}
+      <div class="psn-atitude psn-romance">${window.escadaDaRelacao(r.estagio)}</div>
       ${barra('Afeto', r.afeto, ['aversão', 'devoção'])}
       ${barra('Confiança', r.confianca, ['desconfia', 'confia'])}
+      ${momentos}
+      <h3 class="psn-subsecao">Mudanças</h3>
       ${hist}`;
   }
 

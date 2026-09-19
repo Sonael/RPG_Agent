@@ -42,7 +42,16 @@ ROMANCE = {
                   "relacao_historico": [
                       {"eixo": "afeto", "delta": 30, "motivo": "Dividiram o guarda-chuva", "cap": 2},
                       {"eixo": "confianca", "delta": -30, "motivo": "Mentiu sobre a carta", "cap": 3},
+                  ],
+                  "estagio": "flerte",
+                  "momentos": [
+                      {"titulo": "O guarda-chuva dividido", "descricao": "Ele molhou o ombro inteiro",
+                       "tipo": "momento", "cap": 2},
+                      {"titulo": "Começou o flerte", "descricao": "O bilhete debaixo da porta",
+                       "tipo": "estagio", "cap": 3},
                   ]},
+        "rafael": {"name": "Rafael", "description": "O ex.", "status": "vivo",
+                   "atitude": -20, "estagio": "rompimento", "estagio_antes": "namoro"},
         "marina": {"name": "Marina", "description": "Amiga de infância.", "status": "vivo",
                    "atitude": 70, "confianca": 60},
     },
@@ -143,7 +152,8 @@ def test_nome_abre_a_ficha_com_a_relacao(jogo):
     pg.wait_for_selector("#pessoa-overlay:not(.hidden)", timeout=8000)
     pg.wait_for_function("() => document.getElementById('psn-nome').textContent === 'Lucas'", timeout=8000)
     assert pg.inner_text("#psn-relacao-titulo") == "Relação com você"
-    assert pg.locator("#psn-relacao .psn-romance").count() == 2
+    # Duas barras: afeto e confiança (a escada do estágio é outra coisa).
+    assert pg.locator("#psn-relacao .psn-barra").count() == 2
     assert "Mentiu sobre a carta" in pg.inner_text("#psn-relacao")
     assert not erros, erros[:3]
 
@@ -181,4 +191,46 @@ def test_fantasia_com_regras_continua_como_era(jogo, app_no_ar):
     pg, erros = jogo(estado)
     atalhos = _atalhos(pg)
     assert atalhos[:2] == ["Grupo", "Missões"] and "Mochila" in atalhos, atalhos
+    assert not erros, erros[:3]
+
+
+def test_cartao_mostra_o_estagio_e_o_ultimo_momento(jogo):
+    pg, erros = jogo(ROMANCE)
+    pg.evaluate("() => window.Relacoes._abrir()")
+    pg.wait_for_selector(".rel-cartao[data-nome='Lucas'] .rel-escada", timeout=8000)
+    lucas = pg.locator(".rel-cartao[data-nome='Lucas']")
+    assert lucas.locator(".rel-estagio").inner_text() == "flerte"
+    # Cinco degraus; cheios até o flerte (o terceiro).
+    assert lucas.locator(".rel-segmento").count() == 5
+    assert lucas.locator(".rel-segmento-cheio").count() == 3
+    # text_content: o rótulo "Último momento de 2" é maiúsculo por CSS.
+    ultimo = lucas.locator(".rel-ultimo").text_content()
+    assert "Começou o flerte" in ultimo and "O guarda-chuva" not in ultimo
+    assert "de 2" in ultimo
+    # Marina nunca mudou de estágio: amizade, e nenhum momento ainda.
+    marina = pg.locator(".rel-cartao[data-nome='Marina']")
+    assert marina.locator(".rel-estagio").inner_text() == "amizade"
+    assert marina.locator(".rel-ultimo").count() == 0
+    assert not erros, erros[:3]
+
+
+def test_rompimento_mostra_ate_onde_chegou(jogo):
+    pg, erros = jogo(ROMANCE)
+    pg.evaluate("() => window.Relacoes._abrir()")
+    pg.wait_for_selector(".rel-cartao[data-nome='Rafael'] .rel-escada-rompida", timeout=8000)
+    rafael = pg.locator(".rel-cartao[data-nome='Rafael']")
+    assert rafael.locator(".rel-estagio").inner_text() == "rompimento (chegaram a namoro)"
+    assert rafael.locator(".rel-segmento-cheio").count() == 4
+    assert not erros, erros[:3]
+
+
+def test_ficha_tem_a_linha_do_tempo_inteira(jogo):
+    pg, erros = jogo(ROMANCE)
+    pg.evaluate("() => window.Personagens._abrir('Lucas')")
+    pg.wait_for_selector("#psn-relacao .rel-momentos", timeout=8000)
+    titulos = pg.eval_on_selector_all("#psn-relacao .rel-momento-titulo", "els => els.map(e => e.textContent)")
+    assert titulos == ["Começou o flerte", "O guarda-chuva dividido"]
+    assert pg.locator("#psn-relacao .rel-momento-estagio").count() == 1
+    assert "Ele molhou o ombro inteiro" in pg.inner_text("#psn-relacao")
+    assert pg.locator("#psn-relacao .rel-estagio").inner_text() == "flerte"
     assert not erros, erros[:3]

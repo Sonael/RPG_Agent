@@ -931,8 +931,45 @@ def ajustar_relacao(nome: str, afeto: int = 0, confianca: int = 0,
     return relacoes.ajustar(nome, afeto, confianca, motivo, vinculo)
 
 
+def mudar_estagio(nome: str, estagio: str, motivo: str = "") -> str:
+    """
+    Muda o estágio da relação com alguém, quando a história der o passo: viraram
+    amigos, começou o flerte, começaram a namorar, assumiram um compromisso,
+    romperam, se reconciliaram. Vira um momento marcante sozinho.
+
+    A escada é conhecidos → amizade → flerte → namoro → compromisso, e
+    "rompimento" fica fora dela (voltar de lá é reconciliação). Nem toda
+    relação sobe a escada: uma amizade pode ficar na amizade. ver_relacoes()
+    diz quando afeto e confiança já sustentam o próximo passo, mas quem decide
+    é a cena.
+
+    Args:
+        nome:    Nome da pessoa.
+        estagio: conhecidos, amizade, flerte, namoro, compromisso ou rompimento.
+        motivo:  O que aconteceu — fica no momento.
+    """
+    from rpg import relacoes
+    return relacoes.mudar_estagio(nome, estagio, motivo)
+
+
+def marcar_momento(nome: str, titulo: str, descricao: str = "") -> str:
+    """
+    Guarda um momento marcante com alguém: o primeiro beijo, a briga na chuva, a
+    noite em que ela contou do pai, o presente inesperado. É a memória da
+    relação: o jogador vê a linha do tempo, e ela volta para você a cada turno
+    para as pessoas LEMBRAREM. Marque só o que marcaria — não cada conversa.
+
+    Args:
+        nome:      Nome da pessoa.
+        titulo:    O momento em poucas palavras ("O guarda-chuva dividido").
+        descricao: Uma frase do que aconteceu.
+    """
+    from rpg import relacoes
+    return relacoes.marcar_momento(nome, titulo, descricao)
+
+
 def ver_relacoes() -> str:
-    """Todas as relações com o protagonista: vínculo, afeto e confiança de cada pessoa."""
+    """Todas as relações com o protagonista: vínculo, estágio, afeto, confiança e momentos."""
     from rpg import relacoes
     return relacoes.resumo_para_o_mestre()
 
@@ -1343,6 +1380,8 @@ ALL_TOOLS = [
     list_attitudes,
     # Relações do romance (afeto e confiança; só entram no romance)
     ajustar_relacao,
+    mudar_estagio,
+    marcar_momento,
     ver_relacoes,
     # Contexto (dinâmico e completo)
     get_scene_context,
