@@ -47,6 +47,8 @@ async function logout() {
 // ═══════════════════════════════════════
 //  Campanhas
 // ═══════════════════════════════════════
+let _listaJaEntrou = false;
+
 async function loadCampaigns() {
   const list = document.getElementById('campaign-list');
   try {
@@ -74,10 +76,15 @@ async function loadCampaigns() {
     const txt = s => String(s)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-    list.innerHTML = data.map(c => {
+    // Na primeira carga as campanhas entram uma a uma (--i dá o atraso);
+    // recarregar a lista depois de salvar ou apagar não repete a entrada.
+    const entra = !_listaJaEntrou;
+    _listaJaEntrou = true;
+    list.innerHTML = data.map((c, i) => {
       const nA = jsAttr(c.name), nT = txt(c.name);
       return `
-      <div class="campaign-item" onclick="selectCampaign('${nA}', false)" id="ci-${CSS.escape(c.name)}">
+      <div class="campaign-item${entra ? ' campanha-entra' : ''}"${entra ? ` style="--i:${i}"` : ''}
+           onclick="selectCampaign('${nA}', false)" id="ci-${CSS.escape(c.name)}">
         <div>
           <div class="campaign-item-name">${nT}</div>
           <div class="campaign-item-meta">Cap.${c.chapter||1} · ${c.characters||0} personagens · ${c.events||0} eventos</div>
@@ -1690,13 +1697,35 @@ function toggleAiCreate(on) {
   document.getElementById('wz-ai-hint').classList.toggle('hidden', on);
 }
 
+// O que a IA preencheu aparece um campo depois do outro, como tinta
+// chegando ao papel (style.css, campoPreenchido; --i dá o atraso).
+function wzCamposChegam(ids) {
+  if (typeof animacoesLigadas === 'function' && !animacoesLigadas()) return;
+  ids.forEach((id, i) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.remove('campo-preenchido');
+    void el.offsetWidth;
+    el.style.setProperty('--i', i);
+    el.classList.add('campo-preenchido');
+    el.addEventListener('animationend', function tirar(e) {
+      if (e.target !== el) return;
+      el.classList.remove('campo-preenchido');
+      el.removeEventListener('animationend', tirar);
+    });
+  });
+}
+
 async function generateLore() {
   const prompt = document.getElementById('wz-ai-prompt').value.trim();
   if (!prompt) { document.getElementById('wz-ai-status').textContent = 'Escreva uma ideia antes.'; return; }
   const btn = document.getElementById('wz-ai-btn');
   const status = document.getElementById('wz-ai-status');
   btn.disabled = true;
-  btn.textContent = 'Gerando...';
+  // A pena do chat (style.css, penaEscreve): escreve enquanto a IA pensa.
+  btn.innerHTML = `<span class="pena-gerando"><svg class="pena-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z"/>
+    <line x1="16" y1="8" x2="2" y2="22"/><line x1="17.5" y1="15" x2="9" y2="15"/></svg>Gerando…</span>`;
   status.textContent = '';
   try {
     const keys  = typeof window.getApiKeys === 'function' ? window.getApiKeys() : {};
@@ -1719,15 +1748,17 @@ async function generateLore() {
     const data = await res.json();
     if (!res.ok || !data.ok) throw new Error(data.error || 'Erro desconhecido');
     const lore = data.lore;
-    if (lore.story_summary)    document.getElementById('wz-summary').value  = lore.story_summary;
-    if (lore.current_scene)    document.getElementById('wz-scene').value    = lore.current_scene;
-    if (lore.current_location) document.getElementById('wz-location').value = lore.current_location;
+    const preenchidos = [];
+    if (lore.story_summary)    { document.getElementById('wz-summary').value  = lore.story_summary;    preenchidos.push('wz-summary'); }
+    if (lore.current_scene)    { document.getElementById('wz-scene').value    = lore.current_scene;    preenchidos.push('wz-scene'); }
+    if (lore.current_location) { document.getElementById('wz-location').value = lore.current_location; preenchidos.push('wz-location'); }
     if (Array.isArray(lore.locations)) {
       wzLocs = lore.locations.map(l => ({
         name: l.name || '', dentro_de: l.dentro_de || '',
         description: l.description || '', details: l.details || '', notes: l.notes || '',
       }));
       wzRenderLocs();
+      preenchidos.push('wz-locations-list');
     }
     if (Array.isArray(lore.events) && lore.events.length) {
       wzEvts = lore.events.map(e => ({
@@ -1739,7 +1770,9 @@ async function generateLore() {
         consequence: e.consequence || '',
       }));
       wzRenderEvts();
+      preenchidos.push('wz-events-list');
     }
+    wzCamposChegam(preenchidos);
     // O mundo do gênero (segredos, facções...): só o do gênero de agora.
     const mundoDaIa = wzMundoDaIa(lore, campaignType);
     wzMundo = edMundoDaCampanha(mundoDaIa);

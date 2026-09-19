@@ -906,3 +906,140 @@ def test_fragmento_novo_de_lenda_se_encaixa(app_no_ar, abrir):
         assert not erros, erros[:3]
     finally:
         voltar()
+
+
+# --- Barra lateral e menu -----------------------------------------------------
+# barra.js: a hora nova sobe no lugar da velha e, quando vira o dia, um sol (ou
+# uma lua) cruza o relógio; o que muda na barra ganha um destaque breve.
+# menu.js: a lista de campanhas entra em sequência; "Gerar com IA" escreve com
+# a pena enquanto espera, e os campos preenchidos aparecem um a um.
+
+def _com_relogio(cap, dia, hora, local="Villa Ravenhurst"):
+    e = copy.deepcopy(cap.DIARIO)
+    e["relogio"] = {"dia": dia, "hora": hora}
+    e["current_location"] = local
+    return e
+
+
+def test_relogio_a_hora_sobe_e_o_dia_novo_traz_o_sol(app_no_ar, abrir):
+    _, _, cap = app_no_ar
+    pg, erros, trocar, voltar = _romance(app_no_ar, abrir, _com_relogio(cap, 4, 16))
+    try:
+        pg.wait_for_selector("#sb-tempo:not(.hidden)", timeout=8000)
+        _terminar(pg)
+        assert pg.locator("#sb-tempo .sb-astro").count() == 0
+        trocar(_com_relogio(cap, 4, 18))
+        pg.evaluate("() => refreshMemory()")
+        pg.wait_for_function("() => document.getElementById('sb-tempo-texto').classList.contains('sb-hora-mudou')",
+                             timeout=5000)
+        assert pg.locator("#sb-tempo .sb-astro").count() == 0, "a hora andou, mas o dia é o mesmo"
+        trocar(_com_relogio(cap, 5, 7))
+        pg.evaluate("() => refreshMemory()")
+        pg.wait_for_selector("#sb-tempo .sb-astro.sb-astro-sol", timeout=5000)
+        # O astro some no fim da animação.
+        pg.wait_for_function("() => !document.querySelector('#sb-tempo .sb-astro')", timeout=4000)
+        trocar(_com_relogio(cap, 6, 22))
+        pg.evaluate("() => refreshMemory()")
+        pg.wait_for_selector("#sb-tempo .sb-astro.sb-astro-lua", timeout=5000)
+        assert not erros, erros[:3]
+    finally:
+        voltar()
+
+
+def test_barra_o_lugar_novo_destaca_e_sem_animacoes_nada(app_no_ar, abrir):
+    _, _, cap = app_no_ar
+    for animacoes in ("ligadas", "desligadas"):
+        import requests
+        url = app_no_ar[0]
+        requests.post(f"{url}/__estado", json=_com_relogio(cap, 4, 16), timeout=10)
+        pg, erros = abrir("/game.html", animacoes)
+        pg.wait_for_selector("#sb-tempo:not(.hidden)", timeout=8000)
+        requests.post(f"{url}/__estado", json=_com_relogio(cap, 5, 9, "Avenida dos Mil Sóis"), timeout=10)
+        pg.evaluate("""() => { window.__marcas = [];
+            new MutationObserver(ms => ms.forEach(m => { if (m.target.classList)
+                window.__marcas.push(...m.target.classList); }))
+              .observe(document.getElementById('sidebar'), {attributes: true, subtree: true, attributeFilter: ['class']}); }""")
+        pg.evaluate("() => refreshMemory()")
+        pg.wait_for_function("() => document.getElementById('sb-location-nome').textContent.includes('Mil')",
+                             timeout=5000)
+        pg.wait_for_timeout(300)
+        marcas = set(pg.evaluate("() => window.__marcas"))
+        if animacoes == "ligadas":
+            assert {"sb-mudou", "sb-hora-mudou"} <= marcas, marcas
+            assert pg.locator("#sb-tempo .sb-astro").count() == 1
+        else:
+            assert not ({"sb-mudou", "sb-hora-mudou"} & marcas), marcas
+            assert pg.locator("#sb-tempo .sb-astro").count() == 0
+        assert not erros, erros[:3]
+    import requests
+    requests.post(f"{app_no_ar[0]}/__estado", json=copy.deepcopy(cap.DIARIO), timeout=10)
+
+
+def test_lista_de_campanhas_entra_em_sequencia(abrir):
+    pg, erros = abrir("/menu.html")
+    pg.wait_for_selector("#campaign-list .campaign-item", timeout=8000)
+    r = pg.evaluate("""() => [...document.querySelectorAll('#campaign-list .campaign-item')].map(e =>
+        [e.style.getPropertyValue('--i'), e.getAnimations().map(a => a.animationName)])""")
+    assert r and r[0][0] == "0" and "campanhaEntra" in r[0][1], r
+    # Recarregar a lista (depois de apagar ou salvar) não repete a entrada.
+    pg.evaluate("async () => { await loadCampaigns(); }")
+    assert pg.evaluate("""() => document.querySelector('#campaign-list .campaign-item')
+                              .getAnimations().length""") == 0
+    assert not erros, erros[:3]
+
+
+def test_gerar_com_ia_escreve_com_a_pena_e_os_campos_chegam_um_a_um(abrir):
+    pg, erros = abrir("/menu.html")
+    _terminar(pg)
+    liberar = []
+    pg.route("**/api/campaigns/generate-lore", lambda rota: liberar.append(rota))
+    pg.evaluate("""() => { openWizard(); document.getElementById('wz-name').value = 'Teste';
+        toggleAiCreate(true); document.getElementById('wz-ai-prompt').value = 'um farol assombrado';
+        window.__gerando = generateLore(); }""")
+    pg.wait_for_function("() => document.querySelector('#wz-ai-btn .pena-gerando')", timeout=3000)
+    assert pg.is_disabled("#wz-ai-btn")
+    pg.wait_for_timeout(200)
+    assert liberar, "o pedido não saiu"
+    liberar[0].fulfill(status=200, content_type="application/json", body=json.dumps({"ok": True, "lore": {
+        "story_summary": "Um farol que acende sozinho.", "current_scene": "A tempestade chega.",
+        "current_location": "O Farol", "locations": [{"name": "O Farol", "description": "Na ponta"}]}}))
+    pg.evaluate("async () => { await window.__gerando; }")
+    r = pg.evaluate("""() => ['wz-summary', 'wz-scene', 'wz-location'].map(id => {
+        const el = document.getElementById(id);
+        return [el.value, el.classList.contains('campo-preenchido'), el.style.getPropertyValue('--i')]; })""")
+    assert [x[1] for x in r] == [True, True, True], r
+    assert [x[2] for x in r] == ["0", "1", "2"], r
+    assert pg.text_content("#wz-ai-btn").strip() == "Gerar com IA"
+    assert pg.locator("#wz-ai-btn .pena-gerando").count() == 0
+    assert not erros, erros[:3]
+
+
+def test_barra_a_contagem_do_atalho_pulsa_e_o_progresso_da_missao_desliza(app_no_ar, abrir):
+    _, _, cap = app_no_ar
+    antes = _com_relogio(cap, 4, 16)
+    antes["quests"]["a audiencia real"]["objetivos"] = [
+        {"texto": "Chegar ao palácio", "feito": False}, {"texto": "Falar com Elara", "feito": False}]
+    depois = copy.deepcopy(antes)
+    depois["quests"]["a audiencia real"]["objetivos"][0]["feito"] = True
+    depois["quests"]["o ladrao de reliquias"] = {
+        "titulo": "O ladrão de relíquias", "status": "ativa", "descricao": "", "objetivos": [],
+        "quem_deu": "", "recompensa": "", "cap_inicio": 1}
+    pg, erros, trocar, voltar = _romance(app_no_ar, abrir, antes)
+    try:
+        pg.wait_for_selector("#sb-atalho-missoes .sb-atalho-conta", timeout=8000)
+        trocar(depois)
+        r = pg.evaluate("""async () => {
+            await refreshMemory();
+            const conta = document.querySelector('#sb-atalho-missoes .sb-atalho-conta');
+            const trilho = document.querySelector('#sb-missao .sb-missao-trilho > span');
+            return [conta.className, trilho.style.width,
+                    document.querySelector('#sb-missao .sb-missao-conta').className];
+        }""")
+        assert "num-subiu" in r[0], r
+        assert r[1] == "0%", r              # parte de onde estava...
+        assert "num-subiu" in r[2], r
+        pg.wait_for_function("() => document.querySelector('#sb-missao .sb-missao-trilho > span').style.width === '50%'",
+                             timeout=3000)       # ...e chega à metade
+        assert not erros, erros[:3]
+    finally:
+        voltar()

@@ -69,6 +69,9 @@
     recolher: '<polyline points="11 17 6 12 11 7"/><polyline points="18 17 13 12 18 7"/>',
     aviso: '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>'
       + '<line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+    sol: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4'
+      + 'M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+    lua: '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>',
   };
 
   const ehDnd = () => _mem.dnd_mode === true || _mem.campaign_type === 'dnd';
@@ -147,7 +150,7 @@
                       onclick="window.Barra.abrir('${t.id}')" title="${esc(c ? `${t.rotulo}: ${c.dica}` : t.dica)}"
                       aria-label="${esc(c ? `${t.rotulo}, ${c.dica}` : t.rotulo)}">
         ${svg(ICONES[t.icone || t.id])}<span class="sb-atalho-rotulo">${esc(t.rotulo)}</span>
-        ${c ? `<span class="sb-atalho-conta${c.alerta ? ' sb-atalho-alerta' : ''}">${c.n}</span>` : ''}
+        ${c ? `<span class="sb-atalho-conta${c.alerta ? ' sb-atalho-alerta' : ''}" data-num="sb:conta:${t.id}">${c.n}</span>` : ''}
       </button>`;
     }).join('');
 
@@ -159,7 +162,7 @@
         const c = conta[id];
         return `<button class="bi-botao" type="button" data-tela="${id}" onclick="window.Barra.abrir('${id}')"
                         aria-label="${esc(c ? `${t.rotulo}, ${c.dica}` : t.rotulo)}">
-          <span class="bi-icone">${svg(ICONES[t.icone || id], 22)}${c ? `<span class="bi-conta${c.alerta ? ' sb-atalho-alerta' : ''}">${c.n}</span>` : ''}</span>
+          <span class="bi-icone">${svg(ICONES[t.icone || id], 22)}${c ? `<span class="bi-conta${c.alerta ? ' sb-atalho-alerta' : ''}" data-num="bi:conta:${id}">${c.n}</span>` : ''}</span>
           <span class="bi-rotulo">${esc(t.rotulo)}</span></button>`;
       }).join('') + `
         <button id="bi-mais" class="bi-botao" type="button" data-tela="mais" aria-label="Mais: o painel da campanha"
@@ -182,6 +185,23 @@
     return (PERIODOS.find(([a, b]) => h >= a && h < b) || [0, 0, ''])[2];
   }
 
+  // O que a barra mostrou da última vez: o que mudar ganha um destaque breve.
+  // undefined é "ainda não desenhou" (a primeira carga não destaca nada).
+  let _ondeAntes;
+
+  // O dia virou: um sol (de manhã à tarde) ou uma lua (à noite) cruza o
+  // relógio em arco e some.
+  function astro(tempo, hora) {
+    const dia = hora >= 6 && hora < 18;
+    const el = document.createElement('span');
+    el.className = `sb-astro ${dia ? 'sb-astro-sol' : 'sb-astro-lua'}`;
+    el.setAttribute('aria-hidden', 'true');
+    el.innerHTML = svg(ICONES[dia ? 'sol' : 'lua'], 16);
+    el.addEventListener('animationend', () => el.remove());
+    tempo.querySelectorAll('.sb-astro').forEach(a => a.remove());
+    tempo.appendChild(el);
+  }
+
   function renderOnde() {
     const local = _mem.current_location || '';
     const nome = q('sb-location-nome');
@@ -196,6 +216,17 @@
       tempo.classList.toggle('hidden', !hora);
       q('sb-tempo-texto').textContent = hora;
       tempo.title = hora ? `${hora} (${periodoDaHora(_mem.relogio)}): veja quem pode descansar` : '';
+    }
+    const r = _mem.relogio || {};
+    const agora = { local, capitulo: _mem.chapter || 1, hora, dia: r.dia, h: Number(r.hora || 0) };
+    const antes = _ondeAntes;
+    _ondeAntes = agora;
+    if (!antes || !window.destacar) return;
+    if (local !== antes.local) window.destacar(botaoLocal, 'sb-mudou');
+    if (agora.capitulo !== antes.capitulo) window.destacar(cap && cap.closest('button'), 'sb-mudou');
+    if (hora && antes.hora && hora !== antes.hora) {
+      window.destacar(q('sb-tempo-texto'), 'sb-hora-mudou');
+      if (agora.dia !== antes.dia && window.animacoesLigadas && window.animacoesLigadas()) astro(tempo, agora.h);
     }
   }
 
@@ -262,8 +293,9 @@
             <button class="sb-heroi-nome" type="button" onclick="window.Barra.verHeroi('${aspas(h.nome)}')"
                     title="Abrir a ficha de ${esc(h.nome)}">${esc(h.nome)}</button>
             <span class="sb-heroi-vida ${classeDaVida(h)}" role="img"
-                  aria-label="Vida ${h.vida.atual} de ${h.vida.max}"><span style="width:${h.vida.pct}%"></span></span>
-            <span class="sb-heroi-num">${h.vida.atual}/${h.vida.max}${h.vida.temp ? `<small>+${h.vida.temp}</small>` : ''}</span>
+                  aria-label="Vida ${h.vida.atual} de ${h.vida.max}"><span data-barra="${esc(`sb:${h.nome}:vida`)}"
+                  style="width:${h.vida.pct}%"></span></span>
+            <span class="sb-heroi-num" data-num="${esc(`sb:${h.nome}:vida`)}" data-valor="${h.vida.atual}">${h.vida.atual}/${h.vida.max}${h.vida.temp ? `<small>+${h.vida.temp}</small>` : ''}</span>
             ${marcasDoHeroi(h) ? `<span class="sb-heroi-marcas">${marcasDoHeroi(h)}</span>` : ''}
           </div>`).concat(semFicha);
       }
@@ -293,6 +325,7 @@
     return ativas[0] || null;
   }
 
+  let _missaoAntes;
   function renderMissao() {
     const botao = q('sb-missao');
     if (!botao) return;
@@ -307,8 +340,11 @@
     botao.innerHTML = `
       <span class="sb-missao-rotulo">${svg(ICONES.missoes, 16)} Missão</span>
       <span class="sb-missao-titulo">${esc(m.titulo || '')}</span>
-      ${objs.length ? `<span class="sb-missao-progresso"><span class="sb-missao-trilho"><span style="width:${pct}%"></span></span>`
-        + `<span class="sb-missao-conta">${feitos}/${objs.length}</span></span>` : ''}`;
+      ${objs.length ? `<span class="sb-missao-progresso"><span class="sb-missao-trilho"><span data-barra="${esc(`sb:missao:${m.titulo}`)}" style="width:${pct}%"></span></span>`
+        + `<span class="sb-missao-conta" data-num="${esc(`sb:missao:${m.titulo}`)}" data-valor="${feitos}">${feitos}/${objs.length}</span></span>` : ''}`;
+    // Outra missão passou a ser a principal: a barra destaca a troca.
+    if (_missaoAntes !== undefined && _missaoAntes !== m.titulo && window.destacar) window.destacar(botao, 'sb-mudou');
+    _missaoAntes = m.titulo;
   }
 
   // Romance: o próximo encontro marcado, com quanto falta. Avisa (cor) quando
@@ -350,7 +386,7 @@
     const vidas = ehDnd() ? herois.filter(h => !h.morto).map(h => `
       <span class="faixa-heroi" title="${esc(h.nome)}: ${h.vida.atual}/${h.vida.max}">
         <span class="faixa-inicial">${esc(h.nome.charAt(0))}</span>
-        <span class="sb-heroi-vida ${classeDaVida(h)}"><span style="width:${h.vida.pct}%"></span></span>
+        <span class="sb-heroi-vida ${classeDaVida(h)}"><span data-barra="${esc(`faixa:${h.nome}:vida`)}" style="width:${h.vida.pct}%"></span></span>
       </span>`).join('') : '';
     // A hora fica fora do texto do local: dentro dele, um nome longo a cortava
     // nas reticências.
@@ -445,7 +481,15 @@
       renderHerois();
       renderAtalhos();
       renderFaixa();
+      animar();
     } catch (_) { /* a barra nunca derruba o turno */ }
+  }
+
+  // Vida dos heróis, progresso da missão e contagens dos atalhos: o que
+  // mudou desliza, conta ou pulsa (utils.js, animarNumeros).
+  function animar() {
+    if (!window.animarNumeros) return;
+    ['sidebar', 'faixa-relance', 'barra-inferior'].forEach(id => window.animarNumeros(q(id)));
   }
 
   function render(mem) {
@@ -457,6 +501,7 @@
     renderAtalhos();
     renderFaixa();
     renderAvisos();
+    animar();
     carregarGrupo();
   }
 

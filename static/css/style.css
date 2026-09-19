@@ -513,6 +513,66 @@ html.anim-on #sb-encontro.sb-encontro-novo { animation: encontroEntra .6s ease-o
 }
 @keyframes encontroEntra { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: none; } }
 
+/* Barra lateral (barra.js). A hora nova sobe no lugar da velha; quando o dia
+   vira, um sol ou uma lua cruza o relógio em arco. O que mudou (lugar,
+   capítulo, a missão principal) ganha um brilho breve; a vida dos heróis e
+   o progresso da missão deslizam, e as contagens dos atalhos pulsam. */
+#sb-tempo { position: relative; }
+html.anim-on #sb-tempo-texto.sb-hora-mudou { display: inline-block; animation: horaSobe .6s ease-out; }
+@keyframes horaSobe { from { opacity: 0; transform: translateY(70%); } to { opacity: 1; transform: none; } }
+.sb-astro { position: absolute; left: 2px; top: 50%; margin-top: -8px; width: 16px; height: 16px;
+            opacity: 0; pointer-events: none; }
+.sb-astro svg { display: block; }
+.sb-astro-sol { color: var(--lcl-gold, #b89947); }
+.sb-astro-lua { color: var(--ink-user, #2b4a7a); }
+html.anim-on .sb-astro { animation: astroCruza 1.6s ease-in-out; }
+@keyframes astroCruza {
+  0%   { opacity: 0; transform: translate(-6px, 12px) rotate(-40deg); }
+  25%  { opacity: 1; }
+  50%  { transform: translate(28px, -16px) rotate(0deg); }
+  75%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(62px, 12px) rotate(40deg); }
+}
+html.anim-on .sb-mudou { animation: sbMudou 1.2s ease-out; }
+@keyframes sbMudou {
+  0%   { box-shadow: 0 0 0 0 rgba(184,153,71,0); }
+  25%  { box-shadow: 0 0 0 3px rgba(184,153,71,.45); background-color: rgba(184,153,71,.18); }
+  100% { box-shadow: 0 0 0 0 rgba(184,153,71,0); }
+}
+html.anim-on .sb-heroi-vida > span[data-barra], html.anim-on .sb-missao-trilho > span[data-barra] { transition: width .7s ease-out; }
+html.anim-on .sb-heroi-num.num-subiu { animation: numSobe .7s ease-out; }
+html.anim-on .sb-heroi-num.num-desceu { animation: numDesce .7s ease-out; }
+html.anim-on .sb-missao-conta.num-subiu { display: inline-block; animation: numSobe .7s ease-out; }
+
+/* Menu: as campanhas entram uma a uma, depois que a capa abre (quem chega
+   virando a página não espera a capa). */
+html.anim-on .campaign-item.campanha-entra {
+  animation: campanhaEntra .45s ease-out backwards;
+  animation-delay: calc(1s + var(--i, 0) * 70ms);
+}
+html.anim-on.chegou-virando .campaign-item.campanha-entra { animation-delay: calc(var(--i, 0) * 70ms); }
+@keyframes campanhaEntra { from { opacity: 0; transform: translateX(-14px); } to { opacity: 1; transform: none; } }
+/* "Gerar com IA": a pena escreve no botão; os campos preenchidos chegam um
+   depois do outro, como tinta no papel. */
+.pena-gerando { display: inline-flex; align-items: center; gap: 8px; }
+.pena-gerando .pena-svg { width: 16px; height: 16px; }
+/* No botão a pena escreve no lugar, sem andar sobre o texto. */
+html.anim-on .pena-gerando .pena-svg { animation-name: penaNoLugar; }
+@keyframes penaNoLugar {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: translateX(-2px) rotate(-14deg); }
+  75% { transform: translateX(2px) rotate(-6deg); }
+}
+html.anim-on .campo-preenchido {
+  animation: campoPreenchido .7s ease-out backwards;
+  animation-delay: calc(var(--i, 0) * 140ms);
+}
+@keyframes campoPreenchido {
+  0%   { opacity: 0; transform: translateY(6px); }
+  50%  { opacity: 1; box-shadow: 0 0 0 3px rgba(184,153,71,.35); }
+  100% { transform: none; box-shadow: 0 0 0 0 rgba(184,153,71,0); }
+}
+
 /* Menos movimento: pelo aparelho (prefers-reduced-motion, se a escolha for
    "Seguir o sistema") ou pela escolha "Desligadas" nas configurações. Tudo
    troca na hora; o que é comandado pelo JS pergunta a animacoesLigadas(). */
