@@ -9075,6 +9075,23 @@ def _relogio() -> dict:
     return memory.campaign.setdefault("relogio", {"dia": 1, "hora": 8})
 
 
+def hora_do_relogio(r: dict) -> int:
+    """
+    A hora gravada, de 0 a 23; 8 só quando não há hora nenhuma.
+
+    Era `int(r.get("hora", 8) or 8)`: 0 é falso em Python, e meia-noite virava
+    8h da manhã — o relógio pulava 8 horas a cada dia que virava à meia-noite,
+    e os encontros marcados para depois dela chegavam 8 horas atrasados.
+    """
+    h = (r or {}).get("hora")
+    if h is None or h == "":
+        return 8
+    try:
+        return int(h) % 24
+    except (TypeError, ValueError):
+        return 8
+
+
 def _periodo(hora: int) -> str:
     for ini, fim, nome in _PERIODOS:
         if ini <= hora < fim:
@@ -9085,12 +9102,12 @@ def _periodo(hora: int) -> str:
 def _agora_em_horas() -> int:
     """Instante atual como horas absolutas desde o dia 1 — facilita subtrair."""
     r = _relogio()
-    return int(r.get("dia", 1) or 1) * 24 + int(r.get("hora", 8) or 8)
+    return int(r.get("dia", 1) or 1) * 24 + hora_do_relogio(r)
 
 
 def _hora_legivel() -> str:
     r = _relogio()
-    h = int(r.get("hora", 8) or 8)
+    h = hora_do_relogio(r)
     return f"Dia {int(r.get('dia', 1) or 1)}, {h:02d}h ({_periodo(h)})"
 
 
@@ -9117,9 +9134,12 @@ def advance_time(hours: int, reason: str = "") -> str:
 
     r     = _relogio()
     antes = _hora_legivel()
-    total = int(r.get("hora", 8) or 8) + h
+    total = hora_do_relogio(r) + h
     r["dia"]  = int(r.get("dia", 1) or 1) + total // 24
     r["hora"] = total % 24
+    # Para a cobrança do relógio parado (agent._pendencias_block) e o aviso de
+    # narração que fez o tempo passar sem ele (validator).
+    memory.marcar_upkeep("relogio")
     memory.save_campaign()
 
     motivo = f" — {reason}" if reason else ""

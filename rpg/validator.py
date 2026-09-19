@@ -294,6 +294,42 @@ def _check_new_characters_unsaved(response: str, c: dict) -> list[Violation]:
 # Ponto de entrada
 # ---------------------------------------------------------------------------
 
+# Frases de narração em que o tempo PASSOU (no passado ou no presente
+# narrativo). De propósito fica de fora o que costuma ser plano ou fala sobre
+# o futuro ("ao anoitecer", "amanhã"): o aviso é para o mestre, e um aviso
+# falso a cada turno ensinaria a ignorá-lo.
+_NUMERO = r"(?:uma?|duas|dois|tres|quatro|cinco|seis|sete|oito|nove|dez|doze|algumas|varias|muitas|\d+)"
+_TEMPO_PASSOU = re.compile(
+    r"\b(?:no dia seguinte|na (?:manha|tarde|noite|madrugada) seguinte"
+    r"|(?:horas|dias|semanas|meses) (?:depois|mais tarde|se passa\w*|passa\w*)"
+    rf"|{_NUMERO} (?:horas?|dias?|semanas?) (?:depois|mais tarde|de (?:viagem|caminhada|marcha|estrada|cavalgada|espera))"
+    r"|amanheceu|anoiteceu|o sol (?:nasceu|se pos)|a noite (?:caiu|passou)|caiu a noite"
+    r"|passa(?:m|ram) a noite|dorm(?:em|iram) ate)\b"
+)
+
+
+def _check_time_passed(response: str, c: dict) -> list[Violation]:
+    """
+    A narração fez o tempo passar e o relógio não andou neste turno.
+
+    O relógio só anda por advance_time(); se o mestre narra "no dia seguinte"
+    e não chama, o mundo fica parado: o encontro marcado não chega, o descanso
+    longo não volta a valer. Vai para o mestre no turno seguinte (pendências),
+    não para o jogador.
+    """
+    if memory.turnos_sem("relogio") == 0:      # andou neste turno
+        return []
+    achado = _TEMPO_PASSOU.search(_normalize(response))
+    if not achado:
+        return []
+    return [Violation(
+        severity="aviso",
+        rule="time_not_advanced",
+        message=(f"A narração fez o tempo passar (\"{achado.group(0)}\") e o relógio não andou. "
+                 "Se o tempo passou mesmo, chame advance_time(horas, motivo)."),
+    )]
+
+
 def validate(response: str) -> ValidationResult:
     """
     Valida a resposta do agente contra a memória atual.
@@ -310,5 +346,6 @@ def validate(response: str) -> ValidationResult:
     result.violations.extend(_check_unknown_locations(response, c))
     result.violations.extend(_check_flag_contradictions(response, c))
     result.violations.extend(_check_new_characters_unsaved(response, c))
+    result.violations.extend(_check_time_passed(response, c))
 
     return result

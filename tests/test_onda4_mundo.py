@@ -536,11 +536,15 @@ def test_atitudes_entram_no_contexto_da_cena(campanha, povoar):
 
 
 def test_campanha_sem_onda4_nao_ganha_ruido_no_contexto(campanha):
-    """Sem missão, sem relógio e sem atitude, o bloco de cena não muda."""
+    """
+    Sem missão e sem atitude, o bloco de cena não ganha essas linhas. O tempo
+    aparece sempre: sem ele o mestre não via que o mundo estava parado às 8h
+    do dia 1 (test_relogio_do_mestre.py).
+    """
     campanha.pop("relogio", None)
     campanha.pop("quests", None)
     ctx = tools.get_scene_context()
 
     assert "Missões ativas" not in ctx
     assert "Atitude dos NPCs" not in ctx
-    assert "Tempo:" not in ctx
+    assert "Tempo: Dia 1, 08h (manhã) — o relógio ainda não andou" in ctx

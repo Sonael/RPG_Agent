@@ -1339,11 +1339,16 @@ def get_scene_context(extra_characters: str = "", extra_locations: str = "") -> 
 
     # Relógio: sem ele na cena o agente não tem como saber que anoiteceu nem
     # há quanto tempo ninguém dorme — e voltaria a tratar descanso como grátis.
+    # Sempre, mesmo antes do primeiro advance_time: sem a linha, o mestre não
+    # via que o mundo estava parado às 8h do dia 1.
+    from rpg.tools_dnd import _periodo, hora_do_relogio
     rel = c.get("relogio")
     if rel:
-        from rpg.tools_dnd import _periodo
-        h = int(rel.get("hora", 8) or 8)
+        h = hora_do_relogio(rel)
         parts.append(f"Tempo: Dia {rel.get('dia', 1)}, {h:02d}h ({_periodo(h)})")
+    else:
+        parts.append("Tempo: Dia 1, 08h (manhã) — o relógio ainda não andou nesta campanha; "
+                     "use advance_time() quando a história consumir tempo")
 
     # Resumo (só as primeiras 3 linhas para economizar tokens)
     summary = c.get("story_summary", "")

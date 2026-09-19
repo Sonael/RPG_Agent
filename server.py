@@ -2262,6 +2262,8 @@ def chat():
                         {"severity": v.severity, "rule": v.rule, "message": v.message, "detail": v.detail}
                         for v in result.violations
                     ]
+                    # Só para o mestre: o jogador não tem como fazer o relógio andar.
+                    SO_PARA_O_MESTRE = ("time_not_advanced",)
 
                     # Fecha o ciclo da manutenção de memória.
                     #
@@ -2277,12 +2279,13 @@ def chat():
                         memory.avancar_turno()
                         memory.campaign["_pendencias"] = [
                             v["message"] for v in violations
-                            if v["rule"] in ("unsaved_character", "unknown_location")
+                            if v["rule"] in ("unsaved_character", "unknown_location") + SO_PARA_O_MESTRE
                         ][:6]
                         memory.save_campaign()
 
                     yield f"data: {json.dumps({'type': 'text', 'content': response_text})}\n\n"
 
+                    violations = [v for v in violations if v["rule"] not in SO_PARA_O_MESTRE]
                     if violations:
                         yield f"data: {json.dumps({'type': 'violations', 'violations': violations})}\n\n"
 

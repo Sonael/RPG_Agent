@@ -1182,6 +1182,12 @@ def instrucao_da_campanha(campaign_type: str, dnd_mode: bool) -> str:
 # Snapshot de cena — injetado na instrução A CADA TURNO (instruction provider)
 # ---------------------------------------------------------------------------
 
+def _hora_da_campanha(c: dict) -> str:
+    from rpg.tools_dnd import hora_do_relogio
+    rel = c.get("relogio") or {}
+    return f"Dia {rel.get('dia', 1) or 1}, {hora_do_relogio(rel):02d}h"
+
+
 def _pendencias_block() -> str:
     """
     Cobrança de manutenção de memória, recomputada a cada turno.
@@ -1214,6 +1220,10 @@ def _pendencias_block() -> str:
             ("resumo", 5, "update_story_summary() — o resumo vivo da história"),
             ("diario", 8, "add_diary_entry() — o diário da campanha"),
             ("mundo",  6, "update_world_state() — local e cena atuais"),
+            # O relógio só anda quando o mestre manda; parado, o encontro
+            # marcado nunca chega e o descanso longo nunca volta a valer.
+            ("relogio", 10, "advance_time() — o relógio do mundo "
+                            f"(parado em {_hora_da_campanha(_m.campaign)})"),
         ):
             n = _m.turnos_sem(chave)
             if n < 0:
