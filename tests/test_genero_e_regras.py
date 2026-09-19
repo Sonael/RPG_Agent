@@ -224,6 +224,30 @@ def test_configuracao_de_tela_junta_genero_e_regras():
     assert livre["label"] == "Dark Fantasy" and livre["role_label"] != "Classe"
 
 
+def test_cada_genero_da_nome_as_proprias_telas():
+    """A barra lateral dizia "Grupo" e "Missões" num romance."""
+    nomes = {}
+    for genero in memory.GENEROS:
+        telas = agent.get_campaign_config(genero)["telas"]
+        for chave in ("grupo", "missoes", "titulo_missoes", "mapa", "titulo_mapa"):
+            assert telas.get(chave), (genero, chave)
+        nomes[genero] = telas
+    assert nomes["romance"]["missoes"] == "Tramas"
+    assert nomes["horror"]["grupo"] == "Sobreviventes"
+    # No romance, o atalho do grupo abre as Relações.
+    assert nomes["romance"].get("tela_do_grupo") == "relacoes"
+    assert not any(nomes[g].get("tela_do_grupo") for g in memory.GENEROS if g != "romance")
+
+
+def test_memoria_manda_a_configuracao_com_as_regras():
+    """/api/memory montava a configuração sem as regras: o rótulo perdia o "· D&D"."""
+    import server
+
+    cfg = server._config_da_campanha({"campaign_type": "horror", "dnd_mode": True})
+    assert cfg["label"] == "Horror / Suspense · D&D"
+    assert cfg["telas"]["grupo"] == "Sobreviventes"
+
+
 def test_configuracao_aceita_o_dnd_antigo():
     cfg = agent.get_campaign_config("dnd")
     assert cfg["label"] == "Fantasia / Aventura · D&D"

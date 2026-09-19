@@ -56,6 +56,8 @@ CAMPAIGN_CONFIGS = {
         "role_label":     "Classe / Função",
         "role_examples":  "guerreira, mago, ladino, curandeiro...",
         "flag_hint":      "Ex: portao_aberto=sim, dragao_derrotado=true",
+        "telas": {"grupo": "Grupo", "missoes": "Missões", "titulo_missoes": "O Livro de Missões",
+                  "mapa": "Mapa", "titulo_mapa": "O Mapa"},
     },
     "dark_fantasy": {
         "label":          "Dark Fantasy",
@@ -63,6 +65,8 @@ CAMPAIGN_CONFIGS = {
         "role_label":     "Ofício / Juramento",
         "role_examples":  "mercenária, caçador de bruxas, clérigo renegado, alquimista...",
         "flag_hint":      "Ex: pacto_selado=sim, aldeia_queimada=true",
+        "telas": {"grupo": "Companhia", "missoes": "Missões", "titulo_missoes": "O Livro de Missões",
+                  "mapa": "Mapa", "titulo_mapa": "O Mapa"},
     },
     "romance": {
         "label":          "Romance / Drama",
@@ -70,6 +74,9 @@ CAMPAIGN_CONFIGS = {
         "role_label":     "Relacionamento",
         "role_examples":  "interesse romântico, melhor amigo, rival, mentor...",
         "flag_hint":      "Ex: primeiro_beijo=sim, segredo_revelado=nao",
+        "telas": {"grupo": "Próximos", "missoes": "Tramas", "titulo_missoes": "As Tramas",
+                  "mapa": "Lugares", "titulo_mapa": "Os Lugares",
+                  "tela_do_grupo": "relacoes"},
     },
     "horror": {
         "label":          "Horror / Suspense",
@@ -77,6 +84,8 @@ CAMPAIGN_CONFIGS = {
         "role_label":     "Papel no Grupo",
         "role_examples":  "líder, cético, especialista, ferido...",
         "flag_hint":      "Ex: monstro_avistado=sim, luz_quebrada=true",
+        "telas": {"grupo": "Sobreviventes", "missoes": "Objetivos", "titulo_missoes": "Os Objetivos",
+                  "mapa": "Mapa", "titulo_mapa": "O Mapa"},
     },
     "misterio": {
         "label":          "Mistério / Investigação",
@@ -84,6 +93,8 @@ CAMPAIGN_CONFIGS = {
         "role_label":     "Papel na Investigação",
         "role_examples":  "detetive, informante, suspeito, testemunha...",
         "flag_hint":      "Ex: pista_encontrada=sim, suspeito_eliminado=carlos",
+        "telas": {"grupo": "Aliados", "missoes": "Casos", "titulo_missoes": "Os Casos",
+                  "mapa": "Mapa", "titulo_mapa": "O Mapa"},
     },
     "scifi": {
         "label":          "Ficção Científica / Cyberpunk",
@@ -91,6 +102,8 @@ CAMPAIGN_CONFIGS = {
         "role_label":     "Especialização",
         "role_examples":  "hacker, piloto, médico, mercenário...",
         "flag_hint":      "Ex: nave_hackeada=sim, corporacao_inimiga=arasaka",
+        "telas": {"grupo": "Tripulação", "missoes": "Contratos", "titulo_missoes": "Os Contratos",
+                  "mapa": "Mapa", "titulo_mapa": "O Mapa"},
     },
     "faroeste": {
         "label":          "Faroeste / Velho Oeste",
@@ -98,6 +111,8 @@ CAMPAIGN_CONFIGS = {
         "role_label":     "Papel na Gangue",
         "role_examples":  "pistoleiro, xerife, buscador, curandeiro...",
         "flag_hint":      "Ex: recompensa_ativa=sim, xerife_corrupto=true",
+        "telas": {"grupo": "Comparsas", "missoes": "Serviços", "titulo_missoes": "Os Serviços",
+                  "mapa": "Mapa", "titulo_mapa": "O Mapa"},
     },
     "dnd": {
         "label":          "D&D / RPG Estruturado",
@@ -107,6 +122,10 @@ CAMPAIGN_CONFIGS = {
         "flag_hint":      "Ex: missao_completada=sim, chefe_derrotado=true",
     },
 }
+
+# `telas`: o nome do grupo, das missões e do mapa em cada gênero, para a barra
+# lateral e o título das telas. Antes a barra dizia "Grupo" e "Missões" num
+# romance. `tela_do_grupo` troca a tela que o atalho do grupo abre.
 
 # ---------------------------------------------------------------------------
 # Instrução base — regras de memória (igual para todos os estilos)
@@ -258,8 +277,13 @@ Você é um narrador de histórias românticas e dramáticas.
   um olhar que dura um segundo a mais, um silêncio compartilhado.
 • CONSEQUÊNCIAS EMOCIONAIS: escolhas afetam relacionamentos. Confiança se
   constrói e se destrói. Segredos revelados mudam tudo.
-• FLAGS EMOCIONAIS: use flags para rastrear estado dos relacionamentos
-  (ex: confianca_lucas=alta, sentimento_revelado=sim).
+• RELAÇÕES: o jogador tem uma tela de Relações com o afeto e a confiança
+  de cada pessoa e o porquê de cada mudança. Sempre que algo mudar entre o
+  protagonista e alguém, chame ajustar_relacao(nome, afeto, confianca,
+  motivo). São eixos separados — dá para amar quem não se confia — e mexa só
+  no que a cena mexeu. Use vinculo= quando a natureza da relação mudar
+  ("interesse romântico", "namoro", "ex", "rival"). ver_relacoes() mostra
+  todas. Flags ficam para fatos (segredo_revelado=sim), não para sentimentos.
 • Narre em português, segunda pessoa. Mínimo 3–5 parágrafos por turno.
 """,
 

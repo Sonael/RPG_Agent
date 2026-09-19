@@ -110,6 +110,15 @@ def _efeitos_da_atitude(valor: int) -> list[str]:
             f"{pct:+d}% no preço da loja dele"]
 
 
+def _usa_regras() -> bool:
+    """
+    Os efeitos da atitude (CD dos testes sociais, preço da loja) são regras de
+    D&D: numa campanha narrativa eles não existem, e a ficha os prometia.
+    """
+    from rpg.toolsets import _campanha_usa_dnd
+    return _campanha_usa_dnd(memory.campaign)
+
+
 def ficha(nome: str) -> dict:
     from rpg.tools import _faixa_atitude, atitude_de
 
@@ -149,6 +158,15 @@ def ficha(nome: str) -> dict:
 
     loja = _loja_do_personagem(nome_real, local)
 
+    # No romance a ficha mostra a relação (afeto, confiança e vínculo) no lugar
+    # da atitude, e para todos: as pessoas próximas são justamente as que mais
+    # importam, e a atitude escondia a relação de quem é do grupo.
+    romance = (memory.campaign.get("campaign_type") or "") == "romance"
+    relacao = None
+    if romance:
+        from rpg import relacoes
+        relacao = relacoes._pessoa(ch)
+
     return {
         "existe": True,
         "nome": nome_real,
@@ -159,9 +177,11 @@ def ficha(nome: str) -> dict:
         "conhecido": [f for f in (ch.get("conhecido") or []) if isinstance(f, str) and f.strip()],
         "local": {"nome": locais.nome_canonico(local), "alcance": alcance} if local else None,
         # Relação só faz sentido para quem não é do grupo.
-        "atitude": None if do_grupo else {
+        "relacao": relacao,
+        "atitude": None if (do_grupo or romance) else {
             "valor": valor, "rotulo": rotulo, "conduta": conduta,
-            "historico": historico, "efeitos": _efeitos_da_atitude(valor),
+            "historico": historico,
+            "efeitos": _efeitos_da_atitude(valor) if _usa_regras() else [],
         },
         "missoes": missoes,
         # A lista curta é a da tela; `encontros` diz quantas existem ao todo,

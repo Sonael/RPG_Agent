@@ -99,10 +99,12 @@
     _last = d || {};
     ensureDom();
     const contagem = _last.contagem || {};
+    // O filtro do grupo tem o nome do grupo no gênero ("Sobreviventes").
+    const nome = (id, rotulo) => (id === 'grupo' ? window.nomeDaTela('grupo', rotulo) : rotulo);
     q('elc-filtros').innerHTML = FILTROS.map(([id, rotulo]) => `
       <button class="elc-filtro${id === _filtro ? ' elc-filtro-ativo' : ''}" data-filtro="${id}" role="tab"
               aria-selected="${id === _filtro}" onclick="window.Elenco._filtrar('${id}')">
-        ${rotulo} <span class="elc-filtro-conta">${contagem[id] || 0}</span></button>`).join('');
+        ${esc(nome(id, rotulo))} <span class="elc-filtro-conta">${contagem[id] || 0}</span></button>`).join('');
 
     const todos = _last.personagens || [];
     const lista = todos.filter(p => passaNoFiltro(p) && casaNaBusca(p));

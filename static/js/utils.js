@@ -227,6 +227,15 @@ function _definirVisibilidade(btn, campo, escondendo) {
 // enxergaria a função. (Antes era `function alternarChaveVisivel`, que vira
 // propriedade de window; ao mover para cá, isso se perdeu.)
 window.alternarCampoSecreto = alternarCampoSecreto;
+
+// O nome de uma tela no gênero da campanha ("Tramas" no romance, "Casos" no
+// mistério), da configuração que o servidor manda em /api/memory. Sem ela,
+// o nome de sempre.
+function nomeDaTela(chave, padrao) {
+  const telas = (window._campaignConfig && window._campaignConfig.telas) || {};
+  return telas[chave] || padrao;
+}
+window.nomeDaTela = nomeDaTela;
 window.alternarChaveVisivel = alternarCampoSecreto;
 window.alternarSenhaVisivel = alternarCampoSecreto;
 

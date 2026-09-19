@@ -45,6 +45,7 @@ TELAS = [
     ("missoes", "#missoes-overlay", "() => window.Missoes._abrir()"),
     ("diario", "#diario-overlay", "() => window.Diario._abrir()"),
     ("elenco", "#elenco-overlay", "() => window.Elenco._abrir('todos')"),
+    ("relacoes", "#relacoes-overlay", "() => window.Relacoes._abrir()"),
 ]
 
 # Mede cada elemento com texto próprio: a cor do texto contra o primeiro

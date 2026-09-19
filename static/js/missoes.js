@@ -157,6 +157,7 @@
   // ---- Abrir / fechar ----------------------------------------------
   async function abrir(titulo) {
     ensureDom();
+    q('msn-titulo').textContent = window.nomeDaTela('titulo_missoes', 'O Livro de Missões');
     _confirmandoAbandono = '';
     if (!_open) {
       q('missoes-overlay').classList.remove('hidden');

@@ -182,6 +182,7 @@
 
   async function abrir(foco) {
     ensureDom();
+    q('map-titulo').textContent = window.nomeDaTela('titulo_mapa', 'O Mapa');
     _foco = foco || '';
     if (!_open) {
       q('mapa-overlay').classList.remove('hidden');

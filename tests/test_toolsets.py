@@ -14,6 +14,10 @@ Dois filtros, com motivações diferentes:
 
 • Campanha não-D&D — custo. Romance e horror não têm regras; carregavam 39
   ferramentas que nunca chamam.
+
+• As ferramentas das relações (afeto, confiança, estágio, momentos) são do
+  romance: nos outros gêneros a atitude das fichas já cobre o que importa.
+  Por isso "todas" fora do romance é TOTAL menos elas.
 """
 
 import asyncio
@@ -26,10 +30,14 @@ from rpg.toolsets import (
     FerramentasDoTurno,
     FERRAMENTAS_SO_DO_MODO_NARRADO,
     FERRAMENTAS_SO_DO_MODO_DND,
+    FERRAMENTAS_SO_DO_ROMANCE,
 )
 
 TOTAL = len(ALL_TOOLS)
 N_DND = len(FERRAMENTAS_SO_DO_MODO_DND)
+N_ROMANCE = len(FERRAMENTAS_SO_DO_ROMANCE)
+# Tudo o que uma campanha que não é romance pode receber.
+FORA_DO_ROMANCE = TOTAL - N_ROMANCE
 
 
 def nomes(tools):
@@ -68,13 +76,13 @@ def romance(campanha):
 # ---------------------------------------------------------------------------
 
 def test_dnd_narrado_entrega_todas(dnd, conjunto):
-    assert len(entregues(conjunto)) == TOTAL
+    assert len(entregues(conjunto)) == FORA_DO_ROMANCE
 
 
 def test_campo_de_modo_ausente_nao_filtra_nada(dnd, conjunto):
     """Campanha antiga, sem combat_mode: o padrão é o modo narrado."""
     dnd.pop("combat_mode", None)
-    assert len(entregues(conjunto)) == TOTAL
+    assert len(entregues(conjunto)) == FORA_DO_ROMANCE
 
 
 # ---------------------------------------------------------------------------
@@ -89,7 +97,7 @@ def test_modo_tela_retira_as_ferramentas_de_turno(dnd, conjunto):
         "a tela tática resolve o combate pelo motor; a LLM não pode ter "
         "estas ferramentas ou produz turno duplicado"
     )
-    assert len(disponiveis) == TOTAL - len(FERRAMENTAS_SO_DO_MODO_NARRADO)
+    assert len(disponiveis) == FORA_DO_ROMANCE - len(FERRAMENTAS_SO_DO_MODO_NARRADO)
 
 
 @pytest.mark.parametrize("ferramenta", sorted(FERRAMENTAS_SO_DO_MODO_NARRADO))
@@ -130,7 +138,14 @@ def test_todos_os_estilos_sem_regras_filtram(campanha, conjunto, estilo):
     campanha["dnd_mode"] = False
     campanha["campaign_type"] = estilo
     campanha["combat_mode"] = "narrado"
-    assert len(entregues(conjunto)) == TOTAL - N_DND
+    esperado = TOTAL - N_DND if estilo == "romance" else FORA_DO_ROMANCE - N_DND
+    assert len(entregues(conjunto)) == esperado
+
+
+def test_ferramentas_de_relacao_so_no_romance(romance, conjunto):
+    assert FERRAMENTAS_SO_DO_ROMANCE <= nomes(entregues(conjunto))
+    romance["campaign_type"] = "horror"
+    assert not (FERRAMENTAS_SO_DO_ROMANCE & nomes(entregues(conjunto)))
 
 
 @pytest.mark.parametrize("ferramenta", [
@@ -190,7 +205,7 @@ def test_campanha_com_ficha_mantem_o_motor_mesmo_sem_a_flag(campanha, conjunto):
 
     disponiveis = nomes(entregues(conjunto))
     assert "attack_roll" in disponiveis
-    assert len(disponiveis) == TOTAL
+    assert len(disponiveis) == FORA_DO_ROMANCE
 
 
 def test_campanha_sem_ficha_nenhuma_filtra(campanha, conjunto):
@@ -199,13 +214,13 @@ def test_campanha_sem_ficha_nenhuma_filtra(campanha, conjunto):
     campanha["characters"] = {
         "ana": {"name": "Ana", "description": "", "habilidades": []},   # sem sheet
     }
-    assert len(entregues(conjunto)) == TOTAL - N_DND
+    assert len(entregues(conjunto)) == FORA_DO_ROMANCE - N_DND
 
 
 def test_campaign_type_dnd_basta_mesmo_sem_a_flag(campanha, conjunto):
     campanha["dnd_mode"] = False
     campanha["campaign_type"] = "dnd"
-    assert len(entregues(conjunto)) == TOTAL
+    assert len(entregues(conjunto)) == FORA_DO_ROMANCE
 
 
 # ---------------------------------------------------------------------------
@@ -221,7 +236,7 @@ def test_filtros_se_compoem(dnd, conjunto):
     dnd["campaign_type"] = "romance"
     ambos = len(entregues(conjunto))
 
-    assert ambos < so_tela < TOTAL
+    assert ambos < so_tela < FORA_DO_ROMANCE
 
 
 # ---------------------------------------------------------------------------
@@ -249,7 +264,7 @@ def test_voltar_para_narrado_devolve_as_ferramentas(dnd, conjunto):
     dnd["combat_mode"] = "tela"
     entregues(conjunto)
     dnd["combat_mode"] = "narrado"
-    assert len(entregues(conjunto)) == TOTAL
+    assert len(entregues(conjunto)) == FORA_DO_ROMANCE
 
 
 # ---------------------------------------------------------------------------
@@ -269,7 +284,12 @@ def test_erro_ao_ler_a_campanha_entrega_tudo(conjunto, monkeypatch):
     class _MemoriaFalsa:
         campaign = _CampanhaQuebrada()
 
+    # O filtro faz `from rpg import memory`, que lê o atributo do pacote, não
+    # sys.modules: trocar só sys.modules deixava a memória de verdade no lugar,
+    # e o teste passava sem nunca chegar ao caminho de erro.
+    import rpg
     monkeypatch.setitem(__import__("sys").modules, "rpg.memory", _MemoriaFalsa)
+    monkeypatch.setattr(rpg, "memory", _MemoriaFalsa)
     assert len(entregues(conjunto)) == TOTAL
 
 

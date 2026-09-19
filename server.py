@@ -2295,6 +2295,14 @@ def chat():
 # Memória
 # ---------------------------------------------------------------------------
 
+def _config_da_campanha(c: dict) -> dict:
+    """
+    A configuração de tela da campanha: gênero E regras. /api/memory mandava
+    só o gênero, e o rótulo perdia o "· D&D" a cada atualização da barra.
+    """
+    return get_campaign_config(c.get("campaign_type", "fantasia"), c.get("dnd_mode", False))
+
+
 @app.route("/api/memory")
 @require_auth
 def get_memory_state():
@@ -2321,7 +2329,7 @@ def get_memory_state():
     return jsonify({
         "campaign_type":    ct,
         "dnd_mode":         c.get("dnd_mode", False),
-        "campaign_config":  get_campaign_config(ct),
+        "campaign_config":  _config_da_campanha(c),
         "chapter":          c.get("chapter", 1),
         "current_location": c.get("current_location", ""),
         "current_scene":    c.get("current_scene", ""),
@@ -2983,6 +2991,14 @@ def characters_index_route():
     """Todos os personagens, com a categoria e se estão aqui (ver rpg/personagens.py)."""
     from rpg import personagens
     return jsonify(personagens.indice())
+
+
+@app.route("/api/relacoes", methods=["GET"])
+@require_auth
+def relacoes_route():
+    """As relações do romance: afeto, confiança e vínculo de cada pessoa (rpg/relacoes.py)."""
+    from rpg import relacoes
+    return jsonify(relacoes.lista())
 
 
 @app.route("/api/characters/sheet", methods=["GET"])

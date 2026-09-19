@@ -887,6 +887,11 @@ def adjust_attitude(name: str, delta: int, reason: str = "") -> str:
         hist.append({"delta": d, "motivo": reason,
                      "cap": memory.campaign.get("chapter", 1)})
         del hist[:-5]
+    # No romance a atitude é o afeto da tela de Relações: a mudança entra no
+    # histórico dela também, e não só no da ficha.
+    if (memory.campaign.get("campaign_type") or "") == "romance":
+        from rpg import relacoes
+        relacoes.registrar(char, "afeto", depois - antes, reason)
 
     r_antes, _        = _faixa_atitude(antes)
     r_depois, conduta = _faixa_atitude(depois)
@@ -897,6 +902,39 @@ def adjust_attitude(name: str, delta: int, reason: str = "") -> str:
         linha += f"\n   Mudou de faixa: {r_antes} → **{r_depois}**. {conduta}."
     memory.save_campaign()
     return linha
+
+
+def ajustar_relacao(nome: str, afeto: int = 0, confianca: int = 0,
+                    motivo: str = "", vinculo: str = "") -> str:
+    """
+    Muda a relação de alguém com o protagonista. Chame sempre que algo mudar
+    entre os dois: um gesto, uma promessa cumprida ou quebrada, um segredo
+    contado, uma declaração, uma traição. O jogador vê isso na tela de Relações,
+    com o motivo.
+
+    Afeto e confiança são eixos SEPARADOS: dá para amar quem não se confia, e
+    confiar em quem não se ama. Mexa só no que a cena mexeu.
+    Pesos (-100 a +100 em cada eixo):
+      ±5   um gesto pequeno, uma palavra atravessada
+      ±15  promessa cumprida ou quebrada, um segredo contado ou escondido
+      ±30  declaração, traição, sacrifício, uma mentira grande descoberta
+
+    Args:
+        nome:      Nome da pessoa.
+        afeto:     Quanto somar ao afeto (negativo para esfriar).
+        confianca: Quanto somar à confiança (negativo para abalar).
+        motivo:    O que aconteceu — aparece para o jogador.
+        vinculo:   A nova natureza da relação, só quando ela mudar
+                   ("interesse romântico", "namoro", "ex", "amizade", "rival").
+    """
+    from rpg import relacoes
+    return relacoes.ajustar(nome, afeto, confianca, motivo, vinculo)
+
+
+def ver_relacoes() -> str:
+    """Todas as relações com o protagonista: vínculo, afeto e confiança de cada pessoa."""
+    from rpg import relacoes
+    return relacoes.resumo_para_o_mestre()
 
 
 def get_attitude(name: str) -> str:
@@ -1303,6 +1341,9 @@ ALL_TOOLS = [
     adjust_attitude,
     get_attitude,
     list_attitudes,
+    # Relações do romance (afeto e confiança; só entram no romance)
+    ajustar_relacao,
+    ver_relacoes,
     # Contexto (dinâmico e completo)
     get_scene_context,
     get_full_context,

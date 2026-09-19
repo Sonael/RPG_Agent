@@ -316,7 +316,7 @@ que ela fosse aberta.
 |---|---|---|
 | `fantasia` | Grupo de Aventureiros | Aventura ampla, mundo rico, magia narrativa |
 | `dark_fantasy` | Companhia | Mundo que fere, poder com custo, moral cinzenta, violência com peso |
-| `romance` | Pessoas Próximas | Emoções, diálogo, subtexto, flags emocionais |
+| `romance` | Pessoas Próximas | Emoções, diálogo, subtexto, relações (afeto e confiança) |
 | `horror` | Sobreviventes | Tensão, ritmo lento, vulnerabilidade real, trauma |
 | `misterio` | Aliados | Pistas, dedução, suspeitos com álibis |
 | `scifi` | Tripulação | Tech consistente, dilemas morais, facções |
@@ -330,7 +330,57 @@ abas de gênero e uma caixa de regras. Os campos de um personagem seguem a
 REGRA: com D&D, ficha; sem, os campos do gênero (o dark fantasy usa os do
 fantasia, com outro nome — o que muda é o tom, e o tom é do mestre).
 
-`test_genero_e_regras.py` (16) e `test_genero_e_regras_navegador.py` (6).
+### Cada gênero dá nome às telas
+
+A barra lateral dizia "Grupo" e "Missões" num romance. `CAMPAIGN_CONFIGS[g]["telas"]`
+tem o nome do grupo, das missões e do mapa em cada gênero, e a barra (atalhos
+e barra inferior do celular), os títulos das telas de missões e do mapa e o
+filtro do grupo no índice de personagens usam esses nomes (`nomeDaTela` em
+`utils.js`). `/api/memory` passou a mandar a configuração com as regras
+(`server._config_da_campanha`); antes o rótulo perdia o "· D&D".
+
+| Gênero | Grupo | Missões | Mapa |
+|---|---|---|---|
+| `fantasia` | Grupo | Missões | Mapa |
+| `dark_fantasy` | Companhia | Missões | Mapa |
+| `romance` | **Relações** (abre a tela de relações) | Tramas | Lugares |
+| `horror` | Sobreviventes | Objetivos | Mapa |
+| `misterio` | Aliados | Casos | Mapa |
+| `scifi` | Tripulação | Contratos | Mapa |
+| `faroeste` | Comparsas | Serviços | Mapa |
+
+### Relações do romance (`rpg/relacoes.py`, `GET /api/relacoes`)
+
+No romance o coração do jogo é a relação, e ela só existia como flag solta
+(`confianca_lucas=alta`) e como a atitude das fichas, pensada para a loja e os
+testes sociais do D&D. Agora cada pessoa tem:
+
+- **Afeto** (-100 a +100): o quanto gosta do protagonista. É o mesmo campo
+  `atitude` das fichas, então o que o mestre já registrou com
+  `adjust_attitude` continua valendo (e, no romance, entra no histórico da
+  relação também). Faixas: aversão, atrito, neutro, afeição, devoção.
+- **Confiança** (-100 a +100), separada do afeto porque o drama mora na
+  diferença: dá para amar quem não se confia. Faixas: desconfia de você, com
+  um pé atrás, ainda não sabe, confia em você, confia de olhos fechados.
+- **Vínculo**: a natureza da relação ("interesse romântico", "namoro", "ex",
+  "rival"), que começa pelo papel da pessoa no grupo.
+- **O porquê**: as últimas 12 mudanças, com o eixo, o motivo e o capítulo.
+
+O mestre usa `ajustar_relacao(nome, afeto, confianca, motivo, vinculo)` e
+`ver_relacoes()`; as duas só entram no conjunto de ferramentas do romance
+(`toolsets.FERRAMENTAS_SO_DO_ROMANCE`). A instrução do romance manda usá-las,
+e deixa as flags para fatos, não para sentimentos.
+
+No romance o atalho do grupo abre a tela de Relações (`static/js/relacoes.js`):
+um cartão por pessoa, as próximas primeiro e do afeto maior para o menor, com
+os dois medidores, o vínculo e as últimas mudanças; o nome abre a ficha do
+personagem, que no romance mostra "Relação com você" (os dois eixos, para
+todos, inclusive quem é do grupo) no lugar da atitude. Fora do D&D a ficha
+também deixou de prometer os efeitos da atitude na CD e no preço da loja, que
+são regras de D&D.
+
+`test_genero_e_regras.py` (27), `test_genero_e_regras_navegador.py` (9),
+`test_relacoes.py` (13) e `test_relacoes_navegador.py` (7).
 
 ---
 

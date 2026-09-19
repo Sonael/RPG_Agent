@@ -85,6 +85,12 @@ FERRAMENTAS_SO_DO_MODO_NARRADO = frozenset({
 _CARVE_OUT_GENERICAS = frozenset({"roll_dice", "advance_time", "get_world_time"})
 
 
+# As ferramentas das relações (afeto e confiança) são do romance. Nos outros
+# gêneros a atitude das fichas (adjust_attitude) já cobre o que importa, e
+# duas escalas para a mesma coisa só confundiriam o mestre.
+FERRAMENTAS_SO_DO_ROMANCE = frozenset({"ajustar_relacao", "ver_relacoes"})
+
+
 def _nomes_das_ferramentas_dnd() -> frozenset:
     from rpg.tools_dnd import DND_TOOLS
     return frozenset(f.__name__ for f in DND_TOOLS) - _CARVE_OUT_GENERICAS
@@ -147,6 +153,7 @@ class FerramentasDoTurno(BaseToolset):
             camp = memory.campaign
             modo = (camp.get("combat_mode") or "narrado")
             usa_dnd = _campanha_usa_dnd(camp)
+            romance = (camp.get("campaign_type") or "") == "romance"
         except Exception:
             # Falha de forma segura: sem contexto de campanha, entrega tudo.
             return list(self._todas)
@@ -159,6 +166,8 @@ class FerramentasDoTurno(BaseToolset):
             excluir |= FERRAMENTAS_SO_DO_MODO_NARRADO
         if not usa_dnd:
             excluir |= FERRAMENTAS_SO_DO_MODO_DND
+        if not romance:
+            excluir |= FERRAMENTAS_SO_DO_ROMANCE
 
         if not excluir:
             self._log(modo, usa_dnd, self._todas)

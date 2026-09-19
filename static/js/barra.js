@@ -59,6 +59,7 @@
       + '<path d="M15 8h2"/><path d="M15 12h2"/><path d="M7 16h10"/>',
     mochila: '<path d="M4 10a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/>'
       + '<path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/><path d="M8 21v-5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v5"/>',
+    relacoes: '<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21l7.8-7.5 1-1.1a5.5 5.5 0 0 0 0-7.8z"/>',
     mais: '<circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/>',
     local: '<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>',
     capitulo: '<path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>',
@@ -69,6 +70,9 @@
   };
 
   const ehDnd = () => _mem.dnd_mode === true || _mem.campaign_type === 'dnd';
+  // No romance o atalho do grupo abre as Relações (campaign_config.telas).
+  const grupoSaoRelacoes = () => ((_mem.campaign_config || window._campaignConfig || {}).telas || {})
+    .tela_do_grupo === 'relacoes';
 
   // ---- Atalhos -------------------------------------------------------
   const TELAS = [
@@ -80,6 +84,18 @@
     { id: 'mochila', rotulo: 'Mochila', dica: 'O equipamento do grupo', soDnd: true },
   ];
 
+  // O nome e a dica de cada atalho no gênero da campanha.
+  function atalho(t) {
+    const nome = (chave, padrao) => (window.nomeDaTela ? window.nomeDaTela(chave, padrao) : padrao);
+    if (t.id === 'grupo' && grupoSaoRelacoes()) {
+      return { ...t, rotulo: 'Relações', dica: 'Como cada pessoa se sente', icone: 'relacoes' };
+    }
+    if (t.id === 'grupo') return { ...t, rotulo: nome('grupo', t.rotulo), dica: `${nome('grupo', t.rotulo)} lado a lado` };
+    if (t.id === 'missoes') return { ...t, rotulo: nome('missoes', t.rotulo), dica: nome('titulo_missoes', t.dica) };
+    if (t.id === 'mapa') return { ...t, rotulo: nome('mapa', t.rotulo) };
+    return t;
+  }
+
   function abrir(tela) {
     // No celular a gaveta fecha antes: a tela abre por cima do jogo, não dela.
     if (document.getElementById('sidebar')?.classList.contains('active') && typeof window.toggleSidebar === 'function') {
@@ -87,7 +103,8 @@
     }
     const W = window;
     if (tela === 'grupo') {
-      if (ehDnd() && W.Grupo) W.Grupo._abrir();
+      if (grupoSaoRelacoes() && W.Relacoes) W.Relacoes._abrir();
+      else if (ehDnd() && W.Grupo) W.Grupo._abrir();
       else if (W.Elenco) W.Elenco._abrir('grupo');
     } else if (tela === 'missoes' && W.Missoes) W.Missoes._abrir('');
     else if (tela === 'mapa' && W.Mapa) W.Mapa._abrir('');
@@ -117,12 +134,12 @@
     if (!nav) return;
     const conta = contadores();
     const dnd = ehDnd();
-    nav.innerHTML = TELAS.filter(t => !t.soDnd || dnd).map(t => {
+    nav.innerHTML = TELAS.filter(t => !t.soDnd || dnd).map(atalho).map(t => {
       const c = conta[t.id];
       return `<button id="sb-atalho-${t.id}" class="sb-atalho" type="button" data-tela="${t.id}"
                       onclick="window.Barra.abrir('${t.id}')" title="${esc(c ? `${t.rotulo}: ${c.dica}` : t.dica)}"
                       aria-label="${esc(c ? `${t.rotulo}, ${c.dica}` : t.rotulo)}">
-        ${svg(ICONES[t.id])}<span class="sb-atalho-rotulo">${t.rotulo}</span>
+        ${svg(ICONES[t.icone || t.id])}<span class="sb-atalho-rotulo">${esc(t.rotulo)}</span>
         ${c ? `<span class="sb-atalho-conta${c.alerta ? ' sb-atalho-alerta' : ''}">${c.n}</span>` : ''}
       </button>`;
     }).join('');
@@ -131,12 +148,12 @@
     const inferior = q('barra-inferior');
     if (inferior) {
       inferior.innerHTML = ['grupo', 'missoes', 'mapa', 'diario'].map(id => {
-        const t = TELAS.find(x => x.id === id);
+        const t = atalho(TELAS.find(x => x.id === id));
         const c = conta[id];
         return `<button class="bi-botao" type="button" data-tela="${id}" onclick="window.Barra.abrir('${id}')"
                         aria-label="${esc(c ? `${t.rotulo}, ${c.dica}` : t.rotulo)}">
-          <span class="bi-icone">${svg(ICONES[id], 22)}${c ? `<span class="bi-conta${c.alerta ? ' sb-atalho-alerta' : ''}">${c.n}</span>` : ''}</span>
-          <span class="bi-rotulo">${t.rotulo}</span></button>`;
+          <span class="bi-icone">${svg(ICONES[t.icone || id], 22)}${c ? `<span class="bi-conta${c.alerta ? ' sb-atalho-alerta' : ''}">${c.n}</span>` : ''}</span>
+          <span class="bi-rotulo">${esc(t.rotulo)}</span></button>`;
       }).join('') + `
         <button id="bi-mais" class="bi-botao" type="button" data-tela="mais" aria-label="Mais: o painel da campanha"
                 onclick="window.toggleSidebar && window.toggleSidebar()">

@@ -4082,7 +4082,7 @@ body.rest-on { overflow: hidden; }
    fica dentro dele. O caminho até o lugar ("Cliviate › Forja de Cliviate")
    fica no topo e cada trecho abre a ficha daquele lugar.
    ═══════════════════════════════════════════════════════════════════ */
-#local-overlay, #pessoa-overlay, #heroi-overlay, #missoes-overlay, #mapa-overlay, #grupo-overlay, #diario-overlay, #elenco-overlay {
+#local-overlay, #pessoa-overlay, #heroi-overlay, #missoes-overlay, #mapa-overlay, #grupo-overlay, #diario-overlay, #elenco-overlay, #relacoes-overlay {
   --lcl-paper: #fffbf0;
   --lcl-bg:    #f4ebd8;
   --lcl-dark:  #3d2a14;
@@ -4106,7 +4106,7 @@ body.rest-on { overflow: hidden; }
    textos que já usavam variáveis do tema (claras no Noite de Tinta) sumiam no
    pergaminho. O pergaminho é o padrão e continua igual; o dourado das
    molduras é o mesmo em todos os temas, porque lê bem no claro e no escuro. */
-:root[data-theme]:not([data-theme="pergaminho"]) :is(#local-overlay, #pessoa-overlay, #heroi-overlay, #missoes-overlay, #mapa-overlay, #grupo-overlay, #diario-overlay, #elenco-overlay) {
+:root[data-theme]:not([data-theme="pergaminho"]) :is(#local-overlay, #pessoa-overlay, #heroi-overlay, #missoes-overlay, #mapa-overlay, #grupo-overlay, #diario-overlay, #elenco-overlay, #relacoes-overlay) {
   --lcl-paper: var(--page-right);
   --lcl-bg:    var(--page-left);
   --lcl-dark:  var(--text-main);
@@ -4207,10 +4207,10 @@ body.rest-on { overflow: hidden; }
   --grm-red-escuro: color-mix(in srgb, var(--ink-sys) 80%, #000);
   --grm-vaga:  color-mix(in srgb, var(--ink-user) 12%, var(--page-right));
 }
-#local-overlay.hidden, #pessoa-overlay.hidden, #heroi-overlay.hidden, #missoes-overlay.hidden, #mapa-overlay.hidden, #grupo-overlay.hidden, #diario-overlay.hidden, #elenco-overlay.hidden { display: none; }
-body.local-on, body.pessoa-on, body.heroi-on, body.missoes-on, body.mapa-on, body.grupo-on, body.diario-on, body.elenco-on { overflow: hidden; }
+#local-overlay.hidden, #pessoa-overlay.hidden, #heroi-overlay.hidden, #missoes-overlay.hidden, #mapa-overlay.hidden, #grupo-overlay.hidden, #diario-overlay.hidden, #elenco-overlay.hidden, #relacoes-overlay.hidden { display: none; }
+body.local-on, body.pessoa-on, body.heroi-on, body.missoes-on, body.mapa-on, body.grupo-on, body.diario-on, body.elenco-on, body.relacoes-on { overflow: hidden; }
 
-#lcl-frame, #psn-frame, #hro-frame, #msn-frame, #map-frame, #grp-frame, #dia-frame, #elc-frame {
+#lcl-frame, #psn-frame, #hro-frame, #msn-frame, #map-frame, #grp-frame, #dia-frame, #elc-frame, #rel-frame {
   width: 100%; max-width: 940px;
   height: min(90vh, 820px);
   background: var(--lcl-paper); color: var(--lcl-text);
@@ -4342,8 +4342,8 @@ body.local-on, body.pessoa-on, body.heroi-on, body.missoes-on, body.mapa-on, bod
 .char-local { font-family: 'Lora', serif; font-size: 11px; color: var(--text-muted); margin-top: 2px; }
 
 @media (max-width: 760px) {
-  #local-overlay, #pessoa-overlay, #heroi-overlay, #missoes-overlay, #mapa-overlay, #grupo-overlay, #diario-overlay, #elenco-overlay { padding: 0; align-items: stretch; }
-  #lcl-frame, #psn-frame, #hro-frame, #msn-frame, #map-frame, #grp-frame, #dia-frame, #elc-frame { max-width: none; border-radius: 0; border: none; height: var(--app-height, 100vh); }
+  #local-overlay, #pessoa-overlay, #heroi-overlay, #missoes-overlay, #mapa-overlay, #grupo-overlay, #diario-overlay, #elenco-overlay, #relacoes-overlay { padding: 0; align-items: stretch; }
+  #lcl-frame, #psn-frame, #hro-frame, #msn-frame, #map-frame, #grp-frame, #dia-frame, #elc-frame, #rel-frame { max-width: none; border-radius: 0; border: none; height: var(--app-height, 100vh); }
   .lcl-header { padding: var(--esp-4) var(--esp-10) var(--esp-3); max-height: none; overflow: visible; }
   .lcl-title { font-size: 1.3rem; }
   .lcl-corpo { display: block; overflow-y: auto; }
@@ -5040,6 +5040,45 @@ body.loot-on { overflow: hidden; }
 @media (max-width: 760px) {
   .elc-corpo { padding: var(--esp-3); }
   .elc-lista { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   RELAÇÕES DO ROMANCE — static/js/relacoes.js
+
+   Moldura e cartões das fichas (lcl-*); as barras são as da atitude na ficha
+   do personagem (psn-barra). O que é só dela: dois medidores por pessoa,
+   afeto e confiança, e o eixo de cada linha do histórico.
+   ═══════════════════════════════════════════════════════════════════ */
+#rel-frame { max-width: 1040px; }
+.rel-corpo { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: var(--esp-4) var(--esp-5); }
+.rel-lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--esp-3); align-items: start; }
+.rel-cartao { display: flex; flex-direction: column; gap: var(--esp-2); }
+.rel-cartao .lcl-item-cabeca { display: flex; flex-wrap: wrap; align-items: center; gap: var(--esp-1); }
+.rel-nome {
+  font: inherit; font-family: 'Playfair Display', serif; font-size: 1.05rem; font-weight: 700;
+  color: var(--lcl-dark); background: none; border: none; padding: 0; margin-right: var(--esp-1);
+  cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px;
+}
+.rel-nome:hover { color: var(--lcl-ink); }
+.rel-vinculo { text-transform: none; }
+.rel-medidor-topo { display: flex; align-items: baseline; gap: var(--esp-2); font-size: 0.86rem; }
+.rel-eixo { font-weight: 700; color: var(--lcl-dark); min-width: 5.6em; }
+.rel-faixa { flex: 1 1 auto; color: var(--lcl-green); font-style: italic; }
+.rel-negativo .rel-faixa { color: var(--lcl-red); }
+.rel-valor { font-variant-numeric: tabular-nums; color: var(--lcl-muted); }
+.rel-barra { margin-top: var(--esp-1); }
+.rel-historico { margin: 0; }
+.rel-historico-eixo { font-size: 0.74rem; color: var(--lcl-muted); text-transform: uppercase; letter-spacing: .04em; margin-right: var(--esp-1); }
+.psn-vinculo { margin: 0 0 var(--esp-2); font-style: italic; color: var(--lcl-muted); }
+.psn-romance + .psn-romance { margin-top: var(--esp-2); }
+/* A faixa da atitude é capitalizada ("Amistoso"); a da relação é uma frase
+   ("com um pé atrás"), que capitalizada vira "Com Um Pé Atrás". */
+.psn-romance .psn-atitude-rotulo { color: var(--lcl-green); text-transform: none; }
+.psn-romance-negativo .psn-atitude-rotulo { color: var(--lcl-red); }
+.rel-sem-historia { margin: 0; font-size: 0.84rem; font-style: italic; color: var(--lcl-muted); }
+@media (max-width: 760px) {
+  .rel-corpo { padding: var(--esp-3); }
+  .rel-lista { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* Diário: a página "Até aqui" (resumo da história e onde o grupo está). */

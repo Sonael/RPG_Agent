@@ -43,7 +43,7 @@
         <div class="lcl-corpo">
           <section class="lcl-corpo-pessoas" aria-label="Relação e o que o grupo sabe">
             <div id="psn-relacao-bloco">
-              <h2 class="lcl-secao">Relação com o grupo</h2>
+              <h2 class="lcl-secao" id="psn-relacao-titulo">Relação com o grupo</h2>
               <div id="psn-relacao"></div>
             </div>
             <h2 class="lcl-secao psn-secao-sabe">O que o grupo sabe</h2>
@@ -125,6 +125,37 @@
       ${hist}`;
   }
 
+  // No romance: afeto e confiança, o vínculo e o porquê das últimas mudanças,
+  // com as mesmas barras da atitude. Vale também para quem é do grupo.
+  function relacaoDoRomance(r) {
+    const barra = (rotulo, eixo, pontas) => {
+      const pos = Math.max(0, Math.min(100, (eixo.valor + 100) / 2));
+      return `
+        <div class="psn-atitude psn-romance${eixo.valor < 0 ? ' psn-romance-negativo' : ''}">
+          <div class="psn-atitude-topo">
+            <span class="psn-atitude-rotulo">${rotulo}: ${esc(eixo.rotulo)}</span>
+            <span class="psn-atitude-valor">${eixo.valor >= 0 ? '+' : ''}${eixo.valor}</span>
+          </div>
+          <div class="psn-barra" role="img" aria-label="${rotulo} ${eixo.valor} de -100 a 100">
+            <div class="psn-barra-meio"></div>
+            <div class="psn-barra-marca" style="left:${pos}%"></div>
+          </div>
+          <div class="psn-barra-pontas"><span>${pontas[0]}</span><span>${pontas[1]}</span></div>
+        </div>`;
+    };
+    const eixo = { afeto: 'afeto', confianca: 'confiança' };
+    const hist = (r.historico || []).length
+      ? `<ul class="psn-historico">${r.historico.map(h => `
+          <li><span class="psn-delta ${h.delta >= 0 ? 'psn-sobe' : 'psn-desce'}">${h.delta >= 0 ? '+' : ''}${h.delta}</span>
+              <span class="rel-historico-eixo">${eixo[h.eixo] || esc(h.eixo)}</span>
+              ${esc(h.motivo)}${h.capitulo ? ` <small>cap. ${esc(h.capitulo)}</small>` : ''}</li>`).join('')}</ul>`
+      : '<div class="lcl-vazio">Nada mudou entre vocês ainda.</div>';
+    return `${r.vinculo ? `<p class="psn-vinculo">${esc(r.vinculo)}</p>` : ''}
+      ${barra('Afeto', r.afeto, ['aversão', 'devoção'])}
+      ${barra('Confiança', r.confianca, ['desconfia', 'confia'])}
+      ${hist}`;
+  }
+
   // As cenas em que ele aparece, da mais recente para trás: é o que o jogador
   // quer lembrar antes de falar com alguém ("o que a gente fez com ele mesmo?").
   function cenas(f) {
@@ -193,8 +224,9 @@
     q('psn-onde').innerHTML = onde(_last);
     q('psn-desc').textContent = _last.descricao || '';
     q('psn-tracos').textContent = _last.tracos ? `Traços: ${_last.tracos}` : '';
-    q('psn-relacao-bloco').classList.toggle('hidden', !_last.atitude);
-    q('psn-relacao').innerHTML = relacao(_last.atitude);
+    q('psn-relacao-bloco').classList.toggle('hidden', !_last.atitude && !_last.relacao);
+    q('psn-relacao-titulo').textContent = _last.relacao ? 'Relação com você' : 'Relação com o grupo';
+    q('psn-relacao').innerHTML = _last.relacao ? relacaoDoRomance(_last.relacao) : relacao(_last.atitude);
     const sabe = _last.conhecido || [];
     q('psn-sabe').innerHTML = sabe.length
       ? `<ul class="psn-sabe-lista">${sabe.map(s => `<li>${esc(s)}</li>`).join('')}</ul>`
