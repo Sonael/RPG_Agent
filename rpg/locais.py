@@ -293,6 +293,11 @@ def missoes_daqui(nome: str) -> list[dict]:
     return saida
 
 
+def _mudancas_de(nome: str) -> list:
+    from rpg import mudancas
+    return mudancas.do_lugar(nome) if nome else []
+
+
 def ficha(nome: str = "") -> dict:
     """
     A ficha do local para a tela: o lugar, o caminho até ele, o que fica
@@ -346,4 +351,6 @@ def ficha(nome: str = "") -> dict:
         "eventos": cenas[:MAX_ACONTECIMENTOS],
         "acontecimentos": len(cenas),
         "missoes": missoes_daqui(nome_final),
+        # Como o lugar mudou pelo que o grupo fez (rpg/mudancas.py).
+        "mudancas": _mudancas_de(nome_final),
     }

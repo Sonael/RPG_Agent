@@ -70,7 +70,7 @@
   // combate → nível → grimório → descanso → loja nessa ordem; esta checagem é o que faz
   // a loja ESPERAR em vez de se empilhar sobre as outras.
   const OUTRAS_TELAS = ['combat-on', 'levelup-on', 'rest-on', 'grimoire-on', 'inventory-on',
-                        'loot-on', 'local-on', 'pessoa-on', 'heroi-on', 'missoes-on', 'mapa-on', 'grupo-on', 'diario-on', 'elenco-on', 'relacoes-on'];
+                        'loot-on', 'local-on', 'pessoa-on', 'heroi-on', 'missoes-on', 'mapa-on', 'grupo-on', 'diario-on', 'elenco-on', 'relacoes-on', 'mundo-on'];
   const outraTelaAberta = () => OUTRAS_TELAS.some(c => document.body.classList.contains(c));
 
   // ---- DOM ---------------------------------------------------------

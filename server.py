@@ -992,7 +992,7 @@ def _payload_de_campanha(name: str, dados: dict, personagens: dict) -> dict:
     pelo nome, "fica dentro de" e "onde está" com o nome do lugar. Ciclo em
     "fica dentro de" levanta ValueError, que as rotas devolvem como 400.
     """
-    from rpg import encontros as _encontros, locais as _locais, segredos as _segredos, tensoes as _tensoes
+    from rpg import encontros as _encontros, faccoes as _faccoes, locais as _locais, segredos as _segredos, tensoes as _tensoes
     locations, erro = _locais.normalizar_campanha_editada(
         dados.get("locations", {}), {}, personagens, {}, dados.get("lojas", {}))
     if erro:
@@ -1036,6 +1036,11 @@ def _payload_de_campanha(name: str, dados: dict, personagens: dict) -> dict:
         "segredos":             _segredos.importar(dados.get("segredos"), dados.get("protagonist", "")),
         "encontros":            _encontros.importar(dados.get("encontros")),
         "tensoes":              _tensoes.importar(dados.get("tensoes")),
+        # O mundo da fantasia: renome, facções e títulos; lendas e bestiário.
+        # (Laços ficam em cada personagem; mudanças, em cada lugar.)
+        **_faccoes.importar(dados),
+        "lendas":               dados.get("lendas", {}) if isinstance(dados.get("lendas"), dict) else {},
+        "bestiario":            dados.get("bestiario", {}) if isinstance(dados.get("bestiario"), dict) else {},
         "_turno":               dados.get("_turno", 0),
         "_upkeep":              dados.get("_upkeep", {}),
     }
@@ -3010,6 +3015,14 @@ def characters_index_route():
     """Todos os personagens, com a categoria e se estão aqui (ver rpg/personagens.py)."""
     from rpg import personagens
     return jsonify(personagens.indice())
+
+
+@app.route("/api/mundo", methods=["GET"])
+@require_auth
+def mundo_route():
+    """O Mundo da fantasia: renome, facções, títulos, laços, lendas, bestiário e mudanças (rpg/mundo.py)."""
+    from rpg import mundo
+    return jsonify(mundo.estado())
 
 
 @app.route("/api/relacoes", methods=["GET"])

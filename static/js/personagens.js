@@ -42,6 +42,7 @@
 
         <div class="lcl-corpo">
           <section class="lcl-corpo-pessoas" aria-label="Relação e o que se sabe">
+            <div id="psn-laco"></div>
             <div id="psn-relacao-bloco">
               <h2 class="lcl-secao" id="psn-relacao-titulo">Relação com o grupo</h2>
               <div id="psn-relacao"></div>
@@ -195,6 +196,31 @@
     </div>`;
   }
 
+  // Fantasia: o laço do companheiro e os títulos que o mundo deu a ele.
+  function laco(f) {
+    const titulos = (f.titulos || []).map(t => `
+      <li class="rel-seg"><span>Título</span> <strong>${esc(t.titulo)}</strong>${t.motivo ? ` — ${esc(t.motivo)}` : ''}</li>`).join('');
+    const l = f.laco;
+    if (!l && !titulos) return '';
+    const pos = l ? Math.max(0, Math.min(100, (l.lealdade.valor + 100) / 2)) : 0;
+    const arco = l && l.arco ? `
+      <p class="rel-seg-linha"><span>Arco</span> ${esc(l.arco.titulo)} <em>(${esc(l.arco.estado)})</em></p>
+      ${l.arco.passos.length ? `<ol class="rel-momentos">${l.arco.passos.map(p => `
+        <li class="rel-momento"><span class="rel-momento-titulo">${esc(p.texto)}</span>${
+          p.capitulo ? ` <small class="rel-momento-cap">cap. ${esc(p.capitulo)}</small>` : ''}</li>`).join('')}</ol>` : ''}` : '';
+    return `
+      <h2 class="lcl-secao">${l ? 'Laço' : 'Títulos'}</h2>
+      ${l ? `<div class="psn-atitude psn-romance${l.lealdade.valor < 0 ? ' psn-romance-negativo' : ''}">
+        <div class="psn-atitude-topo"><span class="psn-atitude-rotulo">Lealdade: ${esc(l.lealdade.faixa)}</span>
+          <span class="psn-atitude-valor">${l.lealdade.valor >= 0 ? '+' : ''}${l.lealdade.valor}</span></div>
+        <div class="psn-barra" role="img" aria-label="Lealdade ${l.lealdade.valor} de -100 a 100">
+          <div class="psn-barra-meio"></div><div class="psn-barra-marca" style="left:${pos}%"></div></div>
+        <div class="psn-barra-pontas"><span>partir</span><span>até o fim</span></div></div>
+        ${l.objetivo ? `<p class="rel-seg-linha"><span>Quer</span> ${esc(l.objetivo)}</p>` : ''}
+        ${arco}` : ''}
+      ${titulos ? `<ul class="rel-segs psn-titulos">${titulos}</ul>` : ''}`;
+  }
+
   // As cenas em que ele aparece, da mais recente para trás: é o que o jogador
   // quer lembrar antes de falar com alguém ("o que a gente fez com ele mesmo?").
   function cenas(f) {
@@ -265,6 +291,7 @@
     q('psn-tracos').textContent = _last.tracos ? `Traços: ${_last.tracos}` : '';
     q('psn-relacao-bloco').classList.toggle('hidden', !_last.atitude && !_last.relacao);
     q('psn-relacao-titulo').textContent = _last.relacao ? 'Relação com você' : 'Relação com o grupo';
+    q('psn-laco').innerHTML = laco(_last);
     q('psn-sabe-titulo').textContent = window.frase('sabe', 'O que o grupo sabe');
     // Pelo nome: "com ele" supunha o gênero de todo personagem.
     q('psn-cenas-titulo').textContent = `Últimas cenas com ${_last.nome}`;

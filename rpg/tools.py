@@ -1067,6 +1067,200 @@ def ajustar_tensao(pessoa_a: str, pessoa_b: str, delta: int = 0, motivo: str = "
     return tensoes.ajustar(pessoa_a, pessoa_b, delta, motivo, tipo, percebida)
 
 
+def ajustar_renome(delta: int, motivo: str = "") -> str:
+    """
+    Muda o renome do grupo (0 a 100: desconhecidos, falados na região,
+    conhecidos no reino, famosos, lendários). Chame quando um feito se
+    espalharia: salvar uma cidade, matar um dragão, uma vergonha pública.
+    ±5 um feito local · ±15 um feito que corre o reino · ±30 algo que vira canção.
+
+    Args:
+        delta:  Quanto somar (negativo para cair no esquecimento ou na vergonha).
+        motivo: O feito.
+    """
+    from rpg import faccoes
+    return faccoes.ajustar_renome(delta, motivo)
+
+
+def ajustar_reputacao(faccao: str, delta: int = 0, motivo: str = "", tipo: str = "",
+                      descricao: str = "", conhecida: bool = True) -> str:
+    """
+    Muda a reputação do grupo com uma facção — reino, guilda, ordem, cidade,
+    culto, clã. Cria a facção se ela ainda não existir. Vai de -100 (inimigos
+    declarados) a +100 (heróis da causa). ±10 um favor ou afronta · ±25 algo
+    que a facção não esquece · ±50 salvar ou trair a facção.
+
+    Args:
+        faccao:    Nome da facção.
+        delta:     Quanto somar (negativo para piorar).
+        motivo:    O que o grupo fez.
+        tipo:      reino, guilda, ordem, cidade, culto... (ao criar).
+        descricao: Uma frase sobre a facção (ao criar).
+        conhecida: False se o grupo ainda não sabe que ela existe (o jogador não vê).
+    """
+    from rpg import faccoes
+    return faccoes.ajustar_reputacao(faccao, delta, motivo, tipo, descricao, conhecida)
+
+
+def conceder_titulo(quem: str, titulo: str, motivo: str = "", efeito: str = "") -> str:
+    """
+    O mundo passa a chamar alguém (ou o grupo) por um título: "Matadora do Wyrm
+    de Cinza", "Os Sem-Bandeira". Dê títulos raros, por feitos que as pessoas
+    comentariam. Use o título na narração: é como os outros os chamam.
+
+    Args:
+        quem:   Nome do personagem, ou "o grupo".
+        titulo: O título.
+        motivo: O feito que o originou.
+        efeito: O que ele muda ("abre as portas da nobreza", "atrai caçadores de recompensa").
+    """
+    from rpg import faccoes
+    return faccoes.conceder_titulo(quem, titulo, motivo, efeito)
+
+
+def registrar_mudanca(local: str, mudanca: str, causa: str = "") -> str:
+    """
+    Registra como um lugar mudou pelo que o grupo fez (ou deixou de fazer): "a
+    ponte foi reconstruída", "a vila prosperou", "o templo virou ruína". O
+    jogador vê na ficha do local e no mapa, e você recebe ao voltar lá.
+
+    Args:
+        local:   O lugar.
+        mudanca: O que mudou.
+        causa:   Por quê (o que o grupo fez).
+    """
+    from rpg import mudancas
+    return mudancas.registrar(local, mudanca, causa)
+
+
+def ajustar_lealdade(nome: str, delta: int, motivo: str = "") -> str:
+    """
+    Muda a lealdade de um companheiro (-100 à beira de partir, +100 até o fim).
+    Não é o quanto ele gosta do grupo (isso é a atitude): é se ele fica quando
+    custar caro. Sobe quando o grupo honra o que ele valoriza, cai quando o
+    trai ou o ignora. ±10 um gesto · ±25 uma escolha que o toca · ±40 trair ou
+    salvar o que ele mais ama. Lealdade muito baixa pode virar abandono.
+
+    Args:
+        nome:   O companheiro.
+        delta:  Quanto somar.
+        motivo: O que aconteceu.
+    """
+    from rpg import lacos
+    return lacos.ajustar_lealdade(nome, delta, motivo)
+
+
+def definir_arco(nome: str, objetivo: str = "", arco: str = "") -> str:
+    """
+    Dá a um companheiro um objetivo pessoal e um arco — a história DELE:
+    redenção, vingança, uma dívida, um amor perdido. Defina cedo; o arco é o
+    que faz o companheiro ser gente.
+
+    Args:
+        nome:     O companheiro.
+        objetivo: O que ele quer ("limpar o nome do pai").
+        arco:     O arco em poucas palavras ("A redenção de Kael").
+    """
+    from rpg import lacos
+    return lacos.definir_arco(nome, objetivo, arco)
+
+
+def avancar_arco(nome: str, passo: str, estado: str = "") -> str:
+    """
+    Avança o arco de um companheiro com o que aconteceu na história, e fecha
+    quando acabar.
+
+    Args:
+        nome:   O companheiro.
+        passo:  O que aconteceu no arco ("Encontrou o irmão vivo").
+        estado: Só ao fechar: cumprido, falhou ou abandonado.
+    """
+    from rpg import lacos
+    return lacos.avancar_arco(nome, passo, estado)
+
+
+def registrar_lenda(titulo: str, tipo: str = "lenda", verdade: str = "", conhecida: bool = False) -> str:
+    """
+    Registra uma lenda, profecia, artefato perdido, mistério ou ruína do mundo,
+    com a VERDADE que só você sabe. O grupo não vê enquanto não ouvir falar
+    dela; depois, junta fragmentos. Registre cedo, para plantar pistas.
+
+    Args:
+        titulo:    O nome ("A Coroa Afogada").
+        tipo:      lenda, profecia, artefato perdido, mistério ou ruína.
+        verdade:   O que ela é de fato — só para você.
+        conhecida: True se o grupo já ouviu falar dela.
+    """
+    from rpg import lendas
+    return lendas.registrar(titulo, tipo, verdade, conhecida)
+
+
+def revelar_fragmento(titulo: str, fragmento: str, fonte: str = "") -> str:
+    """
+    O grupo descobre um pedaço de uma lenda: o que um bardo cantou, o que diz
+    uma inscrição, o que viram numa ruína. Revele em pedaços, pela boca do
+    mundo, e nunca a verdade inteira de uma vez.
+
+    Args:
+        titulo:    A lenda.
+        fragmento: O que o grupo ficou sabendo.
+        fonte:     De onde ("um velho pescador", "a inscrição do altar").
+    """
+    from rpg import lendas
+    return lendas.revelar_fragmento(titulo, fragmento, fonte)
+
+
+def resolver_lenda(titulo: str, desfecho: str) -> str:
+    """
+    Fecha uma lenda quando a história a resolve: o artefato achado, a profecia
+    cumprida (ou quebrada), o mistério explicado.
+
+    Args:
+        titulo:   A lenda.
+        desfecho: O que a história revelou.
+    """
+    from rpg import lendas
+    return lendas.resolver(titulo, desfecho)
+
+
+def registrar_criatura(nome: str, descricao: str = "", tipo: str = "",
+                       encontro: bool = True, derrotada: bool = False) -> str:
+    """
+    Põe uma criatura no bestiário do grupo, ou conta mais um encontro com ela.
+    Chame quando o grupo encontrar uma criatura que valha lembrar (não cada
+    lobo), e com derrotada=True quando a vencerem.
+
+    Args:
+        nome:      A criatura.
+        descricao: Como ela é.
+        tipo:      fera, morto-vivo, dragão, fada...
+        encontro:  Conta mais um encontro.
+        derrotada: Conta mais uma derrotada.
+    """
+    from rpg import bestiario
+    return bestiario.registrar(nome, descricao, tipo, encontro, derrotada)
+
+
+def anotar_criatura(nome: str, nota: str, tipo: str = "fato") -> str:
+    """
+    O grupo descobre algo sobre uma criatura: um hábito, uma lenda, uma
+    FRAQUEZA (tipo="fraqueza"). Só o que eles descobriram de fato.
+
+    Args:
+        nome: A criatura.
+        nota: O que descobriram.
+        tipo: "fato" ou "fraqueza".
+    """
+    from rpg import bestiario
+    return bestiario.anotar(nome, nota, tipo)
+
+
+def ver_mundo() -> str:
+    """Renome, facções, títulos, laços, lendas (com a verdade) e o bestiário, para você se situar."""
+    from rpg import mundo
+    return mundo.bloco_de_cena().strip() or "Nada registrado ainda."
+
+
 def ver_segredos() -> str:
     """Todos os segredos, inclusive os que o protagonista ainda não sabe."""
     from rpg import segredos
@@ -1494,6 +1688,20 @@ ALL_TOOLS = [
     marcar_encontro,
     resolver_encontro,
     ajustar_tensao,
+    # O mundo da fantasia (só fantasia e dark fantasy)
+    ajustar_renome,
+    ajustar_reputacao,
+    conceder_titulo,
+    registrar_mudanca,
+    ajustar_lealdade,
+    definir_arco,
+    avancar_arco,
+    registrar_lenda,
+    revelar_fragmento,
+    resolver_lenda,
+    registrar_criatura,
+    anotar_criatura,
+    ver_mundo,
     # Contexto (dinâmico e completo)
     get_scene_context,
     get_full_context,

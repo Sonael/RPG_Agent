@@ -57,7 +57,8 @@ CAMPAIGN_CONFIGS = {
         "role_examples":  "guerreira, mago, ladino, curandeiro...",
         "flag_hint":      "Ex: portao_aberto=sim, dragao_derrotado=true",
         "telas": {"grupo": "Grupo", "missoes": "Missões", "titulo_missoes": "O Livro de Missões",
-                  "mapa": "Mapa", "titulo_mapa": "O Mapa"},
+                  "mapa": "Mapa", "titulo_mapa": "O Mapa",
+                  "mundo": "Mundo"},
     },
     "dark_fantasy": {
         "label":          "Dark Fantasy",
@@ -66,7 +67,8 @@ CAMPAIGN_CONFIGS = {
         "role_examples":  "mercenária, caçador de bruxas, clérigo renegado, alquimista...",
         "flag_hint":      "Ex: pacto_selado=sim, aldeia_queimada=true",
         "telas": {"grupo": "Companhia", "missoes": "Missões", "titulo_missoes": "O Livro de Missões",
-                  "mapa": "Mapa", "titulo_mapa": "O Mapa"},
+                  "mapa": "Mapa", "titulo_mapa": "O Mapa",
+                  "mundo": "Mundo"},
     },
     "romance": {
         "label":          "Romance / Drama",
@@ -1112,6 +1114,33 @@ _CENAS_POR_GENERO = {
 }
 
 
+# O mundo da fantasia: o que o D&D não mede. Entra na fantasia e no dark
+# fantasy, com e sem regras.
+_MUNDO_DA_FANTASIA = """
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+O MUNDO REAGE, E OS COMPANHEIROS SÃO GENTE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+O jogador tem a tela "O Mundo". Registre ali o que a história construir:
+• RENOME E FACÇÕES: ajustar_renome quando um feito se espalhar;
+  ajustar_reputacao com reinos, guildas, ordens e cidades pelo que o grupo
+  fez a eles. A fama chega antes dos heróis — guardas, nobres e taverneiros
+  reagem a ela. Facção que o grupo ainda não conhece: conhecida=False.
+• TÍTULOS: conceder_titulo, raro, por feitos que as pessoas comentariam; e
+  use o título na narração, é como os outros os chamam.
+• MUDANÇAS NO MUNDO: registrar_mudanca quando um lugar mudar pelo que o grupo
+  fez. Ao voltar lá, mostre a mudança.
+• LAÇOS: os companheiros têm vontade própria. definir_arco cedo (objetivo e a
+  história deles), avancar_arco quando ela andar, ajustar_lealdade quando o
+  grupo honrar ou trair o que eles valorizam. Lealdade baixa pode virar
+  abandono ou traição — deixe acontecer.
+• LENDAS: registrar_lenda com a verdade só para você, revelar_fragmento em
+  pedaços pela boca do mundo, resolver_lenda quando a história resolver.
+• BESTIÁRIO: registrar_criatura e anotar_criatura com o que o grupo descobriu
+  (fraquezas com tipo="fraqueza"). Se usarem uma fraqueza conhecida, ela
+  funciona.
+"""
+
+
 def _cenas_do_genero(genero: str) -> str:
     cenas = _CENAS_POR_GENERO[genero]
     linhas = [
@@ -1142,6 +1171,8 @@ def instrucao_da_campanha(campaign_type: str, dnd_mode: bool) -> str:
     genero, dnd = regras_e_genero(campaign_type, dnd_mode)
     partes = [_STYLE_INSTRUCTIONS[genero].strip(), _TOM_EM_TODA_CENA.strip(),
               _cenas_do_genero(genero)]
+    if genero in ("fantasia", "dark_fantasy"):
+        partes.append(_MUNDO_DA_FANTASIA.strip())
     if dnd:
         partes.append(_STYLE_INSTRUCTIONS["dnd"].strip())
     return "\n\n".join(partes)
@@ -1207,6 +1238,15 @@ def _pendencias_block() -> str:
               "Se algum item não se aplicar (ex.: o grupo não saiu do lugar), "
               "ignore-o em silêncio."
         )
+    except Exception:
+        return ""
+
+
+def _mundo_block() -> str:
+    """Na fantasia e no dark fantasy: renome, facções, laços, lendas (rpg/mundo.py)."""
+    try:
+        from rpg import mundo
+        return mundo.bloco_de_cena()
     except Exception:
         return ""
 
@@ -1347,6 +1387,7 @@ def create_agent(model, campaign_type: str = "fantasia", dnd_mode: bool | None =
             instr += _TELA_BLOCK
         instr += _scene_snapshot_block()
         instr += _relacoes_block()
+        instr += _mundo_block()
         instr += _pendencias_block()
         return instr
 

@@ -16,8 +16,8 @@ Dois filtros, com motivações diferentes:
   ferramentas que nunca chamam.
 
 • As ferramentas das relações (afeto, confiança, estágio, momentos) são do
-  romance: nos outros gêneros a atitude das fichas já cobre o que importa.
-  Por isso "todas" fora do romance é TOTAL menos elas.
+  romance, e as do mundo (renome, facções, laços, lendas, bestiário) são da
+  fantasia e do dark fantasy. esperado() diz quantas cada campanha recebe.
 """
 
 import asyncio
@@ -31,13 +31,31 @@ from rpg.toolsets import (
     FERRAMENTAS_SO_DO_MODO_NARRADO,
     FERRAMENTAS_SO_DO_MODO_DND,
     FERRAMENTAS_SO_DO_ROMANCE,
+    FERRAMENTAS_SO_DA_FANTASIA,
 )
 
 TOTAL = len(ALL_TOOLS)
 N_DND = len(FERRAMENTAS_SO_DO_MODO_DND)
 N_ROMANCE = len(FERRAMENTAS_SO_DO_ROMANCE)
-# Tudo o que uma campanha que não é romance pode receber.
-FORA_DO_ROMANCE = TOTAL - N_ROMANCE
+N_FANTASIA = len(FERRAMENTAS_SO_DA_FANTASIA)
+
+
+def esperado(genero: str, dnd: bool = True, tela: bool = False) -> int:
+    """Quantas ferramentas uma campanha recebe: o total menos o que não é dela."""
+    n = TOTAL
+    if not dnd:
+        n -= N_DND
+    if genero != "romance":
+        n -= N_ROMANCE
+    if genero not in ("fantasia", "dark_fantasy"):
+        n -= N_FANTASIA
+    if tela:
+        n -= len(FERRAMENTAS_SO_DO_MODO_NARRADO)
+    return n
+
+
+# A campanha D&D das fixtures é fantasia ("dnd" é a fantasia de antes).
+FORA_DO_ROMANCE = esperado("fantasia")
 
 
 def nomes(tools):
@@ -97,7 +115,7 @@ def test_modo_tela_retira_as_ferramentas_de_turno(dnd, conjunto):
         "a tela tática resolve o combate pelo motor; a LLM não pode ter "
         "estas ferramentas ou produz turno duplicado"
     )
-    assert len(disponiveis) == FORA_DO_ROMANCE - len(FERRAMENTAS_SO_DO_MODO_NARRADO)
+    assert len(disponiveis) == esperado("fantasia", tela=True)
 
 
 @pytest.mark.parametrize("ferramenta", sorted(FERRAMENTAS_SO_DO_MODO_NARRADO))
@@ -129,7 +147,7 @@ def test_ferramentas_que_devem_sobreviver_ao_modo_tela(dnd, conjunto, ferramenta
 def test_campanha_sem_regras_perde_o_motor_dnd(romance, conjunto):
     disponiveis = nomes(entregues(conjunto))
     assert not (disponiveis & FERRAMENTAS_SO_DO_MODO_DND)
-    assert len(disponiveis) == TOTAL - N_DND
+    assert len(disponiveis) == esperado("romance", dnd=False)
 
 
 @pytest.mark.parametrize("estilo", ["fantasia", "romance", "horror",
@@ -138,8 +156,7 @@ def test_todos_os_estilos_sem_regras_filtram(campanha, conjunto, estilo):
     campanha["dnd_mode"] = False
     campanha["campaign_type"] = estilo
     campanha["combat_mode"] = "narrado"
-    esperado = TOTAL - N_DND if estilo == "romance" else FORA_DO_ROMANCE - N_DND
-    assert len(entregues(conjunto)) == esperado
+    assert len(entregues(conjunto)) == esperado(estilo, dnd=False)
 
 
 def test_ferramentas_de_relacao_so_no_romance(romance, conjunto):
@@ -214,7 +231,7 @@ def test_campanha_sem_ficha_nenhuma_filtra(campanha, conjunto):
     campanha["characters"] = {
         "ana": {"name": "Ana", "description": "", "habilidades": []},   # sem sheet
     }
-    assert len(entregues(conjunto)) == FORA_DO_ROMANCE - N_DND
+    assert len(entregues(conjunto)) == esperado("fantasia", dnd=False)
 
 
 def test_campaign_type_dnd_basta_mesmo_sem_a_flag(campanha, conjunto):

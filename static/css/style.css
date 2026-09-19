@@ -4082,7 +4082,7 @@ body.rest-on { overflow: hidden; }
    fica dentro dele. O caminho até o lugar ("Cliviate › Forja de Cliviate")
    fica no topo e cada trecho abre a ficha daquele lugar.
    ═══════════════════════════════════════════════════════════════════ */
-#local-overlay, #pessoa-overlay, #heroi-overlay, #missoes-overlay, #mapa-overlay, #grupo-overlay, #diario-overlay, #elenco-overlay, #relacoes-overlay {
+#local-overlay, #pessoa-overlay, #heroi-overlay, #missoes-overlay, #mapa-overlay, #grupo-overlay, #diario-overlay, #elenco-overlay, #relacoes-overlay, #mundo-overlay {
   --lcl-paper: #fffbf0;
   --lcl-bg:    #f4ebd8;
   --lcl-dark:  #3d2a14;
@@ -4106,7 +4106,7 @@ body.rest-on { overflow: hidden; }
    textos que já usavam variáveis do tema (claras no Noite de Tinta) sumiam no
    pergaminho. O pergaminho é o padrão e continua igual; o dourado das
    molduras é o mesmo em todos os temas, porque lê bem no claro e no escuro. */
-:root[data-theme]:not([data-theme="pergaminho"]) :is(#local-overlay, #pessoa-overlay, #heroi-overlay, #missoes-overlay, #mapa-overlay, #grupo-overlay, #diario-overlay, #elenco-overlay, #relacoes-overlay) {
+:root[data-theme]:not([data-theme="pergaminho"]) :is(#local-overlay, #pessoa-overlay, #heroi-overlay, #missoes-overlay, #mapa-overlay, #grupo-overlay, #diario-overlay, #elenco-overlay, #relacoes-overlay, #mundo-overlay) {
   --lcl-paper: var(--page-right);
   --lcl-bg:    var(--page-left);
   --lcl-dark:  var(--text-main);
@@ -4207,10 +4207,10 @@ body.rest-on { overflow: hidden; }
   --grm-red-escuro: color-mix(in srgb, var(--ink-sys) 80%, #000);
   --grm-vaga:  color-mix(in srgb, var(--ink-user) 12%, var(--page-right));
 }
-#local-overlay.hidden, #pessoa-overlay.hidden, #heroi-overlay.hidden, #missoes-overlay.hidden, #mapa-overlay.hidden, #grupo-overlay.hidden, #diario-overlay.hidden, #elenco-overlay.hidden, #relacoes-overlay.hidden { display: none; }
-body.local-on, body.pessoa-on, body.heroi-on, body.missoes-on, body.mapa-on, body.grupo-on, body.diario-on, body.elenco-on, body.relacoes-on { overflow: hidden; }
+#local-overlay.hidden, #pessoa-overlay.hidden, #heroi-overlay.hidden, #missoes-overlay.hidden, #mapa-overlay.hidden, #grupo-overlay.hidden, #diario-overlay.hidden, #elenco-overlay.hidden, #relacoes-overlay.hidden, #mundo-overlay.hidden { display: none; }
+body.local-on, body.pessoa-on, body.heroi-on, body.missoes-on, body.mapa-on, body.grupo-on, body.diario-on, body.elenco-on, body.relacoes-on, body.mundo-on { overflow: hidden; }
 
-#lcl-frame, #psn-frame, #hro-frame, #msn-frame, #map-frame, #grp-frame, #dia-frame, #elc-frame, #rel-frame {
+#lcl-frame, #psn-frame, #hro-frame, #msn-frame, #map-frame, #grp-frame, #dia-frame, #elc-frame, #rel-frame, #mnd-frame {
   width: 100%; max-width: 940px;
   height: min(90vh, 820px);
   background: var(--lcl-paper); color: var(--lcl-text);
@@ -4342,8 +4342,8 @@ body.local-on, body.pessoa-on, body.heroi-on, body.missoes-on, body.mapa-on, bod
 .char-local { font-family: 'Lora', serif; font-size: 11px; color: var(--text-muted); margin-top: 2px; }
 
 @media (max-width: 760px) {
-  #local-overlay, #pessoa-overlay, #heroi-overlay, #missoes-overlay, #mapa-overlay, #grupo-overlay, #diario-overlay, #elenco-overlay, #relacoes-overlay { padding: 0; align-items: stretch; }
-  #lcl-frame, #psn-frame, #hro-frame, #msn-frame, #map-frame, #grp-frame, #dia-frame, #elc-frame, #rel-frame { max-width: none; border-radius: 0; border: none; height: var(--app-height, 100vh); }
+  #local-overlay, #pessoa-overlay, #heroi-overlay, #missoes-overlay, #mapa-overlay, #grupo-overlay, #diario-overlay, #elenco-overlay, #relacoes-overlay, #mundo-overlay { padding: 0; align-items: stretch; }
+  #lcl-frame, #psn-frame, #hro-frame, #msn-frame, #map-frame, #grp-frame, #dia-frame, #elc-frame, #rel-frame, #mnd-frame { max-width: none; border-radius: 0; border: none; height: var(--app-height, 100vh); }
   .lcl-header { padding: var(--esp-4) var(--esp-10) var(--esp-3); max-height: none; overflow: visible; }
   .lcl-title { font-size: 1.3rem; }
   .lcl-corpo { display: block; overflow-y: auto; }
@@ -5141,6 +5141,29 @@ body.loot-on { overflow: hidden; }
   .rel-corpo { padding: var(--esp-3); }
   .rel-lista { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   O MUNDO (fantasia e dark fantasy) — static/js/mundo.js
+
+   Moldura, abas e cartões das Relações; o que é só dela: o renome, a
+   facção negativa, o arco do companheiro e a lenda resolvida.
+   ═══════════════════════════════════════════════════════════════════ */
+#mnd-frame { max-width: 1040px; }
+.mnd-lista { display: block; }
+.mnd-renome .rel-intensidade > span, .mnd-fama > span { background: var(--lcl-gold); opacity: 1; }
+.mnd-faccao, .mnd-companheiro, .mnd-lenda, .mnd-criatura, .mnd-mudanca, .mnd-titulo-item {
+  display: flex; flex-direction: column; gap: var(--esp-1);
+}
+.mnd-faccao .rel-faixa, .mnd-companheiro .rel-faixa { color: var(--lcl-green); }
+.mnd-negativa { border-left: 3px solid var(--lcl-red); }
+.mnd-negativa .rel-faixa { color: var(--lcl-red); }
+.mnd-arco { display: flex; flex-direction: column; gap: var(--esp-1); }
+.mnd-arco-fim .rel-momento::before { background: var(--lcl-muted); }
+.mnd-lenda-resolvida { opacity: .85; }
+.mnd-desfecho { font-style: italic; }
+.lcl-mudanca .lcl-item-desc { margin: 0; }
+.map-marca-mudou { border-color: var(--lcl-gold); }
+.psn-titulos strong { color: var(--lcl-dark); }
 
 /* Diário: a página "Até aqui" (resumo da história e onde o grupo está). */
 .dia-cap-resumo .dia-cap-numero { font-style: italic; }

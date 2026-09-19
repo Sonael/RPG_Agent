@@ -53,6 +53,10 @@
             <h2 class="lcl-secao">Quem está aqui</h2>
             <div id="lcl-grupo" class="lcl-grupo"></div>
             <div id="lcl-pessoas" class="lcl-lista"></div>
+            <div id="lcl-mudancas-bloco" class="hidden">
+              <h2 class="lcl-secao">Como este lugar mudou</h2>
+              <div id="lcl-mudancas" class="lcl-lista"></div>
+            </div>
             <h2 class="lcl-secao">O que aconteceu aqui</h2>
             <div id="lcl-eventos" class="lcl-lista"></div>
           </section>
@@ -210,6 +214,14 @@
     q('lcl-missoes').innerHTML = missoes.length
       ? missoes.map(missaoDaqui).join('')
       : '<div class="lcl-vazio">Nenhuma missão ligada a este lugar.</div>';
+
+    // O que o grupo mudou aqui (fantasia): a ponte reconstruída, a vila que prosperou.
+    const mudancas = _last.mudancas || [];
+    q('lcl-mudancas-bloco').classList.toggle('hidden', !mudancas.length);
+    q('lcl-mudancas').innerHTML = mudancas.map(m => `
+      <div class="lcl-item lcl-mudanca"><p class="lcl-item-desc">${esc(m.texto)}${
+        m.capitulo ? ` <small>cap. ${esc(m.capitulo)}</small>` : ''}</p>
+        ${m.causa ? `<p class="rel-seg-linha"><span>Porque</span> ${esc(m.causa)}</p>` : ''}</div>`).join('');
 
     const cenas = _last.eventos || [];
     const total = _last.acontecimentos || cenas.length;

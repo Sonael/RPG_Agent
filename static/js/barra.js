@@ -59,6 +59,8 @@
       + '<path d="M15 8h2"/><path d="M15 12h2"/><path d="M7 16h10"/>',
     mochila: '<path d="M4 10a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/>'
       + '<path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/><path d="M8 21v-5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v5"/>',
+    mundo: '<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/>'
+      + '<path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>',
     relacoes: '<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21l7.8-7.5 1-1.1a5.5 5.5 0 0 0 0-7.8z"/>',
     mais: '<circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/>',
     local: '<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>',
@@ -82,6 +84,8 @@
     { id: 'diario', rotulo: 'Diário', dica: 'A história, capítulo a capítulo' },
     { id: 'personagens', rotulo: 'Personagens', dica: 'Todos os personagens, com busca' },
     { id: 'mochila', rotulo: 'Mochila', dica: 'O equipamento do grupo', soDnd: true },
+    // Fantasia e dark fantasy: renome, companheiros, lendas, bestiário, mudanças.
+    { id: 'mundo', rotulo: 'Mundo', dica: 'Renome, companheiros, lendas e bestiário', soTela: 'mundo' },
   ];
 
   // O nome e a dica de cada atalho no gênero da campanha.
@@ -110,6 +114,7 @@
     else if (tela === 'mapa' && W.Mapa) W.Mapa._abrir('');
     else if (tela === 'diario' && W.Diario) W.Diario._abrir();
     else if (tela === 'personagens' && W.Elenco) W.Elenco._abrir('todos');
+    else if (tela === 'mundo' && W.Mundo) W.Mundo._abrir();
     else if (tela === 'mochila' && W.Inventory) {
       const heroi = ((_grupo && _grupo.herois) || []).find(h => !h.morto);
       W.Inventory._abrir(heroi ? heroi.nome : (_mem.protagonist || ''));
@@ -134,7 +139,9 @@
     if (!nav) return;
     const conta = contadores();
     const dnd = ehDnd();
-    nav.innerHTML = TELAS.filter(t => !t.soDnd || dnd).map(atalho).map(t => {
+    const telas = ((_mem.campaign_config || window._campaignConfig || {}).telas) || {};
+    nav.innerHTML = TELAS.filter(t => (!t.soDnd || dnd) && (!t.soTela || telas[t.soTela]))
+      .map(atalho).map(t => {
       const c = conta[t.id];
       return `<button id="sb-atalho-${t.id}" class="sb-atalho" type="button" data-tela="${t.id}"
                       onclick="window.Barra.abrir('${t.id}')" title="${esc(c ? `${t.rotulo}: ${c.dica}` : t.dica)}"

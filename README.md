@@ -469,7 +469,47 @@ com quem ela está em tensão.
 
 `test_tensoes.py` (13).
 
-`test_genero_e_regras.py` (27), `test_genero_e_regras_navegador.py` (9),
+### O mundo da fantasia (`rpg/mundo.py` e vizinhos, `GET /api/mundo`)
+
+Antes a fantasia era o D&D: sem as regras, sobravam o tom e as telas
+genéricas; com elas, o jogo media muito bem o herói e quase nada do mundo em
+volta dele. Agora a fantasia e o dark fantasy, com e sem D&D, têm a tela
+**"O Mundo"** (atalho "Mundo" na barra), com cinco abas:
+
+- **Renome** (`faccoes.py`): a fama do grupo (0 a 100: desconhecidos, falados
+  na região, conhecidos no reino, famosos, lendários); as **facções** —
+  reinos, guildas, ordens, cidades, cultos — com reputação de -100 a +100
+  (inimigos declarados até heróis da causa) e o porquê; e os **títulos**
+  ("O Juramentado"), com o feito e o que mudam. Facção que o grupo não
+  conhece fica só com o mestre.
+- **Companheiros** (`lacos.py`): a **lealdade** de cada um (-100 à beira de
+  partir, +100 até o fim; diferente da atitude: é se ele fica quando custar
+  caro), o **objetivo** e o **arco** pessoal em passos, que o mestre avança e
+  fecha (cumprido, falhou, abandonado). A lealdade mais baixa vem primeiro.
+- **Lendas** (`lendas.py`): profecias, artefatos perdidos, mistérios e ruínas,
+  com a **verdade** só para o mestre; o grupo junta **fragmentos** (o que
+  ouviu, leu, viu, e de quem) até a história resolver. Lenda nunca ouvida não
+  aparece.
+- **Bestiário** (`bestiario.py`): cada criatura com encontros, derrotas, o que
+  se sabe e as **fraquezas** descobertas.
+- **Mudanças** (`mudancas.py`): como os lugares mudaram pelo que o grupo fez
+  ("a vila prosperou, porque os bandidos foram expulsos"). Aparecem também na
+  ficha do local ("Como este lugar mudou") e no mapa (selo "mudou").
+
+A ficha do companheiro mostra o laço (lealdade, objetivo, arco) e os títulos
+dele. O mestre tem 13 ferramentas (`ajustar_renome`, `ajustar_reputacao`,
+`conceder_titulo`, `registrar_mudanca`, `ajustar_lealdade`, `definir_arco`,
+`avancar_arco`, `registrar_lenda`, `revelar_fragmento`, `resolver_lenda`,
+`registrar_criatura`, `anotar_criatura`, `ver_mundo`), só na fantasia e no
+dark fantasy (`toolsets.FERRAMENTAS_SO_DA_FANTASIA`); a instrução ensina
+quando usá-las, e o bloco de cena de cada turno traz o renome, as facções
+(inclusive as desconhecidas), os títulos, as mudanças do lugar atual, os
+laços, as lendas em aberto com a verdade e as fraquezas conhecidas. A
+importação guarda renome, facções, títulos, lendas e bestiário.
+
+`test_mundo.py` (20) e `test_mundo_navegador.py` (4).
+
+`test_genero_e_regras.py` (27), `test_genero_e_regras_navegador.py` (10),
 `test_segredos.py` (18),
 `test_relacoes.py` (28) e `test_relacoes_navegador.py` (21).
 

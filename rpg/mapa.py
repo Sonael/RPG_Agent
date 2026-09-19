@@ -29,7 +29,8 @@ def _todos_os_lugares() -> dict:
             saida[locais.norm(loc["name"])] = {
                 "nome": loc["name"], "tipo": "local",
                 "dentro_de": loc.get("dentro_de", "") or "",
-                "descricao": (loc.get("description", "") or "")[:140]}
+                "descricao": (loc.get("description", "") or "")[:140],
+                "mudancas": len(loc.get("mudancas") or [])}
     for loja in (memory.campaign.get("lojas") or {}).values():
         if not isinstance(loja, dict) or not (loja.get("nome") or "").strip():
             continue
@@ -91,6 +92,7 @@ def mapa_snapshot() -> dict:
         total = len(aqui) + sum(n["pessoas_total"] for n in sub)
         return {
             "nome": lug["nome"], "tipo": lug["tipo"], "descricao": lug["descricao"],
+            "mudancas": lug.get("mudancas", 0),
             "alcance": locais.alcance(lug["nome"]),
             "grupo_aqui": chave == locais.norm(atual) and bool(atual),
             # O caminho até onde o grupo está vem aberto na árvore.

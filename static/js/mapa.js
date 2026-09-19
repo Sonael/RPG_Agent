@@ -104,6 +104,7 @@
       n.grupo_aqui ? `<span class="lcl-marca lcl-marca-grupo">${esc(window.frase('grupo_aqui', 'grupo aqui'))}</span>` : '',
       !n.grupo_aqui && ALCANCE[n.alcance] ? `<span class="lcl-marca map-marca-alcance">${ALCANCE[n.alcance]}</span>` : '',
       n.tipo === 'loja' ? '<span class="lcl-marca lcl-marca-loja">loja</span>' : '',
+      n.mudancas ? `<span class="lcl-marca map-marca-mudou" title="Mudou pelo que o grupo fez">mudou</span>` : '',
       n.tipo === 'sem_registro' ? '<span class="lcl-marca map-marca-sem" title="Citado na campanha, mas nunca registrado como local">sem registro</span>' : '',
       n.pessoas_total ? `<span class="map-contagem" title="Pessoas aqui e nos lugares de dentro">${n.pessoas_total} ${n.pessoas_total === 1 ? 'pessoa' : 'pessoas'}</span>` : '',
     ].join('');

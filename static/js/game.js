@@ -1043,6 +1043,7 @@ function sincronizarTelas() {
     try { if (window.Diario) await window.Diario.sync(); } catch (_) {}
     try { if (window.Elenco) await window.Elenco.sync(); } catch (_) {}
     try { if (window.Relacoes) await window.Relacoes.sync(); } catch (_) {}
+    try { if (window.Mundo) await window.Mundo.sync(); } catch (_) {}
   };
   _filaTelas = _filaTelas.then(rodada, rodada);
   return _filaTelas;

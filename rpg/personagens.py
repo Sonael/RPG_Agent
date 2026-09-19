@@ -110,6 +110,13 @@ def _efeitos_da_atitude(valor: int) -> list[str]:
             f"{pct:+d}% no preço da loja dele"]
 
 
+def _mundo_da_pessoa(ch: dict) -> dict:
+    from rpg import faccoes, lacos
+    if (memory.campaign.get("campaign_type") or "") not in faccoes.GENEROS:
+        return {"laco": None, "titulos": []}
+    return {"laco": lacos.do_companheiro(ch), "titulos": faccoes.titulos(ch.get("name", ""))}
+
+
 def _usa_regras() -> bool:
     """
     Os efeitos da atitude (CD dos testes sociais, preço da loja) são regras de
@@ -178,6 +185,9 @@ def ficha(nome: str) -> dict:
         "local": {"nome": locais.nome_canonico(local), "alcance": alcance} if local else None,
         # Relação só faz sentido para quem não é do grupo.
         "relacao": relacao,
+        # Fantasia: o laço do companheiro (lealdade, objetivo, arco) e os
+        # títulos que o mundo deu a ele.
+        **_mundo_da_pessoa(ch),
         "atitude": None if (do_grupo or romance) else {
             "valor": valor, "rotulo": rotulo, "conduta": conduta,
             "historico": historico,

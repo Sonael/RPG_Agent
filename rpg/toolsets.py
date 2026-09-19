@@ -93,6 +93,17 @@ FERRAMENTAS_SO_DO_ROMANCE = frozenset({"ajustar_relacao", "mudar_estagio", "marc
                                        "marcar_encontro", "resolver_encontro", "ajustar_tensao"})
 
 
+# O mundo da fantasia: renome, facções, títulos, mudanças, laços, lendas e o
+# bestiário. Só fantasia e dark fantasy, com ou sem D&D: nos outros gêneros
+# seriam 13 ferramentas de peso morto.
+FERRAMENTAS_SO_DA_FANTASIA = frozenset({
+    "ajustar_renome", "ajustar_reputacao", "conceder_titulo", "registrar_mudanca",
+    "ajustar_lealdade", "definir_arco", "avancar_arco", "registrar_lenda",
+    "revelar_fragmento", "resolver_lenda", "registrar_criatura", "anotar_criatura", "ver_mundo",
+})
+GENEROS_DA_FANTASIA = ("fantasia", "dark_fantasy")
+
+
 def _nomes_das_ferramentas_dnd() -> frozenset:
     from rpg.tools_dnd import DND_TOOLS
     return frozenset(f.__name__ for f in DND_TOOLS) - _CARVE_OUT_GENERICAS
@@ -156,6 +167,8 @@ class FerramentasDoTurno(BaseToolset):
             modo = (camp.get("combat_mode") or "narrado")
             usa_dnd = _campanha_usa_dnd(camp)
             romance = (camp.get("campaign_type") or "") == "romance"
+            # "dnd" é a fantasia com regras de antes da separação.
+            fantasia = (camp.get("campaign_type") or "") in GENEROS_DA_FANTASIA + ("dnd",)
         except Exception:
             # Falha de forma segura: sem contexto de campanha, entrega tudo.
             return list(self._todas)
@@ -170,6 +183,8 @@ class FerramentasDoTurno(BaseToolset):
             excluir |= FERRAMENTAS_SO_DO_MODO_DND
         if not romance:
             excluir |= FERRAMENTAS_SO_DO_ROMANCE
+        if not fantasia:
+            excluir |= FERRAMENTAS_SO_DA_FANTASIA
 
         if not excluir:
             self._log(modo, usa_dnd, self._todas)

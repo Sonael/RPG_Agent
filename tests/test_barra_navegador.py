@@ -483,7 +483,9 @@ def test_celular_mais_abre_a_gaveta_com_o_relance_e_os_atalhos(abrir):
     pg.wait_for_timeout(400)
     assert pg.is_visible("#sb-herois .sb-heroi[data-nome='Helena']")
     assert pg.is_visible("#sb-missao")
-    assert pg.locator("#sb-atalhos .sb-atalho").count() == 6
+    # Os seis de sempre e, numa fantasia, "Mundo" (renome, companheiros, lendas).
+    assert pg.locator("#sb-atalhos .sb-atalho").count() == 7
+    assert pg.is_visible("#sb-atalho-mundo")
     assert pg.is_hidden("#sb-recolher")
     pg.click("#sb-atalho-personagens")
     pg.wait_for_selector("#elenco-overlay:not(.hidden)", timeout=5000)
