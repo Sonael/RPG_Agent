@@ -3948,6 +3948,7 @@ async function openEditCampaign(e, name) {
     if (el) el.value = '';
   });
   document.getElementById('ed-err').textContent = '';
+  edMundo = {};
   document.getElementById('ed-chars-list').innerHTML = '<div style="padding:10px;font-style:italic;color:var(--text-muted);">Carregando...</div>';
   document.getElementById('ed-locs-list').innerHTML = '';
   document.getElementById('ed-evts-list').innerHTML = '';
@@ -4036,6 +4037,11 @@ async function openEditCampaign(e, name) {
     edFlags = Object.entries(c.quest_flags || {}).map(([chave, valor]) => ({ chave, valor: String(valor ?? '') }));
     edRenderFlags();
 
+    // O mundo do gênero (passo 4). Cópia: cada item guarda o que o editor
+    // não mostra (histórico, capítulo) e volta inteiro ao salvar.
+    edMundo = edMundoDaCampanha(c);
+    edRenderStep();
+
   } catch (err) {
     await showAlert('Erro', err.message, 'danger');
     closeEditOverlay();
@@ -4060,9 +4066,12 @@ function editGoTo(step) {
   edRenderStep();
 }
 
+// O passo 4 (o mundo do gênero) só existe no romance e na fantasia.
+function edUltimoPasso() { return ED_MUNDO[edGenero()] ? 4 : 3; }
+
 function editNext() {
   if (edStep === 1) { if (!edValidateStep1()) return; edStep = 2; }
-  else if (edStep === 2) { edStep = 3; }
+  else if (edStep < edUltimoPasso()) { edStep++; }
   edRenderStep();
 }
 
@@ -4071,16 +4080,26 @@ function editBack() {
 }
 
 function edRenderStep() {
-  [1,2,3].forEach(n => {
-    document.getElementById(`ed-panel-${n}`).classList.toggle('hidden', edStep !== n);
+  const ultimo = edUltimoPasso();
+  // Trocar para um gênero sem o passo 4 estando nele volta ao 3.
+  if (edStep > ultimo) edStep = ultimo;
+  const mundo = ED_MUNDO[edGenero()];
+  document.getElementById('ed-dot-4')?.classList.toggle('hidden', !mundo);
+  document.getElementById('ed-line-4')?.classList.toggle('hidden', !mundo);
+  const nome = document.getElementById('ed-dot-4-nome');
+  if (nome && mundo) nome.textContent = mundo.titulo;
+  [1,2,3,4].forEach(n => {
+    document.getElementById(`ed-panel-${n}`)?.classList.toggle('hidden', edStep !== n);
     const dot = document.getElementById(`ed-dot-${n}`);
+    if (!dot) return;
     dot.classList.remove('active','done');
     if (n === edStep) dot.classList.add('active');
     else if (n < edStep) dot.classList.add('done');
   });
+  if (edStep === 4) edRenderMundo();
   document.getElementById('ed-back-btn').classList.toggle('hidden', edStep === 1);
-  document.getElementById('ed-next-btn').classList.toggle('hidden', edStep === 3);
-  document.getElementById('ed-save-btn').classList.toggle('hidden', edStep !== 3);
+  document.getElementById('ed-next-btn').classList.toggle('hidden', edStep === ultimo);
+  document.getElementById('ed-save-btn').classList.toggle('hidden', edStep !== ultimo);
   document.getElementById('ed-err').textContent = '';
   document.getElementById('edit-scroll').scrollTop = 0;
 }
@@ -4931,6 +4950,251 @@ function edRenderEvts() {
     </div>`).join('');
 }
 
+// ── O mundo do gênero (passo 4) ────────────────────────────────────
+// O que é da campanha inteira, e não de um personagem: no romance, segredos,
+// tensões entre os outros e encontros marcados; na fantasia e no dark
+// fantasy, renome, facções, títulos, lendas e bestiário. Antes só o jogo
+// (pelo mestre) mexia nisso. O servidor normaliza com as mesmas funções da
+// importação (_mundo_editado).
+const ED_MUNDO = {
+  romance:  { titulo: 'Relações', colecoes: ['segredos', 'tensoes', 'encontros'] },
+  fantasia: { titulo: 'Mundo',    colecoes: ['renome', 'faccoes', 'titulos', 'lendas', 'bestiario'] },
+};
+ED_MUNDO.dark_fantasy = ED_MUNDO.fantasia;
+
+// Tipos de campo: text, textarea, number, select, check, pessoa (nome, com
+// sugestões dos personagens), lugar, nomes (lista separada por vírgula),
+// notas (uma por linha, bestiário) e fragmentos (uma por linha, "texto | fonte").
+// `inteiro` ocupa a linha toda.
+const ED_COLECOES = {
+  segredos: {
+    rotulo: 'Segredos', novo: '+ Segredo', nada: 'Nenhum segredo.',
+    dica: 'Sem dono, o segredo é seu: você o esconde de alguém. Com dono, é de outra pessoa, e você só o conhece se souber como.',
+    vazio: () => ({ titulo: '', descricao: '', dono: '', escondido_de: [], sabem: [], revelado: false, como: '' }),
+    campos: [
+      { id: 'titulo', label: 'O segredo', type: 'text', inteiro: true, hint: 'Ex: A bolsa em Lisboa' },
+      { id: 'descricao', label: 'Descrição', type: 'textarea', inteiro: true },
+      { id: 'dono', label: 'De quem é', type: 'pessoa', hint: 'vazio: é seu' },
+      { id: 'sabem', label: 'Quem já sabe', type: 'nomes', hint: 'nomes separados por vírgula' },
+      { id: 'escondido_de', label: 'Você esconde de (só nos seus)', type: 'nomes', hint: 'nomes separados por vírgula' },
+      { id: 'como', label: 'Você sabe (só nos dos outros)', type: 'select',
+        options: [['', 'Ainda não'], ['contou', 'Contaram a você'], ['descobriu', 'Você descobriu']] },
+    ],
+  },
+  tensoes: {
+    rotulo: 'Tensões entre os outros', novo: '+ Tensão', nada: 'Nenhuma tensão.',
+    dica: 'Entre duas pessoas que não são você: ciúme, rivalidade, mágoa, desconfiança.',
+    vazio: () => ({ a: '', b: '', tipo: 'ciume', intensidade: 30, percebida: true }),
+    campos: [
+      { id: 'a', label: 'Entre', type: 'pessoa' },
+      { id: 'b', label: 'E', type: 'pessoa' },
+      { id: 'tipo', label: 'Tipo', type: 'select',
+        options: [['ciume', 'Ciúme'], ['rivalidade', 'Rivalidade'], ['magoa', 'Mágoa'], ['desconfianca', 'Desconfiança']] },
+      { id: 'intensidade', label: 'Intensidade (0 a 100)', type: 'number', min: 0, max: 100 },
+      { id: 'percebida', label: 'Você já percebeu', type: 'check' },
+    ],
+  },
+  encontros: {
+    rotulo: 'Encontros marcados', novo: '+ Encontro', nada: 'Nenhum encontro marcado.',
+    dica: 'Dia e hora no relógio do mundo. A barra avisa quando está perto.',
+    vazio: () => ({ com: '', o_que: '', dia: 1, hora: 20, onde: '', estado: 'marcado' }),
+    campos: [
+      { id: 'com', label: 'Com', type: 'pessoa' },
+      { id: 'o_que', label: 'O quê', type: 'text', hint: 'Ex: jantar' },
+      { id: 'dia', label: 'Dia', type: 'number', min: 1 },
+      { id: 'hora', label: 'Hora (0 a 23)', type: 'number', min: 0, max: 23 },
+      { id: 'onde', label: 'Onde', type: 'lugar' },
+      { id: 'estado', label: 'Estado', type: 'select',
+        options: [['marcado', 'Marcado'], ['aconteceu', 'Aconteceu'], ['faltou', 'Você faltou'], ['cancelado', 'Cancelado']] },
+    ],
+  },
+  renome: {
+    rotulo: 'Renome do grupo', unico: true,
+    campos: [{ id: 'valor', label: '0 desconhecidos, 50 famosos no reino, 100 lendários',
+               type: 'number', min: 0, max: 100 }],
+  },
+  faccoes: {
+    rotulo: 'Facções', novo: '+ Facção', nada: 'Nenhuma facção.',
+    vazio: () => ({ nome: '', tipo: '', descricao: '', reputacao: 0, conhecida: true }),
+    campos: [
+      { id: 'nome', label: 'Nome', type: 'text', hint: 'Ex: Guarda de Cliviate' },
+      { id: 'tipo', label: 'Tipo', type: 'text', hint: 'reino, guilda, ordem, culto...' },
+      { id: 'descricao', label: 'Descrição', type: 'textarea', inteiro: true },
+      { id: 'reputacao', label: 'Reputação do grupo (-100 a 100)', type: 'number', min: -100, max: 100 },
+      { id: 'conhecida', label: 'O grupo sabe que ela existe', type: 'check' },
+    ],
+  },
+  titulos: {
+    rotulo: 'Títulos', novo: '+ Título', nada: 'Nenhum título.',
+    vazio: () => ({ titulo: '', quem: '', motivo: '', efeito: '' }),
+    campos: [
+      { id: 'titulo', label: 'Título', type: 'text', hint: 'Ex: Matadores do Lobo Branco' },
+      { id: 'quem', label: 'De quem', type: 'pessoa', hint: 'vazio: o grupo' },
+      { id: 'motivo', label: 'Por quê', type: 'text' },
+      { id: 'efeito', label: 'O que muda', type: 'text' },
+    ],
+  },
+  lendas: {
+    rotulo: 'Lendas', novo: '+ Lenda', nada: 'Nenhuma lenda.',
+    vazio: () => ({ titulo: '', tipo: 'lenda', verdade: '', fragmentos: [], conhecida: true, desfecho: '' }),
+    campos: [
+      { id: 'titulo', label: 'Lenda', type: 'text', hint: 'Ex: O Lobo Branco' },
+      { id: 'tipo', label: 'Tipo', type: 'select',
+        options: [['lenda', 'Lenda'], ['profecia', 'Profecia'], ['artefato perdido', 'Artefato perdido'], ['mistério', 'Mistério'], ['ruína', 'Ruína']] },
+      { id: 'verdade', label: 'A verdade (só o mestre vê)', type: 'textarea', inteiro: true },
+      { id: 'fragmentos', label: 'O que o grupo já ouviu (um por linha; a fonte depois de |)', type: 'fragmentos', inteiro: true,
+        hint: 'Dizem que ele caça na lua nova | o ferreiro' },
+      { id: 'desfecho', label: 'Desfecho (se a história já resolveu)', type: 'text', inteiro: true },
+      { id: 'conhecida', label: 'O grupo já ouviu falar dela', type: 'check' },
+    ],
+  },
+  bestiario: {
+    rotulo: 'Bestiário', novo: '+ Criatura', nada: 'Nenhuma criatura.',
+    vazio: () => ({ nome: '', tipo: '', descricao: '', fatos: [], fraquezas: [], encontros: 0, derrotadas: 0 }),
+    campos: [
+      { id: 'nome', label: 'Criatura', type: 'text' },
+      { id: 'tipo', label: 'Tipo', type: 'text', hint: 'fera, morto-vivo, dragão...' },
+      { id: 'descricao', label: 'Como ela é', type: 'textarea', inteiro: true },
+      { id: 'fatos', label: 'O que o grupo sabe (um por linha)', type: 'notas', inteiro: true },
+      { id: 'fraquezas', label: 'Fraquezas descobertas (uma por linha)', type: 'notas', inteiro: true },
+      { id: 'encontros', label: 'Vezes encontrada', type: 'number', min: 0 },
+      { id: 'derrotadas', label: 'Vezes derrotada', type: 'number', min: 0 },
+    ],
+  },
+};
+
+let edMundo = {};
+
+function edMundoDaCampanha(c) {
+  const copia = v => JSON.parse(JSON.stringify(v ?? null));
+  const lista = v => Array.isArray(v) ? copia(v) : Object.values(copia(v) || {});
+  const segredos = lista(c.segredos);
+  // "Você sabe" é um campo só: revelado sem "como" é que contaram.
+  segredos.forEach(s => { if (s.revelado && !s.como) s.como = 'contou'; if (!s.revelado) s.como = ''; });
+  return {
+    segredos, tensoes: lista(c.tensoes), encontros: lista(c.encontros),
+    renome: { valor: 0, ...(copia(c.renome) || {}) },
+    faccoes: lista(c.faccoes), titulos: lista(c.titulos), lendas: lista(c.lendas), bestiario: lista(c.bestiario),
+  };
+}
+
+function edMundoParaSalvar() {
+  const cfg = ED_MUNDO[edGenero()];
+  if (!cfg || !Object.keys(edMundo).length) return {};
+  return Object.fromEntries(cfg.colecoes.map(k => [k, edMundo[k]]));
+}
+
+function edMundoValor(item, f) {
+  const v = item[f.id];
+  if (f.type === 'nomes') return (v || []).join(', ');
+  if (f.type === 'notas') return (v || []).map(n => n.texto).join('\n');
+  if (f.type === 'fragmentos') return (v || []).map(x => x.fonte ? `${x.texto} | ${x.fonte}` : x.texto).join('\n');
+  return v ?? '';
+}
+
+function edMundoCampo(col, i, f, item) {
+  const on = `edMundoMudar('${col}', ${i}, '${f.id}', this)`;
+  const hint = escHtml(f.hint || '');
+  const v = edMundoValor(item, f);
+  let campo;
+  if (f.type === 'check') {
+    return `<label class="ed-mundo-check${f.inteiro ? ' inteiro' : ''}" data-campo="${f.id}">
+      <input type="checkbox" ${v ? 'checked' : ''} onchange="${on}"> ${escHtml(f.label)}</label>`;
+  } else if (f.type === 'select') {
+    campo = `<select onchange="${on}">${f.options.map(([val, rot]) =>
+      `<option value="${escHtml(val)}"${val === v ? ' selected' : ''}>${escHtml(rot)}</option>`).join('')}</select>`;
+  } else if (['textarea', 'notas', 'fragmentos'].includes(f.type)) {
+    campo = `<textarea rows="2" placeholder="${hint}" onchange="${on}">${escHtml(v)}</textarea>`;
+  } else if (f.type === 'number') {
+    campo = `<input type="number"${f.min !== undefined ? ` min="${f.min}"` : ''}${f.max !== undefined ? ` max="${f.max}"` : ''}
+      value="${escHtml(v)}" placeholder="${hint}" onchange="${on}">`;
+  } else {
+    const lista = f.type === 'pessoa' ? ' list="ed-pessoas"' : f.type === 'lugar' ? ' list="ed-lugares"' : '';
+    campo = `<input type="text"${lista} value="${escHtml(v)}" placeholder="${hint}" onchange="${on}">`;
+  }
+  return `<div class="${f.inteiro ? 'inteiro' : ''}" data-campo="${f.id}"><span class="cwc-label">${escHtml(f.label)}</span>${campo}</div>`;
+}
+
+function edRenderMundo() {
+  const box = document.getElementById('ed-mundo');
+  const cfg = ED_MUNDO[edGenero()];
+  if (!box) return;
+  if (!cfg) { box.innerHTML = ''; return; }
+  const dl = document.getElementById('ed-pessoas');
+  if (dl) dl.innerHTML = edChars.map(c => (c.name || '').trim()).filter(Boolean)
+    .map(n => `<option value="${escHtml(n)}"></option>`).join('');
+  edAtualizarLugares();
+  box.innerHTML = cfg.colecoes.map(col => {
+    const def = ED_COLECOES[col];
+    if (def.unico) {
+      return `<div class="field-group ed-mundo-colecao" data-colecao="${col}">
+        <label>${escHtml(def.rotulo)}</label>
+        <div class="ed-mundo-campos">${def.campos.map(f => edMundoCampo(col, -1, f, edMundo[col] || {})).join('')}</div>
+      </div>`;
+    }
+    const itens = edMundo[col] || [];
+    return `<div class="field-group ed-mundo-colecao" data-colecao="${col}">
+      <div class="linha-secao">
+        <label>${escHtml(def.rotulo)}</label>
+        <button class="clean-button btn-inline-mini" onclick="edMundoNovo('${col}')">${def.novo}</button>
+      </div>
+      ${def.dica ? `<div class="campo-nota">${escHtml(def.dica)}</div>` : ''}
+      ${itens.length ? itens.map((item, i) => `
+        <div class="wz-loc-card ed-mundo-item">
+          <button onclick="edMundoRemover('${col}', ${i})" aria-label="Remover" title="Remover"
+            style="position:absolute;top:8px;right:8px;background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:14px;">✕</button>
+          <div class="ed-mundo-campos">${def.campos.map(f => edMundoCampo(col, i, f, item)).join('')}</div>
+        </div>`).join('') : `<div class="ed-flags-vazio">${escHtml(def.nada)}</div>`}
+    </div>`;
+  }).join('');
+}
+
+function edMundoNovo(col) {
+  edMundo[col] = edMundo[col] || [];
+  edMundo[col].push(ED_COLECOES[col].vazio());
+  edRenderMundo();
+  const itens = document.querySelectorAll(`.ed-mundo-colecao[data-colecao="${col}"] .ed-mundo-item`);
+  itens[itens.length - 1]?.querySelector('input, textarea')?.focus();
+}
+
+function edMundoRemover(col, i) {
+  edMundo[col].splice(i, 1);
+  edRenderMundo();
+}
+
+function edMundoMudar(col, i, id, el) {
+  const f = ED_COLECOES[col].campos.find(c => c.id === id);
+  const item = i < 0 ? (edMundo[col] = edMundo[col] || {}) : edMundo[col][i];
+  const linhas = () => el.value.split('\n').map(s => s.trim()).filter(Boolean);
+  let v;
+  if (f.type === 'check') v = el.checked;
+  else if (f.type === 'number') {
+    // Vazio ou inválido não apaga: o servidor descartaria o encontro sem dia.
+    if (el.value === '' || !Number.isFinite(Number(el.value))) { el.value = item[id] ?? ''; return; }
+    v = Number(el.value);
+    if (f.min !== undefined) v = Math.max(f.min, v);
+    if (f.max !== undefined) v = Math.min(f.max, v);
+    el.value = v;
+  }
+  else if (f.type === 'nomes') v = el.value.split(',').map(s => s.trim()).filter(Boolean);
+  else if (f.type === 'notas') {
+    const antes = item[id] || [];
+    v = linhas().map(t => antes.find(n => n.texto === t) || { texto: t, cap: 1 });
+  }
+  else if (f.type === 'fragmentos') {
+    const antes = item[id] || [];
+    v = linhas().map(l => {
+      const [t, ...resto] = l.split('|');
+      const texto = t.trim(), fonte = resto.join('|').trim();
+      return antes.find(x => x.texto === texto && (x.fonte || '') === fonte) || { texto, fonte, cap: 1 };
+    }).filter(x => x.texto);
+  }
+  else v = el.value;
+  item[id] = v;
+  // "Você sabe" de um segredo dos outros é o revelado do jogo.
+  if (col === 'segredos' && id === 'como') item.revelado = !!v;
+}
+
 // ── Salvar ─────────────────────────────────────────────────────────
 async function saveEditedCampaign() {
   if (!edValidateStep1()) { edStep = 1; edRenderStep(); return; }
@@ -5019,6 +5283,8 @@ async function saveEditedCampaign() {
       current_location: document.getElementById('ed-location').value,
       // O marcado no cartão; sem ninguém marcado, o que estava gravado.
       protagonist:      (edChars.find(c => c.protagonista && c.name.trim())?.name.trim()) || edProtagonistaGravado,
+      // Só as coleções do gênero de agora; as de outro ficam como estavam.
+      ...edMundoParaSalvar(),
       characters,
       locations,
       events,

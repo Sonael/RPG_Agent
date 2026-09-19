@@ -4015,6 +4015,20 @@ body.rest-on { overflow: hidden; }
 }
 .moldura-tela .cwc-header { background: var(--tl-bg); border-bottom-color: var(--tl-gold); }
 .moldura-tela .cwc-header:hover { background: var(--tl-realce); }
+/* Passo 4 do editor (o mundo do gênero): dois campos por linha; o texto
+   longo ocupa a linha toda. */
+.ed-mundo-campos {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: var(--esp-2) var(--esp-4); padding-right: var(--esp-6);
+}
+.ed-mundo-campos .inteiro { grid-column: 1 / -1; }
+.ed-mundo-check {
+  display: flex; align-items: center; gap: var(--esp-2);
+  font-size: 13px; color: var(--text-muted); cursor: pointer; align-self: end;
+  padding-bottom: var(--esp-2);
+}
+.ed-mundo-colecao .campo-nota { margin: 0 0 var(--esp-2); }
+@media (max-width: 700px) { .ed-mundo-campos { grid-template-columns: 1fr; padding-right: 0; } }
 .moldura-tela .cwc-seta { color: var(--tl-gold-texto); font-size: 12px; }
 .moldura-tela .cwc-nome {
   font-family: 'Playfair Display', serif; font-size: 1rem; font-weight: 700; color: var(--tl-dark);

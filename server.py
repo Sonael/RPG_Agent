@@ -1107,6 +1107,30 @@ def get_campaign(name):
         return jsonify({"error": str(e)}), 500
 
 
+def _mundo_editado(dados: dict, existente: dict, protagonista: str) -> dict:
+    """As coleções do mundo do gênero que o editor mandou, no formato do jogo."""
+    from rpg import bestiario as _bestiario, encontros as _encontros, faccoes as _faccoes, lendas as _lendas
+    from rpg import segredos as _segredos, tensoes as _tensoes
+    saida = {}
+    if "segredos" in dados:
+        saida["segredos"] = _segredos.importar(dados["segredos"], protagonista)
+    if "tensoes" in dados:
+        saida["tensoes"] = _tensoes.importar(dados["tensoes"])
+    if "encontros" in dados:
+        saida["encontros"] = _encontros.importar(dados["encontros"])
+    if "lendas" in dados:
+        saida["lendas"] = _lendas.importar(dados["lendas"])
+    if "bestiario" in dados:
+        saida["bestiario"] = _bestiario.importar(dados["bestiario"])
+    # Renome, facções e títulos saem juntos de faccoes.importar: o que não
+    # veio entra como estava, para não voltar ao padrão.
+    trio = ("renome", "faccoes", "titulos")
+    if any(k in dados for k in trio):
+        juntos = {k: dados[k] if k in dados else existente.get(k) for k in trio}
+        saida.update({k: v for k, v in _faccoes.importar(juntos).items() if k in trio})
+    return saida
+
+
 @app.route("/api/campaigns/<name>", methods=["PUT"])
 @require_auth
 def update_campaign(name):
@@ -1192,6 +1216,11 @@ def update_campaign(name):
         # que não manda o campo não apaga as que existem.
         "quest_flags":      campaign_data.get("quest_flags", existing.get("quest_flags", {})),
     })
+    # O mundo do gênero, editado no passo 4 do editor: segredos, tensões e
+    # encontros no romance; renome, facções, títulos, lendas e bestiário na
+    # fantasia. Passa pelas mesmas funções da importação (formato do jogo,
+    # faixas, repetidos de fora). Só o que veio: o resto fica como estava.
+    payload.update(_mundo_editado(campaign_data, existing, payload.get("protagonist", "")))
 
     try:
         if new_name != name:

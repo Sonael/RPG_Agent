@@ -205,3 +205,34 @@ def test_ficha_mochila_e_habilidades_que_o_editor_nao_manda_ficam(rota):
     editada["characters"]["brom"]["inventario"] = []
     assert put(editada).status_code == 200
     assert gravado["characters"]["brom"]["inventario"] == []
+
+
+def test_mundo_editado_passa_pela_importacao_e_so_o_que_veio_muda(rota):
+    """
+    O passo 4 do editor manda as coleções do gênero. Elas passam pelas mesmas
+    funções da importação; renome, facções e títulos saem juntos de
+    faccoes.importar, e o que não veio entra como estava.
+    """
+    antiga, put, gravado = rota
+    antiga.update({"protagonist": "Alden",
+                   "renome": {"valor": 12, "historico": [{"delta": 12, "motivo": "a emboscada"}]},
+                   "titulos": [{"titulo": "Os do Portão", "quem": "o grupo", "motivo": "", "efeito": "", "cap": 1}],
+                   "lendas": {"o lobo": {"titulo": "O Lobo", "tipo": "lenda", "verdade": "", "fragmentos": [],
+                                         "conhecida": False, "desfecho": "", "cap": 1}}})
+    editada = copy.deepcopy(antiga)
+    for fora in ("renome", "titulos", "lendas"):                   # o editor não mandou
+        editada.pop(fora)
+    editada["faccoes"] = [{"nome": "Guarda", "reputacao": 300, "conhecida": False},
+                          {"nome": ""}]                                   # sem nome: fora
+    editada["segredos"] = [{"titulo": "O mapa", "dono": "Alden", "escondido_de": "Brom"},
+                           {"titulo": "A dívida", "dono": "Brom", "revelado": True, "como": "descobriu"}]
+    assert put(editada).status_code == 200
+
+    assert gravado["faccoes"] == {"guarda": {"nome": "Guarda", "tipo": "facção", "descricao": "",
+                                             "reputacao": 100, "conhecida": False, "historico": [], "cap": 1}}
+    assert gravado["renome"] == antiga["renome"], "mandar só as facções zerou o renome"
+    assert [t["titulo"] for t in gravado["titulos"]] == ["Os do Portão"]
+    assert gravado["lendas"] == antiga["lendas"]                         # não veio: como estava
+    mapa, divida = gravado["segredos"]["o mapa"], gravado["segredos"]["a divida"]
+    assert (mapa["dono"], mapa["escondido_de"]) == ("", ["Brom"])      # o protagonista como dono é "seu"
+    assert (divida["revelado"], divida["dono_sabe"]) == (True, False)

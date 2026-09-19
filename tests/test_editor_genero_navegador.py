@@ -257,3 +257,173 @@ def test_notas_do_local_aparecem_e_se_editam(editor):
     _salvar(pg)
     assert gravado["locations"]["café aurora"]["notes"] == "O dono vende o café em abril"
     assert not erros, erros[:3]
+
+
+# --- Passo 4: o mundo do gênero ------------------------------------------------
+# Segredos, tensões e encontros (romance); renome, facções, títulos, lendas e
+# bestiário (fantasia). Antes só o jogo mexia nisso: o editor preservava, mas
+# não mostrava.
+
+ROMANCE_MUNDO = copy.deepcopy(ROMANCE)
+ROMANCE_MUNDO.update({
+    "relogio": {"dia": 6, "hora": 15},
+    "segredos": {
+        "a bolsa em lisboa": {"titulo": "A bolsa em Lisboa", "descricao": "Vai embora em março", "dono": "",
+                              "escondido_de": ["Lucas"], "sabem": ["Helena"], "revelado": False, "como": "",
+                              "dono_sabe": True, "cap": 2, "historico": [{"delta": -5, "motivo": "quase contou"}]},
+        "o irmão na prisão": {"titulo": "O irmão na prisão", "descricao": "", "dono": "Lucas", "escondido_de": [],
+                              "sabem": [], "revelado": True, "como": "descobriu", "dono_sabe": False,
+                              "cap": 3, "cap_revelado": 4, "historico": []},
+    },
+    "tensoes": {"helena|lucas": {"a": "Helena", "b": "Lucas", "tipo": "ciume", "intensidade": 60,
+                                 "percebida": False, "historico": [{"delta": 20, "motivo": "o baile"}], "cap": 2}},
+    "encontros": [{"id": 1, "com": "Lucas", "dia": 7, "hora": 20, "onde": "Café Aurora", "o_que": "jantar",
+                   "estado": "marcado", "cap": 3}],
+})
+
+FANTASIA_MUNDO = copy.deepcopy(FANTASIA)
+FANTASIA_MUNDO.update({
+    "renome": {"valor": 12, "historico": [{"delta": 12, "motivo": "a emboscada"}]},
+    "faccoes": {"guarda de cliviate": {"nome": "Guarda de Cliviate", "tipo": "cidade", "descricao": "A milícia.",
+                                       "reputacao": 20, "conhecida": True,
+                                       "historico": [{"delta": 20, "motivo": "salvaram o portão"}], "cap": 1}},
+    "titulos": [{"titulo": "Os do Portão", "quem": "o grupo", "motivo": "salvaram o portão", "efeito": "", "cap": 1}],
+    "lendas": {"o lobo branco": {"titulo": "O Lobo Branco", "tipo": "lenda", "verdade": "É o prefeito",
+                                 "fragmentos": [{"texto": "Caça na lua nova", "fonte": "o ferreiro", "cap": 2}],
+                                 "conhecida": True, "desfecho": "", "cap": 1}},
+    "bestiario": {"lobo das brumas": {"nome": "Lobo das Brumas", "tipo": "fera", "descricao": "Enorme.",
+                                      "fatos": [{"texto": "Anda em matilha", "cap": 2}], "fraquezas": [],
+                                      "encontros": 2, "derrotadas": 1, "cap": 1}},
+})
+
+
+def _genero(pg, genero):
+    pg.evaluate("() => editGoTo(1)")
+    pg.select_option("#ed-type", genero)
+
+
+def _passo_4(pg):
+    pg.evaluate("() => editGoTo(4)")
+    pg.wait_for_selector("#ed-panel-4:not(.hidden) .ed-mundo-colecao", timeout=5000)
+
+
+def _item(pg, colecao, i):
+    return pg.locator(f".ed-mundo-colecao[data-colecao='{colecao}'] .ed-mundo-item").nth(i)
+
+
+def _campo(item, campo):
+    return item.locator(f"[data-campo='{campo}'] :is(input, select, textarea)")
+
+
+def test_passo_4_so_no_romance_e_na_fantasia(editor):
+    abrir, erros, _ = editor
+    pg = abrir(ROMANCE_MUNDO)
+    assert pg.is_visible("#ed-dot-4") and pg.inner_text("#ed-dot-4-nome") == "Relações"
+    _genero(pg, "horror")
+    pg.evaluate("() => editGoTo(3)")
+    assert not pg.is_visible("#ed-dot-4")
+    assert pg.is_visible("#ed-save-btn") and not pg.is_visible("#ed-next-btn")
+    _genero(pg, "fantasia")
+    assert pg.inner_text("#ed-dot-4-nome") == "Mundo"
+    assert pg.is_visible("#ed-next-btn") and not pg.is_visible("#ed-save-btn")
+    assert not erros, erros[:3]
+
+
+def test_romance_edita_segredos_tensoes_e_encontros(editor):
+    abrir, erros, gravado = editor
+    pg = abrir(ROMANCE_MUNDO)
+    _passo_4(pg)
+
+    bolsa, irmao = _item(pg, "segredos", 0), _item(pg, "segredos", 1)
+    assert _campo(bolsa, "titulo").input_value() == "A bolsa em Lisboa"
+    assert _campo(bolsa, "escondido_de").input_value() == "Lucas"
+    assert _campo(irmao, "dono").input_value() == "Lucas"
+    assert _campo(irmao, "como").input_value() == "descobriu"
+    tensao = _item(pg, "tensoes", 0)
+    assert _campo(tensao, "intensidade").input_value() == "60"
+    assert not _campo(tensao, "percebida").is_checked()
+    assert _campo(_item(pg, "encontros", 0), "dia").input_value() == "7"
+
+    _mudar(_campo(bolsa, "sabem"), "Helena, Rafa")
+    _mudar(_campo(irmao, "como"), "")
+    _mudar(_campo(tensao, "intensidade"), 150)                  # passa do teto
+    assert _campo(tensao, "intensidade").input_value() == "100"
+    _campo(tensao, "percebida").check()
+    pg.click(".ed-mundo-colecao[data-colecao='encontros'] button:has-text('+ Encontro')")
+    novo = _item(pg, "encontros", 1)
+    for campo, valor in (("com", "Rafa"), ("o_que", "cinema"), ("dia", 8), ("hora", 19)):
+        _mudar(_campo(novo, campo), valor)
+    _salvar(pg)
+
+    seg = gravado["segredos"]
+    assert seg["a bolsa em lisboa"]["sabem"] == ["Helena", "Rafa"]
+    assert seg["a bolsa em lisboa"]["historico"] == [{"delta": -5, "motivo": "quase contou"}], "perdeu o histórico"
+    assert seg["o irmao na prisao"]["revelado"] is False             # chave como o jogo grava: sem acento
+    t = gravado["tensoes"]["helena|lucas"]
+    assert (t["intensidade"], t["percebida"], t["historico"]) == (100, True, [{"delta": 20, "motivo": "o baile"}])
+    assert [(e["com"], e["o_que"], e["dia"], e["hora"]) for e in gravado["encontros"]] == \
+        [("Lucas", "jantar", 7, 20), ("Rafa", "cinema", 8, 19)]
+    assert not erros, erros[:3]
+
+
+def test_remover_um_segredo(editor):
+    abrir, erros, gravado = editor
+    pg = abrir(ROMANCE_MUNDO)
+    _passo_4(pg)
+    _item(pg, "segredos", 0).locator("button[aria-label='Remover']").click()
+    assert pg.locator(".ed-mundo-colecao[data-colecao='segredos'] .ed-mundo-item").count() == 1
+    _salvar(pg)
+    assert list(gravado["segredos"]) == ["o irmao na prisao"]
+    assert not erros, erros[:3]
+
+
+def test_fantasia_edita_renome_faccoes_lendas_e_bestiario(editor):
+    abrir, erros, gravado = editor
+    pg = abrir(FANTASIA_MUNDO)
+    _passo_4(pg)
+    renome = pg.locator(".ed-mundo-colecao[data-colecao='renome'] [data-campo='valor'] input")
+    assert renome.input_value() == "12"
+    lenda = _item(pg, "lendas", 0)
+    assert _campo(lenda, "fragmentos").input_value() == "Caça na lua nova | o ferreiro"
+    assert _campo(lenda, "verdade").input_value() == "É o prefeito"
+
+    _mudar(renome, 30)
+    _mudar(_campo(_item(pg, "faccoes", 0), "reputacao"), -10)
+    _mudar(_campo(lenda, "fragmentos"), "Caça na lua nova | o ferreiro\nUivos no norte | o guarda")
+    _mudar(_campo(_item(pg, "bestiario", 0), "fraquezas"), "Prata\nFogo")
+    _mudar(_campo(_item(pg, "titulos", 0), "efeito"), "A guarda abre o portão à noite")
+    _salvar(pg)
+
+    assert gravado["renome"]["valor"] == 30
+    assert gravado["renome"]["historico"] == [{"delta": 12, "motivo": "a emboscada"}]
+    guarda = gravado["faccoes"]["guarda de cliviate"]
+    assert guarda["reputacao"] == -10 and guarda["historico"][0]["motivo"] == "salvaram o portão"
+    frags = gravado["lendas"]["o lobo branco"]["fragmentos"]
+    assert frags == [{"texto": "Caça na lua nova", "fonte": "o ferreiro", "cap": 2},
+                     {"texto": "Uivos no norte", "fonte": "o guarda", "cap": 1}]
+    assert [n["texto"] for n in gravado["bestiario"]["lobo das brumas"]["fraquezas"]] == ["Prata", "Fogo"]
+    assert gravado["bestiario"]["lobo das brumas"]["fatos"] == [{"texto": "Anda em matilha", "cap": 2}]
+    assert gravado["titulos"][0]["efeito"] == "A guarda abre o portão à noite"
+    assert not erros, erros[:3]
+
+
+def test_trocar_de_genero_nao_apaga_o_mundo_do_outro(editor):
+    abrir, erros, gravado = editor
+    pg = abrir(ROMANCE_MUNDO)
+    _genero(pg, "fantasia")
+    _salvar(pg)
+    assert list(gravado["segredos"]) == ["a bolsa em lisboa", "o irmão na prisão"]
+    assert gravado["tensoes"]["helena|lucas"]["intensidade"] == 60
+    assert not erros, erros[:3]
+
+
+def test_numero_vazio_nao_apaga_o_encontro(editor):
+    abrir, erros, gravado = editor
+    pg = abrir(ROMANCE_MUNDO)
+    _passo_4(pg)
+    dia = _campo(_item(pg, "encontros", 0), "dia")
+    _mudar(dia, "")
+    assert dia.input_value() == "7"
+    _salvar(pg)
+    assert gravado["encontros"][0]["dia"] == 7
+    assert not erros, erros[:3]
