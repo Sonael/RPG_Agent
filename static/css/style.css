@@ -2672,6 +2672,11 @@ body.shop-on { overflow: hidden; }
   --lvl-muted: #6e5c4f;
   --lvl-green: #2e7d32;
   --lvl-red:   #8b2315;
+  --lvl-trilho: #e6ded2;
+  --lvl-line:   #e0d5c2;
+  --lvl-sobre:  #fff;
+  --lvl-green-escuro: #1f5c23;
+  --lvl-red-escuro:   #6b1a0f;
 
   position: fixed; inset: 0; z-index: 9000;
   background: rgba(20,12,6,0.82); backdrop-filter: blur(4px);
@@ -2740,7 +2745,7 @@ body.levelup-on { overflow: hidden; }
 .lvl-xp { margin-top: var(--esp-3); }
 .lvl-xp-barra {
   height: 6px; border-radius: 3px;
-  background: #e6ded2; overflow: hidden;
+  background: var(--lvl-trilho); overflow: hidden;
 }
 .lvl-xp-fill {
   height: 100%; background: var(--lvl-gold);
@@ -2773,7 +2778,7 @@ body.levelup-on { overflow: hidden; }
   display: flex; flex-direction: column; align-items: center;
   min-width: 76px;
   padding: var(--esp-1) var(--esp-2);
-  border: 1px solid #e0d5c2; border-radius: 6px;
+  border: 1px solid var(--lvl-line); border-radius: 6px;
   background: var(--lvl-paper);
 }
 .lvl-attr-nome  { font-size: 0.7rem; color: var(--lvl-muted); text-transform: uppercase; letter-spacing: .03em; }
@@ -2852,7 +2857,7 @@ body.levelup-on { overflow: hidden; }
 .lvl-step {
   display: flex; flex-direction: column; align-items: center; gap: 2px;
   background: var(--lvl-paper);
-  border: 1px solid #e0d5c2; border-radius: 8px;
+  border: 1px solid var(--lvl-line); border-radius: 8px;
   padding: var(--esp-2) var(--esp-2) var(--esp-1);
   transition: border-color .15s, background .15s;
 }
@@ -2870,7 +2875,7 @@ body.levelup-on { overflow: hidden; }
   font-family: 'Lora', serif; font-size: 1.2rem; font-weight: 700; line-height: 1;
   cursor: pointer; transition: background .15s;
 }
-.lvl-step-btn:hover:not(:disabled) { background: var(--lvl-gold); color: #fff; }
+.lvl-step-btn:hover:not(:disabled) { background: var(--lvl-gold); color: var(--lvl-sobre); }
 .lvl-step-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 .lvl-step-valor {
   min-width: 2ch; text-align: center;
@@ -2894,10 +2899,10 @@ body.levelup-on { overflow: hidden; }
 }
 .lvl-asi-desfazer:hover:not(:disabled) { background: var(--lvl-bg); }
 .lvl-asi-confirmar {
-  background: var(--lvl-green); color: #fff;
+  background: var(--lvl-green); color: var(--lvl-sobre);
   border: 1px solid var(--lvl-green);
 }
-.lvl-asi-confirmar:hover:not(:disabled) { background: #1f5c23; }
+.lvl-asi-confirmar:hover:not(:disabled) { background: var(--lvl-green-escuro); }
 .lvl-asi-desfazer:disabled, .lvl-asi-confirmar:disabled {
   opacity: 0.45; cursor: not-allowed;
 }
@@ -2941,13 +2946,13 @@ body.levelup-on { overflow: hidden; }
 }
 .lvl-msg-erro { color: var(--lvl-red); font-weight: 700; }
 .lvl-concluir {
-  background: var(--lvl-red); color: #fff;
+  background: var(--lvl-red); color: var(--lvl-sobre);
   border: 1px solid var(--lvl-gold); border-radius: 6px;
   font-family: 'Lora', serif; font-weight: 700; font-size: 0.9rem;
   padding: var(--esp-2) var(--esp-5); cursor: pointer;
   flex: 0 0 auto;
 }
-.lvl-concluir:hover:not(:disabled) { background: #6b1a0f; }
+.lvl-concluir:hover:not(:disabled) { background: var(--lvl-red-escuro); }
 /* Desabilitado enquanto houver escolha pendente: sair da tela devendo é
    exatamente o que ela existe para impedir. Fechar no ✕ continua possível. */
 .lvl-concluir:disabled {
@@ -3029,6 +3034,13 @@ body.levelup-on { overflow: hidden; }
   --inv-red:   #8b2315;
   --inv-green: #2e7d32;
   --inv-line:  #e0d5c2;
+  --inv-trilho: #e6ded2;
+  --inv-sobre:  #fff;
+  --inv-roxo:   #5b3f8a;
+  --inv-roxo-borda: #7b5ea7;
+  --inv-roxo-fundo: #efe8f6;
+  --inv-verde-texto: #1f5e24;
+  --inv-red-escuro:  #6b1a0f;
 
   position: fixed; inset: 0; z-index: 9000;
   background: rgba(20,12,6,0.82); backdrop-filter: blur(4px);
@@ -3102,7 +3114,7 @@ body.inventory-on { overflow: hidden; }
 }
 .inv-num { font-variant-numeric: tabular-nums; }
 .inv-carga-barra {
-  position: relative; height: 8px; border-radius: 4px; background: #e6ded2; overflow: hidden;
+  position: relative; height: 8px; border-radius: 4px; background: var(--inv-trilho); overflow: hidden;
 }
 .inv-carga-fill { height: 100%; background: var(--inv-green); transition: width .3s; }
 .inv-carga-cheia { background: #c58b1c; }
@@ -3159,8 +3171,8 @@ body.inventory-on { overflow: hidden; }
   font-size: 0.7rem; border-radius: 10px; padding: 1px var(--esp-2);
   border: 1px solid var(--inv-line); color: var(--inv-muted);
 }
-.inv-marca-equip { background: var(--inv-leather); border-color: var(--inv-leather); color: #fff; font-weight: 700; }
-.inv-marca-identificar { border-color: #7b5ea7; color: #5b3f8a; font-weight: 700; }
+.inv-marca-equip { background: var(--inv-leather); border-color: var(--inv-leather); color: var(--inv-sobre); font-weight: 700; }
+.inv-marca-identificar { border-color: var(--inv-roxo-borda); color: var(--inv-roxo); font-weight: 700; }
 .inv-item-desc { margin: var(--esp-2) 0 0; font-size: 0.82rem; color: var(--inv-muted); line-height: 1.4; }
 .inv-item-acoes { display: flex; gap: var(--esp-2); flex-wrap: wrap; margin-top: var(--esp-2); }
 .inv-btn {
@@ -3169,15 +3181,15 @@ body.inventory-on { overflow: hidden; }
   background: var(--inv-paper); color: var(--inv-dark); border: 1px solid var(--inv-gold);
 }
 .inv-btn:hover { background: var(--inv-bg); }
-.inv-btn-equipar { background: var(--inv-leather); border-color: var(--inv-leather); color: #fff; }
+.inv-btn-equipar { background: var(--inv-leather); border-color: var(--inv-leather); color: var(--inv-sobre); }
 .inv-btn-equipar:hover { background: var(--inv-dark); }
 .inv-previa { font-weight: 400; opacity: .9; margin-left: 2px; font-variant-numeric: tabular-nums; }
-.inv-btn-identificar { border-color: #7b5ea7; color: #5b3f8a; }
+.inv-btn-identificar { border-color: var(--inv-roxo-borda); color: var(--inv-roxo); }
 .inv-marca-srd { border-color: var(--inv-gold); color: var(--inv-dark); }
 /* Ação no ar: a tela espera. Sem isto o Identificar (que vai ao Open5e e pode
    levar segundos) parecia um botão morto. */
 .inv-btn:disabled, .inv-quem-sel:disabled { opacity: .5; cursor: progress; }
-.inv-btn-consultando:disabled { opacity: 1; background: #efe8f6; }
+.inv-btn-consultando:disabled { opacity: 1; background: var(--inv-roxo-fundo); }
 .inv-btn-consultando::before {
   content: ''; display: inline-block; width: .8em; height: .8em;
   margin-right: var(--esp-1); vertical-align: -1px;
@@ -3185,17 +3197,17 @@ body.inventory-on { overflow: hidden; }
   animation: inv-gira .8s linear infinite;
 }
 @keyframes inv-gira { to { transform: rotate(360deg); } }
-.inv-item-consultando { border-color: #7b5ea7; }
+.inv-item-consultando { border-color: var(--inv-roxo-borda); }
 .inv-item { transition: box-shadow .3s, background-color .3s; }
 .inv-item-destaque { box-shadow: 0 0 0 2px var(--inv-gold); background: var(--inv-bg); }
-.inv-msg-carregando { font-style: italic; color: #5b3f8a; }
+.inv-msg-carregando { font-style: italic; color: var(--inv-roxo); }
 @media (prefers-reduced-motion: reduce) {
   .inv-btn-consultando::before { animation: none; border-right-color: currentColor; }
   .inv-item { transition: none; }
 }
 .inv-btn-largar { color: var(--inv-muted); border-color: var(--inv-line); }
 /* Usar fora do combate: verde de cura, para não competir com "equipar". */
-.inv-btn-usar, .inv-btn-dar { border-color: #2e7d32; color: #1f5e24; }
+.inv-btn-usar, .inv-btn-dar { border-color: var(--inv-green); color: var(--inv-verde-texto); }
 .inv-btn-usar:hover:not(:disabled), .inv-btn-dar:hover:not(:disabled) { background: rgba(46,125,50,0.1); }
 .inv-uso-motivo { flex-basis: 100%; font-size: 0.74rem; font-style: italic; color: var(--inv-muted); }
 .inv-vazio { color: var(--inv-muted); font-style: italic; text-align: center; padding: var(--esp-8) var(--esp-4); }
@@ -3209,12 +3221,12 @@ body.inventory-on { overflow: hidden; }
 .inv-msg { flex: 1 1 auto; font-size: 0.88rem; color: var(--inv-dark); min-height: 1.2em; }
 .inv-msg-erro { color: var(--inv-red); font-weight: 700; }
 .inv-fechar {
-  background: var(--inv-red); color: #fff;
+  background: var(--inv-red); color: var(--inv-sobre);
   border: 1px solid var(--inv-gold); border-radius: 6px;
   font-family: 'Lora', serif; font-weight: 700; font-size: 0.9rem;
   padding: var(--esp-2) var(--esp-5); cursor: pointer; flex: 0 0 auto;
 }
-.inv-fechar:hover { background: #6b1a0f; }
+.inv-fechar:hover { background: var(--inv-red-escuro); }
 
 @media (max-width: 760px) {
   #inventory-overlay { padding: 0; align-items: stretch; }
@@ -3514,6 +3526,11 @@ body.grimoire-on { overflow: hidden; }
   --rst-green: #2e7d32;
   --rst-red:   #8b2315;
   --rst-ember: #b5541c;
+  --rst-line:   #e0d5c2;
+  --rst-trilho: #e6ded2;
+  --rst-sobre:  #fff;
+  --rst-ember-escuro: #8f4115;
+  --rst-red-escuro:   #6b1a0f;
 
   position: fixed; inset: 0; z-index: 9000;
   background: rgba(20,12,6,0.82); backdrop-filter: blur(4px);
@@ -3589,7 +3606,7 @@ body.rest-on { overflow: hidden; }
   border: 1px solid var(--rst-gold); border-radius: 8px;
   padding: var(--esp-3) var(--esp-4);
 }
-.rst-card-fora { opacity: 0.62; border-color: #e0d5c2; }
+.rst-card-fora { opacity: 0.62; border-color: var(--rst-line); }
 .rst-card-cabeca { display: flex; flex-direction: column; }
 .rst-nome { font-family: 'Playfair Display', serif; font-weight: 700; font-size: 1.08rem; color: var(--rst-dark); }
 .rst-classe { font-size: 0.8rem; color: var(--rst-muted); text-transform: capitalize; }
@@ -3602,7 +3619,7 @@ body.rest-on { overflow: hidden; }
 }
 .rst-vida-barra {
   position: relative; height: 8px; border-radius: 4px;
-  background: #e6ded2; overflow: hidden;
+  background: var(--rst-trilho); overflow: hidden;
 }
 .rst-vida-fill { height: 100%; background: var(--rst-red); transition: width .35s; }
 .rst-vida-teto {
@@ -3628,15 +3645,15 @@ body.rest-on { overflow: hidden; }
 .rst-gastos { font-size: 0.78rem; color: var(--rst-ember); font-weight: 700; }
 .rst-dado {
   font-family: 'Lora', serif; font-weight: 700; font-size: 0.88rem;
-  background: var(--rst-ember); color: #fff;
+  background: var(--rst-ember); color: var(--rst-sobre);
   border: 1px solid var(--rst-ember); border-radius: 6px;
   padding: var(--esp-2) var(--esp-4); cursor: pointer;
   transition: background .15s;
 }
-.rst-dado:hover:not(:disabled) { background: #8f4115; }
+.rst-dado:hover:not(:disabled) { background: var(--rst-ember-escuro); }
 .rst-dado:disabled {
   background: var(--rst-paper); color: var(--rst-muted);
-  border-color: #e0d5c2; cursor: not-allowed;
+  border-color: var(--rst-line); cursor: not-allowed;
 }
 
 .rst-longo-lista {
@@ -3676,10 +3693,10 @@ body.rest-on { overflow: hidden; }
 }
 .rst-cancelar:hover:not(:disabled) { background: var(--rst-paper); border-color: var(--rst-dark); }
 .rst-concluir {
-  background: var(--rst-red); color: #fff;
+  background: var(--rst-red); color: var(--rst-sobre);
   border: 1px solid var(--rst-gold);
 }
-.rst-concluir:hover:not(:disabled) { background: #6b1a0f; }
+.rst-concluir:hover:not(:disabled) { background: var(--rst-red-escuro); }
 .rst-cancelar:disabled, .rst-concluir:disabled { opacity: 0.45; cursor: not-allowed; }
 .rst-concluir:disabled { background: var(--rst-muted); }
 
@@ -3744,10 +3761,10 @@ body.rest-on { overflow: hidden; }
 
    A classe .moldura-tela no overlay traz a mesma moldura: papel creme,
    borda dourada, título vermelho, faixa de rodapé e botão principal
-   vermelho. As telas não seguem o tema escolhido nas configurações, e a
-   moldura também não: as variáveis de tema são redefinidas aqui dentro, de
-   modo que os estilos inline do JS (que usam var(--page-edge),
-   var(--ink-user) etc.) passam a desenhar em pergaminho sem reescrevê-los.
+   vermelho. No pergaminho as variáveis de tema são redefinidas aqui dentro,
+   de modo que os estilos inline do JS (que usam var(--page-edge),
+   var(--ink-user) etc.) desenham na paleta das telas sem reescrevê-los; nos
+   outros temas elas voltam a ser as do tema (bloco logo abaixo).
    ═══════════════════════════════════════════════════════════════════ */
 .moldura-tela {
   --tl-paper: #fffbf0;
@@ -3759,6 +3776,11 @@ body.rest-on { overflow: hidden; }
   --tl-muted: #6e5c4f;
   --tl-green: #2e7d32;
   --tl-red:   #8b2315;
+  --tl-sobre:  #fff;
+  --tl-red-escuro: #6b1a0f;
+  --tl-placeholder: #a8998a;
+  --tl-realce: #efe3cb;
+  --tl-gold-texto: var(--tl-gold);
 
   --page-right: var(--tl-paper);
   --page-left:  var(--tl-bg);
@@ -3780,6 +3802,41 @@ body.rest-on { overflow: hidden; }
   backdrop-filter: blur(4px);
   font-family: 'Lora', serif;
   color: var(--tl-text);
+}
+/* A moldura segue o tema, como as outras telas. Fora do pergaminho as
+   variáveis de tema voltam a herdar as da página (inherit), e as da moldura
+   passam a ser as do tema: o que o JS desenha com var(--ink-user) e afins
+   continua certo sem reescrever nada. O dourado da moldura fica. */
+:root[data-theme]:not([data-theme="pergaminho"]) .moldura-tela {
+  --page-right: inherit;
+  --page-left:  inherit;
+  --page-edge:  inherit;
+  --text-main:  inherit;
+  --text-muted: inherit;
+  --text-dim:   var(--text-muted);
+  --text:       inherit;
+  --ink-user:   inherit;
+  --ink-main:   inherit;
+  --ink-sys:    inherit;
+  --gold:       inherit;
+  --gold-dim:   inherit;
+  --green:      inherit;
+  --red:        inherit;
+  --blue:       inherit;
+
+  --tl-paper: var(--page-right);
+  --tl-bg:    var(--page-left);
+  --tl-dark:  var(--ink-user);
+  --tl-line:  var(--page-edge);
+  --tl-text:  var(--text-main);
+  --tl-muted: var(--text-muted);
+  --tl-green: var(--green, #2e7d32);
+  --tl-red:   var(--ink-sys);
+  --tl-sobre: var(--page-right);
+  --tl-red-escuro: color-mix(in srgb, var(--ink-sys) 80%, #000);
+  --tl-placeholder: color-mix(in srgb, var(--text-muted) 75%, var(--page-right));
+  --tl-realce: color-mix(in srgb, var(--tl-gold) 14%, var(--page-left));
+  --tl-gold-texto: var(--text-muted);
 }
 
 /* ── A caixa ─────────────────────────────────────────────────────────── */
@@ -3840,7 +3897,7 @@ body.rest-on { overflow: hidden; }
 }
 .moldura-tela .wz-step-dot.active { color: var(--tl-dark); font-weight: 700; }
 .moldura-tela .wz-step-dot.active span:first-child {
-  background: var(--tl-red); border-color: var(--tl-red); color: #fff;
+  background: var(--tl-red); border-color: var(--tl-red); color: var(--tl-sobre);
 }
 .moldura-tela .wz-step-dot.done span:first-child {
   background: rgba(46,125,50,0.12); border-color: var(--tl-green); color: var(--tl-green);
@@ -3878,13 +3935,13 @@ body.rest-on { overflow: hidden; }
 /* ── Botões: os mesmos da Ascensão ───────────────────────────────────── */
 .moldura-tela .btn-main,
 .moldura-tela .btn-save {
-  background: var(--tl-red); color: #fff;
+  background: var(--tl-red); color: var(--tl-sobre);
   border: 1px solid var(--tl-gold); border-radius: 6px;
   font-family: 'Lora', serif; font-weight: 700; font-size: 0.9rem; letter-spacing: 0;
   padding: var(--esp-2) var(--esp-5);
 }
 .moldura-tela .btn-main:hover:not(:disabled),
-.moldura-tela .btn-save:hover { background: #6b1a0f; box-shadow: none; }
+.moldura-tela .btn-save:hover { background: var(--tl-red-escuro); box-shadow: none; }
 .moldura-tela .btn-main:disabled { opacity: 0.45; cursor: not-allowed; background: var(--tl-muted); }
 .moldura-tela .clean-button {
   background: var(--tl-paper); color: var(--tl-dark);
@@ -3913,7 +3970,7 @@ body.rest-on { overflow: hidden; }
   box-shadow: 0 0 0 2px rgba(184,153,71,0.2);
 }
 .moldura-tela input::placeholder,
-.moldura-tela textarea::placeholder { color: #a8998a; font-size: 0.88rem; }
+.moldura-tela textarea::placeholder { color: var(--tl-placeholder); font-size: 0.88rem; }
 .moldura-tela input[type="checkbox"],
 .moldura-tela input[type="radio"] { accent-color: var(--tl-red); }
 .moldura-tela .field-group label,
@@ -3957,8 +4014,8 @@ body.rest-on { overflow: hidden; }
   border: 1px solid var(--tl-gold); border-radius: 8px;
 }
 .moldura-tela .cwc-header { background: var(--tl-bg); border-bottom-color: var(--tl-gold); }
-.moldura-tela .cwc-header:hover { background: #efe3cb; }
-.moldura-tela .cwc-seta { color: var(--tl-gold); font-size: 12px; }
+.moldura-tela .cwc-header:hover { background: var(--tl-realce); }
+.moldura-tela .cwc-seta { color: var(--tl-gold-texto); font-size: 12px; }
 .moldura-tela .cwc-nome {
   font-family: 'Playfair Display', serif; font-size: 1rem; font-weight: 700; color: var(--tl-dark);
 }
@@ -3991,7 +4048,7 @@ body.rest-on { overflow: hidden; }
   border: 1px solid var(--tl-gold); border-radius: 6px;
   font-family: 'Lora', serif; font-weight: 700; font-size: 1rem;
 }
-.moldura-tela .stat-btn:hover:not(:disabled) { background: var(--tl-gold); color: #fff; }
+.moldura-tela .stat-btn:hover:not(:disabled) { background: var(--tl-gold); color: var(--tl-sobre); }
 .moldura-tela .stat-btn:disabled { opacity: .35; cursor: not-allowed; }
 .moldura-tela .stat-cell-mod { color: var(--tl-muted); font-size: 0.76rem; }
 .moldura-tela .dnd-calc-item { color: var(--tl-muted); }
@@ -4209,6 +4266,82 @@ body.rest-on { overflow: hidden; }
   --grm-sobre: var(--page-right);
   --grm-red-escuro: color-mix(in srgb, var(--ink-sys) 80%, #000);
   --grm-vaga:  color-mix(in srgb, var(--ink-user) 12%, var(--page-right));
+}
+
+/* Subir de nível, mochila, descanso e saque seguem o tema, como o combate, a
+   loja e o grimório: as cores fixas viraram variáveis com o valor de sempre
+   (o pergaminho não muda), e aqui cada uma recebe o equivalente do tema. As
+   cores próprias de cada tela (o couro da mochila, a brasa do descanso, o
+   roxo de identificar, o âmbar do saque) são misturadas com o texto do tema:
+   escurecem nos temas claros e clareiam nos escuros, e o texto por cima delas
+   é o papel. O dourado das molduras e as pílulas de reabrir ficam. */
+:root[data-theme]:not([data-theme="pergaminho"]) :is(#levelup-overlay, #inventory-overlay, #rest-overlay, #loot-overlay) {
+  --tema-sobre:  var(--page-right);
+  --tema-escuro-verde: color-mix(in srgb, var(--green, #2e7d32) 80%, #000);
+  --tema-escuro-verm:  color-mix(in srgb, var(--ink-sys) 80%, #000);
+}
+:root[data-theme]:not([data-theme="pergaminho"]) #levelup-overlay {
+  --lvl-paper: var(--page-right);
+  --lvl-bg:    var(--page-left);
+  --lvl-dark:  var(--text-main);
+  --lvl-text:  var(--text-main);
+  --lvl-muted: var(--text-muted);
+  --lvl-green: var(--green, #2e7d32);
+  --lvl-red:   var(--ink-sys);
+  --lvl-trilho: var(--page-edge);
+  --lvl-line:  var(--page-edge);
+  --lvl-sobre: var(--tema-sobre);
+  --lvl-green-escuro: var(--tema-escuro-verde);
+  --lvl-red-escuro:   var(--tema-escuro-verm);
+}
+:root[data-theme]:not([data-theme="pergaminho"]) #inventory-overlay {
+  --inv-paper: var(--page-right);
+  --inv-bg:    var(--page-left);
+  --inv-dark:  var(--text-main);
+  --inv-text:  var(--text-main);
+  --inv-muted: var(--text-muted);
+  --inv-leather: color-mix(in srgb, #7a5a2b 60%, var(--text-main));
+  --inv-red:   var(--ink-sys);
+  --inv-green: var(--green, #2e7d32);
+  --inv-line:  var(--page-edge);
+  --inv-trilho: var(--page-edge);
+  --inv-sobre: var(--tema-sobre);
+  --inv-roxo:  color-mix(in srgb, #7b5ea7 55%, var(--text-main));
+  --inv-roxo-borda: color-mix(in srgb, #7b5ea7 70%, var(--text-main));
+  --inv-roxo-fundo: color-mix(in srgb, #7b5ea7 16%, var(--page-right));
+  --inv-verde-texto: color-mix(in srgb, var(--green, #2e7d32) 60%, var(--text-main));
+  --inv-red-escuro: var(--tema-escuro-verm);
+}
+:root[data-theme]:not([data-theme="pergaminho"]) #rest-overlay {
+  --rst-paper: var(--page-right);
+  --rst-bg:    var(--page-left);
+  --rst-dark:  var(--text-main);
+  --rst-text:  var(--text-main);
+  --rst-muted: var(--text-muted);
+  --rst-green: var(--green, #2e7d32);
+  --rst-red:   var(--ink-sys);
+  --rst-ember: color-mix(in srgb, #b5541c 70%, var(--text-main));
+  --rst-line:  var(--page-edge);
+  --rst-trilho: var(--page-edge);
+  --rst-sobre: var(--tema-sobre);
+  --rst-ember-escuro: color-mix(in srgb, #b5541c 55%, var(--text-main));
+  --rst-red-escuro:   var(--tema-escuro-verm);
+}
+:root[data-theme]:not([data-theme="pergaminho"]) #loot-overlay {
+  --lot-paper: var(--page-right);
+  --lot-bg:    var(--page-left);
+  --lot-dark:  var(--text-main);
+  --lot-text:  var(--text-main);
+  --lot-muted: var(--text-muted);
+  --lot-green: var(--green, #2e7d32);
+  --lot-red:   var(--ink-sys);
+  --lot-amber: color-mix(in srgb, #a8741a 65%, var(--text-main));
+  --lot-line:  var(--page-edge);
+  --lot-trilho: var(--page-edge);
+  --lot-carga: var(--text-muted);
+  --lot-sobre: var(--tema-sobre);
+  --lot-dark-escuro: color-mix(in srgb, var(--text-main) 80%, var(--page-right));
+  --lot-red-escuro:  var(--tema-escuro-verm);
 }
 #local-overlay.hidden, #pessoa-overlay.hidden, #heroi-overlay.hidden, #missoes-overlay.hidden, #mapa-overlay.hidden, #grupo-overlay.hidden, #diario-overlay.hidden, #elenco-overlay.hidden, #relacoes-overlay.hidden, #mundo-overlay.hidden { display: none; }
 body.local-on, body.pessoa-on, body.heroi-on, body.missoes-on, body.mapa-on, body.grupo-on, body.diario-on, body.elenco-on, body.relacoes-on, body.mundo-on { overflow: hidden; }
@@ -4579,6 +4712,11 @@ body.local-on, body.pessoa-on, body.heroi-on, body.missoes-on, body.mapa-on, bod
   --lot-red:   #8b2315;
   --lot-amber: #a8741a;
   --lot-line:  #e0d5c2;
+  --lot-trilho: #e6ded2;
+  --lot-carga:  #9c8f80;
+  --lot-sobre:  #fff;
+  --lot-dark-escuro: #2e160a;
+  --lot-red-escuro:  #6b1a0f;
 
   position: fixed; inset: 0; z-index: 9000;
   background: rgba(20,12,6,0.82); backdrop-filter: blur(4px);
@@ -4654,8 +4792,8 @@ body.loot-on { overflow: hidden; }
   background: var(--lot-paper); color: var(--lot-dark); border: 1px solid var(--lot-gold);
 }
 .lot-btn:hover:not(:disabled) { background: var(--lot-bg); }
-.lot-btn-dar { background: var(--lot-dark); color: #fff; border-color: var(--lot-dark); }
-.lot-btn-dar:hover:not(:disabled) { background: #2e160a; }
+.lot-btn-dar { background: var(--lot-dark); color: var(--lot-sobre); border-color: var(--lot-dark); }
+.lot-btn-dar:hover:not(:disabled) { background: var(--lot-dark-escuro); }
 .lot-btn-devolver { font-size: 0.72rem; color: var(--lot-muted); border-color: var(--lot-line); }
 
 .lot-moedas-linha {
@@ -4680,8 +4818,8 @@ body.loot-on { overflow: hidden; }
 .lot-fora { font-size: 0.84rem; color: var(--lot-red); }
 .lot-carga-topo { display: flex; justify-content: space-between; font-size: 0.78rem; color: var(--lot-muted); margin-bottom: 3px; }
 .lot-num { font-variant-numeric: tabular-nums; }
-.lot-carga-barra { position: relative; height: 9px; border-radius: 5px; background: #e6ded2; overflow: hidden; }
-.lot-carga-atual { position: absolute; left: 0; top: 0; bottom: 0; background: #9c8f80; }
+.lot-carga-barra { position: relative; height: 9px; border-radius: 5px; background: var(--lot-trilho); overflow: hidden; }
+.lot-carga-atual { position: absolute; left: 0; top: 0; bottom: 0; background: var(--lot-carga); }
 .lot-carga-prevista { position: absolute; top: 0; bottom: 0; background: var(--lot-green); transition: width .25s; }
 .lot-carga-prevista.lot-carga-cheia { background: var(--lot-amber); }
 .lot-carga-prevista.lot-carga-imovel { background: var(--lot-red); }
@@ -4706,8 +4844,8 @@ body.loot-on { overflow: hidden; }
   border-radius: 6px; padding: var(--esp-2) var(--esp-5); cursor: pointer; flex: 0 0 auto;
 }
 .lot-deixar { background: var(--lot-paper); color: var(--lot-dark); border: 1px solid var(--lot-gold); }
-.lot-concluir { background: var(--lot-red); color: #fff; border: 1px solid var(--lot-gold); }
-.lot-concluir:hover:not(:disabled) { background: #6b1a0f; }
+.lot-concluir { background: var(--lot-red); color: var(--lot-sobre); border: 1px solid var(--lot-gold); }
+.lot-concluir:hover:not(:disabled) { background: var(--lot-red-escuro); }
 .lot-deixar:disabled, .lot-concluir:disabled { opacity: 0.45; cursor: not-allowed; }
 
 #lot-reopen {

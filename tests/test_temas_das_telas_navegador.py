@@ -246,3 +246,118 @@ def test_papel_segue_o_tema_e_o_pergaminho_nao_muda(app_no_ar):
     assert papeis["pergaminho"] == "#fffbf0"
     # No escuro, o papel é a página do tema.
     assert papeis["noite-tinta"] != "#fffbf0"
+
+
+# (estado, tela, variável do papel, como abrir). Nível, descanso e saque abrem
+# sozinhos pelo estado; a mochila, pelo atalho do cartão do grupo.
+TELAS_DAS_FICHAS = [
+    ("NIVEL", "#levelup-overlay", "--lvl-paper", None),
+    ("MOCHILA", "#inventory-overlay", "--inv-paper", "() => window.Inventory._abrir('Stelar')"),
+    ("DESCANSO_CURTO", "#rest-overlay", "--rst-paper", None),
+    ("SAQUE", "#loot-overlay", "--lot-paper", None),
+]
+
+
+def _papel(pg, overlay, variavel):
+    return pg.evaluate("([o, v]) => getComputedStyle(document.querySelector(o)).getPropertyValue(v).trim()",
+                       [overlay, variavel])
+
+
+@pytest.mark.parametrize("tema", ["noite-tinta", "sangue-dragao", "floresta", "oceano", "pergaminho"])
+def test_nivel_mochila_descanso_e_saque_seguem_o_tema(app_no_ar, tema):
+    """
+    Subir de nível, mochila, descanso e saque ficaram com o papel claro fixo
+    quando o combate, a loja e o grimório passaram a seguir o tema.
+    """
+    import capturar_telas as cap
+    import requests
+
+    try:
+        for estado, overlay, papel, abrir in TELAS_DAS_FICHAS:
+            pg, erros, fechar = _abrir_estado(app_no_ar, copy.deepcopy(getattr(cap, estado)), tema)
+            try:
+                if abrir:
+                    pg.evaluate(abrir)
+                pg.wait_for_selector(f"{overlay}:not(.hidden)", timeout=10000)
+                pg.wait_for_timeout(600)
+                cor = _papel(pg, overlay, papel)
+                if tema == "pergaminho":
+                    assert cor == "#fffbf0", (overlay, cor)
+                    continue
+                assert cor != "#fffbf0", f"{overlay} ignorou o tema {tema}"
+                r = pg.evaluate(MEDIR, overlay)
+                assert r["medidos"] > 5, (overlay, r)
+                assert not r["ruins"], f"{overlay} no tema {tema}: {r['ruins'][:6]}"
+                assert not erros, erros[:3]
+            finally:
+                fechar()
+    finally:
+        requests.post(f"{app_no_ar[0]}/__estado", json=copy.deepcopy(cap.CIDADE), timeout=10)
+
+
+@pytest.mark.parametrize("tema", ["noite-tinta", "sangue-dragao", "floresta", "pergaminho"])
+def test_editar_do_jogo_segue_o_tema(app_no_ar, tema):
+    """
+    O "Editar" do jogo usa a moldura (.moldura-tela), que redefinia as
+    variáveis do tema para desenhar sempre em pergaminho.
+    """
+    pg, erros, fechar = _abrir_no_tema(app_no_ar, tema)
+    try:
+        pg.evaluate("""async () => {
+            const c = [...(window._lastMem.characters || []), ...(window._lastMem.party || [])]
+              .find(x => (x.name || '') === 'Brom');
+            await openEditModal('character', 'brom', c);
+        }""")
+        pg.wait_for_selector("#edit-overlay:not(.hidden)", timeout=5000)
+        pg.wait_for_timeout(400)
+        cor = _papel(pg, "#edit-overlay", "--tl-paper")
+        if tema == "pergaminho":
+            assert cor == "#fffbf0", cor
+            return
+        assert cor != "#fffbf0", f"o Editar ignorou o tema {tema}"
+        r = pg.evaluate(MEDIR, "#edit-overlay .edit-box")
+        assert r["medidos"] > 5, r
+        assert not r["ruins"], f"Editar no tema {tema}: {r['ruins'][:6]}"
+        assert not erros, erros[:3]
+    finally:
+        fechar()
+
+
+@pytest.mark.parametrize("tema", ["noite-tinta", "sangue-dragao", "oceano", "pergaminho"])
+def test_wizard_e_editor_do_menu_seguem_o_tema(app_no_ar, tema):
+    """O wizard de criação e o editor da campanha, no menu, na mesma moldura."""
+    from playwright.sync_api import sync_playwright
+
+    url, nome, cap = app_no_ar
+    with sync_playwright() as pw:
+        nav = pw.chromium.launch()
+        ctx = nav.new_context(viewport={"width": 1440, "height": 980})
+        ctx.add_init_script(cap._script_de_semente(nome, tema, cap.HISTORICO))
+        pg = ctx.new_page()
+        erros = []
+        pg.on("pageerror", lambda e: erros.append(str(e)))
+        pg.goto(f"{url}/menu.html", wait_until="networkidle")
+        cap._sanear(pg)
+        try:
+            pg.evaluate("() => { openWizard(); document.getElementById('wz-name').value = 'Teste';"
+                        " wizardGoTo(2); addWzChar(); }")
+            pg.wait_for_selector("#wizard-overlay:not(.hidden) .cwc", timeout=5000)
+            pg.wait_for_timeout(300)
+            medidas = {"wizard": ("#wizard-overlay", pg.evaluate(MEDIR, "#wizard-overlay .wizard-box"))}
+            pg.evaluate("() => closeWizard()")
+            pg.evaluate("(n) => openEditCampaign({stopPropagation(){}}, n)", nome)
+            pg.wait_for_function("() => typeof edChars !== 'undefined' && edChars.length > 0", timeout=8000)
+            pg.evaluate("() => { editGoTo(2); edChars[0]._open = true; edRenderChars(); }")
+            pg.wait_for_timeout(300)
+            medidas["editor"] = ("#edit-overlay", pg.evaluate(MEDIR, "#edit-overlay .edit-campaign-box"))
+            for tela, (overlay, r) in medidas.items():
+                cor = _papel(pg, overlay, "--tl-paper")
+                if tema == "pergaminho":
+                    assert cor == "#fffbf0", (tela, cor)
+                    continue
+                assert cor != "#fffbf0", f"{tela} ignorou o tema {tema}"
+                assert r["medidos"] > 5, (tela, r)
+                assert not r["ruins"], f"{tela} no tema {tema}: {r['ruins'][:6]}"
+            assert not erros, erros[:3]
+        finally:
+            nav.close()

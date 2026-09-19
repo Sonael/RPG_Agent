@@ -250,14 +250,19 @@ def _estilo(pg, seletor, *props):
         [seletor, list(props)])
 
 
-def test_wizard_usa_a_moldura_das_telas_mesmo_com_tema_escuro(navegador):
+def test_wizard_usa_a_moldura_das_telas_no_tema_escuro(navegador):
+    """
+    A moldura é a das telas (borda dourada, sem a letra cursiva), e o papel e
+    o botão principal são os do tema, como nas telas: antes a moldura ficava
+    em pergaminho em qualquer tema (test_temas_das_telas_navegador.py).
+    """
     pg, erros = navegador("/menu.html")
     pg.evaluate("() => { document.documentElement.setAttribute('data-theme', 'noite-tinta'); openWizard(); }")
     pg.wait_for_selector("#wizard-overlay:not(.hidden)", timeout=5000)
     fundo, borda = _estilo(pg, "#wizard-box", "background-color", "border-top-color")
-    assert fundo == _PAPEL, "o wizard seguiu o tema em vez da paleta das telas"
+    assert fundo == "rgb(34, 34, 58)", "o wizard não seguiu o papel do tema"      # --page-right do Noite de Tinta
     assert borda == "rgb(184, 153, 71)"
-    assert _estilo(pg, "#wz-next-btn", "background-color") == [_VERMELHO]
+    assert _estilo(pg, "#wz-next-btn", "background-color") == ["rgb(247, 118, 142)"]  # --ink-sys do tema
     assert "Caveat" not in _estilo(pg, "#wz-name", "font-family")[0]
     assert not erros, erros[:3]
 
