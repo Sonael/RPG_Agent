@@ -205,3 +205,161 @@ def test_erro_da_ia_aparece_e_nao_apaga_o_que_ja_estava(wizard):
 
     assert "incompleta" in pg.inner_text("#wz-ai-status")
     assert pg.input_value("#wz-summary") == "Meu resumo escrito à mão"
+
+
+# --- O gênero: protagonista, próximos, campos e mecânicas ---------------------
+# Antes o wizard não gravava protagonista, só "jogador" entrava no grupo (no
+# romance ninguém era próximo), os campos do gênero ficavam vazios e nada das
+# mecânicas do gênero (relação, segredos, laço, facções) chegava à campanha.
+
+LORE_ROMANCE = {
+    "story_summary": "Clara volta à cidade natal.", "current_scene": "O café abre.",
+    "current_location": "Café Aurora",
+    "locations": [{"name": "Café Aurora", "description": "Pequeno.", "details": "", "notes": "", "dentro_de": ""}],
+    "events": [],
+    "characters": [
+        {"name": "Clara", "description": "Fotógrafa.", "traits": "", "notes": "Voltou sem avisar",
+         "role": "", "tipo": "jogador", "protagonista": True, "grupo": True,
+         "extras": {"papel": "Protagonista", "estado_emocional": "esperancoso", "segredo": "Vai embora em março"},
+         "local": ""},
+        {"name": "Lucas", "description": "O vizinho.", "traits": "", "notes": "", "role": "",
+         "tipo": "aliado", "protagonista": False, "grupo": True,
+         "extras": {"papel": "interesse romantico"}, "afeto": 45, "confianca": "-20", "estagio": "Flerte",
+         "local": "Café Aurora"},
+        {"name": "Helena", "description": "A ex de Lucas.", "traits": "", "notes": "", "role": "",
+         "tipo": "inimigo", "protagonista": False, "grupo": False,
+         "extras": {"papel": "Rival Amoroso", "estado_emocional": "Furiosa"}, "afeto": -300,
+         "local": "Café Aurora"},
+    ],
+    "segredos": [{"titulo": "A bolsa em Lisboa", "dono": "", "escondido_de": ["Lucas"]},
+                 {"titulo": "O irmão na prisão", "dono": "Lucas"}],
+    "tensoes": [{"a": "Helena", "b": "Lucas", "tipo": "ciume", "intensidade": 60, "percebida": False}],
+    "faccoes": [{"nome": "A Guilda", "reputacao": 10}],   # de outro gênero: fica de fora
+}
+
+LORE_FANTASIA = json.loads(json.dumps(LORE))
+LORE_FANTASIA["characters"][0]["protagonista"] = True
+LORE_FANTASIA["characters"][0]["lealdade"] = 90                 # é você: não tem laço
+LORE_FANTASIA["characters"][1].update({"lealdade": 70, "objetivo": "Achar a mãe",
+                                       "arco": {"titulo": "Voltar à floresta"}})
+LORE_FANTASIA["characters"][2]["lealdade"] = 50                 # não é do grupo: não tem laço
+LORE_FANTASIA.update({"renome": 5, "faccoes": [{"nome": "Guarda de Cliviate", "reputacao": 20}],
+                      "lendas": [{"titulo": "O Lobo Branco", "verdade": "É o prefeito"}],
+                      "segredos": [{"titulo": "de outro gênero"}]})
+
+
+def _genero(pg, genero, regras="livre"):
+    pg.select_option("#wz-type", genero)
+    if regras == "dnd":
+        pg.select_option("#wz-regras", "dnd")
+    pg.evaluate("() => onWizardTypeChange()")
+
+
+def _criar(pg, estado):
+    pg.evaluate("() => { wizardGoTo(2); createCampaignFromWizard(); }")
+    pg.wait_for_function("() => document.getElementById('wz-err').textContent.length > 0", timeout=10000)
+    return estado["criacao"]["campaign"]
+
+
+def test_romance_gerado_preenche_protagonista_proximos_e_campos(wizard):
+    pg, erros, estado = wizard
+    _genero(pg, "romance")
+    estado["lore"] = {"ok": True, "lore": LORE_ROMANCE}
+    _gerar(pg)
+    assert pg.inner_text("#wz-ai-status").endswith("Também preparou 2 segredos e 1 tensão.")
+
+    pg.evaluate("() => wizardGoTo(2)")
+    pg.wait_for_selector("#wz-chars-list .cwc", timeout=5000)
+    chars = pg.evaluate("() => wzChars.map(c => [c.name, c.protagonista, c.isParty, c.local, c.extras, c.mec])")
+    assert chars == [
+        ["Clara", True, True, "", {"papel": "Protagonista", "estado_emocional": "Esperançoso",
+                                   "segredo": "Vai embora em março"}, {}],
+        ["Lucas", False, True, "", {"papel": "Interesse Romântico"},
+         {"afeto": 45, "confianca": -20, "estagio": "Flerte"}],
+        ["Helena", False, False, "Café Aurora", {"papel": "Rival Amoroso"}, {"afeto": -100}],
+    ]
+    cartoes = pg.locator("#wz-chars-list .cwc")
+    assert cartoes.nth(0).locator(".cwc-voce").count() == 1
+    assert cartoes.nth(0).locator(".wz-protagonista").is_checked()
+    assert cartoes.nth(0).locator(".wz-campos-mec").count() == 0       # você não tem relação com você
+    assert cartoes.nth(1).locator(".wz-campos-mec [data-campo='afeto'] input").input_value() == "45"
+    assert cartoes.nth(1).locator(".wz-campos-mec [data-campo='estagio'] select").input_value() == "Flerte"
+    assert cartoes.nth(2).locator(".wz-campos-extras [data-campo='estado_emocional'] select").input_value() == ""
+    assert not erros, erros[:3]
+
+
+def test_romance_gerado_chega_inteiro_na_campanha(wizard):
+    pg, _, estado = wizard
+    _genero(pg, "romance")
+    estado["lore"] = {"ok": True, "lore": LORE_ROMANCE}
+    _gerar(pg)
+    camp = _criar(pg, estado)
+
+    assert camp["protagonist"] == "Clara"
+    assert {p["name"] for p in camp["party"]} == {"Clara", "Lucas"}
+    lucas, helena, clara = (camp["characters"][k] for k in ("lucas", "helena", "clara"))
+    assert (lucas["atitude"], lucas["confianca"], lucas["estagio"], lucas["role"]) == \
+        (45, -20, "flerte", "Interesse Romântico")
+    assert helena["atitude"] == -100 and "estagio" not in helena
+    assert "atitude" not in clara and "Segredo: Vai embora em março" in clara["notes"]
+    assert [s["titulo"] for s in camp["segredos"]] == ["A bolsa em Lisboa", "O irmão na prisão"]
+    assert camp["tensoes"][0]["percebida"] is False
+    assert "faccoes" not in camp
+
+
+def test_trocar_de_genero_depois_de_gerar_nao_leva_o_romance(wizard):
+    pg, _, estado = wizard
+    _genero(pg, "romance")
+    estado["lore"] = {"ok": True, "lore": LORE_ROMANCE}
+    _gerar(pg)
+    _genero(pg, "horror")
+    camp = _criar(pg, estado)
+    assert "segredos" not in camp and "tensoes" not in camp
+    assert "atitude" not in camp["characters"]["lucas"]
+    assert camp["protagonist"] == "Clara"
+
+
+def test_fantasia_gerada_leva_o_laco_dos_companheiros_e_o_mundo(wizard):
+    pg, erros, estado = wizard          # fantasia com D&D, como o fixture deixa
+    estado["lore"] = {"ok": True, "lore": LORE_FANTASIA}
+    _gerar(pg)
+    assert pg.inner_text("#wz-ai-status").endswith("Também preparou 1 facção e 1 lenda.")
+    pg.evaluate("() => wizardGoTo(2)")
+    pg.wait_for_selector("#wz-chars-list .cwc", timeout=5000)
+    mec = [pg.locator("#wz-chars-list .cwc").nth(i).locator(".wz-campos-mec").count() for i in range(4)]
+    assert mec == [0, 1, 0, 0], "só a companheira tem o laço (nem você, nem quem não é do grupo)"
+
+    camp = _criar(pg, estado)
+    assert camp["protagonist"] == "Alden"
+    lyra = camp["characters"]["lyra"]
+    assert (lyra["lealdade"], lyra["objetivo"], lyra["arco"]) == \
+        (70, "Achar a mãe", {"titulo": "Voltar à floresta", "estado": "em curso", "passos": []})
+    assert "lealdade" not in camp["characters"]["alden"]
+    assert "lealdade" not in camp["characters"]["brom"]
+    assert (camp["renome"], camp["faccoes"][0]["nome"], camp["lendas"][0]["verdade"]) == \
+        (5, "Guarda de Cliviate", "É o prefeito")
+    assert "segredos" not in camp
+    assert not erros, erros[:3]
+
+
+def test_sem_protagonista_da_ia_o_primeiro_jogador_e_voce(wizard):
+    pg, _, estado = wizard
+    _gerar(pg)                          # LORE não marca protagonista
+    assert pg.evaluate("() => wzChars.map(c => c.protagonista)") == [True, False, False, False]
+    assert _criar(pg, estado)["protagonist"] == "Alden"
+
+
+def test_protagonista_a_mao_e_um_so(wizard):
+    pg, erros, estado = wizard
+    _genero(pg, "romance")
+    pg.evaluate("() => wizardGoTo(2)")
+    pg.evaluate("() => { addWzChar(); addWzChar(); wzChars[0].name = 'Ana'; wzChars[1].name = 'Beto'; wzRenderChars(); }")
+    assert pg.evaluate("() => wzChars.map(c => c.protagonista)") == [True, False]
+    pg.locator("#wz-chars-list .cwc").nth(1).locator(".wz-protagonista").check()
+    assert pg.evaluate("() => wzChars.map(c => c.protagonista)") == [False, True]
+    # A relação é de quem não é você: o cartão da Ana ganhou os campos.
+    assert pg.locator("#wz-chars-list .cwc").nth(0).locator(".wz-campos-mec").count() == 1
+    assert _criar(pg, estado)["protagonist"] == "Beto"
+    pg.evaluate("() => removeWzChar(1)")
+    assert pg.evaluate("() => wzChars.map(c => c.protagonista)") == [True]
+    assert not erros, erros[:3]

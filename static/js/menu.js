@@ -1572,6 +1572,10 @@ let wzStep = 1;
 let wzChars = [];    // [{name,desc,traits,status,notes,role,isParty,isDnd,freeMode,classe,raca,stats:{...}}]
 let wzLocs  = [];    // [{name,description,details,notes}]
 let wzEvts  = [];    // [{summary,location,consequence}]
+// O que a IA preparou para o mundo do gênero, fora dos personagens: segredos
+// e tensões no romance; renome, facções e lendas na fantasia. Não tem campo no
+// wizard (boa parte é do mestre), mas segue para a campanha criada.
+let wzMundo = {};
 let wzSelectedModel = '';
 
 // ── Abrir / fechar ─────────────────────────────────────────
@@ -1583,6 +1587,7 @@ function openWizard() {
   wzChars = [];
   wzLocs  = [];
   wzEvts  = [];
+  wzMundo = {};
   // reset fields
   ['wz-name','wz-summary','wz-scene','wz-location'].forEach(id => {
     const el = document.getElementById(id);
@@ -1693,6 +1698,8 @@ async function generateLore() {
         model,
         campaign_type:    campaignType,
         dnd_mode:         wzIsDnd(),
+        // Os campos do gênero que o wizard mostra, para a IA preencher.
+        campos:           wzIsDnd() ? [] : (THEME_CHAR_FIELDS[campaignType]?.fields || []),
         google_api_key:   keys.google_api_key   || '',
         deepseek_api_key: keys.deepseek_api_key  || '',
       }),
@@ -1721,12 +1728,18 @@ async function generateLore() {
       }));
       wzRenderEvts();
     }
+    // O mundo do gênero (segredos, facções...): só o do gênero de agora.
+    wzMundo = wzMundoDaIa(lore, campaignType);
     // Pré-popula personagens gerados pela IA na etapa 2
     if (Array.isArray(lore.characters) && lore.characters.length) {
+      const regras = wzIsDnd();
       wzChars = lore.characters.map((c, idx) => {
         const tipo    = (c.tipo || 'jogador').toLowerCase().trim();
         const isPC    = tipo === 'jogador';   // apenas jogadores têm classe PC
-        const isParty = isPC;                 // jogadores entram no grupo; aliados/inimigos não
+        // Com D&D, o grupo são os jogadores. Sem, quem a IA disse que está com
+        // o protagonista: no romance são as pessoas próximas, que vêm como
+        // "aliado" e antes ficavam fora do grupo (e das Relações).
+        const isParty = c.protagonista === true || (regras || c.grupo === undefined ? isPC : c.grupo === true);
         // Inimigos e aliados usam 'npc'; jogadores usam a classe gerada (ou guerreiro por padrão)
         const classeRaw = isPC ? (c.classe || 'guerreiro') : 'npc';
         const classe  = classeRaw.toLowerCase().trim();
@@ -1757,7 +1770,9 @@ async function generateLore() {
           nivel:       1,
           background:  '',
           stats:       { forca:10, destreza:10, constituicao:10, inteligencia:10, sabedoria:10, carisma:10 },
-          extras:      {},
+          protagonista: c.protagonista === true,
+          extras:      regras ? {} : wzCamposDaIa(c.extras, THEME_CHAR_FIELDS[campaignType]?.fields),
+          mec:         wzCamposDaIa(c, MECANICAS_DO_PERSONAGEM[campaignType]?.fields),
           _asiBonus: {}, _habTab: 'feats',
           _spellLevelFilter: null, _spellQuery: '', _spellResults: [], _spellLoading: false,
           _classFeatures: [], _featLoading: false,
@@ -1771,6 +1786,7 @@ async function generateLore() {
         wzApplyClassDefaults(char);
         return char;
       });
+      wzUmProtagonista();
 
       // Auto-fetch Open5e para NPCs: busca o monstro pelo nome da raça gerada
       // e aplica CR, HP e CA reais sem precisar de interação do usuário.
@@ -1806,6 +1822,10 @@ async function generateLore() {
       status.style.color = 'var(--green)';
       status.textContent = '✓ Lore gerado! Revise os campos.';
     }
+    // Só a contagem: um segredo que o protagonista não sabe e a verdade das
+    // lendas são do mestre, e o wizard não é lugar de estragar a surpresa.
+    const preparado = wzResumoDoMundo(wzMundo);
+    if (preparado) status.textContent += ` Também preparou ${preparado}.`;
   } catch (e) {
     status.style.color = 'var(--red)';
     status.textContent = `✕ ${e.message}`;
@@ -1813,6 +1833,92 @@ async function generateLore() {
     btn.disabled = false;
     btn.textContent = 'Gerar com IA';
   }
+}
+
+// ── O que a IA manda além do básico ────────────────────────
+// As chaves do mundo de cada gênero, as mesmas que o prompt pede e que o
+// servidor normaliza na criação (_payload_de_campanha).
+const MUNDO_DO_GENERO = {
+  romance:      ['segredos', 'tensoes'],
+  fantasia:     ['renome', 'faccoes', 'lendas'],
+  dark_fantasy: ['renome', 'faccoes', 'lendas'],
+};
+
+const wzNorm = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+
+// Valores de campos do wizard vindos da IA: opção de lista só se for uma das
+// opções (sem ligar para acento e maiúscula), número dentro da faixa, texto
+// aparado. O resto fica de fora, como se a IA não tivesse mandado.
+function wzCamposDaIa(origem, campos) {
+  const saida = {};
+  if (!origem || typeof origem !== 'object' || !Array.isArray(campos)) return saida;
+  for (const f of campos) {
+    let v = origem[f.id];
+    if (v && typeof v === 'object' && typeof v.titulo === 'string') v = v.titulo;   // arco como no JSON de importação
+    if (v === undefined || v === null || v === '' || typeof v === 'object') continue;
+    if (f.type === 'select') {
+      const opcao = f.options.find(o => wzNorm(o) === wzNorm(v));
+      if (opcao) saida[f.id] = opcao;
+    } else if (f.type === 'number') {
+      const n = Number(v);
+      if (Number.isFinite(n)) saida[f.id] = Math.round(Math.min(f.max ?? Infinity, Math.max(f.min ?? -Infinity, n)));
+    } else if (String(v).trim()) {
+      saida[f.id] = String(v).trim();
+    }
+  }
+  return saida;
+}
+
+function wzMundoDaIa(lore, genero) {
+  const saida = {};
+  for (const k of MUNDO_DO_GENERO[genero] || []) {
+    const v = lore[k];
+    const tem = k === 'renome'
+      ? typeof v === 'number' || (v && typeof v === 'object')
+      : (Array.isArray(v) ? v.length > 0 : !!v && typeof v === 'object' && Object.keys(v).length > 0);
+    if (tem) saida[k] = v;
+  }
+  return saida;
+}
+
+function wzResumoDoMundo(mundo) {
+  const nomes = { segredos: ['segredo', 'segredos'], tensoes: ['tensão', 'tensões'],
+                  faccoes: ['facção', 'facções'], lendas: ['lenda', 'lendas'] };
+  const partes = Object.entries(nomes).filter(([k]) => mundo[k]).map(([k, [um, varios]]) => {
+    const n = Array.isArray(mundo[k]) ? mundo[k].length : Object.keys(mundo[k]).length;
+    return `${n} ${n > 1 ? varios : um}`;
+  });
+  return partes.length > 1 ? `${partes.slice(0, -1).join(', ')} e ${partes.at(-1)}` : (partes[0] || '');
+}
+
+// Um protagonista só: o primeiro marcado. Sem nenhum, o primeiro do grupo
+// (com D&D, o primeiro jogador). No romance ele é o "Protagonista" da
+// dinâmica, se ninguém disse outra coisa.
+function wzUmProtagonista() {
+  let achou = false;
+  wzChars.forEach(c => { if (c.protagonista && !achou) achou = true; else c.protagonista = false; });
+  if (!achou) { const p = wzChars.find(c => c.isParty); if (p) p.protagonista = true; }
+  const prot = wzChars.find(c => c.protagonista);
+  if (!prot) return;
+  prot.isParty = true;
+  prot.local = '';
+  const cfg = THEME_CHAR_FIELDS[wzTema()];
+  const campo = cfg?.fields.find(f => f.id === cfg.primary);
+  if (campo?.options?.includes('Protagonista') && !prot.extras?.[campo.id]) {
+    prot.extras = { ...(prot.extras || {}), [campo.id]: 'Protagonista' };
+  }
+}
+
+// Marca quem é você no cartão do wizard (é um só: os outros desmarcam).
+function wzMarcarProtagonista(i) {
+  const cfg = THEME_CHAR_FIELDS[wzTema()];
+  wzChars.forEach((c, j) => {
+    c.protagonista = j === i;
+    // Quem deixou de ser você não continua "Protagonista" na dinâmica.
+    if (j !== i && cfg && c.extras?.[cfg.primary] === 'Protagonista') delete c.extras[cfg.primary];
+  });
+  wzUmProtagonista();
+  wzRenderChars();
 }
 
 // ── Locais ─────────────────────────────────────────────────
@@ -1940,6 +2046,9 @@ function addWzChar() {
   wzChars.push({
     name:'', description:'', traits:'', status:'vivo', notes:'', role:'',
     isParty: true,
+    // O primeiro personagem é você; dá para trocar no cartão.
+    protagonista: !wzChars.some(c => c.protagonista),
+    mec: {},
     classe: 'guerreiro', raca: 'humano', freeMode: false, background: '',
     nivel: 1,
     stats: { forca:10, destreza:10, constituicao:10, inteligencia:10, sabedoria:10, carisma:10 },
@@ -1965,6 +2074,7 @@ function addWzChar() {
 
 function removeWzChar(i) {
   wzChars.splice(i, 1);
+  wzUmProtagonista();
   wzRenderChars();
 }
 
@@ -2815,6 +2925,42 @@ THEME_CHAR_FIELDS.dark_fantasy = {
   color: 'rgba(120,40,40,0.08)', border: 'rgba(120,40,40,0.25)',
 };
 
+// As mecânicas do gênero que nascem em cada personagem. No romance, a relação
+// de cada pessoa com você (os campos do jogo: atitude, confianca, estagio); na
+// fantasia, o laço de cada companheiro (lealdade, objetivo, arco). A IA
+// preenche; quem cria à mão também. Ficam em char.mec, fora dos "extras", que
+// viram texto nas notas.
+const MECANICAS_DO_PERSONAGEM = {
+  romance: {
+    label: 'Relação com você',
+    color: 'rgba(200,80,120,0.08)', border: 'rgba(200,80,120,0.22)',
+    fields: [
+      {id:'afeto', label:'Afeto (-100 a 100)', type:'number', min:-100, max:100, semPadrao:true, hint:'0 se mal se conhecem'},
+      {id:'confianca', label:'Confiança (-100 a 100)', type:'number', min:-100, max:100, semPadrao:true, hint:'0 se mal se conhecem'},
+      {id:'estagio', label:'Estágio da Relação', type:'select', options:['Conhecidos','Amizade','Flerte','Namoro','Compromisso','Rompimento']},
+    ],
+  },
+  fantasia: {
+    label: 'Laço com o grupo',
+    color: 'rgba(200,168,75,0.08)', border: 'rgba(200,168,75,0.22)',
+    fields: [
+      {id:'lealdade', label:'Lealdade (-100 a 100)', type:'number', min:-100, max:100, semPadrao:true, hint:'Fica quando custar caro?'},
+      {id:'objetivo', label:'Objetivo', type:'text', hint:'O que quer da vida'},
+      {id:'arco', label:'Arco Pessoal', type:'text', hint:'Ex: Redimir a ordem que traiu'},
+    ],
+  },
+};
+MECANICAS_DO_PERSONAGEM.dark_fantasy = MECANICAS_DO_PERSONAGEM.fantasia;
+
+// Quem tem as mecânicas: no romance, quem não é você; na fantasia, os
+// companheiros (do grupo e não você). O gênero vale com ou sem D&D.
+function wzMecanicasDoChar(char, genero) {
+  const cfg = MECANICAS_DO_PERSONAGEM[genero];
+  if (!cfg || char.protagonista) return null;
+  if (genero !== 'romance' && !char.isParty) return null;
+  return cfg;
+}
+
 const THEME_PARTY_META = {
   fantasia: { member: 'Membro do Grupo',  badge: 'GRUPO',      role: 'Classe / Função',       hint: 'Ex: Guerreira, Mago, Ladino...' },
   dark_fantasy: { member: 'Membro da Companhia', badge: 'COMPANHIA', role: 'Ofício / Juramento', hint: 'Ex: Mercenária, Caçador de bruxas, Clérigo renegado...' },
@@ -2836,31 +2982,37 @@ function wzExtraBadge(char, theme) {
 }
 
 function wzRenderThemeExtras(i, theme, char) {
-  const cfg = THEME_CHAR_FIELDS[theme];
-  if (!cfg) return '';
-  const extras = char.extras || {};
+  return wzRenderCampos(i, THEME_CHAR_FIELDS[theme], char.extras, 'extras');
+}
 
-  let html = `<div style="border-top:1px solid var(--border);margin-top:4px;padding-top:14px;">
+// Os campos de um grupo (os do gênero em "extras", as mecânicas em "mec"),
+// com o valor de char[bolsa]. Lista sem valor mostra "—": antes mostrava a
+// primeira opção, que não era gravada (o "Protagonista" aparecia em todo mundo).
+function wzRenderCampos(i, cfg, valores, bolsa) {
+  if (!cfg) return '';
+  const extras = valores || {};
+
+  let html = `<div class="wz-campos-${bolsa}" style="border-top:1px solid var(--border);margin-top:4px;padding-top:14px;">
     <div style="font-family:'Cinzel',serif;font-size:10px;letter-spacing:0.12em;text-transform:uppercase;margin-bottom:14px;display:flex;align-items:center;gap:6px;">
       <span style="color:var(--gold-dim);">${cfg.label}</span>
     </div>`;
 
   cfg.fields.forEach(f => {
     const val = extras[f.id];
-    const onChange = `wzChars[${i}].extras=wzChars[${i}].extras||{};wzChars[${i}].extras['${f.id}']=this.${f.type === 'number' ? 'valueAsNumber||0' : 'value'}`;
-    html += `<div style="margin-bottom:10px;"><span class="cwc-label">${f.label}</span>`;
+    const onChange = `wzChars[${i}].${bolsa}=wzChars[${i}].${bolsa}||{};wzChars[${i}].${bolsa}['${f.id}']=this.${f.type === 'number' ? 'valueAsNumber||0' : 'value'}`;
+    html += `<div style="margin-bottom:10px;" data-campo="${f.id}"><span class="cwc-label">${f.label}</span>`;
 
     if (f.type === 'select') {
-      html += `<select onchange="${onChange}">`;
+      html += `<select onchange="${onChange}"><option value=""${val ? '' : ' selected'}>—</option>`;
       f.options.forEach(opt => {
-        html += `<option${val === opt || (!val && f.options[0] === opt) ? ' selected' : ''}>${escHtml(opt)}</option>`;
+        html += `<option${val === opt ? ' selected' : ''}>${escHtml(opt)}</option>`;
       });
       html += `</select>`;
     } else if (f.type === 'textarea') {
       html += `<textarea rows="2" placeholder="${escHtml(f.hint||'')}" onchange="${onChange}">${escHtml(val||'')}</textarea>`;
     } else if (f.type === 'number') {
       html += `<input type="number" min="${f.min||0}"${f.max!==undefined?` max="${f.max}"`:''}
-        value="${val !== undefined ? val : (f.min||0)}"
+        value="${val !== undefined ? val : (f.semPadrao ? '' : (f.min||0))}"
         placeholder="${escHtml(f.hint||'')}" onchange="${onChange}">`;
     } else {
       html += `<input type="text" value="${escHtml(val||'')}" placeholder="${escHtml(f.hint||'')}" onchange="${onChange}">`;
@@ -2893,7 +3045,7 @@ function wzRenderChars() {
           <span class="cwc-nome">
             ${char.name || `Personagem ${i+1}`}
           </span>
-          ${char.isParty ? `<span class="cwc-selo">${meta.badge}</span>` : ''}
+          ${char.protagonista ? `<span class="cwc-selo cwc-voce">VOCÊ</span>` : (char.isParty ? `<span class="cwc-selo">${meta.badge}</span>` : '')}
           ${isDnd && char.classe ? `<span class="cwc-classe">${CLASS_DATA_WZ[char.classe]?.label||''}${char.nivel>1?` Nv.${char.nivel}`:''}</span>` : wzExtraBadge(char, wzTema())}
         </div>
         <button onclick="event.stopPropagation();removeWzChar(${i})" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:16px;padding:2px 6px;">✕</button>
@@ -2916,9 +3068,13 @@ function wzRenderChars() {
             <span class="cwc-label">${meta.role}</span>
             <input value="${escHtml(char.role)}" onchange="wzChars[${i}].role=this.value" placeholder="${meta.hint}">
           </div>
-          <div style="display:flex;align-items:center;gap:8px;padding-top:20px;">
+          <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding-top:20px;">
             <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text-dim);">
-              <input type="checkbox" ${char.isParty?'checked':''} onchange="wzChars[${i}].isParty=this.checked" style="accent-color:var(--gold);">
+              <input type="radio" name="wz-protagonista" class="wz-protagonista" ${char.protagonista?'checked':''} onchange="wzMarcarProtagonista(${i})" style="accent-color:var(--gold);">
+              É você (protagonista)
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text-dim);">
+              <input type="checkbox" class="wz-no-grupo" ${char.isParty?'checked':''} ${char.protagonista?'disabled':''} onchange="wzChars[${i}].isParty=this.checked;wzRenderChars()" style="accent-color:var(--gold);">
               ${meta.member}
             </label>
           </div>
@@ -2942,6 +3098,7 @@ function wzRenderChars() {
           <textarea rows="2" onchange="wzChars[${i}].notes=this.value" placeholder="Informações adicionais, objetivos secretos...">${escHtml(char.notes)}</textarea>
         </div>
         ${wzRenderThemeExtras(i, wzTema(), char)}
+        ${wzRenderCampos(i, wzMecanicasDoChar(char, wzGenero()), char.mec, 'mec')}
         <div id="wz-dnd-${i}">${wzBuildDndSectionHtml(i)}</div>
       </div>
     </div>`;
@@ -3239,6 +3396,21 @@ async function createCampaignFromWizard() {
       }
     }
 
+    // As mecânicas do gênero, nos campos que o jogo lê (relacoes.py, lacos.py).
+    const mecCfg = wzMecanicasDoChar(char, campaign_type);
+    const mec = mecCfg ? (char.mec || {}) : {};
+    const numero = v => (v === undefined || v === '' || !Number.isFinite(Number(v)))
+      ? undefined : Math.max(-100, Math.min(100, Math.round(Number(v))));
+    if (campaign_type === 'romance') {
+      if (numero(mec.afeto) !== undefined)     charObj.atitude   = numero(mec.afeto);
+      if (numero(mec.confianca) !== undefined) charObj.confianca = numero(mec.confianca);
+      if (mec.estagio) charObj.estagio = mec.estagio.toLowerCase();
+    } else if (mecCfg) {
+      if (numero(mec.lealdade) !== undefined) charObj.lealdade = numero(mec.lealdade);
+      if ((mec.objetivo || '').trim()) charObj.objetivo = mec.objetivo.trim();
+      if ((mec.arco || '').trim()) charObj.arco = { titulo: mec.arco.trim(), estado: 'em curso', passos: [] };
+    }
+
     characters[key] = charObj;
 
     if (char.isParty) {
@@ -3266,9 +3438,21 @@ async function createCampaignFromWizard() {
     consequence:          e.consequence,
   }));
 
+  // Quem é "você". Antes o wizard não gravava: a campanha nascia sem
+  // protagonista, e ele aparecia nas próprias Relações e em "Com você".
+  const protagonista = wzChars.find(c => c.protagonista && c.name.trim())
+                    || wzChars.find(c => c.isParty && c.name.trim());
+
+  // O mundo do gênero que a IA preparou; o de outro gênero (trocado depois de
+  // gerar) fica de fora.
+  const mundoDoGenero = Object.fromEntries((MUNDO_DO_GENERO[campaign_type] || [])
+    .filter(k => wzMundo[k] !== undefined).map(k => [k, wzMundo[k]]));
+
   const campaignPayload = {
     campaign_type,
     dnd_mode:         isDnd,
+    protagonist:      protagonista ? protagonista.name.trim() : '',
+    ...mundoDoGenero,
     story_summary:    document.getElementById('wz-summary').value.trim(),
     current_scene:    document.getElementById('wz-scene').value.trim(),
     current_location: document.getElementById('wz-location').value.trim(),
