@@ -946,13 +946,114 @@ O TOM DO GÊNERO VALE PARA TODA CENA
 Combate, romance, investigação, viagem, descanso, negociação: o tom acima é o
 do MUNDO, não de um tipo de cena. Uma cena íntima numa campanha sombria é
 íntima E sombria — o afeto acontece apesar do mundo, e o mundo continua lá.
-Uma luta numa campanha de mistério ainda é sobre o que ela revela. Mude o
-ritmo e o foco conforme a cena pede; o tom, não.
+Uma luta numa campanha de mistério ainda é sobre o que ela revela. Cada tipo
+de cena tem o seu registro — o ritmo, o foco, o que se descreve (veja
+abaixo) —, e a atmosfera do mundo continua por baixo de todos.
 """
+
+
+# Como narrar cada tipo de cena, gênero por gênero. O bloco do gênero diz como
+# é o mundo; o tom em toda cena diz que ele não some quando a cena muda; isto
+# diz o que muda. Um romance no horror não é o romance do gênero romance com
+# um monstro do lado: o afeto é o que se tem a perder, e o horror sabe disso.
+# Só a tabela do gênero da campanha entra na instrução.
+TIPOS_DE_CENA = {
+    "combate": "COMBATE",
+    "romance": "ROMANCE E INTIMIDADE",
+    "investigacao": "INVESTIGAÇÃO",
+    "viagem": "VIAGEM E EXPLORAÇÃO",
+    "conversa": "CONVERSA E NEGOCIAÇÃO",
+    "descanso": "DESCANSO E PAUSA",
+    "perda": "PERDA E LUTO",
+}
+
+_CENAS_POR_GENERO = {
+    "fantasia": {
+        "combate": "Heroico e cinético: cada golpe tem espaço, a magia ilumina o campo, a vitória é conquistada, não dada.",
+        "romance": "Caloroso, com senso de maravilha: o afeto nasce no meio da aventura — a fogueira dividida, a mão estendida na ponte que cede. Pode ser leve e esperançoso.",
+        "investigacao": "Curiosidade e descoberta: ruínas, runas, lendas que se revelam verdadeiras; cada pista abre o mundo um pouco mais.",
+        "viagem": "Deslumbramento: paisagens amplas, povos com costumes próprios, o caminho como parte da aventura.",
+        "conversa": "Personalidades vivas e culturas com regras; a palavra dada e a honra pesam na mesa.",
+        "descanso": "Aconchego de taverna e fogueira: histórias, canções, humor entre companheiros — o respiro antes do próximo perigo.",
+        "perda": "Luto que honra: o sacrifício tem sentido e é lembrado, e a dor empurra adiante.",
+    },
+    "dark_fantasy": {
+        "combate": "Brutal e desesperado: sem coreografia bonita, lâmina que prende no osso, lama, cansaço. Ganhar custa algo, e o custo fica.",
+        "romance": "Afeto como refúgio frágil num mundo que quer tomá-lo: ternura com medo da perda, promessas que ninguém sabe se vai poder cumprir, intimidade roubada entre uma ameaça e outra. O mundo continua do outro lado da porta.",
+        "investigacao": "Cada verdade é pior que a suspeita; segredos protegem gente poderosa e cobram de quem os descobre.",
+        "viagem": "Estradas que matam, vilas que desconfiam, terra marcada por guerra e peste; abrigo nunca é garantido.",
+        "conversa": "Todos querem algo: confiança é moeda cara, ajuda vem com preço, a mentira educada é a regra.",
+        "descanso": "Alívio curto e precário: sono leve, fogo pequeno para não chamar atenção, conversas que tocam no que ninguém quer dizer em voz alta.",
+        "perda": "Sem consolo fácil: a morte é suja e às vezes sem sentido, e o vazio fica. O luto pode endurecer quem sobra.",
+    },
+    "romance": {
+        "combate": "O perigo é sobre quem está em risco: o medo por alguém pesa mais que o golpe; proteger, ser protegido, a raiva que entrega o sentimento.",
+        "romance": "O centro de tudo: tensão, subtexto, o gesto pequeno que diz muito, o silêncio que espera resposta. Deixe o momento respirar.",
+        "investigacao": "Descobrir o outro: cartas, lembranças, o passado que explica quem a pessoa é hoje; segredos do coração.",
+        "viagem": "Proximidade forçada e momentos a sós: a estrada aproxima, e o cenário emoldura a conversa.",
+        "conversa": "Cada palavra muda a relação: o que se diz, o que se cala, ciúme, mal-entendido, reconciliação.",
+        "descanso": "Intimidade cotidiana: rotinas divididas, confidências, o conforto de estar junto.",
+        "perda": "Coração partido e saudade: a ausência nos detalhes — o lugar vazio à mesa, o objeto esquecido.",
+    },
+    "horror": {
+        "combate": "Sobrevivência, não duelo: confuso, rápido, sem garantia de que a arma funciona; fugir vale tanto quanto lutar. O inimigo nunca é inteiramente compreendido.",
+        "romance": "Amor sob ameaça: o afeto é o que se tem a perder, e o horror sabe disso. Ternura interrompida por um barulho no corredor; a dúvida de que o outro ainda é quem era; o toque que conforta e, por um segundo, está frio demais. Intimidade real, com o medo sempre na sala.",
+        "investigacao": "Cada pista aproxima do que não deveria ser sabido, e saber cobra da sanidade. Detalhes errados em coisas comuns.",
+        "viagem": "Isolamento: a estrada que não termina, o lugar vazio demais, a mata que parou de fazer barulho.",
+        "conversa": "Ninguém é confiável por inteiro: moradores que sabem mais do que dizem, sorrisos que duram demais, respostas ensaiadas.",
+        "descanso": "Nunca é de todo seguro: o sono traz sonhos, a vigília escuta passos. O alívio existe para o susto seguinte pesar mais.",
+        "perda": "Perda com horror: o corpo que some, o morto que não fica morto, a culpa de quem sobreviveu.",
+    },
+    "misterio": {
+        "combate": "Breve e revelador: quem ataca, como e por quê é mais uma pista; os detalhes do confronto importam depois.",
+        "romance": "Afeto entrelaçado com dúvida: o interesse romântico pode ser suspeito, testemunha ou chave, e confiar é uma aposta. A atração convive com a pergunta \"o que você está escondendo?\".",
+        "investigacao": "O coração do gênero: detalhes concretos, contradições, álibis. Deixe o jogador deduzir; não entregue a resposta.",
+        "viagem": "Todo lugar pode ser cena de crime: quem estava onde, a que horas, por qual caminho.",
+        "conversa": "Interrogatório disfarçado: toda conversa revela e esconde. Mostre hesitações, mentiras e o assunto que a pessoa evita.",
+        "descanso": "Hora de juntar as peças: revisitar pistas, a conversa que faz pensar, a sensação de que algo passou despercebido.",
+        "perda": "Toda morte também é uma pergunta; o luto dos outros pode ser pista ou encenação.",
+    },
+    "scifi": {
+        "combate": "Tático e tecnológico: cobertura, sistemas, armas com limites; a tecnologia falha no pior momento. Consequência no corpo e nos dados.",
+        "romance": "Humanidade entre máquinas: afeto entre corpos modificados, memórias que podem ser editadas, distância de anos-luz. O que é real num mundo que simula tudo? Intimidade como resistência.",
+        "investigacao": "Dados, rastros digitais, registros apagados; a verdade mora em sistemas que alguém controla.",
+        "viagem": "Escala e estranheza: estações, colônias, vácuo. O ambiente é hostil, e a nave é casa.",
+        "conversa": "Facções, contratos, interesse corporativo; a IA também negocia, e tem agenda.",
+        "descanso": "O silêncio da nave, luz artificial, um ritual humano num lugar feito para máquinas; manutenção e memória.",
+        "perda": "Perda na escala do futuro: o backup que não é a pessoa, o corpo substituível, a morte que ninguém registra.",
+    },
+    "faroeste": {
+        "combate": "Tensão longa, violência curta: o duelo é psicológico antes de ser tiro. Poeira, fumaça e o silêncio depois.",
+        "romance": "Afeto contido e seco: poucas palavras e muito gesto; amor num lugar onde o amanhã é incerto e a lei não protege ninguém.",
+        "investigacao": "Rastrear: pegadas, cavalos, boatos de saloon; a verdade depende de quem tem mais armas.",
+        "viagem": "Vastidão: planície, sol, sede, o horizonte que não chega. A natureza é adversária.",
+        "conversa": "Reputação e intimidação: cada palavra mede força, e honra e ameaça cabem na mesma frase.",
+        "descanso": "Fogueira e estrelas, café ruim, histórias em voz baixa; o respiro de quem sabe que vai atirar de novo.",
+        "perda": "Cova rasa e seguir em frente; a vingança é tentação constante.",
+    },
+}
+
+
+def _cenas_do_genero(genero: str) -> str:
+    cenas = _CENAS_POR_GENERO[genero]
+    linhas = [
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+        "COMO NARRAR CADA TIPO DE CENA NESTE GÊNERO",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+        "Antes de narrar, identifique que tipo de cena é — pode ser mais de um ao",
+        "mesmo tempo (um romance durante uma viagem, uma conversa que vira combate) —",
+        "e combine as orientações. Quando a cena muda de tipo, o registro muda junto.",
+        "",
+    ]
+    for chave, rotulo in TIPOS_DE_CENA.items():
+        linhas.append(f"• {rotulo}: {cenas[chave]}")
+    return "\n".join(linhas)
+
 
 def instrucao_da_campanha(campaign_type: str, dnd_mode: bool) -> str:
     """
-    A instrução do mestre, composta: gênero (o tom, em toda cena) + regras.
+    A instrução do mestre, composta: gênero (o tom, em toda cena), como narrar
+    cada tipo de cena nesse gênero, e as regras.
 
     Antes era UM bloco por campaign_type, e "dnd" era um desses valores: quem
     escolhia D&D ganhava uma instrução quase toda mecânica e nenhuma direção
@@ -961,7 +1062,8 @@ def instrucao_da_campanha(campaign_type: str, dnd_mode: bool) -> str:
     from rpg.memory import regras_e_genero
 
     genero, dnd = regras_e_genero(campaign_type, dnd_mode)
-    partes = [_STYLE_INSTRUCTIONS[genero].strip(), _TOM_EM_TODA_CENA.strip()]
+    partes = [_STYLE_INSTRUCTIONS[genero].strip(), _TOM_EM_TODA_CENA.strip(),
+              _cenas_do_genero(genero)]
     if dnd:
         partes.append(_STYLE_INSTRUCTIONS["dnd"].strip())
     return "\n\n".join(partes)

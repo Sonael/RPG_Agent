@@ -281,15 +281,22 @@ editada pelo menu e na geração de lore.
 
 ### A instrução do mestre é composta
 
-`agent.instrucao_da_campanha(genero, dnd_mode)` junta três blocos:
+`agent.instrucao_da_campanha(genero, dnd_mode)` junta quatro blocos:
 
 1. **O gênero** — o tom, de `_STYLE_INSTRUCTIONS`.
 2. **O tom vale para toda cena** — combate, romance, investigação, viagem,
    descanso. Uma cena íntima numa campanha sombria é íntima *e* sombria: o
-   afeto acontece apesar do mundo, e o mundo continua lá. O ritmo e o foco
-   mudam com a cena; o tom, não. Sem isto, cada gênero só sabia narrar o
-   próprio tipo de cena.
-3. **As regras de D&D**, quando ligadas — e elas avisam que não mudam o tom:
+   afeto acontece apesar do mundo, e o mundo continua lá. Sem isto, cada
+   gênero só sabia narrar o próprio tipo de cena.
+3. **Como narrar cada tipo de cena neste gênero** — `_CENAS_POR_GENERO`:
+   combate, romance e intimidade, investigação, viagem e exploração, conversa
+   e negociação, descanso e pausa, perda e luto, cada um com uma orientação
+   própria do gênero. O mestre identifica o tipo da cena (às vezes mais de
+   um: um romance durante uma viagem) e combina as orientações. O romance no
+   horror não é o romance do gênero romance com um monstro ao lado: "amor
+   sob ameaça", o afeto é o que se tem a perder. Só a tabela do gênero da
+   campanha entra na instrução.
+4. **As regras de D&D**, quando ligadas — e elas avisam que não mudam o tom:
    as regras dizem o que acontece, o gênero diz como isso é contado.
 
 `create_agent` recebe os dois campos. Ele fazia `dnd_mode = (campaign_type ==

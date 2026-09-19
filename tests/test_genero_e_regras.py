@@ -94,6 +94,56 @@ def test_o_tom_vale_para_toda_cena_em_qualquer_genero():
             assert "íntima E sombria" in texto
 
 
+def test_todo_genero_sabe_narrar_todo_tipo_de_cena():
+    for genero in memory.GENEROS:
+        cenas = agent._CENAS_POR_GENERO[genero]
+        assert set(cenas) == set(agent.TIPOS_DE_CENA), genero
+        for tipo, texto in cenas.items():
+            assert len(texto) > 60, (genero, tipo)
+
+
+def test_a_mesma_cena_e_narrada_diferente_em_cada_genero():
+    """O romance do horror não é o romance do gênero romance."""
+    for tipo in agent.TIPOS_DE_CENA:
+        textos = [agent._CENAS_POR_GENERO[g][tipo] for g in memory.GENEROS]
+        assert len(set(textos)) == len(textos), tipo
+
+
+def test_romance_no_horror_tem_o_medo_na_sala():
+    texto = agent.instrucao_da_campanha("horror", False)
+    assert "COMO NARRAR CADA TIPO DE CENA NESTE GÊNERO" in texto
+    assert "ROMANCE E INTIMIDADE: Amor sob ameaça" in texto
+    # Só a tabela do gênero da campanha: a do romance não vaza.
+    assert agent._CENAS_POR_GENERO["romance"]["romance"] not in texto
+
+
+def test_cada_genero_leva_so_a_propria_tabela_de_cenas():
+    for genero in memory.GENEROS:
+        for dnd in (True, False):
+            texto = agent.instrucao_da_campanha(genero, dnd)
+            for outro in memory.GENEROS:
+                romance = agent._CENAS_POR_GENERO[outro]["romance"]
+                assert (romance in texto) == (outro == genero), (genero, outro, dnd)
+
+
+def test_ordem_genero_tom_cenas_regras():
+    """As cenas vêm depois do tom do mundo e antes das regras, que não mudam o tom."""
+    texto = agent.instrucao_da_campanha("dark_fantasy", True)
+    i_genero = texto.index("Você é um mestre de dark fantasy")
+    i_tom = texto.index("VALE PARA TODA CENA")
+    i_cenas = texto.index("COMO NARRAR CADA TIPO DE CENA")
+    i_regras = texto.index("REGRAS DE D&D 5e")
+    assert i_genero < i_tom < i_cenas < i_regras
+
+
+def test_mestre_identifica_e_combina_os_tipos_de_cena():
+    texto = agent.instrucao_da_campanha("fantasia", False)
+    assert "identifique que tipo de cena é" in texto
+    assert "combine as orientações" in texto
+    for rotulo in agent.TIPOS_DE_CENA.values():
+        assert f"• {rotulo}:" in texto, rotulo
+
+
 def test_campanha_dnd_antiga_ganha_tom_de_fantasia():
     """Antes a instrução de "dnd" não tinha atmosfera nenhuma."""
     texto = agent.instrucao_da_campanha("dnd", False)
