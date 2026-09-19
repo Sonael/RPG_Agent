@@ -170,6 +170,9 @@ input, textarea {
   width: 100%; background: transparent; border: none; border-bottom: 1px solid var(--page-edge); color: var(--ink-user);
   font-family: 'Caveat', cursive; font-size: 22px; padding: var(--esp-1) 0; outline: none; transition: border-color 0.3s;
 }
+/* Caixinha e rádio não herdam a largura inteira: com ela, a caixinha ocupava a
+   linha do rótulo e o texto ao lado quebrava ("Membro / do Grupo"). */
+input[type="checkbox"], input[type="radio"] { width: auto; flex: 0 0 auto; }
 select {
   width: 100%; background: transparent; border: none; border-bottom: 1px solid var(--page-edge); color: var(--ink-user);
   font-family: 'Lora', serif; font-size: 16px; padding: var(--esp-2) 0; outline: none; transition: border-color 0.3s; cursor: pointer;
