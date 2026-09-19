@@ -244,3 +244,46 @@ def resumo_para_o_mestre() -> str:
             linhas.append(f"• De {s['dono']} — {s['titulo']}"
                           + (f": {s['descricao']}" if s.get("descricao") else "") + f" ({estado})")
     return "\n".join(linhas) if linhas else "Nenhum segredo guardado ainda."
+
+
+# ---------------------------------------------------------------------------
+# Importação (JSON de outro chat ou do editor)
+# ---------------------------------------------------------------------------
+
+def importar(valor, protagonista: str = "") -> dict:
+    """
+    Os segredos de um JSON importado, no formato do jogo: chave pelo título,
+    listas de nomes, o dono vazio quando é o protagonista e os campos que
+    faltarem com o padrão. Aceita dict (como o jogo grava) ou lista.
+    """
+    itens = valor.values() if isinstance(valor, dict) else (valor or [])
+    prot = locais.norm(protagonista or "")
+    saida = {}
+    for s in itens:
+        if not isinstance(s, dict):
+            continue
+        titulo = " ".join(str(s.get("titulo") or "").split())
+        if not titulo or locais.norm(titulo) in saida:
+            continue
+        dono = " ".join(str(s.get("dono") or "").split())
+        if locais.norm(dono) in ("", "voce", "eu", "protagonista", prot):
+            dono = ""
+        revelado = bool(s.get("revelado")) and bool(dono)
+        como = locais.norm(s.get("como") or "")
+        como = como if como in ("contou", "descobriu") else ("contou" if revelado else "")
+        saida[locais.norm(titulo)] = {
+            "titulo": titulo,
+            "descricao": " ".join(str(s.get("descricao") or "").split()),
+            "dono": dono,
+            "escondido_de": [] if dono else _lista_de_nomes(s.get("escondido_de")),
+            "sabem": _lista_de_nomes(s.get("sabem")),
+            "revelado": revelado, "como": como if revelado else "",
+            "dono_sabe": como != "descobriu" if revelado else True,
+            "cap": s.get("cap") or 1,
+            "historico": [h for h in (s.get("historico") or []) if isinstance(h, dict)],
+        }
+        if revelado:
+            saida[locais.norm(titulo)]["cap_revelado"] = s.get("cap_revelado") or s.get("cap") or 1
+        if len(saida) >= MAX_SEGREDOS:
+            break
+    return saida

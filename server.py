@@ -992,7 +992,7 @@ def _payload_de_campanha(name: str, dados: dict, personagens: dict) -> dict:
     pelo nome, "fica dentro de" e "onde está" com o nome do lugar. Ciclo em
     "fica dentro de" levanta ValueError, que as rotas devolvem como 400.
     """
-    from rpg import locais as _locais
+    from rpg import encontros as _encontros, locais as _locais, segredos as _segredos, tensoes as _tensoes
     locations, erro = _locais.normalizar_campanha_editada(
         dados.get("locations", {}), {}, personagens, {}, dados.get("lojas", {}))
     if erro:
@@ -1029,6 +1029,13 @@ def _payload_de_campanha(name: str, dados: dict, personagens: dict) -> dict:
         "relogio":              dados.get("relogio", {}),
         "quests":               dados.get("quests", {}),
         "lojas":                dados.get("lojas", {}),
+        # O romance no nível da campanha: segredos, encontros marcados e as
+        # tensões entre os outros. O que fica em cada personagem (confiança,
+        # vínculo, estágio, momentos) já vinha junto com ele; isto não vinha,
+        # e importar ou criar uma campanha jogava fora.
+        "segredos":             _segredos.importar(dados.get("segredos"), dados.get("protagonist", "")),
+        "encontros":            _encontros.importar(dados.get("encontros")),
+        "tensoes":              _tensoes.importar(dados.get("tensoes")),
         "_turno":               dados.get("_turno", 0),
         "_upkeep":              dados.get("_upkeep", {}),
     }

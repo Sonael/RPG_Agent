@@ -434,8 +434,12 @@ function onModelChange() {
 let currentImportTheme = 'fantasia';
 
 function getImportPrompt(theme) {
-  // As regras são uma caixa à parte: dá para importar D&D de qualquer gênero.
-  const isDnd = !!document.getElementById('import-dnd')?.checked;
+  // As regras são uma caixa à parte, só nos gêneros em que o D&D faz sentido
+  // (a caixa trava nos outros: setImportTheme).
+  const isDnd = !!document.getElementById('import-dnd')?.checked && generoTemRegras(theme);
+  // O romance tem relação em dois eixos, estágio, momentos, segredos,
+  // encontros e tensões entre os outros; o JSON pede tudo isso.
+  const romance = theme === 'romance';
   const themeFocus = {
     fantasia: "focando na magia do mundo, facções e feitos heroicos",
     dark_fantasy: "focando na atmosfera sombria, nos preços que o poder cobrou, nas cicatrizes e na moral cinzenta de cada escolha",
@@ -462,11 +466,21 @@ function getImportPrompt(theme) {
 
   prompt += `  "characters": {\n    "<Nome Exato Maiusculo e Minusculo>": {\n      "name": "<Nome Exato Maiusculo e Minusculo>",\n     "description": "<descrição física minuciosa>",\n      "traits": "<análise psicológica profunda>",\n      "status": "<vivo|morto|desaparecido|preso|inconsciente|outro>",\n      "notes": "<objetivos pessoais ocultos>",\n      "atitude": <inteiro de -100 (hostil) a 100 (leal): o que ESTE personagem sente pelo grupo. 0 se indiferente ou se mal se conhecem>`;
 
+  if (romance) {
+    prompt = prompt.replace('o que ESTE personagem sente pelo grupo', 'o AFETO deste personagem pelo protagonista (-100 aversão, 100 devoção)');
+    prompt += `,\n      "confianca": <inteiro de -100 (desconfia) a 100 (confia de olhos fechados): o quanto ele acredita no protagonista>,\n      "vinculo": "<interesse romântico|namoro|melhor amiga|família|ex|rival|...>",\n      "estagio": "<conhecidos|amizade|flerte|namoro|compromisso|rompimento>",\n      "estagio_antes": "<só no rompimento: até onde a relação chegou>",\n      "momentos": [\n        {"titulo": "<o momento marcante em poucas palavras>", "descricao": "<uma frase>", "cap": <capítulo>}\n      ]`;
+  }
+
   if (isDnd) {
     prompt += `,\n      "sheet": {\n        "classe": "<classe>", "raca": "<raça>", "nivel": 1, "xp": 0, "xp_proximo": 300,\n        "forca": 10, "destreza": 10, "constituicao": 10, "inteligencia": 10, "sabedoria": 10, "carisma": 10,\n        "vida_atual": 10, "vida_max": 10, "mana_atual": 0, "mana_max": 0, "ca": 10, "proficiencia": 2, "hit_die": 8,\n        "ouro": 0, "prata": 0, "cobre": 0,\n        "equipamentos": {"armadura": null, "escudo": null, "arma_principal": null, "amuleto": null},\n        "condicoes": [],\n        "death_saves_sucessos": 0, "death_saves_falhas": 0\n      },\n      "inventario": [\n        {"nome": "<nome_item>", "qtd": 1, "descricao": "<efeito>", "custom": false}\n      ],\n      "habilidades": [\n        {"nome": "<nome_hab>", "descricao": "<efeito>", "custo_mana": 0, "dado": "1d6"}\n      ]`;
   }
 
-  prompt += `\n    }\n  },\n  "locations": {\n    "<nome_em_lowercase>": {\n      "name": "<Nome do Local>",\n      "description": "<descrição sensorial completa>",\n      "details": "<pontos geográficos específicos>",\n      "notes": "<eventos passados ocorridos aqui>"\n    }\n  },\n  "events": [\n    {\n      "index": 1,\n      "summary": "<narração detalhada>",\n      "characters_involved": "<nomes separados por vírgula>",\n      "location": "<onde ocorreu>",\n      "consequence": "<consequência imediata e ramificações>"\n    }\n  ],\n  "party": [\n    {\n      "name": "<nome>",\n      "role": "<função ou classe>",\n      "notes": "<fatos marcantes>"\n    }\n  ],\n  "quest_flags": {\n    "<nome_da_flag>": "<valor detalhado>"\n  },\n  "quests": {\n    "<titulo em lowercase>": {\n      "titulo": "<Titulo da Missao>",\n      "descricao": "<o que o grupo aceitou fazer>",\n      "status": "<ativa|concluida|falhou|abandonada>",\n      "quem_deu": "<quem encomendou>",\n      "recompensa": "<o que foi combinado>",\n      "objetivos": [{"texto": "<passo>", "feito": false}]\n    }\n  },\n  "diary": [\n    {\n      "chapter": <numero>,\n      "title": "<título evocativo>",\n      "content": "<narração em terceira pessoa com estilo literário>"\n    }\n  ]\n}\n\nResponda APENAS com o JSON, sem explicações, sem blocos de código markdown.`;
+  prompt += `\n    }\n  },\n  "locations": {\n    "<nome_em_lowercase>": {\n      "name": "<Nome do Local>",\n      "description": "<descrição sensorial completa>",\n      "details": "<pontos geográficos específicos>",\n      "notes": "<eventos passados ocorridos aqui>"\n    }\n  },\n  "events": [\n    {\n      "index": 1,\n      "summary": "<narração detalhada>",\n      "characters_involved": "<nomes separados por vírgula>",\n      "location": "<onde ocorreu>",\n      "consequence": "<consequência imediata e ramificações>"\n    }\n  ],\n  "party": [\n    {\n      "name": "<nome>",\n      "role": "<função ou classe>",\n      "notes": "<fatos marcantes>"\n    }\n  ],\n  "quest_flags": {\n    "<nome_da_flag>": "<valor detalhado>"\n  },\n  "quests": {\n    "<titulo em lowercase>": {\n      "titulo": "<Titulo da Missao>",\n      "descricao": "<o que o grupo aceitou fazer>",\n      "status": "<ativa|concluida|falhou|abandonada>",\n      "quem_deu": "<quem encomendou>",\n      "recompensa": "<o que foi combinado>",\n      "objetivos": [{"texto": "<passo>", "feito": false}]\n    }\n  },\n  "diary": [\n    {\n      "chapter": <numero>,\n      "title": "<título evocativo>",\n      "content": "<narração em terceira pessoa com estilo literário>"\n    }\n  ]`;
+
+  if (romance) {
+    prompt += `,\n  "relogio": {"dia": <dia atual da história, 1 no começo>, "hora": <hora atual, 0 a 23>},\n  "segredos": {\n    "<titulo em lowercase>": {\n      "titulo": "<o segredo em poucas palavras>",\n      "descricao": "<uma frase>",\n      "dono": "<vazio se é do protagonista; senão, o nome de quem o guarda>",\n      "escondido_de": ["<só nos do protagonista: de quem ele esconde>"],\n      "sabem": ["<quem já sabe>"],\n      "revelado": <só nos dos outros: true se o protagonista já sabe>,\n      "como": "<contou|descobriu: como o protagonista ficou sabendo>"\n    }\n  },\n  "encontros": [\n    {"com": "<nome>", "dia": <dia no relógio acima>, "hora": <0 a 23>, "onde": "<lugar>", "o_que": "<jantar, cinema...>"}\n  ],\n  "tensoes": [\n    {"a": "<nome>", "b": "<outro nome, nunca o protagonista>", "tipo": "<ciume|rivalidade|magoa|desconfianca>", "intensidade": <0 a 100>, "percebida": <false se o protagonista ainda não notou>}\n  ]`;
+  }
+  prompt += `\n}\n\nResponda APENAS com o JSON, sem explicações, sem blocos de código markdown.`;
 
   return prompt;
 }

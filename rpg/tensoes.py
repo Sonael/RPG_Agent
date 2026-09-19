@@ -166,3 +166,25 @@ def resumo_para_o_mestre() -> str:
                       f"{tri['estagios'][1]} com {tri['b']}. O ciúme vai aparecer: decida quem percebe e "
                       f"registre com ajustar_tensao.")
     return "\n".join(linhas)
+
+
+def importar(valor) -> dict:
+    """As tensões de um JSON importado: chave pelo par, tipo válido, intensidade de 0 a 100."""
+    itens = valor.values() if isinstance(valor, dict) else (valor or [])
+    saida = {}
+    for x in itens:
+        if not isinstance(x, dict):
+            continue
+        a, b = " ".join(str(x.get("a") or "").split()), " ".join(str(x.get("b") or "").split())
+        if not a or not b or locais.norm(a) == locais.norm(b):
+            continue
+        tipo = locais.norm(x.get("tipo") or "ciume")
+        try:
+            valor_i = max(0, min(100, int(x.get("intensidade") or 0)))
+        except (TypeError, ValueError):
+            valor_i = 0
+        saida[_chave(a, b)] = {"a": a, "b": b, "tipo": tipo if tipo in TIPOS else "ciume",
+                               "intensidade": valor_i, "percebida": x.get("percebida", True) is not False,
+                               "historico": [h for h in (x.get("historico") or []) if isinstance(h, dict)],
+                               "cap": x.get("cap") or 1}
+    return saida

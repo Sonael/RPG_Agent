@@ -148,3 +148,24 @@ def resumo_para_o_mestre() -> str:
                  if e["atrasado"] else "")
         linhas.append(f"• {e['com']}: {e['o_que']} — {e['quando']}{onde} ({e['falta']}){cobra}")
     return "\n".join(linhas)
+
+
+def importar(valor) -> list:
+    """Os encontros de um JSON importado: dia e hora inteiros, estado válido, ids."""
+    saida = []
+    for e in (valor or []) if isinstance(valor, list) else []:
+        if not isinstance(e, dict) or not str(e.get("com") or "").strip():
+            continue
+        try:
+            dia, hora = int(e.get("dia")), int(e.get("hora"))
+        except (TypeError, ValueError):
+            continue
+        if not 0 <= hora <= 23:
+            continue
+        estado = locais.norm(e.get("estado") or "marcado")
+        saida.append({"id": len(saida) + 1, "com": " ".join(str(e["com"]).split()), "dia": dia, "hora": hora,
+                      "onde": " ".join(str(e.get("onde") or "").split()),
+                      "o_que": " ".join(str(e.get("o_que") or "").split()) or "encontro",
+                      "estado": estado if estado in ESTADOS + ("marcado",) else "marcado",
+                      "cap": e.get("cap") or 1})
+    return saida[-MAX_ENCONTROS:]

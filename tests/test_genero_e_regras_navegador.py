@@ -248,3 +248,24 @@ def test_importar_tem_regras_numa_caixa_a_parte(menu):
     texto = pg.inner_text("#import-prompt-text")
     assert '"dnd_mode": false' in texto and '"sheet"' not in texto
     assert not erros, erros[:3]
+
+
+def test_prompt_de_importacao_do_romance_pede_o_que_o_romance_tem(menu):
+    pg, erros, _ = menu
+    pg.evaluate("() => openImportModal()")
+    pg.wait_for_selector("#import-overlay:not(.hidden)", timeout=5000)
+    pg.click(".import-tab[data-theme='romance']")
+    texto = pg.inner_text("#import-prompt-text")
+    for campo in ('"confianca"', '"vinculo"', '"estagio"', '"momentos"', '"relogio"',
+                  '"segredos"', '"escondido_de"', '"encontros"', '"tensoes"', '"percebida"'):
+        assert campo in texto, campo
+    assert "AFETO deste personagem pelo protagonista" in texto
+    assert texto.rstrip().endswith("sem blocos de código markdown.")
+    # O JSON de exemplo continua um objeto só, fechado no fim.
+    assert texto.count('"diary"') == 1
+    # Numa fantasia nada disso aparece.
+    pg.click(".import-tab[data-theme='fantasia']")
+    texto = pg.inner_text("#import-prompt-text")
+    assert '"segredos"' not in texto and '"confianca"' not in texto
+    assert "o que ESTE personagem sente pelo grupo" in texto
+    assert not erros, erros[:3]
