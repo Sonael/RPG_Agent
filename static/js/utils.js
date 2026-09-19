@@ -237,6 +237,14 @@ function nomeDaTela(chave, padrao) {
 }
 window.nomeDaTela = nomeDaTela;
 
+// Uma frase da tela no gênero da campanha. No romance não há "grupo": "O que
+// o grupo sabe" vira "O que você sabe". Sem frase própria, a de sempre.
+function frase(chave, padrao) {
+  const frases = (window._campaignConfig && window._campaignConfig.frases) || {};
+  return frases[chave] || padrao;
+}
+window.frase = frase;
+
 // O estágio da relação (romance): o nome do degrau e uma barra em cinco
 // segmentos, cheia até onde a relação está. No rompimento a barra fica
 // apagada até onde ela chegou e o nome diz "rompimento". Vem pronto de

@@ -41,12 +41,12 @@
         </header>
 
         <div class="lcl-corpo">
-          <section class="lcl-corpo-pessoas" aria-label="Relação e o que o grupo sabe">
+          <section class="lcl-corpo-pessoas" aria-label="Relação e o que se sabe">
             <div id="psn-relacao-bloco">
               <h2 class="lcl-secao" id="psn-relacao-titulo">Relação com o grupo</h2>
               <div id="psn-relacao"></div>
             </div>
-            <h2 class="lcl-secao psn-secao-sabe">O que o grupo sabe</h2>
+            <h2 class="lcl-secao psn-secao-sabe" id="psn-sabe-titulo">O que o grupo sabe</h2>
             <div id="psn-sabe" class="lcl-lista"></div>
             <h2 class="lcl-secao psn-secao-sabe" id="psn-cenas-titulo">Últimas cenas com ele</h2>
             <div id="psn-cenas" class="lcl-lista"></div>
@@ -77,7 +77,7 @@
   // ---- Render ------------------------------------------------------
   function onde(f) {
     const partes = [];
-    if (f.do_grupo) partes.push('<span class="lcl-selo-texto lcl-alcance-aqui">Do grupo</span>');
+    if (f.do_grupo) partes.push(`<span class="lcl-selo-texto lcl-alcance-aqui">${esc(window.frase('do_grupo', 'Do grupo'))}</span>`);
     if (f.local && f.local.nome) {
       partes.push(`<span class="psn-em">Em <a href="#" class="lcl-migalha"
         onclick="event.preventDefault();window.Personagens._verLocal('${aspas(f.local.nome)}')">${esc(f.local.nome)}</a></span>`);
@@ -93,7 +93,7 @@
         ? `<button class="lcl-btn lcl-btn-ir" onclick="window.Personagens._falar('${aspas(f.nome)}')"
             title="Manda ao mestre: Quero falar com ${esc(f.nome)}.">Falar com</button>`
         : `<button class="lcl-btn" disabled title="${(f.status || '').toLowerCase() === 'morto'
-            ? 'Não está mais entre os vivos' : 'Longe do grupo: vá até lá primeiro'}">Falar com</button>`);
+            ? 'Não está mais entre os vivos' : `${window.frase('longe', 'Longe do grupo')}: vá até lá primeiro`}">Falar com</button>`);
     }
     return partes.join('');
   }
@@ -264,6 +264,9 @@
     q('psn-tracos').textContent = _last.tracos ? `Traços: ${_last.tracos}` : '';
     q('psn-relacao-bloco').classList.toggle('hidden', !_last.atitude && !_last.relacao);
     q('psn-relacao-titulo').textContent = _last.relacao ? 'Relação com você' : 'Relação com o grupo';
+    q('psn-sabe-titulo').textContent = window.frase('sabe', 'O que o grupo sabe');
+    // Pelo nome: "com ele" supunha o gênero de todo personagem.
+    q('psn-cenas-titulo').textContent = `Últimas cenas com ${_last.nome}`;
     q('psn-relacao').innerHTML = _last.relacao
       ? relacaoDoRomance(_last.relacao, gestos(_last)) : relacao(_last.atitude);
     const sabe = _last.conhecido || [];

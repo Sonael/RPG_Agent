@@ -101,7 +101,7 @@
     const expansivel = temFilhos || temPessoas;
     const aberto = expansivel && (_busca ? true : _abertos.has(n.nome));
     const marcas = [
-      n.grupo_aqui ? '<span class="lcl-marca lcl-marca-grupo">grupo aqui</span>' : '',
+      n.grupo_aqui ? `<span class="lcl-marca lcl-marca-grupo">${esc(window.frase('grupo_aqui', 'grupo aqui'))}</span>` : '',
       !n.grupo_aqui && ALCANCE[n.alcance] ? `<span class="lcl-marca map-marca-alcance">${ALCANCE[n.alcance]}</span>` : '',
       n.tipo === 'loja' ? '<span class="lcl-marca lcl-marca-loja">loja</span>' : '',
       n.tipo === 'sem_registro' ? '<span class="lcl-marca map-marca-sem" title="Citado na campanha, mas nunca registrado como local">sem registro</span>' : '',
@@ -136,7 +136,7 @@
     ensureDom();
     const caminho = _last.caminho_atual || [];
     q('map-onde').innerHTML = _last.local_atual
-      ? `<span class="map-onde-rotulo">O grupo está em</span> ${caminho.map(esc).join('<span class="lcl-sep">›</span>')}`
+      ? `<span class="map-onde-rotulo">${esc(window.frase('esta_em', 'O grupo está em'))}</span> ${caminho.map(esc).join('<span class="lcl-sep">›</span>')}`
       : '<span class="map-onde-rotulo">Local atual não definido</span>';
 
     const arvore = _last.arvore || [];

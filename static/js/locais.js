@@ -23,11 +23,12 @@
   const q = (id) => document.getElementById(id);
   const aspas = (s) => esc(s).replace(/'/g, "\\'");
 
+  // As frases do alcance no gênero da campanha ("Você está aqui" no romance).
   const ROTULO_ALCANCE = {
-    aqui: 'O grupo está aqui',
-    dentro: 'Fica dentro do local do grupo',
-    acima: 'É onde o local do grupo fica',
-    vizinho: 'Ao lado do local do grupo',
+    aqui: () => window.frase('aqui', 'O grupo está aqui'),
+    dentro: () => window.frase('dentro', 'Fica dentro do local do grupo'),
+    acima: () => window.frase('acima', 'É onde o local do grupo fica'),
+    vizinho: () => window.frase('vizinho', 'Ao lado do local do grupo'),
   };
 
   // ---- DOM ---------------------------------------------------------
@@ -110,7 +111,7 @@
       ? `<button class="lcl-btn lcl-btn-ir" onclick="window.Locais._falar('${aspas(p.nome)}')"
                  title="Manda ao mestre: Quero falar com ${esc(p.nome)}.">Falar com</button>`
       : `<button class="lcl-btn" disabled
-                 title="${status === 'morto' ? 'Não está mais entre os vivos' : 'Longe do grupo: vá até lá primeiro'}">Falar com</button>`;
+                 title="${status === 'morto' ? 'Não está mais entre os vivos' : `${window.frase('longe', 'Longe do grupo')}: vá até lá primeiro`}">Falar com</button>`;
     return `
       <div class="lcl-item" data-nome="${esc(p.nome)}">
         <div class="lcl-item-cabeca"><span class="lcl-item-nome">${esc(p.nome)}</span>${marca}</div>
@@ -124,7 +125,7 @@
 
   function lugarDentro(d) {
     const marcas = [
-      d.alcance === 'aqui' ? '<span class="lcl-marca lcl-marca-grupo">grupo aqui</span>' : '',
+      d.alcance === 'aqui' ? `<span class="lcl-marca lcl-marca-grupo">${esc(window.frase('grupo_aqui', 'grupo aqui'))}</span>` : '',
       d.tipo === 'loja' ? '<span class="lcl-marca lcl-marca-loja">loja</span>' : '',
       d.pessoas ? `<span class="lcl-marca">${d.pessoas} ${d.pessoas === 1 ? 'pessoa' : 'pessoas'}</span>` : '',
     ].join('');
@@ -176,7 +177,9 @@
     q('lcl-nome').textContent = _last.nome || 'Local desconhecido';
     q('lcl-tipo').textContent = _last.tipo === 'loja' ? '— loja' : '';
 
-    const selo = ROTULO_ALCANCE[_last.alcance] || (_last.nome ? 'Longe do grupo' : '');
+    const selo = ROTULO_ALCANCE[_last.alcance] ? ROTULO_ALCANCE[_last.alcance]()
+      : (_last.nome ? window.frase('longe', 'Longe do grupo') : '');
+    q('lcl-onde').textContent = window.frase('onde_esta', 'Onde o grupo está');
     const pai = _last.pai;
     q('lcl-selo').innerHTML =
       (selo ? `<span class="lcl-selo-texto lcl-alcance-${esc(_last.alcance || 'longe')}">${esc(selo)}</span>` : '')
@@ -187,9 +190,11 @@
     const desc = _last.descricao || (_last.tipo === 'loja' && pai ? `Loja em ${pai.nome}.` : '');
     q('lcl-desc').textContent = desc || (_last.existe ? '' : 'Este lugar ainda não foi registrado pelo mestre.');
 
-    const grupo = _last.grupo_aqui || [];
+    // "Com você" (romance) não lista você mesmo: o protagonista sai da lista.
+    const eu = window.frase('com_voce', '') ? ((window._lastMem || {}).protagonist || '').toLowerCase() : '';
+    const grupo = (_last.grupo_aqui || []).filter(n => !eu || String(n).toLowerCase() !== eu);
     q('lcl-grupo').innerHTML = grupo.length
-      ? `<span class="lcl-grupo-rotulo">Grupo</span>${grupo.map(n => `<span class="lcl-grupo-nome">${esc(n)}</span>`).join('')}`
+      ? `<span class="lcl-grupo-rotulo">${esc(window.frase('com_voce', 'Grupo'))}</span>${grupo.map(n => `<span class="lcl-grupo-nome">${esc(n)}</span>`).join('')}`
       : '';
     const pessoas = _last.pessoas || [];
     q('lcl-pessoas').innerHTML = pessoas.length

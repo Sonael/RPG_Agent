@@ -77,6 +77,26 @@ CAMPAIGN_CONFIGS = {
         "telas": {"grupo": "Próximos", "missoes": "Tramas", "titulo_missoes": "As Tramas",
                   "mapa": "Lugares", "titulo_mapa": "Os Lugares",
                   "tela_do_grupo": "relacoes"},
+        # No romance não há "grupo": há você e as pessoas do seu círculo. As
+        # telas falavam "O que o grupo sabe", "Do grupo", "O grupo está aqui".
+        "frases": {
+            "sabe":         "O que você sabe",
+            "do_grupo":     "Do seu círculo",
+            "longe":        "Longe de você",
+            "aqui":         "Você está aqui",
+            "dentro":       "Fica dentro de onde você está",
+            "acima":        "É onde fica o lugar em que você está",
+            "vizinho":      "Ao lado de onde você está",
+            "onde_esta":    "Onde você está",
+            "grupo_aqui":   "você está aqui",
+            "esta_em":      "Você está em",
+            "com_voce":     "Com você",
+            "marca_grupo":  "círculo",
+            "relacao_com":  "Relação com você",
+            "novo_membro":  "Nova pessoa próxima",
+            "ninguem":      "Ninguém próximo ainda.",
+            "fora":         "fora do seu círculo",
+        },
     },
     "horror": {
         "label":          "Horror / Suspense",

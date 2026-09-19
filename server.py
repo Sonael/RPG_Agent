@@ -2360,6 +2360,9 @@ def get_memory_state():
         # funcionando sem migração nenhuma.
         "relogio":          c.get("relogio", {}),
         "encontro":         _encontro_da_barra(c),
+        # Quem é "você": a ficha do local, no romance, não lista o protagonista
+        # em "Com você".
+        "protagonist":      c.get("protagonist", "") or "",
         "quests":           list((c.get("quests") or {}).values()),
     })
 

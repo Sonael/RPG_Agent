@@ -125,7 +125,7 @@
     return {
       grupo: alertas ? { n: alertas, alerta: true, dica: `${alertas} ${alertas === 1 ? 'herói pede' : 'heróis pedem'} atenção` } : null,
       missoes: ativas ? { n: ativas, dica: `${ativas} ${ativas === 1 ? 'missão ativa' : 'missões ativas'}` } : null,
-      personagens: outros ? { n: outros, dica: `${outros} fora do grupo` } : null,
+      personagens: outros ? { n: outros, dica: `${outros} ${window.frase ? window.frase('fora', 'fora do grupo') : 'fora do grupo'}` } : null,
     };
   }
 
@@ -268,7 +268,7 @@
         </div>`);
     }
     alvo.innerHTML = linhas.length ? linhas.join('')
-      : '<span class="empty-state sb-vazio">Ninguém no grupo ainda.</span>';
+      : `<span class="empty-state sb-vazio">${esc(window.frase ? window.frase('ninguem', 'Ninguém no grupo ainda.') : 'Ninguém no grupo ainda.')}</span>`;
   }
 
   // Qual missão mostrar: a ativa do capítulo mais recente; no empate, a mais

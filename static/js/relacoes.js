@@ -95,7 +95,8 @@
     const status = (p.status || '').toLowerCase();
     const marcas = [
       p.vinculo ? `<span class="lcl-marca rel-vinculo">${esc(p.vinculo)}</span>` : '',
-      p.proximo ? '<span class="lcl-marca lcl-marca-grupo">próxima</span>' : '',
+      // "próxima" supunha o gênero de todo mundo; o círculo é de todos.
+      p.proximo ? '<span class="lcl-marca lcl-marca-grupo">seu círculo</span>' : '',
       status && status !== 'vivo' ? `<span class="lcl-marca">${esc(p.status)}</span>` : '',
     ].join('');
     return `

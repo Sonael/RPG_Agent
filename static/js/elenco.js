@@ -51,7 +51,7 @@
         </div>
         <div class="lcl-rodape">
           <div id="elc-msg" class="lcl-msg" aria-live="polite"></div>
-          <button class="lcl-btn lcl-btn-sec" onclick="window.Elenco._novo('membro')">Novo membro do grupo</button>
+          <button id="elc-novo-membro" class="lcl-btn lcl-btn-sec" onclick="window.Elenco._novo('membro')">Novo membro do grupo</button>
           <button class="lcl-btn lcl-btn-sec" onclick="window.Elenco._novo('personagem')">Novo personagem</button>
           <button class="lcl-fechar" onclick="window.Elenco._fechar()">Fechar</button>
         </div>
@@ -81,10 +81,10 @@
   function cartao(p) {
     const status = norm(p.status);
     const marcas = [
-      p.do_grupo ? '<span class="lcl-marca lcl-marca-grupo">grupo</span>' : '',
+      p.do_grupo ? `<span class="lcl-marca lcl-marca-grupo">${esc(window.frase('marca_grupo', 'grupo'))}</span>` : '',
       p.aqui && !p.do_grupo ? '<span class="lcl-marca map-marca-alcance">aqui</span>' : '',
       status && status !== 'vivo' ? `<span class="lcl-marca${p.categoria === 'morto' ? ' elc-marca-morto' : ''}">${esc(p.status)}</span>` : '',
-      p.atitude ? `<span class="lcl-marca" title="Relação com o grupo">${esc(p.atitude)}</span>` : '',
+      p.atitude ? `<span class="lcl-marca" title="${esc(window.frase('relacao_com', 'Relação com o grupo'))}">${esc(p.atitude)}</span>` : '',
     ].join('');
     return `
       <button class="lcl-item elc-cartao elc-${esc(p.categoria)}" data-nome="${esc(p.nome)}"
@@ -106,6 +106,7 @@
               aria-selected="${id === _filtro}" onclick="window.Elenco._filtrar('${id}')">
         ${esc(nome(id, rotulo))} <span class="elc-filtro-conta">${contagem[id] || 0}</span></button>`).join('');
 
+    q('elc-novo-membro').textContent = window.frase('novo_membro', 'Novo membro do grupo');
     const todos = _last.personagens || [];
     const lista = todos.filter(p => passaNoFiltro(p) && casaNaBusca(p));
     q('elc-lista').innerHTML = lista.length

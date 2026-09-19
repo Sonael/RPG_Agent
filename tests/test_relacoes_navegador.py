@@ -344,3 +344,44 @@ def test_gestos_esperam_quem_esta_longe(jogo):
     assert pg.locator("#psn-relacao .psn-gestos button:not([disabled])").count() == 0
     assert "Longe de você" in pg.text_content("#psn-relacao .psn-gestos")
     assert not erros, erros[:3]
+
+
+def test_no_romance_as_telas_falam_de_voce_e_nao_do_grupo(jogo):
+    """"O que o grupo sabe" num romance não fazia sentido; "com ele" supunha o gênero."""
+    pg, erros = jogo(ROMANCE)
+    pg.evaluate("() => window.Personagens._abrir('Lucas')")
+    pg.wait_for_function("() => document.getElementById('psn-nome')?.textContent === 'Lucas'", timeout=8000)
+    assert pg.inner_text("#psn-sabe-titulo") == "O que você sabe"
+    assert pg.inner_text("#psn-cenas-titulo") == "Últimas cenas com Lucas"
+    assert "Do seu círculo" in pg.inner_text("#psn-onde")
+    pg.evaluate("() => window.Personagens._fechar()")
+    pg.evaluate("() => window.Locais._abrir('')")
+    pg.wait_for_selector("#local-overlay:not(.hidden) #lcl-selo", timeout=8000)
+    pg.wait_for_timeout(300)
+    assert "Você está aqui" in pg.inner_text("#lcl-selo")
+    assert pg.inner_text("#lcl-onde") == "Onde você está"
+    # "Com você" não lista a própria protagonista.
+    com_voce = pg.inner_text("#lcl-grupo")
+    assert "Lucas" in com_voce and "Clara" not in com_voce
+    pg.evaluate("() => window.Locais._fechar()")
+    pg.evaluate("() => window.Mapa._abrir('')")
+    pg.wait_for_selector("#mapa-overlay:not(.hidden) .map-onde-rotulo", timeout=8000)
+    assert pg.inner_text(".map-onde-rotulo") == "Você está em"
+    pg.evaluate("() => window.Mapa._fechar()")
+    pg.evaluate("() => window.Relacoes._abrir()")
+    pg.wait_for_selector(".rel-cartao[data-nome='Lucas'] .lcl-marca-grupo", timeout=8000)
+    assert pg.inner_text(".rel-cartao[data-nome='Lucas'] .lcl-marca-grupo") == "seu círculo"
+    assert "grupo" not in pg.inner_text("#relacoes-overlay").lower()
+    assert not erros, erros[:3]
+
+
+def test_fora_do_romance_as_frases_continuam(jogo, app_no_ar):
+    cap = app_no_ar[2]
+    estado = copy.deepcopy(cap.CIDADE)
+    estado.update({"campaign_type": "fantasia", "dnd_mode": True})
+    pg, erros = jogo(estado)
+    pg.evaluate("() => window.Personagens._abrir('Brom')")
+    pg.wait_for_function("() => document.getElementById('psn-nome')?.textContent === 'Brom'", timeout=8000)
+    assert pg.inner_text("#psn-sabe-titulo") == "O que o grupo sabe"
+    assert pg.inner_text("#psn-cenas-titulo") == "Últimas cenas com Brom"
+    assert not erros, erros[:3]
