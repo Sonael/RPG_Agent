@@ -310,6 +310,16 @@ function encontrosDaPessoa(lista) {
       <strong>(${esc(e.falta)})</strong></li>`).join('')}</ul>`;
 }
 window.encontrosDaPessoa = encontrosDaPessoa;
+
+// As tensões de uma pessoa com outras (romance), só as já percebidas.
+function tensoesDaPessoa(lista) {
+  const esc = window.escapeHtml;
+  if (!(lista || []).length) return '';
+  return `<ul class="rel-tensoes">${lista.map(t => `
+    <li class="rel-tensao-linha${t.intensidade >= 50 ? ' rel-tensao-forte' : ''}">
+      <span>Tensão com ${esc(t.com)}</span> ${esc(t.tipo)}, ${esc(t.faixa)}</li>`).join('')}</ul>`;
+}
+window.tensoesDaPessoa = tensoesDaPessoa;
 window.alternarChaveVisivel = alternarCampoSecreto;
 window.alternarSenhaVisivel = alternarCampoSecreto;
 

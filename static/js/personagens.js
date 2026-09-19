@@ -157,6 +157,7 @@
       ${acoes || ''}
       <div class="psn-atitude psn-romance">${window.escadaDaRelacao(r.estagio)}</div>
       ${window.encontrosDaPessoa(r.encontros)}
+      ${window.tensoesDaPessoa(r.tensoes)}
       ${barra('Afeto', r.afeto, ['aversão', 'devoção'])}
       ${barra('Confiança', r.confianca, ['desconfia', 'confia'])}
       ${window.segredosDaPessoa(r.segredos) ? `<h3 class="psn-subsecao">Segredos</h3>${window.segredosDaPessoa(r.segredos)}` : ''}

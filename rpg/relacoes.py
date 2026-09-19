@@ -240,14 +240,21 @@ def ajustar(nome: str, afeto=0, confianca=0, motivo: str = "", vinculo: str = ""
 
 
 def _tem_relacao(ch: dict) -> bool:
-    from rpg import encontros, segredos
+    from rpg import encontros, segredos, tensoes
     if locais.norm(ch.get("name", "")) in segredos.envolvidos():
+        return True
+    if tensoes.da_pessoa(ch.get("name", "")):
         return True
     if encontros.da_pessoa(ch.get("name", "")):
         return True
     return (bool(_membro_do_grupo(ch)) or "atitude" in ch or "confianca" in ch
             or bool(ch.get("vinculo")) or bool(ch.get("relacao_historico"))
             or bool(ch.get("estagio")) or bool(ch.get("momentos")))
+
+
+def _tensoes_da_pessoa(nome: str) -> list:
+    from rpg import tensoes
+    return tensoes.da_pessoa(nome)
 
 
 def _encontros_da_pessoa(nome: str) -> list:
@@ -280,6 +287,7 @@ def _pessoa(ch: dict) -> dict:
         "momentos": momentos,
         "segredos": _segredos_da_pessoa(ch.get("name", "")),
         "encontros": _encontros_da_pessoa(ch.get("name", "")),
+        "tensoes": _tensoes_da_pessoa(ch.get("name", "")),
         "proximo": bool(_membro_do_grupo(ch)),
         "status": ch.get("status", "") or "vivo",
         "afeto": {"valor": afeto, "rotulo": _faixa(AFETO, afeto)},
@@ -300,9 +308,10 @@ def lista() -> dict:
                if isinstance(ch, dict) and ch.get("name")
                and locais.norm(ch["name"]) != protagonista and _tem_relacao(ch)]
     pessoas.sort(key=lambda p: (not p["proximo"], -p["afeto"]["valor"], locais.norm(p["nome"])))
-    from rpg import segredos
+    from rpg import segredos, tensoes
     return {"pessoas": pessoas, "protagonista": memory.campaign.get("protagonist", "") or "",
-            "segredos": segredos.visiveis()}
+            "segredos": segredos.visiveis(),
+            "tensoes": tensoes.percebidas(), "triangulos": tensoes.triangulos()}
 
 
 def resumo_para_o_mestre() -> str:
@@ -331,12 +340,13 @@ def bloco_de_cena() -> str:
     sabia do afeto e dos momentos se chamasse ver_relacoes(), e não chamava: o
     primeiro beijo do capítulo 2 não voltava na conversa do capítulo 5.
     """
-    from rpg import encontros, segredos
+    from rpg import encontros, segredos, tensoes
     if (memory.campaign.get("campaign_type") or "") != "romance":
         return ""
     tem_segredos = bool(memory.campaign.get("segredos"))
     agenda = encontros.resumo_para_o_mestre()
-    if not lista()["pessoas"] and not tem_segredos and not agenda:
+    atritos = tensoes.resumo_para_o_mestre()
+    if not lista()["pessoas"] and not tem_segredos and not agenda and not atritos:
         return ""
     bloco = ("\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
              "RELAÇÕES (estágio, afeto, confiança e o que lembram juntos)\n"
@@ -353,4 +363,8 @@ def bloco_de_cena() -> str:
         bloco += ("\n\nENCONTROS MARCADOS (pelo relógio do mundo)\n"
                   "Quando chegar a hora, narre o encontro — ou a falta — e feche com "
                   "resolver_encontro(). O jogador vê o próximo na barra.\n" + agenda)
+    if atritos:
+        bloco += ("\n\nTENSÕES ENTRE OS OUTROS (ciúme, rivalidade, mágoa) E TRIÂNGULOS\n"
+                  "As pessoas não existem só em relação ao protagonista: deixe o ciúme e a "
+                  "rivalidade aparecerem nas cenas, e registre com ajustar_tensao().\n" + atritos)
     return bloco

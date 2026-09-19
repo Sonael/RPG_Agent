@@ -57,6 +57,16 @@ ROMANCE = {
                    "atitude": -20, "estagio": "rompimento", "estagio_antes": "namoro"},
         "marina": {"name": "Marina", "description": "Amiga de infância.", "status": "vivo",
                    "atitude": 70, "confianca": 60},
+        "tomas": {"name": "Tomás", "description": "O professor de dança.", "status": "vivo",
+                  "atitude": 30, "estagio": "flerte"},
+        "helena": {"name": "Helena", "description": "A ex de Lucas.", "status": "vivo"},
+    },
+    "tensoes": {
+        "helena|lucas": {"a": "Helena", "b": "Lucas", "tipo": "ciume", "intensidade": 55, "percebida": True,
+                         "historico": [{"delta": 55, "motivo": "A cena no corredor", "cap": 3}], "cap": 3},
+        # Ainda não percebida: nunca pode aparecer na tela.
+        "lucas|marina": {"a": "Marina", "b": "Lucas", "tipo": "ciume", "intensidade": 30, "percebida": False,
+                         "historico": [{"delta": 30, "motivo": "Marina escondeu o bilhete", "cap": 3}], "cap": 3},
     },
     "party": [{"name": "Lucas", "role": "interesse romântico"},
               {"name": "Marina", "role": "melhor amiga"}],
@@ -384,4 +394,31 @@ def test_fora_do_romance_as_frases_continuam(jogo, app_no_ar):
     pg.wait_for_function("() => document.getElementById('psn-nome')?.textContent === 'Brom'", timeout=8000)
     assert pg.inner_text("#psn-sabe-titulo") == "O que o grupo sabe"
     assert pg.inner_text("#psn-cenas-titulo") == "Últimas cenas com Brom"
+    assert not erros, erros[:3]
+
+
+def test_aba_de_tensoes_e_triangulos(jogo):
+    pg, erros = jogo(ROMANCE)
+    pg.evaluate("() => window.Relacoes._abrir('tensoes')")
+    pg.wait_for_selector(".rel-tensao", timeout=8000)
+    # Uma tensão percebida e um triângulo (flerte com Lucas e com Tomás).
+    assert pg.text_content("#rel-abas .elc-filtro[data-aba='tensoes'] .elc-filtro-conta") == "2"
+    tensao = " ".join(pg.locator(".rel-tensao[data-par='Helena × Lucas']").text_content().split())
+    assert "ciúme" in tensao and "tensão aberta" in tensao and "A cena no corredor" in tensao
+    assert "rel-tensao-forte" in pg.get_attribute(".rel-tensao[data-par='Helena × Lucas']", "class")
+    tri = " ".join(pg.locator(".rel-triangulo").text_content().split())
+    assert "Você entre Lucas e Tomás" in tri and "flerte com Lucas" in tri
+    # O ciúme que a protagonista não percebeu não chega à tela.
+    assert "Marina escondeu o bilhete" not in pg.content()
+    assert "Marina × Lucas" not in pg.content()
+    assert not erros, erros[:3]
+
+
+def test_cartao_mostra_a_tensao_com_a_outra_ponta(jogo):
+    pg, erros = jogo(ROMANCE)
+    pg.evaluate("() => window.Relacoes._abrir()")
+    pg.wait_for_selector(".rel-cartao[data-nome='Lucas'] .rel-tensoes", timeout=8000)
+    lucas = " ".join(pg.text_content(".rel-cartao[data-nome='Lucas'] .rel-tensoes").split())
+    assert "Tensão com Helena" in lucas and "ciúme, tensão aberta" in lucas
+    assert "Marina" not in lucas
     assert not erros, erros[:3]

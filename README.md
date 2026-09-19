@@ -448,9 +448,30 @@ o encontro que passou da hora sem ser resolvido.
 
 `test_encontros.py` (12).
 
+### Ciúme e triângulos do romance (`rpg/tensoes.py`)
+
+Toda relação era entre o protagonista e alguém; o que acontece entre os
+outros — a ex que não suporta o novo namoro, dois pretendentes que se medem —
+não existia. `ajustar_tensao(pessoa_a, pessoa_b, delta, motivo, tipo,
+percebida)` registra uma tensão entre duas outras pessoas: um tipo (ciúme,
+rivalidade, mágoa, desconfiança), uma intensidade de 0 a 100 (latente,
+incômodo, tensão aberta, à beira da ruptura; em 0, resolvida) e o porquê.
+Como os segredos, a tensão pode estar escondida (`percebida=False`): o
+jogador só a vê quando a história mostrar.
+
+O **triângulo** é detectado sozinho: duas pessoas ao mesmo tempo em flerte
+ou mais com o protagonista. O jogador vê (ele sabe com quem flerta), e o
+mestre é avisado no bloco de cena de que o ciúme vai aparecer.
+
+As Relações ganham a aba "Tensões" (os triângulos e as tensões percebidas,
+com a intensidade e o porquê), e o cartão e a ficha de cada pessoa mostram
+com quem ela está em tensão.
+
+`test_tensoes.py` (13).
+
 `test_genero_e_regras.py` (27), `test_genero_e_regras_navegador.py` (9),
 `test_segredos.py` (18),
-`test_relacoes.py` (28) e `test_relacoes_navegador.py` (17).
+`test_relacoes.py` (28) e `test_relacoes_navegador.py` (21).
 
 ---
 

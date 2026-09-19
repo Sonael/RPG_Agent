@@ -13,6 +13,10 @@
 //  e como cada um ficou sabendo) e os dos outros que ele já descobriu. Os que
 //  ele ainda não sabe nunca chegam aqui: o motor não manda.
 //
+//  A aba TENSÕES mostra o ciúme, a rivalidade e a mágoa entre as OUTRAS
+//  pessoas, só as que o protagonista já percebeu, e os triângulos: duas
+//  pessoas ao mesmo tempo em flerte ou mais com ele.
+//
 //  REGRA DE OURO, a mesma das outras telas: nenhuma regra aqui. As faixas
 //  ("devoção", "com um pé atrás"), a ordem e quem entra na lista vêm do motor
 //  (rpg/relacoes.py via /api/relacoes). A moldura e as classes são as das
@@ -115,6 +119,7 @@
             ${window.linhaDoTempo(p.momentos, 1)}
           </div>` : ''}
         ${window.segredosDaPessoa(p.segredos)}
+        ${window.tensoesDaPessoa(p.tensoes)}
         ${historico(p)}
       </article>`;
   }
@@ -150,6 +155,44 @@
       </article>`;
   }
 
+  // ---- Tensões e triângulos ----------------------------------------
+  function tensao(t) {
+    const hist = (t.historico || []).map(h => `
+      <li><span class="psn-delta ${h.delta >= 0 ? 'psn-desce' : 'psn-sobe'}">${h.delta >= 0 ? '+' : ''}${h.delta}</span>
+        ${esc(h.motivo)}${h.capitulo ? ` <small>cap. ${esc(h.capitulo)}</small>` : ''}</li>`).join('');
+    return `
+      <article class="lcl-item rel-tensao${t.intensidade >= 50 ? ' rel-tensao-forte' : ''}"
+               data-par="${esc(t.a)} × ${esc(t.b)}">
+        <div class="lcl-item-cabeca"><span class="lcl-item-nome">${esc(t.a)} × ${esc(t.b)}</span>
+          <span class="lcl-marca">${esc(t.tipo)}</span></div>
+        <div class="rel-medidor-topo"><span class="rel-faixa">${esc(t.faixa)}</span>
+          <span class="rel-valor">${t.intensidade}</span></div>
+        <div class="rel-intensidade" role="img" aria-label="Intensidade ${t.intensidade} de 100">
+          <span style="width:${Math.max(0, Math.min(100, t.intensidade))}%"></span></div>
+        ${hist ? `<ul class="psn-historico rel-historico">${hist}</ul>` : ''}
+      </article>`;
+  }
+
+  function triangulo(x) {
+    return `
+      <article class="lcl-item rel-triangulo" data-par="${esc(x.a)} e ${esc(x.b)}">
+        <div class="lcl-item-cabeca"><span class="lcl-item-nome">Você entre ${esc(x.a)} e ${esc(x.b)}</span></div>
+        <p class="lcl-item-desc">${esc(x.estagios[0])} com ${esc(x.a)}, ${esc(x.estagios[1])} com ${esc(x.b)}.
+          ${x.tensao ? `Entre os dois: ${esc(x.tensao.tipo)}, ${esc(x.tensao.faixa)}.` : 'Os dois ainda não se estranharam. Ainda.'}</p>
+      </article>`;
+  }
+
+  function listaDeTensoes() {
+    const tensoes = _last.tensoes || [];
+    const tri = _last.triangulos || [];
+    return `
+      ${tri.length ? `<section class="rel-segredos-grupo"><h2 class="lcl-secao">Triângulos</h2>
+        <div class="rel-segredos-lista">${tri.map(triangulo).join('')}</div></section>` : ''}
+      <section class="rel-segredos-grupo"><h2 class="lcl-secao">Entre as pessoas</h2>
+        <div class="rel-segredos-lista">${tensoes.length ? tensoes.map(tensao).join('')
+          : '<div class="lcl-vazio">Nenhuma tensão que você tenha percebido.</div>'}</div></section>`;
+  }
+
   function listaDeSegredos() {
     const sg = _last.segredos || { seus: [], dos_outros: [] };
     const seus = sg.seus.length ? sg.seus.map(segredoSeu).join('')
@@ -171,14 +214,20 @@
     const pessoas = _last.pessoas || [];
     const sg = _last.segredos || { seus: [], dos_outros: [] };
     const nSegredos = sg.seus.length + sg.dos_outros.length;
-    q('rel-abas').innerHTML = [['pessoas', 'Pessoas', pessoas.length], ['segredos', 'Segredos', nSegredos]]
+    const nTensoes = (_last.tensoes || []).length + (_last.triangulos || []).length;
+    q('rel-abas').innerHTML = [['pessoas', 'Pessoas', pessoas.length], ['segredos', 'Segredos', nSegredos],
+                               ['tensoes', 'Tensões', nTensoes]]
       .map(([id, rotulo, n]) => `
         <button class="elc-filtro${id === _aba ? ' elc-filtro-ativo' : ''}" data-aba="${id}" role="tab"
                 aria-selected="${id === _aba}" onclick="window.Relacoes._aba('${id}')">
           ${rotulo} <span class="elc-filtro-conta">${n}</span></button>`).join('');
-    q('rel-lista').classList.toggle('rel-lista-segredos', _aba === 'segredos');
+    q('rel-lista').classList.toggle('rel-lista-segredos', _aba !== 'pessoas');
     if (_aba === 'segredos') {
       q('rel-lista').innerHTML = listaDeSegredos();
+      return;
+    }
+    if (_aba === 'tensoes') {
+      q('rel-lista').innerHTML = listaDeTensoes();
       return;
     }
     q('rel-lista').innerHTML = pessoas.length
@@ -197,7 +246,7 @@
   // ---- Abrir / fechar ----------------------------------------------
   async function abrir(aba) {
     ensureDom();
-    _aba = aba === 'segredos' ? 'segredos' : 'pessoas';
+    _aba = ['segredos', 'tensoes'].includes(aba) ? aba : 'pessoas';
     if (!_open) {
       q('relacoes-overlay').classList.remove('hidden');
       document.body.classList.add('relacoes-on');

@@ -1043,6 +1043,30 @@ def resolver_encontro(com: str, estado: str, motivo: str = "") -> str:
     return encontros.resolver(com, estado, motivo)
 
 
+def ajustar_tensao(pessoa_a: str, pessoa_b: str, delta: int = 0, motivo: str = "",
+                   tipo: str = "", percebida: bool = True) -> str:
+    """
+    Muda a tensão entre duas OUTRAS pessoas (não o protagonista): a ex que não
+    suporta o novo namoro, a amiga e o pretendente que se estranham, dois
+    pretendentes que se medem. Cria a tensão se ela ainda não existir.
+
+    Intensidade de 0 a 100 (latente, incômodo, tensão aberta, à beira da
+    ruptura); voltando a 0, está resolvida. Pesos: ±10 uma farpa, um olhar;
+    ±25 uma discussão, uma cena de ciúme; ±40 uma humilhação, uma traição.
+
+    Args:
+        pessoa_a:  Uma das pessoas.
+        pessoa_b:  A outra.
+        delta:     Quanto somar (negativo para acalmar).
+        motivo:    O que aconteceu.
+        tipo:      ciúme, rivalidade, mágoa ou desconfiança (só ao criar ou mudar).
+        percebida: False se o protagonista ainda não percebeu — o jogador não
+                   vê até você chamar de novo com percebida=True.
+    """
+    from rpg import tensoes
+    return tensoes.ajustar(pessoa_a, pessoa_b, delta, motivo, tipo, percebida)
+
+
 def ver_segredos() -> str:
     """Todos os segredos, inclusive os que o protagonista ainda não sabe."""
     from rpg import segredos
@@ -1469,6 +1493,7 @@ ALL_TOOLS = [
     ver_segredos,
     marcar_encontro,
     resolver_encontro,
+    ajustar_tensao,
     # Contexto (dinâmico e completo)
     get_scene_context,
     get_full_context,
