@@ -336,7 +336,7 @@ def test_fantasia_gerada_leva_o_laco_dos_companheiros_e_o_mundo(wizard):
         (70, "Achar a mãe", {"titulo": "Voltar à floresta", "estado": "em curso", "passos": []})
     assert "lealdade" not in camp["characters"]["alden"]
     assert "lealdade" not in camp["characters"]["brom"]
-    assert (camp["renome"], camp["faccoes"][0]["nome"], camp["lendas"][0]["verdade"]) == \
+    assert (camp["renome"]["valor"], camp["faccoes"][0]["nome"], camp["lendas"][0]["verdade"]) == \
         (5, "Guarda de Cliviate", "É o prefeito")
     assert "segredos" not in camp
     assert not erros, erros[:3]
@@ -390,3 +390,59 @@ def test_fora_do_romance_o_wizard_continua_falando_do_grupo(wizard):
     cartao = pg.locator("#wz-chars-list .cwc").nth(0)
     assert "O que o grupo sabe" in cartao.inner_text()
     assert cartao.locator(".wz-onde-esta").get_attribute("placeholder") == "o grupo fica no Local Atual"
+
+
+# --- Passo 3: revisar o mundo que a IA preparou -------------------------------
+# Antes só aparecia a contagem ("Também preparou 2 segredos"): não havia como
+# corrigir um segredo ou uma lenda antes de criar. Fica atrás de um aviso,
+# porque parte é do mestre.
+
+def test_mundo_gerado_fica_atras_do_aviso_e_se_edita(wizard):
+    pg, erros, estado = wizard
+    _genero(pg, "romance")
+    estado["lore"] = {"ok": True, "lore": LORE_ROMANCE}
+    _gerar(pg)
+    pg.evaluate("() => wizardGoTo(3)")
+    assert pg.inner_text("#wz-dot-3-nome") == "Relações"
+    assert pg.is_visible("#wz-mundo-aviso") and not pg.is_visible("#wz-mundo")
+    assert "2 segredos e 1 tensão" in pg.inner_text("#wz-mundo-aviso-texto")
+    assert "O irmão na prisão" not in pg.inner_text("#wizard-overlay"), "o segredo apareceu antes do aviso"
+
+    pg.click("#wz-mundo-mostrar")
+    segredo = pg.locator("#wz-mundo .ed-mundo-colecao[data-colecao='segredos'] .ed-mundo-item").nth(1)
+    campo = segredo.locator("[data-campo='titulo'] input")
+    assert campo.input_value() == "O irmão na prisão"
+    campo.fill("O irmão foragido")
+    campo.dispatch_event("change")
+    pg.click("#wz-mundo .ed-mundo-colecao[data-colecao='encontros'] button:has-text('+ Encontro')")
+    novo = pg.locator("#wz-mundo .ed-mundo-colecao[data-colecao='encontros'] .ed-mundo-item").nth(0)
+    for c, v in (("com", "Lucas"), ("o_que", "cinema"), ("dia", "2"), ("hora", "19")):
+        el = novo.locator(f"[data-campo='{c}'] input")
+        el.fill(v)
+        el.dispatch_event("change")
+    assert pg.is_visible("#wz-mundo"), "o aviso voltou depois de acrescentar"
+
+    camp = _criar(pg, estado)
+    assert [s["titulo"] for s in camp["segredos"]] == ["A bolsa em Lisboa", "O irmão foragido"]
+    assert [(e["com"], e["o_que"], e["dia"], e["hora"]) for e in camp["encontros"]] == [("Lucas", "cinema", 2, 19)]
+    assert not erros, erros[:3]
+
+
+def test_passo_3_so_no_romance_e_na_fantasia_e_a_mao_abre_direto(wizard):
+    pg, erros, _ = wizard                          # fantasia com D&D, sem gerar
+    pg.evaluate("() => wizardGoTo(2)")
+    assert pg.is_visible("#wz-dot-3") and pg.inner_text("#wz-dot-3-nome") == "Mundo"
+    assert pg.is_visible("#wz-next-btn") and not pg.is_visible("#wz-create-btn")
+    pg.evaluate("() => wizardGoTo(3)")
+    assert not pg.is_visible("#wz-mundo-aviso") and pg.is_visible("#wz-mundo")   # nada a esconder
+    assert pg.locator("#wz-mundo .ed-mundo-colecao").count() == 5
+    pg.click("#wz-mundo .ed-mundo-colecao[data-colecao='faccoes'] button:has-text('+ Facção')")
+    pg.evaluate("() => { wizardGoTo(2); wizardGoTo(3); }")          # sair e voltar reavalia o aviso
+    assert pg.is_visible("#wz-mundo") and not pg.is_visible("#wz-mundo-aviso"), \
+        "acrescentar à mão trouxe o aviso de volta"
+    pg.evaluate("() => wizardGoTo(1)")
+    _genero(pg, "horror")
+    assert not pg.is_visible("#wz-dot-3")
+    pg.evaluate("() => wizardGoTo(3)")                 # não existe no horror: fica no 2
+    assert pg.evaluate("() => wzStep") == 2 and pg.is_visible("#wz-create-btn")
+    assert not erros, erros[:3]

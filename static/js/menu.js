@@ -1574,8 +1574,10 @@ let wzLocs  = [];    // [{name,description,details,notes}]
 let wzEvts  = [];    // [{summary,location,consequence}]
 // O que a IA preparou para o mundo do gênero, fora dos personagens: segredos
 // e tensões no romance; renome, facções e lendas na fantasia. Não tem campo no
-// wizard (boa parte é do mestre), mas segue para a campanha criada.
+// wizard, no passo 3 (atrás de um aviso: boa parte é do mestre), e segue
+// para a campanha criada. No formato do passo do mundo do editor.
 let wzMundo = {};
+let wzMundoAberto = false;
 let wzSelectedModel = '';
 
 // ── Abrir / fechar ─────────────────────────────────────────
@@ -1587,7 +1589,8 @@ function openWizard() {
   wzChars = [];
   wzLocs  = [];
   wzEvts  = [];
-  wzMundo = {};
+  wzMundo = edMundoDaCampanha({});
+  wzMundoAberto = false;
   // reset fields
   ['wz-name','wz-summary','wz-scene','wz-location'].forEach(id => {
     const el = document.getElementById(id);
@@ -1620,34 +1623,48 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ── Navegação ─────────────────────────────────────────────
 function wizardGoTo(step) {
-  if (step === 2 && wzStep === 1) { if (!wzValidateStep1()) return; }
+  if (step > 1 && wzStep === 1) { if (!wzValidateStep1()) return; }
   wzStep = step;
   wzRenderStep();
 }
+
+// O passo 3 (o mundo do gênero) só existe no romance e na fantasia.
+function wzUltimoPasso() { return ED_MUNDO[wzGenero()] ? 3 : 2; }
 
 function wizardNext() {
   if (wzStep === 1) {
     if (!wzValidateStep1()) return;
     wzStep = 2;
-    wzRenderStep();
+  } else if (wzStep < wzUltimoPasso()) {
+    wzStep++;
   }
+  wzRenderStep();
 }
 
 function wizardBack() {
-  if (wzStep === 2) { wzStep = 1; wzRenderStep(); }
+  if (wzStep > 1) { wzStep--; wzRenderStep(); }
 }
 
 function wzRenderStep() {
-  document.getElementById('wz-panel-1').classList.toggle('hidden', wzStep !== 1);
-  document.getElementById('wz-panel-2').classList.toggle('hidden', wzStep !== 2);
+  const ultimo = wzUltimoPasso();
+  // Trocar para um gênero sem o passo 3 estando nele volta ao 2.
+  if (wzStep > ultimo) wzStep = ultimo;
+  const mundo = ED_MUNDO[wzGenero()];
+  document.getElementById('wz-dot-3')?.classList.toggle('hidden', !mundo);
+  document.getElementById('wz-line-3')?.classList.toggle('hidden', !mundo);
+  const nome = document.getElementById('wz-dot-3-nome');
+  if (nome && mundo) nome.textContent = mundo.titulo;
+  [1, 2, 3].forEach(n => document.getElementById(`wz-panel-${n}`)?.classList.toggle('hidden', wzStep !== n));
   document.getElementById('wz-back-btn').classList.toggle('hidden', wzStep === 1);
-  document.getElementById('wz-next-btn').classList.toggle('hidden', wzStep === 2);
-  document.getElementById('wz-create-btn').classList.toggle('hidden', wzStep === 1);
+  document.getElementById('wz-next-btn').classList.toggle('hidden', wzStep === ultimo);
+  document.getElementById('wz-create-btn').classList.toggle('hidden', wzStep !== ultimo);
   document.getElementById('wz-err').textContent = '';
+  if (wzStep === 3) wzRenderMundo();
 
   // Step dots
-  ['1','2'].forEach(n => {
+  ['1','2','3'].forEach(n => {
     const dot = document.getElementById(`wz-dot-${n}`);
+    if (!dot) return;
     dot.classList.remove('active','done');
     const s = parseInt(n);
     if (s === wzStep) dot.classList.add('active');
@@ -1729,7 +1746,9 @@ async function generateLore() {
       wzRenderEvts();
     }
     // O mundo do gênero (segredos, facções...): só o do gênero de agora.
-    wzMundo = wzMundoDaIa(lore, campaignType);
+    const mundoDaIa = wzMundoDaIa(lore, campaignType);
+    wzMundo = edMundoDaCampanha(mundoDaIa);
+    wzMundoAberto = false;           // conteúdo novo: o aviso volta
     // Pré-popula personagens gerados pela IA na etapa 2
     if (Array.isArray(lore.characters) && lore.characters.length) {
       const regras = wzIsDnd();
@@ -1824,7 +1843,7 @@ async function generateLore() {
     }
     // Só a contagem: um segredo que o protagonista não sabe e a verdade das
     // lendas são do mestre, e o wizard não é lugar de estragar a surpresa.
-    const preparado = wzResumoDoMundo(wzMundo);
+    const preparado = wzResumoDoMundo(mundoDaIa);
     if (preparado) status.textContent += ` Também preparou ${preparado}.`;
   } catch (e) {
     status.style.color = 'var(--red)';
@@ -1836,12 +1855,13 @@ async function generateLore() {
 }
 
 // ── O que a IA manda além do básico ────────────────────────
-// As chaves do mundo de cada gênero, as mesmas que o prompt pede e que o
-// servidor normaliza na criação (_payload_de_campanha).
+// As chaves do mundo de cada gênero: as do passo do mundo (ED_MUNDO, que o
+// passo 3 do wizard mostra), que o servidor normaliza na criação
+// (_payload_de_campanha). O prompt pede parte delas; o resto se põe à mão.
 const MUNDO_DO_GENERO = {
-  romance:      ['segredos', 'tensoes'],
-  fantasia:     ['renome', 'faccoes', 'lendas'],
-  dark_fantasy: ['renome', 'faccoes', 'lendas'],
+  romance:      ['segredos', 'tensoes', 'encontros'],
+  fantasia:     ['renome', 'faccoes', 'titulos', 'lendas', 'bestiario'],
+  dark_fantasy: ['renome', 'faccoes', 'titulos', 'lendas', 'bestiario'],
 };
 
 const wzNorm = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
@@ -1884,10 +1904,9 @@ function wzMundoDaIa(lore, genero) {
 function wzResumoDoMundo(mundo) {
   const nomes = { segredos: ['segredo', 'segredos'], tensoes: ['tensão', 'tensões'],
                   faccoes: ['facção', 'facções'], lendas: ['lenda', 'lendas'] };
-  const partes = Object.entries(nomes).filter(([k]) => mundo[k]).map(([k, [um, varios]]) => {
-    const n = Array.isArray(mundo[k]) ? mundo[k].length : Object.keys(mundo[k]).length;
-    return `${n} ${n > 1 ? varios : um}`;
-  });
+  const conta = k => !mundo[k] ? 0 : Array.isArray(mundo[k]) ? mundo[k].length : Object.keys(mundo[k]).length;
+  const partes = Object.entries(nomes).filter(([k]) => conta(k) > 0)
+    .map(([k, [um, varios]]) => `${conta(k)} ${conta(k) > 1 ? varios : um}`);
   return partes.length > 1 ? `${partes.slice(0, -1).join(', ')} e ${partes.at(-1)}` : (partes[0] || '');
 }
 
@@ -1907,6 +1926,45 @@ function wzUmProtagonista() {
   if (campo?.options?.includes('Protagonista') && !prot.extras?.[campo.id]) {
     prot.extras = { ...(prot.extras || {}), [campo.id]: 'Protagonista' };
   }
+}
+
+// ── Passo 3: o mundo do gênero ─────────────────────────────
+// Os mesmos campos do passo 4 do editor (mundoRender). O que a IA preparou
+// tem parte que é do mestre, e quem quer descobrir jogando não pode dar de
+// cara com isso: fica atrás de um aviso. Criado à mão, não há surpresa.
+const WZ_AVISO_DO_MUNDO = {
+  romance: 'Parte disso é do mestre: segredos das outras pessoas que você ainda não sabe, '
+         + 'tensões que você ainda não percebeu. Se quiser descobrir jogando, crie sem abrir.',
+  fantasia: 'Parte disso é do mestre: a verdade das lendas, facções que o grupo ainda não '
+          + 'conhece. Se quiser descobrir jogando, crie sem abrir.',
+};
+WZ_AVISO_DO_MUNDO.dark_fantasy = WZ_AVISO_DO_MUNDO.fantasia;
+
+function wzMundoTemAlgo() {
+  return Object.entries(wzMundo).some(([k, v]) => Array.isArray(v) ? v.length > 0 : k === 'renome' && !!v?.valor);
+}
+
+function wzRenderMundo() {
+  const genero = wzGenero();
+  const mostrar = wzMundoAberto || !wzMundoTemAlgo();
+  document.getElementById('wz-mundo-aviso')?.classList.toggle('hidden', mostrar);
+  document.getElementById('wz-mundo')?.classList.toggle('hidden', !mostrar);
+  const texto = document.getElementById('wz-mundo-aviso-texto');
+  if (texto) {
+    const preparado = wzResumoDoMundo(wzMundo);
+    texto.textContent = `A IA preparou ${preparado || 'o mundo desta campanha'}. ${WZ_AVISO_DO_MUNDO[genero] || ''}`;
+  }
+  if (mostrar) {
+    // Uma vez à mostra, fica: quem abriu vazio e acrescentou um segredo não
+    // pode dar de novo com o aviso.
+    wzMundoAberto = true;
+    mundoRender('wz');
+  }
+}
+
+function wzMostrarMundo() {
+  wzMundoAberto = true;
+  wzRenderMundo();
 }
 
 // Marca quem é você no cartão do wizard (é um só: os outros desmarcam).
@@ -2034,12 +2092,12 @@ function wzTema()   { return wzIsDnd() ? 'dnd' : wzGenero(); }
 
 function onWizardTypeChange() {
   ajustarRegrasAoGenero('wz-type', 'wz-regras', 'wz-regras-dica');
-  if (wzStep === 2) {
-    const isDnd = wzIsDnd();
-    document.getElementById('wz-char-mode-hint').textContent =
-      isDnd ? 'Modo D&D: campos de ficha completa disponíveis.' : 'Modo narrativo: campos básicos.';
-    wzRenderChars();
-  }
+  // Redesenha os passos (o 3 aparece ou some com o gênero) sem perder a
+  // rolagem de quem só trocou o seletor.
+  const antes = wzStep;
+  const rolagem = document.getElementById('wizard-scroll').scrollTop;
+  wzRenderStep();
+  if (wzStep === antes) document.getElementById('wizard-scroll').scrollTop = rolagem;
 }
 
 function addWzChar() {
@@ -3943,7 +4001,7 @@ async function openEditCampaign(e, name) {
   const overlay = document.getElementById('edit-overlay');
   overlay.classList.remove('hidden');
 
-  ['ed-name','ed-summary','ed-scene','ed-location'].forEach(id => {
+  ['ed-name','ed-summary','ed-scene','ed-location','ed-relogio-dia','ed-relogio-hora'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
@@ -3971,6 +4029,10 @@ async function openEditCampaign(e, name) {
     document.getElementById('ed-summary').value     = c.story_summary    || '';
     document.getElementById('ed-scene').value       = c.current_scene    || '';
     document.getElementById('ed-location').value    = c.current_location || '';
+    // Relógio do mundo: vazio se nunca andou (a hora 0 é meia-noite, não vazio).
+    const rel = c.relogio || {};
+    document.getElementById('ed-relogio-dia').value  = rel.dia  ?? '';
+    document.getElementById('ed-relogio-hora').value = rel.hora ?? '';
     // Quem é você: marcado no cartão (edChars[].protagonista), como no wizard.
     // Era um campo de texto livre, que aceitava um nome que não existe.
     edProtagonistaGravado = c.protagonist || '';
@@ -5065,6 +5127,15 @@ const ED_COLECOES = {
 
 let edMundo = {};
 
+// O passo do mundo existe no editor (passo 4) e no wizard (passo 3), com os
+// mesmos campos: o contexto diz de onde vêm os dados e onde desenhar.
+const MUNDO_CTX = {
+  ed: { dados: () => edMundo, genero: () => edGenero(), caixa: 'ed-mundo', pessoas: 'ed-pessoas',
+        nomes: () => edChars.map(c => c.name), lugares: () => edAtualizarLugares() },
+  wz: { dados: () => wzMundo, genero: () => wzGenero(), caixa: 'wz-mundo', pessoas: 'wz-pessoas',
+        nomes: () => wzChars.map(c => c.name), lugares: () => wzAtualizarLugares() },
+};
+
 function edMundoDaCampanha(c) {
   const copia = v => JSON.parse(JSON.stringify(v ?? null));
   const lista = v => Array.isArray(v) ? copia(v) : Object.values(copia(v) || {});
@@ -5073,9 +5144,19 @@ function edMundoDaCampanha(c) {
   segredos.forEach(s => { if (s.revelado && !s.como) s.como = 'contou'; if (!s.revelado) s.como = ''; });
   return {
     segredos, tensoes: lista(c.tensoes), encontros: lista(c.encontros),
-    renome: { valor: 0, ...(copia(c.renome) || {}) },
+    renome: typeof c.renome === 'number' ? { valor: c.renome } : { valor: 0, ...(copia(c.renome) || {}) },
     faccoes: lista(c.faccoes), titulos: lista(c.titulos), lendas: lista(c.lendas), bestiario: lista(c.bestiario),
   };
+}
+
+// O relógio só vai se tiver dia: vazio fica como estava (o jogo o põe em
+// Dia 1, 8h na primeira vez que o tempo anda). Hora vazia é 8h.
+function edRelogioParaSalvar() {
+  const dia  = document.getElementById('ed-relogio-dia')?.value.trim() ?? '';
+  const hora = document.getElementById('ed-relogio-hora')?.value.trim() ?? '';
+  if (dia === '' || !Number.isFinite(Number(dia))) return {};
+  const h = hora === '' || !Number.isFinite(Number(hora)) ? 8 : Math.round(Number(hora));
+  return { relogio: { dia: Math.max(1, Math.round(Number(dia))), hora: Math.max(0, Math.min(23, h)) } };
 }
 
 function edMundoParaSalvar() {
@@ -5092,8 +5173,8 @@ function edMundoValor(item, f) {
   return v ?? '';
 }
 
-function edMundoCampo(col, i, f, item) {
-  const on = `edMundoMudar('${col}', ${i}, '${f.id}', this)`;
+function edMundoCampo(ctx, col, i, f, item) {
+  const on = `mundoMudar('${ctx}', '${col}', ${i}, '${f.id}', this)`;
   const hint = escHtml(f.hint || '');
   const v = edMundoValor(item, f);
   let campo;
@@ -5115,56 +5196,62 @@ function edMundoCampo(col, i, f, item) {
   return `<div class="${f.inteiro ? 'inteiro' : ''}" data-campo="${f.id}"><span class="cwc-label">${escHtml(f.label)}</span>${campo}</div>`;
 }
 
-function edRenderMundo() {
-  const box = document.getElementById('ed-mundo');
-  const cfg = ED_MUNDO[edGenero()];
+function edRenderMundo() { mundoRender('ed'); }
+
+function mundoRender(ctx) {
+  const c = MUNDO_CTX[ctx];
+  const dados = c.dados();
+  const box = document.getElementById(c.caixa);
+  const cfg = ED_MUNDO[c.genero()];
   if (!box) return;
   if (!cfg) { box.innerHTML = ''; return; }
-  const dl = document.getElementById('ed-pessoas');
-  if (dl) dl.innerHTML = edChars.map(c => (c.name || '').trim()).filter(Boolean)
+  const dl = document.getElementById(c.pessoas);
+  if (dl) dl.innerHTML = c.nomes().map(n => (n || '').trim()).filter(Boolean)
     .map(n => `<option value="${escHtml(n)}"></option>`).join('');
-  edAtualizarLugares();
+  c.lugares();
   box.innerHTML = cfg.colecoes.map(col => {
     const def = ED_COLECOES[col];
     if (def.unico) {
       return `<div class="field-group ed-mundo-colecao" data-colecao="${col}">
         <label>${escHtml(def.rotulo)}</label>
-        <div class="ed-mundo-campos">${def.campos.map(f => edMundoCampo(col, -1, f, edMundo[col] || {})).join('')}</div>
+        <div class="ed-mundo-campos">${def.campos.map(f => edMundoCampo(ctx, col, -1, f, dados[col] || {})).join('')}</div>
       </div>`;
     }
-    const itens = edMundo[col] || [];
+    const itens = dados[col] || [];
     return `<div class="field-group ed-mundo-colecao" data-colecao="${col}">
       <div class="linha-secao">
         <label>${escHtml(def.rotulo)}</label>
-        <button class="clean-button btn-inline-mini" onclick="edMundoNovo('${col}')">${def.novo}</button>
+        <button class="clean-button btn-inline-mini" onclick="mundoNovo('${ctx}', '${col}')">${def.novo}</button>
       </div>
       ${def.dica ? `<div class="campo-nota">${escHtml(def.dica)}</div>` : ''}
       ${itens.length ? itens.map((item, i) => `
         <div class="wz-loc-card ed-mundo-item">
-          <button onclick="edMundoRemover('${col}', ${i})" aria-label="Remover" title="Remover"
+          <button onclick="mundoRemover('${ctx}', '${col}', ${i})" aria-label="Remover" title="Remover"
             style="position:absolute;top:8px;right:8px;background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:14px;">✕</button>
-          <div class="ed-mundo-campos">${def.campos.map(f => edMundoCampo(col, i, f, item)).join('')}</div>
+          <div class="ed-mundo-campos">${def.campos.map(f => edMundoCampo(ctx, col, i, f, item)).join('')}</div>
         </div>`).join('') : `<div class="ed-flags-vazio">${escHtml(def.nada)}</div>`}
     </div>`;
   }).join('');
 }
 
-function edMundoNovo(col) {
-  edMundo[col] = edMundo[col] || [];
-  edMundo[col].push(ED_COLECOES[col].vazio());
-  edRenderMundo();
-  const itens = document.querySelectorAll(`.ed-mundo-colecao[data-colecao="${col}"] .ed-mundo-item`);
+function mundoNovo(ctx, col) {
+  const dados = MUNDO_CTX[ctx].dados();
+  dados[col] = dados[col] || [];
+  dados[col].push(ED_COLECOES[col].vazio());
+  mundoRender(ctx);
+  const itens = document.querySelectorAll(`#${MUNDO_CTX[ctx].caixa} .ed-mundo-colecao[data-colecao="${col}"] .ed-mundo-item`);
   itens[itens.length - 1]?.querySelector('input, textarea')?.focus();
 }
 
-function edMundoRemover(col, i) {
-  edMundo[col].splice(i, 1);
-  edRenderMundo();
+function mundoRemover(ctx, col, i) {
+  MUNDO_CTX[ctx].dados()[col].splice(i, 1);
+  mundoRender(ctx);
 }
 
-function edMundoMudar(col, i, id, el) {
+function mundoMudar(ctx, col, i, id, el) {
+  const dados = MUNDO_CTX[ctx].dados();
   const f = ED_COLECOES[col].campos.find(c => c.id === id);
-  const item = i < 0 ? (edMundo[col] = edMundo[col] || {}) : edMundo[col][i];
+  const item = i < 0 ? (dados[col] = dados[col] || {}) : dados[col][i];
   const linhas = () => el.value.split('\n').map(s => s.trim()).filter(Boolean);
   let v;
   if (f.type === 'check') v = el.checked;
@@ -5285,6 +5372,7 @@ async function saveEditedCampaign() {
       protagonist:      (edChars.find(c => c.protagonista && c.name.trim())?.name.trim()) || edProtagonistaGravado,
       // Só as coleções do gênero de agora; as de outro ficam como estavam.
       ...edMundoParaSalvar(),
+      ...edRelogioParaSalvar(),
       characters,
       locations,
       events,

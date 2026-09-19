@@ -24,7 +24,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;600&family=Lora:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Playfair+Display:ital,wght@0,500;0,700;1,500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/css/style.css?v=76">
+  <link rel="stylesheet" href="/static/css/style.css?v=77">
 </head>
 <body>
   <div class="scene">
@@ -215,6 +215,10 @@
           <div class="wz-step-dot active" id="wz-dot-1" onclick="wizardGoTo(1)"><span>1</span> Mundo & História</div>
           <div class="wz-line"></div>
           <div class="wz-step-dot" id="wz-dot-2" onclick="wizardGoTo(2)"><span>2</span> Personagens</div>
+          <!-- Só no romance e na fantasia: o mundo do gênero, o mesmo passo
+               do editor da campanha. -->
+          <div class="wz-line hidden" id="wz-line-3"></div>
+          <div class="wz-step-dot hidden" id="wz-dot-3" onclick="wizardGoTo(3)"><span>3</span> <span id="wz-dot-3-nome">Mundo</span></div>
         </div>
       </div>
 
@@ -311,6 +315,17 @@
           <div id="wz-chars-list"></div>
           <div id="wz-chars-empty" class="empty-state">Nenhum personagem adicionado.</div>
         </div>
+
+        <!-- Passo 3: o mundo do gênero (menu.js, mundoRender). O que a IA
+             preparou tem parte que é do mestre: fica atrás de um aviso. -->
+        <div id="wz-panel-3" class="hidden">
+          <datalist id="wz-pessoas"></datalist>
+          <div id="wz-mundo-aviso" class="wz-mundo-aviso">
+            <p id="wz-mundo-aviso-texto"></p>
+            <button type="button" id="wz-mundo-mostrar" class="clean-button btn-inline" onclick="wzMostrarMundo()">Mostrar e editar</button>
+          </div>
+          <div id="wz-mundo" class="hidden"></div>
+        </div>
       </div>
 
       <div class="wizard-footer">
@@ -393,6 +408,18 @@
             <!-- Sugestões para Local Atual, "Fica dentro de" e "Onde está":
                  os locais do passo 3 e as lojas da campanha. -->
             <datalist id="ed-lugares"></datalist>
+          </div>
+          <!-- O relógio do mundo: só anda no jogo quando o mestre avança o
+               tempo. Aqui dá para acertar o dia e a hora (os encontros
+               marcados do romance dependem dele). Vazio: ainda não começou. -->
+          <div class="field-group">
+            <label>Relógio do mundo</label>
+            <div class="cwc-row2">
+              <div><span class="cwc-label">Dia</span>
+                <input type="number" id="ed-relogio-dia" min="1" placeholder="vazio: ainda não começou"></div>
+              <div><span class="cwc-label">Hora (0 a 23)</span>
+                <input type="number" id="ed-relogio-hora" min="0" max="23" placeholder="8"></div>
+            </div>
           </div>
           <!-- O protagonista é marcado no cartão do personagem (passo 2),
                como no wizard: "É você (protagonista)". -->
@@ -478,7 +505,7 @@
   </div>
 
   <script src="/static/js/utils.js?v=17"></script>
-  <script src="/static/js/menu.js?v=56"></script>
+  <script src="/static/js/menu.js?v=57"></script>
   <script>
     // Animação de volta para a capa quando carregado da cache
     window.addEventListener('pageshow', function(event) {

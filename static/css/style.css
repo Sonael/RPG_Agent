@@ -4028,6 +4028,13 @@ body.rest-on { overflow: hidden; }
   padding-bottom: var(--esp-2);
 }
 .ed-mundo-colecao .campo-nota { margin: 0 0 var(--esp-2); }
+/* O aviso antes do mundo que a IA preparou, no wizard. */
+.wz-mundo-aviso {
+  border: 1px dashed var(--gold, #b89947); border-radius: 8px;
+  padding: var(--esp-4) var(--esp-5); text-align: center;
+  color: var(--text-muted); font-size: 14px; line-height: 1.55;
+}
+.wz-mundo-aviso p { margin: 0 0 var(--esp-3); }
 @media (max-width: 700px) { .ed-mundo-campos { grid-template-columns: 1fr; padding-right: 0; } }
 .moldura-tela .cwc-seta { color: var(--tl-gold-texto); font-size: 12px; }
 .moldura-tela .cwc-nome {

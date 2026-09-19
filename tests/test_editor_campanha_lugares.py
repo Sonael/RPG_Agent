@@ -236,3 +236,13 @@ def test_mundo_editado_passa_pela_importacao_e_so_o_que_veio_muda(rota):
     mapa, divida = gravado["segredos"]["o mapa"], gravado["segredos"]["a divida"]
     assert (mapa["dono"], mapa["escondido_de"]) == ("", ["Brom"])      # o protagonista como dono é "seu"
     assert (divida["revelado"], divida["dono_sabe"]) == (True, False)
+
+
+@pytest.mark.parametrize("relogio", [{"dia": 0, "hora": 8}, {"dia": 3, "hora": 24}, {"dia": "x", "hora": 1}, "lixo"])
+def test_relogio_invalido_fica_como_estava(rota, relogio):
+    antiga, put, gravado = rota
+    antiga["relogio"] = {"dia": 2, "hora": 0}
+    editada = copy.deepcopy(antiga)
+    editada["relogio"] = relogio
+    assert put(editada).status_code == 200
+    assert gravado["relogio"] == {"dia": 2, "hora": 0}

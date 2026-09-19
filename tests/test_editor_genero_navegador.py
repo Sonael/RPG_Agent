@@ -427,3 +427,52 @@ def test_numero_vazio_nao_apaga_o_encontro(editor):
     _salvar(pg)
     assert gravado["encontros"][0]["dia"] == 7
     assert not erros, erros[:3]
+
+
+# --- O relógio do mundo e os números dos encontros ----------------------------
+
+def test_relogio_aparece_e_se_acerta(editor):
+    abrir, erros, gravado = editor
+    pg = abrir({**ROMANCE_MUNDO, "relogio": {"dia": 6, "hora": 0}})
+    pg.evaluate("() => editGoTo(1)")
+    assert pg.input_value("#ed-relogio-dia") == "6"
+    assert pg.input_value("#ed-relogio-hora") == "0", "meia-noite apareceu vazia"
+    pg.fill("#ed-relogio-dia", "7")
+    pg.fill("#ed-relogio-hora", "30")                               # passa das 23
+    _salvar(pg)
+    assert gravado["relogio"] == {"dia": 7, "hora": 23}
+    assert not erros, erros[:3]
+
+
+def test_relogio_vazio_fica_como_estava(editor):
+    abrir, erros, gravado = editor
+    pg = abrir({**ROMANCE, "relogio": {}})
+    pg.evaluate("() => editGoTo(1)")
+    assert pg.input_value("#ed-relogio-dia") == ""
+    _salvar(pg)
+    assert gravado.get("relogio") in ({}, None)
+    assert not erros, erros[:3]
+
+
+def test_apagar_um_encontro_nao_muda_o_numero_dos_outros(editor):
+    abrir, erros, gravado = editor
+    campanha = copy.deepcopy(ROMANCE_MUNDO)
+    campanha["encontros"] = [
+        {"id": 1, "com": "Lucas", "dia": 7, "hora": 20, "onde": "", "o_que": "jantar", "estado": "marcado", "cap": 1},
+        {"id": 2, "com": "Helena", "dia": 8, "hora": 18, "onde": "", "o_que": "café", "estado": "faltou",
+         "motivo": "dormiu demais", "cap": 1, "cap_resolvido": 2},
+        {"id": 3, "com": "Rafa", "dia": 9, "hora": 21, "onde": "", "o_que": "show", "estado": "marcado", "cap": 2},
+    ]
+    pg = abrir(campanha)
+    _passo_4(pg)
+    _item(pg, "encontros", 0).locator("button[aria-label='Remover']").click()
+    pg.click(".ed-mundo-colecao[data-colecao='encontros'] button:has-text('+ Encontro')")
+    novo = _item(pg, "encontros", 2)
+    for campo, valor in (("com", "Lucas"), ("o_que", "cinema")):
+        _mudar(_campo(novo, campo), valor)
+    _salvar(pg)
+    enc = {e["o_que"]: e for e in gravado["encontros"]}
+    assert (enc["café"]["id"], enc["show"]["id"], enc["cinema"]["id"]) == (2, 3, 4)
+    assert (enc["café"]["motivo"], enc["café"]["cap_resolvido"]) == ("dormiu demais", 2), \
+        "salvar jogou fora o motivo do encontro resolvido"
+    assert not erros, erros[:3]

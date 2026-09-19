@@ -1221,6 +1221,15 @@ def update_campaign(name):
     # fantasia. Passa pelas mesmas funções da importação (formato do jogo,
     # faixas, repetidos de fora). Só o que veio: o resto fica como estava.
     payload.update(_mundo_editado(campaign_data, existing, payload.get("protagonist", "")))
+    # O relógio do mundo, acertado no passo 1. Inválido fica como estava.
+    rel = campaign_data.get("relogio")
+    if isinstance(rel, dict):
+        try:
+            dia, hora = int(rel.get("dia")), int(rel.get("hora"))
+        except (TypeError, ValueError):
+            dia, hora = 0, -1
+        if dia >= 1 and 0 <= hora <= 23:
+            payload["relogio"] = {**(existing.get("relogio") or {}), "dia": dia, "hora": hora}
 
     try:
         if new_name != name:
