@@ -60,6 +60,9 @@ def rota(monkeypatch):
 
     cap._instalar_dubles({"name": "Base"}, "Base")
     monkeypatch.setattr(genai, "Client", _Cliente)
+    # O limite de gerações por usuário (12 em 15 min) é do servidor, não do
+    # teste: sem zerar, o 13º teste do arquivo recebe 429.
+    server._rate_buckets.clear()
     cliente = server.app.test_client()
 
     def gerar(texto=TXT, **extra):
@@ -144,3 +147,79 @@ def test_extrair_json_da_ia_pega_o_primeiro_objeto_valido():
     assert server._extrair_json_da_ia('lixo {"a": 1} mais lixo') == {"a": 1}
     with pytest.raises(ValueError):
         server._extrair_json_da_ia('[1, 2, 3]')
+
+
+# --- O gênero no prompt ------------------------------------------------------
+# Antes o prompt só dizia o id do gênero ("romance"): não pedia quem é o
+# protagonista, quem está com ele (no romance, só "jogador" entrava no grupo),
+# os campos do gênero que o wizard mostra, nem as mecânicas do gênero — as
+# telas de Relações e do Mundo nasciam vazias.
+
+CAMPOS_ROMANCE = [
+    {"id": "papel", "label": "Papel na Dinâmica", "type": "select",
+     "options": ["Protagonista", "Interesse Romântico", "Rival Amoroso"]},
+    {"id": "segredo", "label": "Segredo Guardado", "type": "text", "hint": "O que esconde, e de quem?"},
+]
+
+
+def _prompt(rota, **corpo):
+    gerar, resposta = rota
+    assert gerar(**corpo).status_code == 200
+    return resposta["pedido"]["contents"]
+
+
+def test_romance_pede_protagonista_proximos_campos_e_relacao(rota):
+    p = _prompt(rota, campaign_type="romance", dnd_mode=False, campos=CAMPOS_ROMANCE)
+    for trecho in ('"protagonista":<true|false>', '"grupo":<true|false>',
+                   '"papel":"<Protagonista|Interesse Romântico|Rival Amoroso>"',
+                   '"segredo":"<Segredo Guardado (O que esconde, e de quem?)>"',
+                   '"afeto":<-100 a 100>', '"confianca":<-100 a 100>',
+                   '"estagio":"<conhecidos|amizade|flerte|namoro|compromisso|rompimento>"',
+                   '"segredos":[', '"tensoes":[', "O campo 'role' é 'Relacionamento'",
+                   "Gênero (tom do mundo): Romance / Drama"):
+        assert trecho in p, trecho
+    for de_outro in ('"lealdade"', '"faccoes"', '"lendas"', '"renome"', '"classe"', "com base na classe"):
+        assert de_outro not in p, de_outro
+
+
+def test_fantasia_com_dnd_pede_o_laco_e_o_mundo(rota):
+    # Com D&D a ficha continua (classe e raça); os campos do gênero não, que
+    # o wizard não os mostra com regras.
+    p = _prompt(rota, campaign_type="fantasia", dnd_mode=True, campos=CAMPOS_ROMANCE)
+    for trecho in ('"protagonista":<true|false>', '"lealdade":<-100 a 100>', '"objetivo":""', '"arco":""',
+                   '"renome":<0 a 100>', '"faccoes":[', '"lendas":[', '"classe"', '"raca"',
+                   "Fantasia / Aventura · D&D"):
+        assert trecho in p, trecho
+    for de_outro in ('"extras"', '"grupo"', '"afeto"', '"segredos"', '"tensoes"'):
+        assert de_outro not in p, de_outro
+
+
+def test_dark_fantasy_sem_regras_tem_o_mundo_e_os_campos(rota):
+    p = _prompt(rota, campaign_type="dark_fantasy", dnd_mode=False,
+                campos=[{"id": "raca", "label": "Raça", "type": "select", "options": ["Humano", "Elfo"]}])
+    for trecho in ('"grupo":<true|false>', '"extras":{"raca":"<Humano|Elfo>"}', '"lealdade"', '"faccoes":[',
+                   "(Companhia)"):
+        assert trecho in p, trecho
+
+
+def test_horror_nao_ganha_mecanica_de_outro_genero(rota):
+    p = _prompt(rota, campaign_type="horror", dnd_mode=False,
+                campos=[{"id": "sanidade", "label": "Sanidade Atual (0–10)", "type": "number", "min": 0, "max": 10}])
+    assert '"extras":{"sanidade":<0 a 10: Sanidade Atual (0–10)>}' in p
+    for de_outro in ('"afeto"', '"segredos"', '"lealdade"', '"faccoes"'):
+        assert de_outro not in p, de_outro
+
+
+def test_campos_do_menu_sao_filtrados():
+    import server
+    campos = server._campos_do_genero([
+        {"id": "creditos", "label": "Créditos", "type": "number", "min": 0},
+        {"id": "Fora Do Padrao", "label": "x"},
+        {"id": "papel", "type": "select", "options": ["A", 3, " ", "B"]},
+        "lixo",
+    ] + [{"id": f"c{'x' * i}", "label": "y"} for i in range(10)])
+    assert [c["id"] for c in campos][:2] == ["creditos", "papel"]
+    assert len(campos) <= 8
+    assert campos[1]["opcoes"] == ["A", "B"]
+    assert server._campo_no_schema(campos[0]) == '"creditos":<número, mínimo 0: Créditos>'
+    assert server._campos_do_genero("lixo") == []

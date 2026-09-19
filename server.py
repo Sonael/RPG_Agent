@@ -2446,6 +2446,39 @@ def _extrair_json_da_ia(raw: str) -> dict:
     )
 
 
+def _campos_do_genero(valor) -> list[dict]:
+    """
+    Os campos de personagem do gênero (THEME_CHAR_FIELDS do wizard), como o
+    menu os manda: só o que o prompt usa, com tamanho limitado. A lista mora no
+    menu, que é quem desenha os campos; aqui ela só vira texto do prompt.
+    """
+    saida = []
+    for c in (valor if isinstance(valor, list) else [])[:8]:
+        if not isinstance(c, dict) or not re.fullmatch(r"[a-z_]{1,30}", str(c.get("id") or "")):
+            continue
+        campo = {"id": c["id"], "tipo": c.get("type") if c.get("type") in ("select", "text", "textarea", "number") else "text",
+                 "rotulo": " ".join(str(c.get("label") or "").split())[:60],
+                 "dica": " ".join(str(c.get("hint") or "").split())[:120],
+                 "opcoes": [" ".join(str(o).split())[:40] for o in (c.get("options") or [])
+                            if isinstance(o, str) and o.strip()][:15]}
+        for k in ("min", "max"):
+            if isinstance(c.get(k), (int, float)) and not isinstance(c.get(k), bool):
+                campo[k] = c[k]
+        saida.append(campo)
+    return saida
+
+
+def _campo_no_schema(c: dict) -> str:
+    """Um campo de 'extras' no JSON pedido à IA: opções, faixa ou o que ele é."""
+    if c["tipo"] == "select" and c["opcoes"]:
+        return json.dumps(c["id"]) + ":" + json.dumps("<" + "|".join(c["opcoes"]) + ">", ensure_ascii=False)
+    if c["tipo"] == "number":
+        faixa = f'{c.get("min", 0)} a {c["max"]}' if "max" in c else f'número, mínimo {c.get("min", 0)}'
+        return f'{json.dumps(c["id"])}:<{faixa}: {c["rotulo"]}>'
+    texto = c["rotulo"] + (f" ({c['dica']})" if c["dica"] else "")
+    return json.dumps(c["id"]) + ":" + json.dumps(f"<{texto}>", ensure_ascii=False)
+
+
 @app.route("/api/campaigns/generate-lore", methods=["POST"])
 @require_auth
 def generate_lore():
@@ -2518,21 +2551,89 @@ def generate_lore():
         "satyr, sprite, pixie, blink-dog"
     )
 
+    # O gênero decide o que mais o mundo precisa nascer tendo: o romance tem a
+    # relação de cada pessoa com o protagonista, segredos e tensões; a
+    # fantasia, o laço dos companheiros, renome, facções e lendas. Sem isso as
+    # telas dessas mecânicas começavam vazias e o grupo do romance, sem
+    # ninguém (só "jogador" entrava no grupo).
+    cfg_genero = get_campaign_config(campaign_type, is_dnd)
+    romance    = campaign_type == "romance"
+    mundo      = campaign_type in ("fantasia", "dark_fantasy")
+    campos     = [] if is_dnd else _campos_do_genero(data.get("campos"))
+
     # Schema D&D: inclui tipo (jogador/aliado/inimigo) e classe apenas para PCs.
     # O campo "raca" tem semântica DIFERENTE conforme o tipo:
     #   • PC          → raça D&D em PT (humano, elfo, …)
     #   • aliado/inim → slug SRD em INGLÊS (resolve no Open5e p/ CR/HP/CA reais)
     char_schema = (
         '{"name":"","description":"","traits":"","notes":"","role":"",'
-        '"tipo":"<jogador|aliado|inimigo>",'
+        '"tipo":"<jogador|aliado|inimigo>","protagonista":<true|false>,'
         '"classe":"<bárbaro|guerreiro|paladino|patrulheiro|bardo|clérigo|druida|monge|ladino|mago|feiticeiro|bruxo|npc>",'
         '"raca":"<PC: humano|elfo|anão|halfling|draconato|gnomo|meio-elfo|meio-orc|tiferino · '
                 'NPC: slug SRD em INGLÊS da lista fornecida no texto>",'
-        '"local":"<nome de um dos locais gerados, ou vazio>"}'
         if is_dnd else
         '{"name":"","description":"","traits":"","notes":"","role":"","tipo":"<jogador|aliado|inimigo>",'
-        '"local":"<nome de um dos locais gerados, ou vazio>"}'
+        '"protagonista":<true|false>,"grupo":<true|false>,'
     )
+    if campos:
+        char_schema += '"extras":{' + ",".join(_campo_no_schema(c) for c in campos) + '},'
+    if romance:
+        char_schema += ('"afeto":<-100 a 100>,"confianca":<-100 a 100>,'
+                        '"estagio":"<conhecidos|amizade|flerte|namoro|compromisso|rompimento>",')
+    if mundo:
+        char_schema += '"lealdade":<-100 a 100>,"objetivo":"","arco":"",'
+    char_schema += '"local":"<nome de um dos locais gerados, ou vazio>"}'
+
+    mundo_schema = ""
+    if romance:
+        mundo_schema = (
+            ',"segredos":[{"titulo":"","descricao":"",'
+            '"dono":"<vazio se é do protagonista; senão, o nome de quem o guarda>",'
+            '"escondido_de":["<de quem se esconde>"],"sabem":["<quem já sabe>"]}],'
+            '"tensoes":[{"a":"","b":"","tipo":"<ciume|rivalidade|magoa|desconfianca>",'
+            '"intensidade":<0 a 100>,"percebida":<true|false>}]'
+        )
+    if mundo:
+        mundo_schema = (
+            ',"renome":<0 a 100>,'
+            '"faccoes":[{"nome":"","tipo":"<reino|guilda|ordem|cidade|culto|casa nobre|...>","descricao":"",'
+            '"reputacao":<-100 a 100>,"conhecida":<true|false>}],'
+            '"lendas":[{"titulo":"","tipo":"<lenda|profecia|artefato perdido|mistério|ruína>",'
+            '"verdade":"","fragmentos":[{"texto":"","fonte":""}]}]'
+        )
+
+    genero_tip = (
+        f"Gênero: {cfg_genero['label']}. O campo 'role' é '{cfg_genero['role_label']}' "
+        f"(ex.: {cfg_genero['role_examples']}). "
+        "Marque 'protagonista': true em EXATAMENTE um personagem, quem o jogador vai viver "
+        "(se a ideia não disser quem é, crie um); os outros ficam com false. "
+    )
+    if not is_dnd:
+        genero_tip += (
+            f"'grupo' é true para quem está com o protagonista ({cfg_genero['party_label']}), "
+            "o protagonista inclusive, e false para os outros. "
+        )
+    if campos:
+        genero_tip += ("Preencha todos os campos de 'extras' de cada personagem; nos que mostram "
+                       "opções separadas por |, use EXATAMENTE uma delas. ")
+    if romance:
+        genero_tip += (
+            "Em cada personagem que não é o protagonista: 'afeto' é o quanto ele gosta do "
+            "protagonista (-100 aversão, 100 devoção) e 'confianca' o quanto acredita nele, os dois "
+            "perto de 0 se mal se conhecem; 'estagio' é onde a relação está agora. No protagonista, "
+            "deixe os três de fora. Gere 1 a 3 segredos, pelo menos um de outra pessoa que o "
+            "protagonista ainda não sabe, e 0 a 2 tensões entre os outros ('a' e 'b' nunca são o "
+            "protagonista; 'percebida' false se ele ainda não notou). "
+        )
+    if mundo:
+        genero_tip += (
+            "Só nos companheiros do grupo que não são o protagonista: 'lealdade' (se ele fica "
+            "quando custar caro), 'objetivo' (o que ele quer da vida) e 'arco' (a história pessoal "
+            "dele em poucas palavras: uma redenção, uma vingança, uma dívida); nos outros, deixe "
+            "de fora. 'renome' é o quanto o grupo já é conhecido (0 a 20 para quem está começando). "
+            "Gere 2 a 3 facções, podendo haver uma que o grupo ainda não conhece (conhecida false), "
+            "e 1 a 2 lendas com a 'verdade' (só o mestre vê) e, se o grupo já ouviu algo, um fragmento. "
+        )
     char_tip = (
         'Para D&D use o campo "tipo" para classificar cada personagem: '
         '"jogador" = herói/aventureiro com classe PC (bárbaro, guerreiro, mago, etc.); '
@@ -2566,7 +2667,7 @@ def generate_lore():
         '"current_location":"<nome do local inicial>",'
         '"locations":[{"name":"","description":"","details":"","notes":"","dentro_de":""}],'
         '"events":[{"summary":"","location":"","characters_involved":"","consequence":""}],'
-        f'"characters":[' + char_schema + ']}' + '}\n'
+        f'"characters":[' + char_schema + ']' + mundo_schema + '}\n'
         "Gere 2-3 locais relevantes. "
         "Se um local fica DENTRO de outro gerado (a taverna dentro da cidade), preencha "
         "'dentro_de' com o nome exato desse outro; senão deixe vazio. "
@@ -2576,13 +2677,15 @@ def generate_lore():
         "Gere TODOS os personagens mencionados na ideia (máximo 4), um por pessoa citada. "
         "Preencha obrigatoriamente o campo 'notes' dos personagens com o seu histórico ou motivação. "
         f"{char_tip}"
+        f"{genero_tip}"
         "IMPORTANTE: Nos campos dos personagens (description, traits, notes) NÃO mencione nomes de magias, "
         "habilidades mecânicas, equipamentos ou atributos numéricos — apenas narrativa pura, personalidade e história. "
-        "Magias, habilidades e equipamentos serão aplicados automaticamente pelo sistema com base na classe escolhida. "
+        + ("Magias, habilidades e equipamentos serão aplicados automaticamente pelo sistema com base na classe escolhida. "
+           if is_dnd else "") +
         "Responda APENAS com JSON válido, sem markdown, sem comentários."
     )
     
-    full_prompt = (f"{system}\n\nIdeia: {user_prompt}\n\nGênero (tom do mundo): {campaign_type}"
+    full_prompt = (f"{system}\n\nIdeia: {user_prompt}\n\nGênero (tom do mundo): {cfg_genero['label']}"
                    f"\nRegras: {'D&D 5e' if is_dnd else 'narrativa livre'}")
 
     _route = "DeepSeek" if is_deepseek else ("Ollama" if is_ollama else "Gemini")
