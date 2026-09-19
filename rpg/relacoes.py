@@ -240,9 +240,17 @@ def ajustar(nome: str, afeto=0, confianca=0, motivo: str = "", vinculo: str = ""
 
 
 def _tem_relacao(ch: dict) -> bool:
+    from rpg import segredos
+    if locais.norm(ch.get("name", "")) in segredos.envolvidos():
+        return True
     return (bool(_membro_do_grupo(ch)) or "atitude" in ch or "confianca" in ch
             or bool(ch.get("vinculo")) or bool(ch.get("relacao_historico"))
             or bool(ch.get("estagio")) or bool(ch.get("momentos")))
+
+
+def _segredos_da_pessoa(nome: str) -> dict:
+    from rpg import segredos
+    return segredos.da_pessoa(nome)
 
 
 def _pessoa(ch: dict) -> dict:
@@ -263,6 +271,7 @@ def _pessoa(ch: dict) -> dict:
         "estagio": {"atual": estagio, "escada": list(ESCADA),
                     "chegou_a": (antes if antes in ESCADA else "") if estagio == ROMPIMENTO else ""},
         "momentos": momentos,
+        "segredos": _segredos_da_pessoa(ch.get("name", "")),
         "proximo": bool(_membro_do_grupo(ch)),
         "status": ch.get("status", "") or "vivo",
         "afeto": {"valor": afeto, "rotulo": _faixa(AFETO, afeto)},
@@ -283,7 +292,9 @@ def lista() -> dict:
                if isinstance(ch, dict) and ch.get("name")
                and locais.norm(ch["name"]) != protagonista and _tem_relacao(ch)]
     pessoas.sort(key=lambda p: (not p["proximo"], -p["afeto"]["valor"], locais.norm(p["nome"])))
-    return {"pessoas": pessoas, "protagonista": memory.campaign.get("protagonist", "") or ""}
+    from rpg import segredos
+    return {"pessoas": pessoas, "protagonista": memory.campaign.get("protagonist", "") or "",
+            "segredos": segredos.visiveis()}
 
 
 def resumo_para_o_mestre() -> str:
@@ -312,13 +323,21 @@ def bloco_de_cena() -> str:
     sabia do afeto e dos momentos se chamasse ver_relacoes(), e não chamava: o
     primeiro beijo do capítulo 2 não voltava na conversa do capítulo 5.
     """
+    from rpg import segredos
     if (memory.campaign.get("campaign_type") or "") != "romance":
         return ""
-    if not lista()["pessoas"]:
+    tem_segredos = bool(memory.campaign.get("segredos"))
+    if not lista()["pessoas"] and not tem_segredos:
         return ""
-    return ("\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            "RELAÇÕES (estágio, afeto, confiança e o que lembram juntos)\n"
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            "Use os momentos na narração: as pessoas lembram. \"Madura para\" é só "
-            "para você: o passo acontece quando a cena pedir, com mudar_estagio().\n"
-            + resumo_para_o_mestre())
+    bloco = ("\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+             "RELAÇÕES (estágio, afeto, confiança e o que lembram juntos)\n"
+             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+             "Use os momentos na narração: as pessoas lembram. \"Madura para\" é só "
+             "para você: o passo acontece quando a cena pedir, com mudar_estagio().\n"
+             + resumo_para_o_mestre())
+    if tem_segredos:
+        bloco += ("\n\nSEGREDOS (você vê todos; o jogador só vê os dele e os que já descobriu)\n"
+                  "Um segredo escondido é tensão: deixe-o pesar nas cenas, dê pistas, "
+                  "e revele só quando a história revelar, com revelar_segredo().\n"
+                  + segredos.resumo_para_o_mestre())
+    return bloco

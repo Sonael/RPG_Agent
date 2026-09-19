@@ -9,6 +9,10 @@
 //  namoro, compromisso, ou o rompimento) e o último MOMENTO marcante; a linha
 //  do tempo inteira fica na ficha, que o nome abre.
 //
+//  A aba SEGREDOS lista os do protagonista (de quem ele esconde, quem já sabe
+//  e como cada um ficou sabendo) e os dos outros que ele já descobriu. Os que
+//  ele ainda não sabe nunca chegam aqui: o motor não manda.
+//
 //  REGRA DE OURO, a mesma das outras telas: nenhuma regra aqui. As faixas
 //  ("devoção", "com um pé atrás"), a ordem e quem entra na lista vêm do motor
 //  (rpg/relacoes.py via /api/relacoes). A moldura e as classes são as das
@@ -19,6 +23,7 @@
 
   let _open = false;
   let _last = {};
+  let _aba = 'pessoas';
 
   const esc = (s) => (window.escapeHtml ? window.escapeHtml(s) : String(s == null ? '' : s));
   const q = (id) => document.getElementById(id);
@@ -37,6 +42,7 @@
           <button class="lcl-close" onclick="window.Relacoes._fechar()" aria-label="Fechar" title="Fechar">✕</button>
           <h1 class="lcl-title" id="rel-titulo">Relações</h1>
           <p id="rel-sub" class="lcl-desc"></p>
+          <div id="rel-abas" class="elc-filtros" role="tablist" aria-label="Relações"></div>
         </header>
         <div class="rel-corpo">
           <div id="rel-lista" class="rel-lista"></div>
@@ -106,8 +112,51 @@
             <span class="rel-ultimo-rotulo">Último momento${p.momentos.length > 1 ? ` de ${p.momentos.length}` : ''}</span>
             ${window.linhaDoTempo(p.momentos, 1)}
           </div>` : ''}
+        ${window.segredosDaPessoa(p.segredos)}
         ${historico(p)}
       </article>`;
+  }
+
+  // ---- Segredos ----------------------------------------------------
+  const COMO = { contou: 'contou', descobriu: 'descobriu' };
+
+  function segredoSeu(s) {
+    const hist = (s.historico || []).map(h => `
+      <li>${esc(h.quem)} ${h.acao === 'contou' ? '— você contou' : 'descobriu'}${
+        h.capitulo ? ` <small>cap. ${esc(h.capitulo)}</small>` : ''}</li>`).join('');
+    return `
+      <article class="lcl-item rel-segredo${s.escondido_de.length ? ' rel-segredo-escondido' : ''}" data-titulo="${esc(s.titulo)}">
+        <div class="lcl-item-cabeca"><span class="lcl-item-nome">${esc(s.titulo)}</span></div>
+        ${s.descricao ? `<p class="lcl-item-desc">${esc(s.descricao)}</p>` : ''}
+        ${s.escondido_de.length ? `<p class="rel-seg-linha rel-seg-esconde"><span>Escondido de</span> ${esc(s.escondido_de.join(', '))}</p>` : ''}
+        <p class="rel-seg-linha"><span>Sabem</span> ${s.sabem.length ? esc(s.sabem.join(', ')) : 'ninguém além de você'}</p>
+        ${hist ? `<ul class="rel-seg-historico">${hist}</ul>` : ''}
+      </article>`;
+  }
+
+  function segredoDeOutro(s) {
+    const como = s.como === 'contou'
+      ? `${esc(s.dono)} contou a você`
+      : `você descobriu${s.dono_sabe ? '' : ` — ${esc(s.dono)} não sabe que você sabe`}`;
+    return `
+      <article class="lcl-item rel-segredo" data-titulo="${esc(s.titulo)}">
+        <div class="lcl-item-cabeca"><span class="lcl-item-nome">${esc(s.titulo)}</span>
+          <span class="lcl-marca">de ${esc(s.dono)}</span></div>
+        ${s.descricao ? `<p class="lcl-item-desc">${esc(s.descricao)}</p>` : ''}
+        <p class="rel-seg-linha${s.dono_sabe ? '' : ' rel-seg-esconde'}">${como}${
+          s.capitulo ? ` <small>cap. ${esc(s.capitulo)}</small>` : ''}</p>
+      </article>`;
+  }
+
+  function listaDeSegredos() {
+    const sg = _last.segredos || { seus: [], dos_outros: [] };
+    const seus = sg.seus.length ? sg.seus.map(segredoSeu).join('')
+      : '<div class="lcl-vazio">Você não guarda nenhum segredo. Ainda.</div>';
+    const outros = sg.dos_outros.length ? sg.dos_outros.map(segredoDeOutro).join('')
+      : '<div class="lcl-vazio">Você não descobriu o segredo de ninguém.</div>';
+    return `
+      <section class="rel-segredos-grupo"><h2 class="lcl-secao">Os seus</h2><div class="rel-segredos-lista">${seus}</div></section>
+      <section class="rel-segredos-grupo"><h2 class="lcl-secao">Os dos outros, que você já sabe</h2><div class="rel-segredos-lista">${outros}</div></section>`;
   }
 
   function render(d) {
@@ -118,6 +167,18 @@
       ? `Como cada pessoa se sente em relação a ${quem}.`
       : 'Como cada pessoa se sente em relação a você.';
     const pessoas = _last.pessoas || [];
+    const sg = _last.segredos || { seus: [], dos_outros: [] };
+    const nSegredos = sg.seus.length + sg.dos_outros.length;
+    q('rel-abas').innerHTML = [['pessoas', 'Pessoas', pessoas.length], ['segredos', 'Segredos', nSegredos]]
+      .map(([id, rotulo, n]) => `
+        <button class="elc-filtro${id === _aba ? ' elc-filtro-ativo' : ''}" data-aba="${id}" role="tab"
+                aria-selected="${id === _aba}" onclick="window.Relacoes._aba('${id}')">
+          ${rotulo} <span class="elc-filtro-conta">${n}</span></button>`).join('');
+    q('rel-lista').classList.toggle('rel-lista-segredos', _aba === 'segredos');
+    if (_aba === 'segredos') {
+      q('rel-lista').innerHTML = listaDeSegredos();
+      return;
+    }
     q('rel-lista').innerHTML = pessoas.length
       ? pessoas.map(cartao).join('')
       : `<div class="lcl-vazio">Ninguém marcou você ainda. Quando algo mudar entre você e alguém,
@@ -132,8 +193,9 @@
   }
 
   // ---- Abrir / fechar ----------------------------------------------
-  async function abrir() {
+  async function abrir(aba) {
     ensureDom();
+    _aba = aba === 'segredos' ? 'segredos' : 'pessoas';
     if (!_open) {
       q('relacoes-overlay').classList.remove('hidden');
       document.body.classList.add('relacoes-on');
@@ -172,6 +234,7 @@
     _abrir: abrir,
     _fechar: fechar,
     _ver: ver,
+    _aba: (aba) => { _aba = aba; render(_last); },
     _estado: () => _last,
   };
 })();

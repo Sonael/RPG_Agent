@@ -968,6 +968,52 @@ def marcar_momento(nome: str, titulo: str, descricao: str = "") -> str:
     return relacoes.marcar_momento(nome, titulo, descricao)
 
 
+def guardar_segredo(dono: str, titulo: str, descricao: str = "",
+                    escondido_de: str = "", sabem: str = "") -> str:
+    """
+    Guarda um segredo. Pode ser do PROTAGONISTA (dono="" ou o nome dele): o que
+    ele esconde, de quem esconde (escondido_de) e quem já sabe (sabem). Ou de
+    OUTRA PESSOA (dono="Lucas"): o que ela esconde do protagonista — o jogador
+    NÃO vê esse até ele ser revelado com revelar_segredo, então registre sem
+    medo de estragar a surpresa.
+
+    Args:
+        dono:         De quem é o segredo ("" para o protagonista).
+        titulo:       O segredo em poucas palavras ("A bolsa em Lisboa").
+        descricao:    Uma frase do que é.
+        escondido_de: Só nos segredos do protagonista: de quem ele esconde,
+                      separado por vírgula.
+        sabem:        Quem já sabe, separado por vírgula.
+    """
+    from rpg import segredos
+    return segredos.guardar(dono, titulo, descricao, escondido_de, sabem)
+
+
+def revelar_segredo(titulo: str, a_quem: str = "", como: str = "contou") -> str:
+    """
+    Um segredo chega a alguém. Mexe na confiança sozinho e vira momento:
+      • do protagonista, contado a quem ele escondia: +10 (honestidade);
+        contado a outro: +5; descoberto por quem ele escondia: -25;
+      • de outra pessoa, contado por ela ao protagonista: +10 na confiança
+        dela; descoberto pelo protagonista: fica "ela não sabe que você sabe".
+    Não chame ajustar_relacao para o mesmo efeito: já está feito.
+
+    Args:
+        titulo: O título do segredo, como foi guardado.
+        a_quem: Quem fica sabendo. Segredo de outra pessoa: deixe vazio (é o
+                protagonista quem fica sabendo).
+        como:   "contou" (alguém contou) ou "descobriu" (descobriu sozinho).
+    """
+    from rpg import segredos
+    return segredos.revelar(titulo, a_quem, como)
+
+
+def ver_segredos() -> str:
+    """Todos os segredos, inclusive os que o protagonista ainda não sabe."""
+    from rpg import segredos
+    return segredos.resumo_para_o_mestre()
+
+
 def ver_relacoes() -> str:
     """Todas as relações com o protagonista: vínculo, estágio, afeto, confiança e momentos."""
     from rpg import relacoes
@@ -1383,6 +1429,9 @@ ALL_TOOLS = [
     mudar_estagio,
     marcar_momento,
     ver_relacoes,
+    guardar_segredo,
+    revelar_segredo,
+    ver_segredos,
     # Contexto (dinâmico e completo)
     get_scene_context,
     get_full_context,

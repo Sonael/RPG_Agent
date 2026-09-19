@@ -157,6 +157,7 @@
       <div class="psn-atitude psn-romance">${window.escadaDaRelacao(r.estagio)}</div>
       ${barra('Afeto', r.afeto, ['aversão', 'devoção'])}
       ${barra('Confiança', r.confianca, ['desconfia', 'confia'])}
+      ${window.segredosDaPessoa(r.segredos) ? `<h3 class="psn-subsecao">Segredos</h3>${window.segredosDaPessoa(r.segredos)}` : ''}
       ${momentos}
       <h3 class="psn-subsecao">Mudanças</h3>
       ${hist}`;

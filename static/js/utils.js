@@ -269,13 +269,28 @@ function linhaDoTempo(momentos, limite) {
   const lista = (momentos || []).slice(0, limite || undefined);
   if (!lista.length) return '';
   return `<ol class="rel-momentos">${lista.map(m => `
-    <li class="rel-momento${m.tipo === 'estagio' ? ' rel-momento-estagio' : ''}">
+    <li class="rel-momento${m.tipo === 'estagio' ? ' rel-momento-estagio' : ''}${m.tipo === 'segredo' ? ' rel-momento-segredo' : ''}">
       <span class="rel-momento-titulo">${esc(m.titulo)}</span>
       ${m.capitulo ? `<small class="rel-momento-cap">cap. ${esc(m.capitulo)}</small>` : ''}
       ${m.descricao ? `<span class="rel-momento-desc">${esc(m.descricao)}</span>` : ''}
     </li>`).join('')}</ol>`;
 }
 window.linhaDoTempo = linhaDoTempo;
+
+// Os segredos que tocam uma pessoa, como o protagonista os vê: o que ele
+// esconde dela, o que ela já sabe dele e o que ele sabe dela.
+function segredosDaPessoa(s) {
+  const esc = window.escapeHtml;
+  if (!s) return '';
+  const itens = [
+    ...(s.voce_esconde || []).map(t => `<li class="rel-seg rel-seg-esconde"><span>Você esconde</span> ${esc(t)}</li>`),
+    ...(s.sabe_dos_seus || []).map(t => `<li class="rel-seg"><span>Sabe do seu</span> ${esc(t)}</li>`),
+    ...(s.voce_sabe_dele || []).map(x => `<li class="rel-seg rel-seg-sabe"><span>Você sabe</span> ${esc(x.titulo)}${
+      x.dono_sabe ? '' : ' <em>(não sabe que você sabe)</em>'}</li>`),
+  ];
+  return itens.length ? `<ul class="rel-segs">${itens.join('')}</ul>` : '';
+}
+window.segredosDaPessoa = segredosDaPessoa;
 window.alternarChaveVisivel = alternarCampoSecreto;
 window.alternarSenhaVisivel = alternarCampoSecreto;
 

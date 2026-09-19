@@ -57,6 +57,23 @@ ROMANCE = {
     },
     "party": [{"name": "Lucas", "role": "interesse romântico"},
               {"name": "Marina", "role": "melhor amiga"}],
+    "segredos": {
+        "a bolsa em lisboa": {
+            "titulo": "A bolsa em Lisboa", "descricao": "Aceitou a bolsa e vai embora em março",
+            "dono": "", "escondido_de": ["Lucas"], "sabem": ["Marina"],
+            "revelado": False, "como": "", "dono_sabe": True, "cap": 2,
+            "historico": [{"acao": "contou", "quem": "Marina", "cap": 2}]},
+        "o irmao na prisao": {
+            "titulo": "O irmão na prisão", "descricao": "Visita o irmão todo domingo",
+            "dono": "Lucas", "escondido_de": [], "sabem": [],
+            "revelado": True, "como": "descobriu", "dono_sabe": False, "cap": 1, "cap_revelado": 3,
+            "historico": [{"acao": "descobriu", "quem": "Clara", "cap": 3}]},
+        # Ainda não revelado: nunca pode aparecer na tela.
+        "o anel guardado": {
+            "titulo": "O anel guardado", "descricao": "Comprou um anel e não teve coragem",
+            "dono": "Lucas", "escondido_de": [], "sabem": [],
+            "revelado": False, "como": "", "dono_sabe": True, "cap": 3, "historico": []},
+    },
 }
 
 
@@ -234,3 +251,49 @@ def test_ficha_tem_a_linha_do_tempo_inteira(jogo):
     assert "Ele molhou o ombro inteiro" in pg.inner_text("#psn-relacao")
     assert pg.locator("#psn-relacao .rel-estagio").inner_text() == "flerte"
     assert not erros, erros[:3]
+
+
+def test_cartao_mostra_os_segredos_que_tocam_cada_pessoa(jogo):
+    pg, erros = jogo(ROMANCE)
+    pg.evaluate("() => window.Relacoes._abrir()")
+    pg.wait_for_selector(".rel-cartao[data-nome='Lucas'] .rel-segs", timeout=8000)
+    lucas = pg.locator(".rel-cartao[data-nome='Lucas'] .rel-segs").text_content()
+    assert "Você esconde" in lucas and "A bolsa em Lisboa" in lucas
+    assert "O irmão na prisão" in lucas and "não sabe que você sabe" in lucas
+    marina = pg.locator(".rel-cartao[data-nome='Marina'] .rel-segs").text_content()
+    assert "Sabe do seu" in marina and "A bolsa em Lisboa" in marina
+    # O segredo que ainda não foi revelado não chega à tela.
+    assert "O anel guardado" not in pg.content()
+    assert not erros, erros[:3]
+
+
+def test_aba_de_segredos(jogo):
+    pg, erros = jogo(ROMANCE)
+    pg.evaluate("() => window.Relacoes._abrir()")
+    pg.wait_for_selector("#rel-abas .elc-filtro[data-aba='segredos']", timeout=8000)
+    assert pg.text_content("#rel-abas .elc-filtro[data-aba='segredos'] .elc-filtro-conta") == "2"
+    pg.click("#rel-abas .elc-filtro[data-aba='segredos']")
+    pg.wait_for_selector(".rel-segredo", timeout=5000)
+    seu = pg.locator(".rel-segredo[data-titulo='A bolsa em Lisboa']")
+    texto = seu.text_content()
+    assert "Escondido de" in texto and "Lucas" in texto
+    assert "Marina — você contou" in " ".join(texto.split())
+    assert "rel-segredo-escondido" in seu.get_attribute("class")
+    outro = " ".join(pg.locator(".rel-segredo[data-titulo='O irmão na prisão']").text_content().split())
+    assert "de Lucas" in outro and "você descobriu — Lucas não sabe que você sabe" in outro
+    assert "O anel guardado" not in pg.content()
+    # E volta para as pessoas.
+    pg.click("#rel-abas .elc-filtro[data-aba='pessoas']")
+    pg.wait_for_selector(".rel-cartao", timeout=5000)
+    assert not erros, erros[:3]
+
+
+def test_ficha_traz_os_segredos_da_pessoa(jogo):
+    pg, erros = jogo(ROMANCE)
+    pg.evaluate("() => window.Personagens._abrir('Lucas')")
+    pg.wait_for_selector("#psn-relacao .rel-segs", timeout=8000)
+    texto = pg.text_content("#psn-relacao .rel-segs")
+    assert "A bolsa em Lisboa" in texto and "O irmão na prisão" in texto
+    assert "O anel guardado" not in pg.content()
+    assert not erros, erros[:3]
+

@@ -402,8 +402,34 @@ no lugar da atitude. Fora do D&D a ficha
 também deixou de prometer os efeitos da atitude na CD e no preço da loja, que
 são regras de D&D.
 
+### Segredos do romance (`rpg/segredos.py`)
+
+A tensão do romance mora no que não se diz. Um segredo era uma flag ou uma
+nota do mestre, e contar ou ser descoberto não mudava nada entre as pessoas.
+Agora há dois tipos:
+
+- **Os seus**: o que o protagonista esconde, de quem esconde e quem já sabe.
+  Contar a quem se escondia é honestidade (+10 de confiança); contar a outro
+  é cumplicidade (+5); quem descobre sozinho o que você escondia dele perde
+  confiança (-25). Contar ou ser descoberto por quem estava no escuro vira
+  momento na linha do tempo da pessoa.
+- **Os dos outros**: o mestre registra desde o começo, mas o jogador só os vê
+  depois de revelados (`segredos.visiveis` não os manda antes). Quem conta
+  confia (+10); o que o protagonista descobre sozinho fica marcado como "não
+  sabe que você sabe".
+
+O mestre usa `guardar_segredo(dono, titulo, descricao, escondido_de, sabem)`,
+`revelar_segredo(titulo, a_quem, como)` e `ver_segredos()`, só no romance. O
+bloco de RELAÇÕES do turno ganha os SEGREDOS, todos, com o aviso de não
+revelar os que o protagonista ainda não sabe. A tela de Relações ganha a aba
+"Segredos" (os seus, com de quem esconde, quem sabe e como cada um ficou
+sabendo; e os dos outros que você já sabe), e o cartão e a ficha de cada
+pessoa mostram o que você esconde dela, o que ela sabe do seu e o que você
+sabe dela.
+
 `test_genero_e_regras.py` (27), `test_genero_e_regras_navegador.py` (9),
-`test_relacoes.py` (28) e `test_relacoes_navegador.py` (10).
+`test_segredos.py` (18),
+`test_relacoes.py` (28) e `test_relacoes_navegador.py` (13).
 
 ---
 
