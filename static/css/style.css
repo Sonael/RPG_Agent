@@ -137,8 +137,8 @@ button:disabled { opacity: 0.4; cursor: not-allowed !important; }
 /* Chegou virando a página (menu e jogo são páginas do mesmo livro): a capa
    não abre de novo, e o conteúdo novo aparece enquanto a folha assenta. */
 html.chegou-virando .tome-cover { display: none; }
-html.chegou-virando .tome > .page-left > *,
-html.chegou-virando .tome > .page-right > * { animation: paginaAssenta .45s ease-out both; }
+html.anim-on.chegou-virando .tome > .page-left > *,
+html.anim-on.chegou-virando .tome > .page-right > * { animation: paginaAssenta .45s ease-out both; }
 @keyframes paginaAssenta { from { opacity: 0; } to { opacity: 1; } }
 
 /* A folha que vira (utils.js, virarPagina e virarParaOutraPagina): frente e
@@ -187,6 +187,40 @@ html.chegou-virando .tome > .page-right > * { animation: paginaAssenta .45s ease
 }
 /* Sem transição: "transition: all" (o botão Iniciar) atrasava o sumiço. */
 .pagina-em-branco * { visibility: hidden !important; transition: none !important; }
+
+/* Telas por cima (mochila, grimório, fichas, mapa, diário, combate...) e as
+   janelas (Editar, wizard, editor, importar, avisos). Abrir: o véu escurece
+   e o papel pousa, subindo um pouco; a animação recomeça sozinha quando a
+   tela deixa de estar escondida. Fechar: uma cópia sai por cima enquanto a
+   de verdade já está fechada (utils.js, _vigiarTelasPorCima). "backwards" e
+   não "both": o fim da animação não pode prender o transform nem a opacidade
+   de quem já os usa (as pílulas sobem ao passar o mouse). Só com html.anim-on
+   (utils.js): sem animações, a tela aparece já no lugar. */
+html.anim-on :is(#local-overlay, #pessoa-overlay, #heroi-overlay, #missoes-overlay, #mapa-overlay, #grupo-overlay,
+    #diario-overlay, #elenco-overlay, #relacoes-overlay, #mundo-overlay, #inventory-overlay,
+    #grimoire-overlay, #shop-overlay, #levelup-overlay, #rest-overlay, #loot-overlay, #combat-overlay,
+    #edit-overlay, #dialog-overlay, #wizard-overlay, #import-overlay):not(.hidden) {
+  animation: veuEntra .22s ease-out backwards;
+}
+html.anim-on :is(#lcl-frame, #psn-frame, #hro-frame, #msn-frame, #map-frame, #grp-frame, #dia-frame, #elc-frame,
+    #rel-frame, #mnd-frame, #inv-frame, #grm-frame, #shp-frame, #lvl-frame, #rst-frame, #lot-frame,
+    #cbt-frame, .edit-box, .dialog-box, .wizard-box, .edit-campaign-box, .import-box) {
+  animation: telaPousa .34s cubic-bezier(.2,.8,.25,1) backwards;
+}
+@keyframes veuEntra { from { opacity: 0; } to { opacity: 1; } }
+@keyframes telaPousa {
+  from { opacity: 0; transform: translateY(18px) scale(.985); box-shadow: 0 2px 6px rgba(0,0,0,.2); }
+  to   { opacity: 1; transform: none; }
+}
+.tela-saindo { pointer-events: none !important; animation: veuSai .2s ease-in forwards !important; }
+.tela-saindo > * { animation: telaLevanta .2s ease-in forwards !important; }
+@keyframes veuSai { to { opacity: 0; } }
+@keyframes telaLevanta { to { opacity: 0; transform: translateY(10px) scale(.985); } }
+/* As pílulas de reabrir sobem ao aparecer. */
+html.anim-on :is(#grm-reopen, #lvl-reopen, #rst-reopen, #lot-reopen, #shp-reopen, #cbt-reopen):not(.hidden) {
+  animation: pilulaSobe .35s cubic-bezier(.2,.8,.25,1) backwards;
+}
+@keyframes pilulaSobe { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
 
 /* Menos movimento: pelo aparelho (prefers-reduced-motion, se a escolha for
    "Seguir o sistema") ou pela escolha "Desligadas" nas configurações. Tudo

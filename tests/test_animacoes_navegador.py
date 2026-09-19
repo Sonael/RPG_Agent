@@ -243,3 +243,114 @@ def test_capitulo_novo_sem_animacoes_nao_cobre_a_narracao(abrir):
     pg.wait_for_timeout(200)
     assert pg.evaluate("() => window.__capitulos") == 0
     assert not erros, erros[:3]
+
+
+# --- Telas por cima: abrir e fechar ------------------------------------------
+# Abrir: o papel pousa (CSS, telaPousa). Fechar: a tela de verdade some na
+# hora e uma cópia sai por cima (utils.js, _vigiarTelasPorCima).
+
+def _animacoes_de(pg, seletor):
+    return pg.evaluate("(s) => { const e = document.querySelector(s);"
+                       " return e ? e.getAnimations().map(a => a.animationName || '') : null; }", seletor)
+
+
+def test_tela_pousa_ao_abrir(abrir):
+    pg, erros = abrir("/game.html")
+    _terminar(pg)
+    pg.evaluate("() => window.Mapa._abrir('')")
+    pg.wait_for_selector("#mapa-overlay:not(.hidden)", timeout=8000)
+    assert "telaPousa" in _animacoes_de(pg, "#map-frame")
+    assert "veuEntra" in _animacoes_de(pg, "#mapa-overlay")
+    assert not erros, erros[:3]
+
+
+def test_fechar_some_na_hora_e_a_copia_sai_por_cima(abrir):
+    pg, erros = abrir("/game.html")
+    _terminar(pg)
+    pg.evaluate("() => window.Mapa._abrir('')")
+    pg.wait_for_selector("#mapa-overlay:not(.hidden)", timeout=8000)
+    _terminar(pg)
+    estado = pg.evaluate("""async () => {
+        window.Mapa._fechar();
+        await new Promise(r => setTimeout(r, 30));
+        const todas = [...document.querySelectorAll('#mapa-overlay')];
+        const copia = todas.find(e => e.classList.contains('tela-saindo'));
+        return { de_verdade_escondida: todas[0].classList.contains('hidden'),
+                 copias: todas.length - 1,
+                 clicavel: copia ? getComputedStyle(copia).pointerEvents : null };
+    }""")
+    assert estado == {"de_verdade_escondida": True, "copias": 1, "clicavel": "none"}, estado
+    pg.wait_for_function("() => !document.querySelector('.tela-saindo')", timeout=3000)
+    # Reabrir logo depois abre a de verdade.
+    pg.evaluate("() => window.Mapa._abrir('')")
+    pg.wait_for_selector("#mapa-overlay:not(.hidden):not(.tela-saindo)", timeout=8000)
+    assert not erros, erros[:3]
+
+
+def test_a_copia_guarda_a_rolagem(abrir):
+    pg, erros = abrir("/game.html")
+    _terminar(pg)
+    pg.evaluate("() => window.Diario._abrir(1)")
+    pg.wait_for_selector("#diario-overlay:not(.hidden) #dia-pagina", timeout=8000)
+    _terminar(pg)
+    rolado = pg.evaluate("""async () => {
+        const p = document.querySelector('#dia-pagina');
+        p.scrollTop = 120; p.dispatchEvent(new Event('scroll'));
+        await new Promise(r => setTimeout(r, 30));
+        return p.scrollTop;
+    }""")
+    assert rolado > 0, "a página do diário não rola nesta campanha"
+    na_copia = pg.evaluate("""async () => {
+        window.Diario._fechar();
+        await new Promise(r => setTimeout(r, 30));
+        const c = document.querySelector('.tela-saindo #dia-pagina');
+        return c ? c.scrollTop : null;
+    }""")
+    assert na_copia == rolado, "a cópia saiu pulando para o topo"
+    assert not erros, erros[:3]
+
+
+def test_sem_animacoes_fecha_sem_copia(abrir):
+    pg, erros = abrir("/game.html", "desligadas")
+    pg.evaluate("() => window.Mapa._abrir('')")
+    pg.wait_for_selector("#mapa-overlay:not(.hidden)", timeout=8000)
+    assert pg.evaluate("""async () => { window.Mapa._fechar(); await new Promise(r => setTimeout(r, 30));
+                           return document.querySelectorAll('.tela-saindo').length; }""") == 0
+    assert not erros, erros[:3]
+
+
+def test_aviso_e_janela_do_menu_pousam(abrir):
+    pg, erros = abrir("/menu.html")
+    _terminar(pg)
+    pg.evaluate("() => { showAlert('Teste', 'Uma mensagem'); }")
+    pg.wait_for_selector("#dialog-overlay:not(.hidden)", timeout=5000)
+    assert "telaPousa" in _animacoes_de(pg, "#dialog-overlay .dialog-box")
+    pg.evaluate("() => document.querySelector('#dialog-overlay button').click()")
+    pg.evaluate("() => openWizard()")
+    assert "telaPousa" in _animacoes_de(pg, "#wizard-overlay .wizard-box")
+    assert not erros, erros[:3]
+
+
+@pytest.mark.parametrize("escolha, movimento", [("desligadas", "no-preference"), ("sistema", "reduce")])
+def test_sem_animacoes_a_tela_aparece_ja_no_lugar(abrir, escolha, movimento):
+    """
+    Encurtar a duração não bastava: no quadro em que a tela aparece, a
+    animação de entrada ainda está no começo, e a pílula da loja era medida
+    16px abaixo do lugar. Sem animações, as de entrada não existem.
+    """
+    pg, erros = abrir("/game.html", escolha, movimento)
+    assert not pg.evaluate("() => document.documentElement.classList.contains('anim-on')")
+    estado = pg.evaluate("""() => { window.Mapa._abrir('');
+        const f = document.querySelector('#map-frame');
+        return [f.getAnimations().length, getComputedStyle(f).transform]; }""")
+    assert estado == [0, "none"], estado
+    assert not erros, erros[:3]
+
+
+def test_escolher_ligadas_liga_as_de_entrada_na_hora(abrir):
+    pg, erros = abrir("/game.html", "desligadas")
+    pg.evaluate("() => applyAnimacoes('ligadas')")
+    assert pg.evaluate("() => document.documentElement.classList.contains('anim-on')")
+    pg.evaluate("() => applyAnimacoes('desligadas')")
+    assert not pg.evaluate("() => document.documentElement.classList.contains('anim-on')")
+    assert not erros, erros[:3]

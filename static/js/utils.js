@@ -429,16 +429,30 @@ function preferenciaDeAnimacoes() {
   } catch (_) { return 'sistema'; }
 }
 
+// html.anim-on liga as animações de entrada (telas pousando, pílulas
+// subindo). Encurtar a duração não basta para elas: no quadro em que a tela
+// aparece, a animação ainda está no começo, e a tela seria vista fora do
+// lugar. Sem animações, elas simplesmente não existem.
+function _marcarAnimacoes() {
+  document.documentElement.classList.toggle('anim-on', animacoesLigadas());
+}
+
 function loadAnimacoes() {
   document.documentElement.dataset.animacoes = preferenciaDeAnimacoes();
+  _marcarAnimacoes();
 }
 
 function applyAnimacoes(id) {
   try { localStorage.setItem('rpg_animacoes', id); } catch (_) {}
   document.documentElement.dataset.animacoes = id;
+  _marcarAnimacoes();
   document.querySelectorAll('.settings-anim-option').forEach(el =>
     el.classList.toggle('active', el.dataset.anim === id));
 }
+// O aparelho pode mudar de ideia com a página aberta.
+try {
+  window.matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', _marcarAnimacoes);
+} catch (_) {}
 
 function animacoesLigadas() {
   const v = document.documentElement.dataset.animacoes || preferenciaDeAnimacoes();
@@ -590,6 +604,52 @@ async function virarParaOutraPagina(url, direcao) {
   window.location.href = url;
 }
 window.virarParaOutraPagina = virarParaOutraPagina;
+
+// Fechar uma tela por cima: ela some na hora (display: none), e quem
+// pergunta se está aberta ouve a verdade. O que se vê sair é uma cópia, por
+// cima, que desbota e é removida. Um observador só, para todas as telas: não
+// é preciso mexer no fechar de cada uma.
+const TELAS_POR_CIMA = [
+  '#local-overlay', '#pessoa-overlay', '#heroi-overlay', '#missoes-overlay', '#mapa-overlay', '#grupo-overlay',
+  '#diario-overlay', '#elenco-overlay', '#relacoes-overlay', '#mundo-overlay', '#inventory-overlay',
+  '#grimoire-overlay', '#shop-overlay', '#levelup-overlay', '#rest-overlay', '#loot-overlay', '#combat-overlay',
+  '#edit-overlay', '#dialog-overlay', '#wizard-overlay', '#import-overlay',
+].join(', ');
+
+// A rolagem de cada parte, guardada ao rolar: depois de escondida, a tela
+// responde scrollTop 0, e a cópia pularia para o topo ao sair.
+const _rolagens = new WeakMap();
+document.addEventListener('scroll', (e) => {
+  if (e.target instanceof Element) _rolagens.set(e.target, e.target.scrollTop);
+}, true);
+
+function _saidaDaTela(el) {
+  const copia = el.cloneNode(true);
+  copia.classList.remove('hidden');
+  copia.classList.add('tela-saindo');
+  copia.setAttribute('aria-hidden', 'true');
+  copia.inert = true;
+  copia.querySelectorAll('input[type=radio]').forEach(r => { r.name = `${r.name || 'r'}-saindo`; });
+  el.after(copia);
+  const orig = el.querySelectorAll('*'), dup = copia.querySelectorAll('*');
+  orig.forEach((o, i) => { if (_rolagens.has(o) && dup[i]) dup[i].scrollTop = _rolagens.get(o); });
+  const tirar = () => copia.remove();
+  copia.addEventListener('animationend', (e) => { if (e.target === copia) tirar(); });
+  setTimeout(tirar, 700);          // se a animação não terminar (aba em segundo plano)
+}
+
+function _vigiarTelasPorCima() {
+  if (!window.MutationObserver || !document.body) return;
+  new MutationObserver((mudancas) => {
+    if (!animacoesLigadas()) return;
+    for (const m of mudancas) {
+      const el = m.target;
+      if (!(el instanceof Element) || el.classList.contains('tela-saindo') || !el.matches(TELAS_POR_CIMA)) continue;
+      const estavaEscondida = (m.oldValue || '').split(/\s+/).includes('hidden');
+      if (!estavaEscondida && el.classList.contains('hidden')) _saidaDaTela(el);
+    }
+  }).observe(document.body, { attributes: true, attributeFilter: ['class'], attributeOldValue: true, subtree: true });
+}
 
 // ═══════════════════════════════════════
 //  Sistema de Fontes
@@ -1382,6 +1442,7 @@ loadAnimacoes();
 document.addEventListener('DOMContentLoaded', () => {
   loadTheme();
   loadAnimacoes();
+  _vigiarTelasPorCima();
   loadFonts();
   _injectSettingsPanel();
   _injectGuide();
