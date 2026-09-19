@@ -452,3 +452,126 @@ def test_sem_animacoes_o_chat_aparece_direto(abrir):
                 d.classList.contains('dado-caiu'), d.querySelector('.dado-numero').textContent]; }""")
     assert r == [False, False, False, False, True, "11"], r
     assert not erros, erros[:3]
+
+
+# --- Combate ---------------------------------------------------------------------
+# O render redesenha os cartões; quem mudou vem da comparação com o anterior.
+# O estado muda no servidor (/__estado) e a tela relê (Combat.sync).
+
+VIGIA_CLASSES = """
+  window.__classesVistas = new Set();
+  new MutationObserver(ms => ms.forEach(m => {
+    if (m.target.classList) m.target.classList.forEach(c => window.__classesVistas.add(c));
+    m.addedNodes && m.addedNodes.forEach(n => n.classList && n.classList.forEach(c => window.__classesVistas.add(c)));
+  })).observe(document, {attributes: true, attributeFilter: ['class'], childList: true, subtree: true});
+"""
+
+
+def _combate(app_no_ar, abrir, animacoes="ligadas", **mudar):
+    import requests
+    url, _, cap = app_no_ar
+    estado = copy.deepcopy(cap.COMBATE_ATIVO)
+    requests.post(f"{url}/__estado", json=estado, timeout=10)
+    pg, erros = abrir("/game.html", animacoes)
+    pg.wait_for_selector("#combat-overlay:not(.hidden) .cbt-card[data-nome='Stelar']", timeout=10000)
+    return pg, erros, url, cap
+
+
+def _mudar_combate(url, cap, pg, personagens=None, turno=None):
+    import requests
+    estado = copy.deepcopy(cap.COMBATE_ATIVO)
+    for nome, vida in (personagens or {}).items():
+        estado["characters"][nome] = {"sheet": {"vida_atual": vida}}
+    if turno is not None:
+        estado["combat_state"]["current_turn_index"] = turno
+    requests.post(f"{url}/__estado", json=estado, timeout=10)
+    pg.evaluate("() => window.Combat.sync()")
+    pg.wait_for_timeout(250)
+
+
+def test_dano_flutua_e_o_cartao_treme(app_no_ar, abrir):
+    pg, erros, url, cap = _combate(app_no_ar, abrir)
+    try:
+        _mudar_combate(url, cap, pg, {"stelar": 12})
+        cartao = pg.locator("#combat-overlay .cbt-card[data-nome='Stelar']")
+        assert "cbt-levou-dano" in cartao.get_attribute("class")
+        assert cartao.locator(".cbt-flutua.dano").inner_text() == "-7"
+        _terminar(pg)
+        pg.wait_for_timeout(200)
+        assert cartao.locator(".cbt-flutua").count() == 0, "o número ficou na tela"
+        # Curar: número verde.
+        _mudar_combate(url, cap, pg, {"stelar": 19})
+        assert pg.locator("#combat-overlay .cbt-card[data-nome='Stelar'] .cbt-flutua.cura").inner_text() == "+7"
+        assert not erros, erros[:3]
+    finally:
+        import requests
+        requests.post(f"{url}/__estado", json=copy.deepcopy(cap.DIARIO), timeout=10)
+
+
+def test_primeiro_desenho_nao_anima_nada(app_no_ar, abrir):
+    pg, erros, url, cap = _combate(app_no_ar, abrir)
+    try:
+        assert pg.locator("#combat-overlay .cbt-flutua, #combat-overlay .cbt-levou-dano").count() == 0
+        assert not erros, erros[:3]
+    finally:
+        import requests
+        requests.post(f"{url}/__estado", json=copy.deepcopy(cap.DIARIO), timeout=10)
+
+
+def test_vez_nova_pulsa(app_no_ar, abrir):
+    pg, erros, url, cap = _combate(app_no_ar, abrir)
+    try:
+        _mudar_combate(url, cap, pg, turno=2)          # Helena
+        assert "cbt-vez-nova" in pg.locator("#combat-overlay .cbt-card[data-nome='Helena']").get_attribute("class")
+        assert "cbt-vez-nova" not in pg.locator("#combat-overlay .cbt-card[data-nome='Stelar']").get_attribute("class")
+        assert not erros, erros[:3]
+    finally:
+        import requests
+        requests.post(f"{url}/__estado", json=copy.deepcopy(cap.DIARIO), timeout=10)
+
+
+def test_combate_novo_da_um_tranco(app_no_ar):
+    import requests
+    url, _, cap = app_no_ar
+    requests.post(f"{url}/__estado", json=copy.deepcopy(cap.COMBATE_ATIVO), timeout=10)
+    try:
+        from playwright.sync_api import sync_playwright
+        with sync_playwright() as pw:
+            nav = pw.chromium.launch()
+            ctx = nav.new_context(viewport={"width": 1440, "height": 900})
+            ctx.add_init_script(cap._script_de_semente(app_no_ar[1], "pergaminho", cap.HISTORICO))
+            ctx.add_init_script("localStorage.setItem('rpg_animacoes', 'ligadas');")
+            ctx.add_init_script(VIGIA_CLASSES)
+            pg = ctx.new_page()
+            pg.goto(f"{url}/game.html", wait_until="networkidle")
+            pg.wait_for_selector("#combat-overlay:not(.hidden)", timeout=10000)
+            assert pg.evaluate("() => window.__classesVistas.has('cbt-inicio')"), "abrir o combate não deu o tranco"
+            pg.wait_for_function("() => !document.getElementById('cbt-frame').classList.contains('cbt-inicio')",
+                                 timeout=3000)
+            nav.close()
+    finally:
+        requests.post(f"{url}/__estado", json=copy.deepcopy(cap.DIARIO), timeout=10)
+
+
+def test_fim_do_combate_cai_como_selo(abrir):
+    pg, erros = abrir("/game.html")
+    r = pg.evaluate("""() => { const ov = document.createElement('div');
+        ov.className = 'cbt-end-overlay'; ov.innerHTML = '<div class="cbt-end-modal"><svg class="cbt-crista"></svg></div>';
+        document.body.appendChild(ov);
+        return [getComputedStyle(ov.querySelector('.cbt-end-modal')).animationName,
+                getComputedStyle(ov.querySelector('.cbt-crista')).animationName]; }""")
+    assert r == ["seloCai", "cristaAparece"], r
+    assert not erros, erros[:3]
+
+
+def test_sem_animacoes_o_combate_so_redesenha(app_no_ar, abrir):
+    pg, erros, url, cap = _combate(app_no_ar, abrir, "desligadas")
+    try:
+        _mudar_combate(url, cap, pg, {"stelar": 12}, turno=2)
+        assert pg.locator("#combat-overlay .cbt-flutua, #combat-overlay .cbt-levou-dano, "
+                          "#combat-overlay .cbt-vez-nova").count() == 0
+        assert pg.locator("#combat-overlay .cbt-card[data-nome='Stelar'] .cbt-bar-num").first.inner_text().startswith("12/")
+        assert not erros, erros[:3]
+    finally:
+        import requests
+        requests.post(f"{url}/__estado", json=copy.deepcopy(cap.DIARIO), timeout=10)

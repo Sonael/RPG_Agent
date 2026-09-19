@@ -169,7 +169,7 @@
     const meta   = `${esc(c.classe || '')}${c.nivel ? ' Nv.' + c.nivel : ''}`.trim();
     const temp   = Number(c.hp_temp || 0);
     const defs   = selosDeDefesa(c);
-    return `<div class="cbt-card ${c.is_party ? 'cbt-aliado' : 'cbt-inimigo'} ${
+    return `<div data-nome="${esc(c.name)}" class="cbt-card ${c.is_party ? 'cbt-aliado' : 'cbt-inimigo'} ${
       c.is_current ? 'cbt-cur' : ''} ${
       out ? 'cbt-out' : (asleep ? 'cbt-asleep' : '')}">
       <div class="cbt-c-header">
@@ -222,6 +222,65 @@
     lg.scrollTop = lg.scrollHeight;
 
     renderActionBar(snap);
+    animarMudancas(snap);
+  }
+
+  // ---- Animações ---------------------------------------------------
+  // O render redesenha os cartões do zero, então quem mudou é descoberto
+  // comparando com o render anterior: o número do dano ou da cura flutua,
+  // a barra de vida desliza do valor antigo ao novo (redesenhada, ela
+  // perdia a transição), o cartão treme no dano, esmaece ao cair, e o de
+  // quem passa a jogar pulsa. Abrir um combate novo dá um tranco na tela.
+  let _antes = null;       // { nome: { hp, max, fora } } do render anterior
+  let _vezAntes = null;
+  let _entrando = false;
+  const _anima = () => typeof window.animacoesLigadas === 'function' && window.animacoesLigadas();
+  const _cartaoDe = (nome) => [...document.querySelectorAll('#combat-overlay .cbt-card[data-nome]')]
+    .find(el => el.dataset.nome === nome);
+
+  function animarMudancas(snap) {
+    const agora = {};
+    (snap.combatants || []).forEach(c => {
+      agora[c.name] = { hp: Number(c.hp) || 0, max: Number(c.hp_max) || 0, fora: isOut(c.status) };
+    });
+    const vez = ((snap.combatants || []).find(c => c.is_current) || {}).name || null;
+    if (_anima()) {
+      const frame = document.getElementById('cbt-frame');
+      if (_entrando && frame) {
+        frame.classList.add('cbt-inicio');
+        const tirar = (e) => { if (e.animationName === 'combateComeca') { frame.classList.remove('cbt-inicio');
+                                 frame.removeEventListener('animationend', tirar); } };
+        frame.addEventListener('animationend', tirar);
+      }
+      if (_antes) {
+        for (const [nome, a] of Object.entries(agora)) {
+          const b = _antes[nome];
+          const cartao = b && _cartaoDe(nome);
+          if (!cartao) continue;
+          const delta = a.hp - b.hp;
+          if (delta !== 0) {
+            const fill = cartao.querySelector('.cbt-bar-fill.hp');
+            if (fill && b.max > 0) {
+              const alvo = fill.style.width;
+              fill.style.width = `${Math.max(0, Math.min(100, (b.hp / b.max) * 100))}%`;
+              requestAnimationFrame(() => requestAnimationFrame(() => { fill.style.width = alvo; }));
+            }
+            cartao.classList.add(delta < 0 ? 'cbt-levou-dano' : 'cbt-curou');
+            const num = document.createElement('span');
+            num.className = `cbt-flutua ${delta < 0 ? 'dano' : 'cura'}`;
+            num.textContent = delta < 0 ? String(delta) : `+${delta}`;
+            num.setAttribute('aria-hidden', 'true');
+            num.addEventListener('animationend', () => num.remove());
+            cartao.appendChild(num);
+          }
+          if (a.fora && !b.fora) cartao.classList.add('cbt-caiu');
+        }
+        if (vez && vez !== _vezAntes) _cartaoDe(vez)?.classList.add('cbt-vez-nova');
+      }
+    }
+    _antes = agora;
+    _vezAntes = vez;
+    _entrando = false;
   }
 
   // Faixa do campo de batalha. Fica escondida quando o combate nao usa
@@ -449,9 +508,11 @@
       render(snap);
       renderResult(snap.result);
     } else if (_open) {
+      _antes = null;
       close(true);
     } else {
       // Combate inativo e a tela já fechada — limpa o estado.
+      _antes = null;
       _userClosed = false;
       if (pill) pill.classList.add('hidden');
     }
@@ -489,6 +550,8 @@
         </div>
       </div>`;
     ov.classList.remove('hidden');
+    _antes = null;
+    _vezAntes = null;
   }
 
   async function sync() {
@@ -523,6 +586,7 @@
   // ---- Abrir / fechar ---------------------------------------------
   function openOverlay() {
     ensureDom();
+    _entrando = _antes === null;
     document.getElementById('combat-overlay').classList.remove('hidden');
     document.body.classList.add('combat-on');
     _open = true; _autoGuard = 0;

@@ -283,6 +283,67 @@ html.anim-on .dado-falha { animation: dadoTreme .5s ease-in-out; }
   60% { transform: translateX(-3px); } 80% { transform: translateX(2px); }
 }
 
+/* O combate (combat.js, animarMudancas): o número do dano ou da cura
+   flutua sobre o cartão, que treme no dano e brilha na cura; quem cai
+   esmaece; o cartão de quem passa a jogar pulsa; abrir um combate novo dá um
+   tranco na tela; o fim cai como um selo. */
+.cbt-card { position: relative; }
+.cbt-flutua {
+  position: absolute; top: 8px; right: 12px; z-index: 3; pointer-events: none;
+  font-family: var(--font-menu); font-weight: 700; font-size: 24px; line-height: 1;
+  text-shadow: 0 1px 0 var(--cbt-paper, #fffbf0), 0 0 6px var(--cbt-paper, #fffbf0);
+}
+.cbt-flutua.dano { color: var(--cbt-red, #8b2315); }
+.cbt-flutua.cura { color: var(--cbt-green, #2e7d32); }
+html.anim-on .cbt-flutua { animation: numeroFlutua 1.1s ease-out forwards; }
+html:not(.anim-on) .cbt-flutua { display: none; }
+@keyframes numeroFlutua {
+  0%   { opacity: 0; transform: translateY(8px) scale(.7); }
+  15%  { opacity: 1; transform: translateY(0) scale(1.2); }
+  100% { opacity: 0; transform: translateY(-30px) scale(1); }
+}
+html.anim-on .cbt-levou-dano { animation: cartaoApanha .45s ease-out; }
+html.anim-on .cbt-curou { animation: cartaoCura .8s ease-out; }
+html.anim-on .cbt-caiu { animation: cartaoCai .9s ease-out; }
+html.anim-on .cbt-vez-nova { animation: vezChega 1s ease-out; }
+@keyframes cartaoApanha {
+  0%, 100% { transform: none; }
+  15% { transform: translateX(-6px); box-shadow: inset 0 0 0 2px var(--cbt-red, #8b2315); }
+  35% { transform: translateX(5px); } 55% { transform: translateX(-3px); } 75% { transform: translateX(2px); }
+}
+@keyframes cartaoCura {
+  0%   { box-shadow: 0 0 0 0 rgba(46,125,50,0); }
+  30%  { box-shadow: 0 0 0 4px rgba(46,125,50,.35), 0 0 20px rgba(46,125,50,.35); }
+  100% { box-shadow: 0 0 0 0 rgba(46,125,50,0); }
+}
+@keyframes cartaoCai {
+  from { filter: none; transform: none; }
+  40%  { transform: translateY(5px) rotate(-1.2deg); }
+  to   { transform: none; }
+}
+@keyframes vezChega {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--cbt-acento, var(--ink-user)) 60%, transparent); }
+  40%  { box-shadow: 0 0 0 7px color-mix(in srgb, var(--cbt-acento, var(--ink-user)) 25%, transparent); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+html.anim-on #cbt-frame.cbt-inicio {
+  animation: telaPousa .34s cubic-bezier(.2,.8,.25,1) backwards, combateComeca .55s .3s ease-out;
+}
+@keyframes combateComeca {
+  0%, 100% { transform: none; box-shadow: 0 15px 35px rgba(0,0,0,.45); }
+  15% { transform: translateX(-8px) rotate(-.4deg); box-shadow: 0 15px 35px rgba(0,0,0,.45), inset 0 0 60px rgba(139,35,21,.35); }
+  35% { transform: translateX(7px) rotate(.3deg); }
+  55% { transform: translateX(-4px); } 75% { transform: translateX(2px); }
+}
+html.anim-on .cbt-end-overlay:not(.hidden) .cbt-end-modal { animation: seloCai .6s cubic-bezier(.2,1.4,.4,1) backwards; }
+html.anim-on .cbt-end-overlay:not(.hidden) .cbt-crista { animation: cristaAparece .8s .45s cubic-bezier(.2,1.6,.4,1) backwards; }
+@keyframes seloCai {
+  from { opacity: 0; transform: scale(1.6) rotate(-6deg); }
+  60%  { opacity: 1; transform: scale(.96) rotate(1deg); }
+  to   { transform: none; }
+}
+@keyframes cristaAparece { from { opacity: 0; transform: scale(.3) rotate(-25deg); } to { opacity: 1; transform: none; } }
+
 /* Menos movimento: pelo aparelho (prefers-reduced-motion, se a escolha for
    "Seguir o sistema") ou pela escolha "Desligadas" nas configurações. Tudo
    troca na hora; o que é comandado pelo JS pergunta a animacoesLigadas(). */
