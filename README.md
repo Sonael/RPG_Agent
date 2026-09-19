@@ -427,9 +427,30 @@ sabendo; e os dos outros que você já sabe), e o cartão e a ficha de cada
 pessoa mostram o que você esconde dela, o que ela sabe do seu e o que você
 sabe dela.
 
+### Gestos e encontros do romance (`rpg/encontros.py`)
+
+A ficha de cada pessoa, no romance, tem **gestos**: convidar para sair, marcar
+um encontro, dar um presente, pedir desculpas, declarar-se e, para cada
+segredo que você esconde dela, "Contar: ...". São atalhos de fala, como o
+"Falar com": mandam "Quero convidar Lucas para sair." ao mestre, que decide a
+reação (a instrução avisa que nem todo convite é aceito). Só com a pessoa por
+perto — do grupo ou alcançável — e viva; longe, ficam desativados com o
+porquê.
+
+Os **encontros marcados** usam o relógio do mundo: `marcar_encontro(com, dia,
+hora, onde, o_que)` e `resolver_encontro(com, estado, motivo)` — aconteceu
+(vira momento), faltou (o protagonista não foi: -15 de confiança, -5 de
+afeto e um momento) ou cancelado (sem efeito). A barra lateral mostra o
+próximo encontro, com quanto falta, em vermelho quando faltam 6 horas ou
+menos ou já passou da hora, e abre a ficha da pessoa; o cartão e a ficha
+mostram os encontros dela; o bloco de cena do mestre traz a agenda e cobra
+o encontro que passou da hora sem ser resolvido.
+
+`test_encontros.py` (12).
+
 `test_genero_e_regras.py` (27), `test_genero_e_regras_navegador.py` (9),
 `test_segredos.py` (18),
-`test_relacoes.py` (28) e `test_relacoes_navegador.py` (13).
+`test_relacoes.py` (28) e `test_relacoes_navegador.py` (17).
 
 ---
 

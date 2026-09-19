@@ -1008,6 +1008,41 @@ def revelar_segredo(titulo: str, a_quem: str = "", como: str = "contou") -> str:
     return segredos.revelar(titulo, a_quem, como)
 
 
+def marcar_encontro(com: str, dia: int, hora: int, onde: str = "", o_que: str = "") -> str:
+    """
+    Marca um encontro combinado na cena: "jantar na sexta às 20h no Aurora". O
+    dia é o do relógio do mundo (get_world_time diz o de hoje). O jogador vê o
+    próximo encontro na barra, com quanto falta, e o bloco de cena avisa você
+    quando chegar a hora.
+
+    Args:
+        com:   Com quem.
+        dia:   O dia no relógio do mundo (o de hoje, ou um à frente).
+        hora:  A hora, de 0 a 23.
+        onde:  Onde vão se encontrar.
+        o_que: O que vão fazer ("jantar", "cinema", "conversar").
+    """
+    from rpg import encontros
+    return encontros.marcar(com, dia, hora, onde, o_que)
+
+
+def resolver_encontro(com: str, estado: str, motivo: str = "") -> str:
+    """
+    Fecha o próximo encontro marcado com alguém, depois de narrado:
+      aconteceu  — vira momento na linha do tempo;
+      faltou     — o protagonista não foi: -15 de confiança e -5 de afeto,
+                   e vira momento (não repita com ajustar_relacao);
+      cancelado  — desmarcado avisando: sem efeito.
+
+    Args:
+        com:    Com quem era o encontro.
+        estado: aconteceu, faltou ou cancelado.
+        motivo: Uma frase do que aconteceu.
+    """
+    from rpg import encontros
+    return encontros.resolver(com, estado, motivo)
+
+
 def ver_segredos() -> str:
     """Todos os segredos, inclusive os que o protagonista ainda não sabe."""
     from rpg import segredos
@@ -1432,6 +1467,8 @@ ALL_TOOLS = [
     guardar_segredo,
     revelar_segredo,
     ver_segredos,
+    marcar_encontro,
+    resolver_encontro,
     # Contexto (dinâmico e completo)
     get_scene_context,
     get_full_context,

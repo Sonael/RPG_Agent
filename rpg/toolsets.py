@@ -89,7 +89,8 @@ _CARVE_OUT_GENERICAS = frozenset({"roll_dice", "advance_time", "get_world_time"}
 # gêneros a atitude das fichas (adjust_attitude) já cobre o que importa, e
 # duas escalas para a mesma coisa só confundiriam o mestre.
 FERRAMENTAS_SO_DO_ROMANCE = frozenset({"ajustar_relacao", "mudar_estagio", "marcar_momento", "ver_relacoes",
-                                       "guardar_segredo", "revelar_segredo", "ver_segredos"})
+                                       "guardar_segredo", "revelar_segredo", "ver_segredos",
+                                       "marcar_encontro", "resolver_encontro"})
 
 
 def _nomes_das_ferramentas_dnd() -> frozenset:

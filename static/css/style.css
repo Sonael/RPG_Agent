@@ -5110,6 +5110,18 @@ body.loot-on { overflow: hidden; }
 .rel-seg-linha { margin: 0; font-size: 0.86rem; color: var(--lcl-text); }
 .rel-seg-historico { margin: var(--esp-1) 0 0; padding-left: var(--esp-4); font-size: 0.82rem; color: var(--lcl-muted); }
 @media (max-width: 760px) { .rel-segredos-lista { grid-template-columns: minmax(0, 1fr); } }
+/* Encontros marcados e gestos (romance). */
+.rel-momento-encontro::before { background: var(--lcl-green); }
+.rel-encontros { list-style: none; margin: 0; padding: 0; font-size: 0.86rem; }
+.rel-encontro > span:first-child {
+  font-size: 0.72rem; color: var(--lcl-muted); text-transform: uppercase; letter-spacing: .04em; margin-right: var(--esp-1);
+}
+.rel-encontro strong { font-weight: 400; color: var(--lcl-muted); }
+.rel-encontro-alerta, .rel-encontro-alerta strong, .rel-encontro-alerta > span:first-child { color: var(--lcl-red); }
+.psn-gestos { margin-bottom: var(--esp-3); }
+.psn-gestos .psn-subsecao { margin-top: 0; }
+.psn-gestos-botoes { display: flex; flex-wrap: wrap; gap: var(--esp-1); }
+.psn-gestos-longe { margin: var(--esp-1) 0 0; font-size: 0.82rem; font-style: italic; color: var(--lcl-muted); }
 .psn-subsecao { margin: var(--esp-3) 0 var(--esp-1); font-family: 'Playfair Display', serif; font-size: 0.95rem; color: var(--lcl-dark); }
 .rel-sem-historia { margin: 0; font-size: 0.84rem; font-style: italic; color: var(--lcl-muted); }
 @media (max-width: 760px) {
@@ -5210,6 +5222,12 @@ body.loot-on { overflow: hidden; }
   padding: var(--esp-2) var(--esp-3); font: inherit; color: var(--text-main);
 }
 .sb-missao:hover { border-color: var(--input-border); }
+/* Romance: o próximo encontro na barra, no molde da missão. */
+.sb-encontro-quando { display: block; font-size: 0.78rem; color: var(--text-muted); }
+.sb-encontro-quando strong { font-weight: 700; }
+.sb-encontro.sb-encontro-alerta .sb-encontro-quando strong,
+.sb-encontro.sb-encontro-alerta .sb-missao-rotulo { color: var(--ink-sys); }
+.sb-encontro.hidden { display: none; }
 .sb-missao-rotulo { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--text-muted); }
 .sb-missao-titulo { font-family: 'Playfair Display', serif; font-size: 14px; font-weight: 700; }
 .sb-missao-progresso { display: flex; align-items: center; gap: var(--esp-2); }

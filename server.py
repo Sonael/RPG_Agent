@@ -2295,6 +2295,14 @@ def chat():
 # Memória
 # ---------------------------------------------------------------------------
 
+def _encontro_da_barra(c: dict):
+    """O próximo encontro marcado, para a barra lateral (só no romance)."""
+    if (c.get("campaign_type") or "") != "romance":
+        return None
+    from rpg import encontros
+    return encontros.proximo()
+
+
 def _config_da_campanha(c: dict) -> dict:
     """
     A configuração de tela da campanha: gênero E regras. /api/memory mandava
@@ -2351,6 +2359,7 @@ def get_memory_state():
         # Campanha antiga não tem essas chaves; o default mantém o front
         # funcionando sem migração nenhuma.
         "relogio":          c.get("relogio", {}),
+        "encontro":         _encontro_da_barra(c),
         "quests":           list((c.get("quests") or {}).values()),
     })
 

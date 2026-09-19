@@ -127,7 +127,7 @@
 
   // No romance: afeto e confiança, o vínculo e o porquê das últimas mudanças,
   // com as mesmas barras da atitude. Vale também para quem é do grupo.
-  function relacaoDoRomance(r) {
+  function relacaoDoRomance(r, acoes) {
     const barra = (rotulo, eixo, pontas) => {
       const pos = Math.max(0, Math.min(100, (eixo.valor + 100) / 2));
       return `
@@ -154,13 +154,44 @@
       ? `<h3 class="psn-subsecao">Momentos</h3>${window.linhaDoTempo(r.momentos)}`
       : '';
     return `${r.vinculo ? `<p class="psn-vinculo">${esc(r.vinculo)}</p>` : ''}
+      ${acoes || ''}
       <div class="psn-atitude psn-romance">${window.escadaDaRelacao(r.estagio)}</div>
+      ${window.encontrosDaPessoa(r.encontros)}
       ${barra('Afeto', r.afeto, ['aversão', 'devoção'])}
       ${barra('Confiança', r.confianca, ['desconfia', 'confia'])}
       ${window.segredosDaPessoa(r.segredos) ? `<h3 class="psn-subsecao">Segredos</h3>${window.segredosDaPessoa(r.segredos)}` : ''}
       ${momentos}
       <h3 class="psn-subsecao">Mudanças</h3>
       ${hist}`;
+  }
+
+  // Gestos do romance: atalhos para falas comuns ao mestre, como o "Falar com".
+  // Quem decide o que acontece é ele — nem todo convite é aceito. Só com a
+  // pessoa por perto (do grupo, ou alcançável) e viva.
+  function gestos(f) {
+    const r = f.relacao;
+    if (!r) return '';
+    const nome = f.nome;
+    const vivo = (f.status || '').toLowerCase() !== 'morto';
+    const perto = vivo && (f.do_grupo || f.pode_falar);
+    const falas = [
+      ['Convidar para sair', `Quero convidar ${nome} para sair.`],
+      ['Marcar um encontro', `Quero marcar um encontro com ${nome}.`],
+      ['Dar um presente', `Quero dar um presente para ${nome}.`],
+      ['Pedir desculpas', `Quero pedir desculpas a ${nome}.`],
+      ['Declarar-se', `Quero me declarar para ${nome}.`],
+      ...((r.segredos && r.segredos.voce_esconde) || []).map(t => [`Contar: ${t}`, `Quero contar a ${nome} sobre ${t}.`]),
+    ];
+    if (!vivo) return '';
+    const botoes = falas.map(([rotulo, fala]) => `
+      <button class="lcl-btn${perto ? ' lcl-btn-ir' : ''}" ${perto ? '' : 'disabled'}
+              title="${perto ? `Manda ao mestre: ${esc(fala)}` : 'Longe: vá até onde está primeiro'}"
+              onclick="window.Personagens._dizer('${aspas(fala)}')">${esc(rotulo)}</button>`).join('');
+    return `<div class="psn-gestos">
+      <h3 class="psn-subsecao">Gestos</h3>
+      <div class="psn-gestos-botoes">${botoes}</div>
+      ${perto ? '' : '<p class="psn-gestos-longe">Longe de você: os gestos ficam para quando estiverem juntos.</p>'}
+    </div>`;
   }
 
   // As cenas em que ele aparece, da mais recente para trás: é o que o jogador
@@ -233,7 +264,8 @@
     q('psn-tracos').textContent = _last.tracos ? `Traços: ${_last.tracos}` : '';
     q('psn-relacao-bloco').classList.toggle('hidden', !_last.atitude && !_last.relacao);
     q('psn-relacao-titulo').textContent = _last.relacao ? 'Relação com você' : 'Relação com o grupo';
-    q('psn-relacao').innerHTML = _last.relacao ? relacaoDoRomance(_last.relacao) : relacao(_last.atitude);
+    q('psn-relacao').innerHTML = _last.relacao
+      ? relacaoDoRomance(_last.relacao, gestos(_last)) : relacao(_last.atitude);
     const sabe = _last.conhecido || [];
     q('psn-sabe').innerHTML = sabe.length
       ? `<ul class="psn-sabe-lista">${sabe.map(s => `<li>${esc(s)}</li>`).join('')}</ul>`
@@ -305,6 +337,7 @@
     _fechar: fechar,
     _ir: (lugar) => enviar(`Vamos até ${lugar}.`),
     _falar: (nome) => enviar(`Quero falar com ${nome}.`),
+    _dizer: (fala) => enviar(fala),
     _verLocal: (lugar) => { fechar(); if (window.Locais) window.Locais._abrir(lugar); },
     _editar: editar,
     _estado: () => _last,

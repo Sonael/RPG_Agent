@@ -269,7 +269,7 @@ function linhaDoTempo(momentos, limite) {
   const lista = (momentos || []).slice(0, limite || undefined);
   if (!lista.length) return '';
   return `<ol class="rel-momentos">${lista.map(m => `
-    <li class="rel-momento${m.tipo === 'estagio' ? ' rel-momento-estagio' : ''}${m.tipo === 'segredo' ? ' rel-momento-segredo' : ''}">
+    <li class="rel-momento${m.tipo === 'estagio' ? ' rel-momento-estagio' : ''}${m.tipo === 'segredo' ? ' rel-momento-segredo' : ''}${m.tipo === 'encontro' ? ' rel-momento-encontro' : ''}">
       <span class="rel-momento-titulo">${esc(m.titulo)}</span>
       ${m.capitulo ? `<small class="rel-momento-cap">cap. ${esc(m.capitulo)}</small>` : ''}
       ${m.descricao ? `<span class="rel-momento-desc">${esc(m.descricao)}</span>` : ''}
@@ -291,6 +291,17 @@ function segredosDaPessoa(s) {
   return itens.length ? `<ul class="rel-segs">${itens.join('')}</ul>` : '';
 }
 window.segredosDaPessoa = segredosDaPessoa;
+
+// Os encontros marcados com uma pessoa (romance), com quanto falta.
+function encontrosDaPessoa(lista) {
+  const esc = window.escapeHtml;
+  if (!(lista || []).length) return '';
+  return `<ul class="rel-encontros">${lista.map(e => `
+    <li class="rel-encontro${e.em_breve || e.atrasado ? ' rel-encontro-alerta' : ''}">
+      <span>Encontro</span> ${esc(e.o_que)} — ${esc(e.quando)}${e.onde ? `, ${esc(e.onde)}` : ''}
+      <strong>(${esc(e.falta)})</strong></li>`).join('')}</ul>`;
+}
+window.encontrosDaPessoa = encontrosDaPessoa;
 window.alternarChaveVisivel = alternarCampoSecreto;
 window.alternarSenhaVisivel = alternarCampoSecreto;
 

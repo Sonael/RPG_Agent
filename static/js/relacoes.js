@@ -105,6 +105,7 @@
                   title="Abrir a ficha de ${esc(p.nome)}">${esc(p.nome)}</button>${marcas}
         </div>
         ${window.escadaDaRelacao(p.estagio)}
+        ${window.encontrosDaPessoa(p.encontros)}
         ${medidor('afeto', 'Afeto', p.afeto, ['aversão', 'devoção'])}
         ${medidor('confianca', 'Confiança', p.confianca, ['desconfia', 'confia'])}
         ${(p.momentos || []).length ? `

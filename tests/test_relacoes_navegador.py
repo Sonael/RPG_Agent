@@ -35,6 +35,9 @@ ROMANCE = {
     "dnd_mode": False,
     "protagonist": "Clara",
     "chapter": 3,
+    "relogio": {"dia": 3, "hora": 14},
+    "encontros": [{"id": 1, "com": "Lucas", "dia": 3, "hora": 18, "onde": "Café Aurora",
+                   "o_que": "jantar", "estado": "marcado", "cap": 3}],
     "characters": {
         "clara": {"name": "Clara", "description": "A protagonista.", "status": "vivo"},
         "lucas": {"name": "Lucas", "description": "O vizinho do 302.", "status": "vivo",
@@ -297,3 +300,47 @@ def test_ficha_traz_os_segredos_da_pessoa(jogo):
     assert "O anel guardado" not in pg.content()
     assert not erros, erros[:3]
 
+
+def test_barra_mostra_o_proximo_encontro_e_abre_a_ficha(jogo):
+    pg, erros = jogo(ROMANCE)
+    pg.wait_for_selector("#sb-encontro:not(.hidden)", timeout=8000)
+    texto = " ".join(pg.text_content("#sb-encontro").split())
+    assert "jantar com Lucas" in texto and "Dia 3, 18h" in texto and "Café Aurora" in texto and "em 4h" in texto
+    # Faltam 4h: está perto, a barra avisa.
+    assert "sb-encontro-alerta" in pg.get_attribute("#sb-encontro", "class")
+    pg.click("#sb-encontro")
+    pg.wait_for_function("() => document.getElementById('psn-nome')?.textContent === 'Lucas'", timeout=8000)
+    assert "jantar" in pg.text_content("#psn-relacao .rel-encontros")
+    assert not erros, erros[:3]
+
+
+def test_cartao_mostra_o_encontro(jogo):
+    pg, erros = jogo(ROMANCE)
+    pg.evaluate("() => window.Relacoes._abrir()")
+    pg.wait_for_selector(".rel-cartao[data-nome='Lucas'] .rel-encontro", timeout=8000)
+    texto = " ".join(pg.text_content(".rel-cartao[data-nome='Lucas'] .rel-encontro").split())
+    assert "jantar — Dia 3, 18h, Café Aurora (em 4h)" in texto
+    assert not erros, erros[:3]
+
+
+def test_gestos_mandam_a_fala_ao_mestre(jogo):
+    pg, erros = jogo(ROMANCE)
+    pg.evaluate("() => { window.__enviado = null; window.sendToAgent = async (t) => { window.__enviado = t; }; }")
+    pg.evaluate("() => window.Personagens._abrir('Lucas')")
+    pg.wait_for_selector("#psn-relacao .psn-gestos button", timeout=8000)
+    rotulos = pg.eval_on_selector_all("#psn-relacao .psn-gestos button", "els => els.map(e => e.textContent.trim())")
+    assert rotulos == ["Convidar para sair", "Marcar um encontro", "Dar um presente", "Pedir desculpas",
+                       "Declarar-se", "Contar: A bolsa em Lisboa"]
+    pg.click("#psn-relacao .psn-gestos button:has-text('Contar: A bolsa em Lisboa')")
+    pg.wait_for_function("() => window.__enviado", timeout=5000)
+    assert pg.evaluate("() => window.__enviado") == "Quero contar a Lucas sobre A bolsa em Lisboa."
+    assert not erros, erros[:3]
+
+
+def test_gestos_esperam_quem_esta_longe(jogo):
+    pg, erros = jogo(ROMANCE)
+    pg.evaluate("() => window.Personagens._abrir('Rafael')")
+    pg.wait_for_selector("#psn-relacao .psn-gestos", timeout=8000)
+    assert pg.locator("#psn-relacao .psn-gestos button:not([disabled])").count() == 0
+    assert "Longe de você" in pg.text_content("#psn-relacao .psn-gestos")
+    assert not erros, erros[:3]

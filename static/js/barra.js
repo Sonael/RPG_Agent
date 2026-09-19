@@ -304,6 +304,23 @@
         + `<span class="sb-missao-conta">${feitos}/${objs.length}</span></span>` : ''}`;
   }
 
+  // Romance: o próximo encontro marcado, com quanto falta. Avisa (cor) quando
+  // está perto ou passou da hora. O motor diz tudo (/api/memory "encontro").
+  function renderEncontro() {
+    const botao = q('sb-encontro');
+    if (!botao) return;
+    const e = _mem.encontro;
+    botao.classList.toggle('hidden', !e);
+    if (!e) { botao.innerHTML = ''; return; }
+    botao.classList.toggle('sb-encontro-alerta', !!(e.em_breve || e.atrasado));
+    botao.dataset.com = e.com;
+    botao.title = `Abrir a ficha de ${e.com}`;
+    botao.innerHTML = `
+      <span class="sb-missao-rotulo">${svg(ICONES.relacoes, 16)} Encontro</span>
+      <span class="sb-missao-titulo">${esc(e.o_que)} com ${esc(e.com)}</span>
+      <span class="sb-encontro-quando">${esc(e.quando)}${e.onde ? ` · ${esc(e.onde)}` : ''} · <strong>${esc(e.falta)}</strong></span>`;
+  }
+
   // Celular: a faixa sob o título, com local, hora e a vida do grupo.
   function renderFaixa() {
     const faixa = q('faixa-relance');
@@ -416,6 +433,7 @@
     renderOnde();
     renderHerois();
     renderMissao();
+    renderEncontro();
     renderAtalhos();
     renderFaixa();
     renderAvisos();
@@ -446,6 +464,10 @@
     nivel: (nome) => {
       if (document.getElementById('sidebar')?.classList.contains('active') && window.toggleSidebar) window.toggleSidebar(true);
       if (window.LevelUp) { window.LevelUp._trocar(nome); window.LevelUp._abrir(); }
+    },
+    abrirEncontro: () => {
+      const e = _mem.encontro;
+      if (e && window.Personagens) window.Personagens._abrir(e.com);
     },
     abrirMissao: () => {
       const m = missaoPrincipal();
