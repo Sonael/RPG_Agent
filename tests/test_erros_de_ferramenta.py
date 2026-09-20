@@ -86,7 +86,7 @@ def test_ferramenta_inventada_sugere_as_parecidas(campanha):
     r = ef.ao_falhar_ferramenta(_Ferramenta("modify_amount"), {"amount": 5}, None,
                                 _erro_do_adk("modify_amount"))
     texto = r["result"]
-    assert texto.startswith("Erro: a ferramenta modify_amount não existe.")
+    assert texto.startswith("[[llm]]Erro: a ferramenta modify_amount não existe.")
     for nome in ("modify_currency", "modify_hp", "modify_mana"):
         assert nome in texto
 
@@ -96,7 +96,7 @@ def test_ferramenta_do_modo_narrado_no_combate_da_tela(campanha):
     memory.campaign["combat_mode"] = "tela"
     texto = ef.ao_falhar_ferramenta(_Ferramenta("attack_roll"), {}, None,
                                     _erro_do_adk("attack_roll"))["result"]
-    assert "tela tática" in texto and texto.startswith("Erro:")
+    assert "tela tática" in texto and texto.startswith("[[llm]]Erro:")
 
 
 def test_ferramenta_de_dnd_numa_campanha_sem_regras(campanha):
@@ -113,7 +113,8 @@ def test_excecao_dentro_da_ferramenta_vira_erro_e_vai_para_o_log(campanha, capsy
     except KeyError as e:
         erro = e
     r = ef.ao_falhar_ferramenta(_Ferramenta("get_character_sheet"), {"name": "Ogro"}, None, erro)
-    assert r["result"].startswith("Erro: get_character_sheet falhou por um problema interno (KeyError")
+    assert r["result"].startswith("Aviso: uma ação do mestre não funcionou")
+    assert "[[llm]] Erro: get_character_sheet falhou por um problema interno (KeyError" in r["result"]
     assert "Não repita a mesma chamada" in r["result"]
     log = capsys.readouterr().out
     assert "[FERRAMENTA] get_character_sheet(name=Ogro) falhou" in log
@@ -185,5 +186,44 @@ def test_turno_segue_depois_de_ferramenta_inventada_e_de_excecao(campanha):
     nomes = [n for n, _ in recebidas]
     assert "modify_amount" in nomes and "get_character_sheet" in nomes
     respostas = {n: r.get("result", "") for n, r in recebidas}
-    assert respostas["modify_amount"].startswith("Erro: a ferramenta modify_amount não existe.")
-    assert respostas["get_character_sheet"].startswith("Erro: get_character_sheet falhou")
+    assert "Erro: a ferramenta modify_amount não existe." in respostas["modify_amount"]
+    assert "Erro: get_character_sheet falhou" in respostas["get_character_sheet"]
+
+
+# ---------------------------------------------------------------------------
+# O que chega ao jogador
+# ---------------------------------------------------------------------------
+# A recusa é conversa com o mestre e aparecia inteira no chat: "Erro:
+# move_combatant não está disponível agora... espere [COMBATE RESOLVIDO NA
+# TELA TÁTICA] para narrar". O servidor já tira o que está entre [[llm]] e
+# [[/llm]] antes de mandar para a tela — é aí que essas mensagens moram agora.
+
+def _visivel(texto):
+    """O mesmo corte que o servidor faz no stream (server.py, tool_result)."""
+    import re
+    return re.sub(r'\s*\[\[llm\]\][\s\S]*?\[\[/llm\]\]\s*', '\n', str(texto)).strip()
+
+
+@pytest.mark.parametrize("nome, prepara", [
+    ("attack_roll", {"dnd_mode": True, "combat_mode": "tela"}),
+    ("roll_initiative", {"dnd_mode": False, "campaign_type": "romance"}),
+    ("modify_amount", {"dnd_mode": True}),
+])
+def test_recusa_de_ferramenta_nao_aparece_para_o_jogador(campanha, nome, prepara):
+    memory.campaign.update(prepara)
+    texto = ef.ao_falhar_ferramenta(_Ferramenta(nome), {}, None, _erro_do_adk(nome))["result"]
+    assert nome in texto, "o mestre precisa saber qual ferramenta recusou"
+    assert _visivel(texto) == "", _visivel(texto)
+
+
+def test_falha_interna_avisa_o_jogador_sem_jargao(campanha, capsys):
+    try:
+        {}["nivel"]
+    except KeyError as e:
+        erro = e
+    texto = ef.ao_falhar_ferramenta(_Ferramenta("get_character_sheet"), {"name": "Ogro"}, None, erro)["result"]
+    visivel = _visivel(texto)
+    assert visivel == "Aviso: uma ação do mestre não funcionou e foi ignorada; a cena continua."
+    assert "get_character_sheet" not in visivel and "KeyError" not in visivel
+    # E o mestre continua recebendo o diagnóstico inteiro.
+    assert "KeyError" in texto and "Não repita a mesma chamada" in texto

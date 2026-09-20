@@ -47,18 +47,21 @@ def mensagem_de_ferramenta_inexistente(nome: str) -> str:
     from rpg.toolsets import FERRAMENTAS_SO_DO_MODO_DND, FERRAMENTAS_SO_DO_MODO_NARRADO
 
     camp = memory.campaign
+    # Tudo aqui é conversa com o mestre. Vai dentro de [[llm]]…[[/llm]], que o
+    # servidor tira do que chega à tela: o jogador não precisa ler o nome da
+    # ferramenta que a IA tentou usar e não podia (server.py, tool_result).
     if nome in FERRAMENTAS_SO_DO_MODO_NARRADO and camp.get("combat_mode") == "tela":
-        return (f"Erro: {nome} não está disponível agora: o combate é resolvido na "
+        return (f"[[llm]]Erro: {nome} não está disponível agora: o combate é resolvido na "
                 f"tela tática, e o jogador age por lá. Não tente de novo; espere "
-                f"[COMBATE RESOLVIDO NA TELA TÁTICA] para narrar.")
+                f"[COMBATE RESOLVIDO NA TELA TÁTICA] para narrar.[[/llm]]")
     if nome in FERRAMENTAS_SO_DO_MODO_DND:
-        return (f"Erro: {nome} não está disponível nesta campanha, que não usa as "
-                f"regras de D&D. Resolva a cena pela narração.")
+        return (f"[[llm]]Erro: {nome} não está disponível nesta campanha, que não usa as "
+                f"regras de D&D. Resolva a cena pela narração.[[/llm]]")
 
     sugestoes = _parecidas(nome, _nomes_conhecidos())
     dica = (f" Talvez você queira: {', '.join(sugestoes)}." if sugestoes else "")
-    return (f"Erro: a ferramenta {nome} não existe.{dica} Use apenas as ferramentas "
-            f"da sua lista; se nenhuma serve, narre sem ferramenta.")
+    return (f"[[llm]]Erro: a ferramenta {nome} não existe.{dica} Use apenas as ferramentas "
+            f"da sua lista; se nenhuma serve, narre sem ferramenta.[[/llm]]")
 
 
 def ao_falhar_ferramenta(tool, args, tool_context, error):
@@ -76,10 +79,13 @@ def ao_falhar_ferramenta(tool, args, tool_context, error):
     print(f"[FERRAMENTA] {nome}({_resumo(args)}) falhou:", flush=True)
     print("".join(traceback.format_exception(type(error), error, error.__traceback__)),
           flush=True)
+    # A primeira frase é para o jogador: alguma coisa falhou, e a cena segue.
+    # O diagnóstico e a ordem de não repetir são do mestre ([[llm]]).
     return {"result": (
-        f"Erro: {nome} falhou por um problema interno ({type(error).__name__}: {error}). "
+        f"Aviso: uma ação do mestre não funcionou e foi ignorada; a cena continua."
+        f"[[llm]] Erro: {nome} falhou por um problema interno ({type(error).__name__}: {error}). "
         f"Não repita a mesma chamada. Confira o estado (get_character_sheet ou "
-        f"get_scene_context) antes de decidir, e siga a cena."
+        f"get_scene_context) antes de decidir, e siga a cena.[[/llm]]"
     )}
 
 

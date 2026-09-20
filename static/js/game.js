@@ -672,14 +672,84 @@ const TOOL_LABEL = {
   equip_item: 'equipando item', unequip_item: 'desequipando item',
   apply_condition: 'aplicando condição', remove_condition: 'removendo condição',
   modify_currency: 'atualizando moedas',
+  // Combate
+  roll_initiative: 'rolando iniciativa', next_turn: 'passando a vez',
+  end_combat: 'encerrando o combate', execute_npc_turn: 'jogando pelo NPC',
+  spawn_monster: 'trazendo criatura', suggest_encounter: 'medindo o desafio',
+  set_npc_strategy: 'definindo a tática', set_combat_side: 'definindo o lado',
+  set_battlefield: 'montando o campo', describe_battlefield: 'olhando o campo',
+  move_combatant: 'movendo no campo', legendary_action: 'ação lendária',
+  set_legendary_actions: 'preparando o chefe', set_recharge_ability: 'preparando recarga',
+  resolve_saving_throw: 'teste de resistência', reveal_defenses: 'revelando defesas',
+  grant_temp_hp: 'dando vida temporária', recruit_character: 'trazendo para o grupo',
+  // Regras do personagem
+  learn_spell: 'aprendendo magia', choose_feat: 'escolhendo talento',
+  apply_asi: 'aumentando atributo', set_feature_choice: 'escolha de classe',
+  add_exhaustion: 'marcando exaustão', remove_exhaustion: 'tirando exaustão',
+  check_encumbrance: 'conferindo a carga', social_check: 'teste social',
+  // Missões
+  add_quest: 'anotando missão', update_quest_objective: 'atualizando objetivo',
+  complete_quest: 'encerrando missão', get_quest: 'lendo missão',
+  list_quests: 'listando missões',
+  // Loja e itens
+  open_shop: 'abrindo a loja', list_shop: 'vendo a loja', buy_item: 'comprando item',
+  sell_item: 'vendendo item', haggle: 'pechinchando', identify_item: 'identificando item',
+  justify_custom_item: 'justificando o item', list_custom_items: 'listando itens próprios',
+  // Mundo e tempo
+  advance_time: 'adiantando o relógio', get_world_time: 'vendo a hora',
+  adjust_attitude: 'mudando o que acham de vocês', get_attitude: 'lendo a atitude',
+  list_attitudes: 'listando atitudes', ver_mundo: 'lendo o mundo',
+  ajustar_renome: 'ajustando o renome', ajustar_reputacao: 'ajustando reputação',
+  conceder_titulo: 'concedendo título', registrar_mudanca: 'registrando mudança no mundo',
+  registrar_lenda: 'registrando lenda', revelar_fragmento: 'revelando fragmento',
+  resolver_lenda: 'resolvendo lenda', registrar_criatura: 'registrando criatura',
+  anotar_criatura: 'anotando no bestiário',
+  ajustar_lealdade: 'ajustando lealdade', definir_arco: 'definindo o arco',
+  avancar_arco: 'avançando o arco',
+  // Romance
+  ver_relacoes: 'lendo as relações', ajustar_relacao: 'ajustando a relação',
+  mudar_estagio: 'mudando o estágio', marcar_momento: 'marcando um momento',
+  ver_segredos: 'lendo os segredos', guardar_segredo: 'guardando segredo',
+  revelar_segredo: 'revelando segredo', ajustar_tensao: 'ajustando a tensão',
+  marcar_encontro: 'marcando encontro', resolver_encontro: 'resolvendo encontro',
 };
+
+// O argumento que diz alguma coisa a quem lê. Antes era o PRIMEIRO da
+// chamada, cortado no caractere 40: saía `roll_initiative "Alistair Vane,
+// Lyra Sunwhisper, Pip, Gob"` e `spawn_monster "3"`.
+const ARG_QUE_INTERESSA = [
+  'name', 'nome', 'char_name', 'character_name', 'npc_name', 'monster_name',
+  'display_name', 'titulo', 'title', 'quest', 'item_name', 'item', 'spell_name',
+  'location', 'local', 'zone', 'zones', 'characters_names', 'reason', 'motivo',
+];
+
+function _cortarNaPalavra(texto, limite) {
+  if (texto.length <= limite) return texto;
+  const corte = texto.slice(0, limite);
+  const espaco = corte.lastIndexOf(' ');
+  return (espaco > limite * 0.5 ? corte.slice(0, espaco) : corte).replace(/[\s,;:]+$/, '') + '…';
+}
+
+function _argDaFerramenta(args) {
+  const dados = args && typeof args === 'object' ? args : null;
+  if (!dados) return '';
+  const chaves = Object.keys(dados);
+  if (!chaves.length) return '';
+  const chave = ARG_QUE_INTERESSA.find(k => String(dados[k] ?? '').trim()) || chaves[0];
+  const texto = String(dados[chave] ?? '').trim();
+  // Número solto e true/false não dizem nada fora do motor.
+  if (!texto || texto === 'true' || texto === 'false' || /^-?\d+([.,]\d+)?$/.test(texto)) return '';
+  return _cortarNaPalavra(texto, 32);
+}
+window._argDaFerramenta = _argDaFerramenta;
 
 function appendToolLog(tools) {
   if (!tools.length) return;
   const c = document.getElementById('chat-history'); const w = document.createElement('div'); w.className = 'tool-log';
   tools.forEach(t => {
     const label = TOOL_LABEL[t.name] || t.name;
-    const arg = t.args && Object.keys(t.args).length ? `"${String(Object.values(t.args)[0]).substring(0, 40)}"` : '';
+    const valor = _argDaFerramenta(t.args);
+    const arg = valor ? `"${valor}"` : '';
     const el = document.createElement('div'); el.className = `tool-item ${t.kind}`;
     el.title = JSON.stringify(t.args, null, 2);
     el.innerHTML = `<span>${label}</span>${arg ? `<span class="tool-item-args">${arg}</span>` : ''}`;
@@ -729,7 +799,33 @@ function _parseMd(text) {
     .replace(/\n/g, '<br>');
 }
 
+// Recusa e falha de ferramenta são escritas para a LLM: "Erro: move_combatant
+// não está disponível agora... Não tente de novo; espere [COMBATE RESOLVIDO NA
+// TELA TÁTICA] para narrar." O jogador lê a parte que é da história; o resto
+// (nome de ferramenta, marcador de instrução) fica no log do servidor.
+function _semLinguaDeMotor(texto) {
+  const frases = String(texto).split(/(?<=[.!?])\s+/);
+  const limpas = frases.filter(f =>
+    !/[a-z_]{3,}\(\)/.test(f)            // "use save_character()"
+    && !/\[[A-ZÀ-Ú][A-ZÀ-Ú \-—]{3,}\]/.test(f)  // "[COMBATE RESOLVIDO...]"
+    && !/\b[a-z][a-z0-9]*_[a-z0-9_]+\b/.test(f));  // "move_combatant", "get_scene_context"
+  return limpas.join(' ').replace(/\s+/g, ' ').trim();
+}
+window._semLinguaDeMotor = _semLinguaDeMotor;
+
 function appendDiceResultLog(toolName, content) {
+  // Só o que veio como erro ou aviso: o resultado normal de uma ferramenta é
+  // texto de jogo e passa inteiro.
+  if (/^\s*(erro|aviso)\s*:/i.test(String(content))) {
+    const limpo = _semLinguaDeMotor(content);
+    // Sobrou só recado de motor: o jogador não vê nada, e a cena segue.
+    if (!limpo || /^\s*(erro|aviso)\s*:?\s*$/i.test(limpo)) return null;
+    content = limpo;
+  }
+  return _appendDiceResultLog(toolName, content);
+}
+
+function _appendDiceResultLog(toolName, content) {
   const labels = {
     attack_roll:      { badge: 'Ação de Combate',              color: 'var(--ink-sys)' },
     make_skill_check: { badge: 'Teste de Habilidade',           color: 'var(--ink-user)' },
@@ -775,6 +871,7 @@ function appendDiceResultLog(toolName, content) {
   }
   document.getElementById('chat-history').appendChild(row);
   scrollDown();
+  return row;
 }
 
 // O dado rola antes de mostrar: o número troca por alguns instantes e cai no
