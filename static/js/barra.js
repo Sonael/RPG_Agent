@@ -146,7 +146,7 @@
     nav.innerHTML = TELAS.filter(t => (!t.soDnd || dnd) && (!t.soTela || telas[t.soTela]))
       .map(atalho).map(t => {
       const c = conta[t.id];
-      return `<button id="sb-atalho-${t.id}" class="sb-atalho" type="button" data-tela="${t.id}"
+      return `<button id="sb-atalho-${t.id}" class="sb-atalho${c ? ' sb-atalho-com-conta' : ''}" type="button" data-tela="${t.id}"
                       onclick="window.Barra.abrir('${t.id}')" title="${esc(c ? `${t.rotulo}: ${c.dica}` : t.dica)}"
                       aria-label="${esc(c ? `${t.rotulo}, ${c.dica}` : t.rotulo)}">
         ${svg(ICONES[t.icone || t.id])}<span class="sb-atalho-rotulo">${esc(t.rotulo)}</span>
@@ -196,7 +196,7 @@
     const el = document.createElement('span');
     el.className = `sb-astro ${dia ? 'sb-astro-sol' : 'sb-astro-lua'}`;
     el.setAttribute('aria-hidden', 'true');
-    el.innerHTML = svg(ICONES[dia ? 'sol' : 'lua'], 16);
+    el.innerHTML = svg(ICONES[dia ? "sol" : "lua"], 20);
     el.addEventListener('animationend', () => el.remove());
     tempo.querySelectorAll('.sb-astro').forEach(a => a.remove());
     tempo.appendChild(el);

@@ -936,6 +936,26 @@ def test_relogio_a_hora_sobe_e_o_dia_novo_traz_o_sol(app_no_ar, abrir):
         trocar(_com_relogio(cap, 5, 7))
         pg.evaluate("() => refreshMemory()")
         pg.wait_for_selector("#sb-tempo .sb-astro.sb-astro-sol", timeout=5000)
+        # O arco tem de caber na linha do relógio: a barra rola e corta o que
+        # sobe acima dela — com o arco alto, o sol sumia pela metade.
+        # Tudo numa leitura só: soltar a animação antes de medir deixava o
+        # astro sumir no meio do caminho (ele se remove no fim).
+        medida = pg.evaluate("""() => {
+            const a = document.querySelector('#sb-tempo .sb-astro');
+            const cont = a.closest('.sidebar-content').getBoundingClientRect();
+            const fora = [];
+            for (let ms = 0; ms <= 2000; ms += 100) {
+                a.getAnimations().forEach(an => { an.pause(); an.currentTime = ms; });
+                const r = a.getBoundingClientRect();
+                if (r.top < cont.top - 0.5 || r.bottom > cont.bottom + 0.5) fora.push(ms);
+            }
+            return {fora, largura: parseFloat(getComputedStyle(a).width)};
+        }""")
+        assert medida["fora"] == [], medida
+        # E é grande o bastante para se ver: 16px sumia na linha.
+        assert medida["largura"] >= 20, medida
+        pg.evaluate("() => document.querySelectorAll('#sb-tempo .sb-astro')"
+                    ".forEach(a => a.getAnimations().forEach(an => an.finish()))")
         # O astro some no fim da animação.
         pg.wait_for_function("() => !document.querySelector('#sb-tempo .sb-astro')", timeout=4000)
         trocar(_com_relogio(cap, 6, 22))

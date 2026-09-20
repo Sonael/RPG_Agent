@@ -518,3 +518,44 @@ def test_celular_tocar_na_faixa_abre_a_gaveta(abrir):
     pg, _ = abrir(**CELULAR)
     pg.click("#faixa-relance")
     pg.wait_for_function("() => document.getElementById('sidebar').classList.contains('active')", timeout=3000)
+
+
+def test_o_contador_nao_cobre_o_icone_nem_corta_o_rotulo(abrir):
+    """
+    O contador nasceu sobre o ícone (top 3px, left 20px): cobria metade do
+    desenho e encostava no rótulo. Na direita, ele precisa do espaço dele —
+    sem isso, "Personagens" fica cortado.
+    """
+    pg, erros = abrir()
+    medidas = pg.evaluate("""() => [...document.querySelectorAll('.sb-atalho')].map(b => {
+        const c = b.querySelector('.sb-atalho-conta');
+        if (!c) return null;
+        const rot = b.querySelector('.sb-atalho-rotulo');
+        const cr = c.getBoundingClientRect();
+        const bate = (x, y) => x.left < y.right - 1 && y.left < x.right - 1
+                            && x.top < y.bottom - 1 && y.top < x.bottom - 1;
+        return {tela: b.dataset.tela,
+                sobre_icone: bate(cr, b.querySelector('svg').getBoundingClientRect()),
+                sobre_rotulo: bate(cr, rot.getBoundingClientRect()),
+                cortado: rot.scrollWidth > rot.clientWidth + 1,
+                dentro: cr.right <= b.getBoundingClientRect().right - 1};
+    }).filter(Boolean)""")
+    assert medidas, "nenhum atalho com contador no estado de teste"
+    for m in medidas:
+        assert not m["sobre_icone"], m
+        assert not m["sobre_rotulo"], m
+        assert not m["cortado"], m
+        assert m["dentro"], m
+    assert not erros, erros[:3]
+
+
+def test_recolhida_o_contador_vai_para_o_canto(abrir):
+    pg, _ = abrir(limpar_memoria=False)
+    pg.evaluate("() => window.Barra.alternar()")
+    pg.wait_for_function("() => document.body.classList.contains('barra-recolhida')", timeout=3000)
+    r = pg.evaluate("""() => { const b = document.getElementById('sb-atalho-missoes');
+        const c = b.querySelector('.sb-atalho-conta').getBoundingClientRect();
+        const cb = b.getBoundingClientRect();
+        return {acima_do_meio: c.top < cb.top + cb.height / 2, dentro: c.right <= cb.right + 1}; }""")
+    assert r == {"acima_do_meio": True, "dentro": True}, r
+    pg.evaluate("() => window.Barra.alternar()")

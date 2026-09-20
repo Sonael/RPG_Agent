@@ -518,20 +518,28 @@ html.anim-on #sb-encontro.sb-encontro-novo { animation: encontroEntra .6s ease-o
    capítulo, a missão principal) ganha um brilho breve; a vida dos heróis e
    o progresso da missão deslizam, e as contagens dos atalhos pulsam. */
 #sb-tempo { position: relative; }
+/* O astro cruza POR TRÁS da hora: por cima, ele parecia um borrão sobre as
+   palavras. (Só o ícone e o texto: um seletor amplo aqui tirava o próprio
+   astro do position: absolute.) */
+#sb-icone-hora, #sb-tempo-texto { position: relative; z-index: 1; }
 html.anim-on #sb-tempo-texto.sb-hora-mudou { display: inline-block; animation: horaSobe .6s ease-out; }
 @keyframes horaSobe { from { opacity: 0; transform: translateY(70%); } to { opacity: 1; transform: none; } }
-.sb-astro { position: absolute; left: 2px; top: 50%; margin-top: -8px; width: 16px; height: 16px;
+/* 16px era discreto demais para algo que passa uma vez por dia. O arco é
+   baixo de propósito: a barra corta o que sobe além da linha do relógio. */
+.sb-astro { position: absolute; left: 0; top: 50%; margin-top: -10px; width: 20px; height: 20px;
             opacity: 0; pointer-events: none; }
 .sb-astro svg { display: block; }
-.sb-astro-sol { color: var(--lcl-gold, #b89947); }
-.sb-astro-lua { color: var(--ink-user, #2b4a7a); }
-html.anim-on .sb-astro { animation: astroCruza 1.6s ease-in-out; }
+.sb-astro-sol { color: var(--lcl-gold, #b89947); filter: drop-shadow(0 0 4px rgba(184,153,71,.7)); }
+.sb-astro-lua { color: var(--ink-user, #2b4a7a); filter: drop-shadow(0 0 4px rgba(43,74,122,.5)); }
+html.anim-on .sb-astro { animation: astroCruza 2s ease-in-out; }
+/* O relógio fica colado no topo da barra: o que sobe acima da linha some no
+   corte da rolagem. O arco cabe dentro dela, subindo só o suficiente. */
 @keyframes astroCruza {
-  0%   { opacity: 0; transform: translate(-6px, 12px) rotate(-40deg); }
-  25%  { opacity: 1; }
-  50%  { transform: translate(28px, -16px) rotate(0deg); }
-  75%  { opacity: 1; }
-  100% { opacity: 0; transform: translate(62px, 12px) rotate(40deg); }
+  0%   { opacity: 0; transform: translate(-8px, 10px) rotate(-40deg) scale(.7); }
+  20%  { opacity: 1; }
+  50%  { transform: translate(30px, -2px) rotate(0deg) scale(1); }
+  80%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(68px, 10px) rotate(40deg) scale(.7); }
 }
 html.anim-on .sb-mudou { animation: sbMudou 1.2s ease-out; }
 @keyframes sbMudou {
@@ -5969,17 +5977,24 @@ body.loot-on { overflow: hidden; }
 
 .sb-atalhos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--esp-2); }
 .sb-atalho {
-  position: relative; display: flex; align-items: center; gap: 6px;
-  padding: 9px 6px 9px var(--esp-2); border: 1px solid var(--page-edge); border-radius: 8px; background: transparent;
+  /* O respiro é curto de propósito: com o contador na direita, "Personagens"
+     só cabe inteiro assim. */
+  position: relative; display: flex; align-items: center; gap: 4px;
+  padding: 9px 6px; border: 1px solid var(--page-edge); border-radius: 8px; background: transparent;
   font-family: 'Lora', serif; font-size: 13.5px; color: var(--text-main); text-align: left; cursor: pointer;
 }
 .sb-atalho:hover { background: rgba(0,0,0,0.04); border-color: var(--input-border); }
 .sb-atalho .sb-icone { flex: 0 0 auto; color: var(--ink-user); }
 .sb-atalho-rotulo { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* O contador fica sobre o ícone: ao lado do rótulo, cortava "Personagens". */
+/* O contador fica na borda direita do botão, sozinho: sobre o ícone ele
+   cobria metade do desenho e encostava no rótulo. O botão que tem contador
+   reserva o espaço dele (sb-atalho-com-conta), e o rótulo continua cortando
+   com reticências em vez de passar por baixo. */
+.sb-atalho-com-conta { padding-right: 21px; }
 .sb-atalho-conta {
-  position: absolute; top: 3px; left: 20px; min-width: 16px; padding: 0 4px; border-radius: 999px;
-  text-align: center; font-size: 10px; line-height: 15px; font-variant-numeric: tabular-nums;
+  position: absolute; top: 50%; right: 5px; transform: translateY(-50%);
+  min-width: 15px; padding: 0 4px; border-radius: 999px;
+  text-align: center; font-size: 9.5px; line-height: 15px; font-variant-numeric: tabular-nums;
   background: var(--page-edge); color: var(--text-main);
 }
 .sb-atalho-alerta { background: var(--ink-sys); color: #fff; }
@@ -6003,8 +6018,12 @@ body.loot-on { overflow: hidden; }
   body.barra-recolhida .sb-topo { justify-content: center; border-bottom: none; }
   body.barra-recolhida #sb-recolher svg { transform: rotate(180deg); }
   body.barra-recolhida .sb-atalhos { grid-template-columns: 1fr; margin-top: 0; }
-  body.barra-recolhida .sb-atalho { justify-content: center; padding: 10px 0; }
-  body.barra-recolhida .sb-atalho-conta { top: 2px; left: auto; right: 2px; }
+  /* Recolhida, o botão é só o ícone: o contador volta para o canto de cima,
+     que é o único lugar que sobra. */
+  body.barra-recolhida .sb-atalho, body.barra-recolhida .sb-atalho-com-conta {
+    justify-content: center; padding: 10px 0;
+  }
+  body.barra-recolhida .sb-atalho-conta { top: 2px; right: 2px; transform: none; }
 }
 
 @media (max-width: 900px) {
