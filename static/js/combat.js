@@ -151,6 +151,12 @@
     ).join('');
   }
 
+  // De que lado cada um luta (memory.lado_no_combate): "grupo", "aliado" ou
+  // "inimigo". O aliado fica do seu lado da tela, mas quem o joga é o motor.
+  // Snapshot antigo, sem o campo, continua valendo pelos dois lados de antes.
+  const lado = (c) => (c && c.lado) || (c && c.is_party ? 'grupo' : 'inimigo');
+  const comOGrupo = (c) => lado(c) !== 'inimigo';
+
   function card(c) {
     const out    = isOut(c.status);
     // "dormindo" (Sleep): esmaece o card e mostra a tag, MAS continua
@@ -169,11 +175,13 @@
     const meta   = `${esc(c.classe || '')}${c.nivel ? ' Nv.' + c.nivel : ''}`.trim();
     const temp   = Number(c.hp_temp || 0);
     const defs   = selosDeDefesa(c);
-    return `<div data-nome="${esc(c.name)}" class="cbt-card ${c.is_party ? 'cbt-aliado' : 'cbt-inimigo'} ${
+    return `<div data-nome="${esc(c.name)}" class="cbt-card ${comOGrupo(c) ? 'cbt-aliado' : 'cbt-inimigo'} ${
+      lado(c) === 'aliado' ? 'cbt-npc-aliado' : ''} ${
       c.is_current ? 'cbt-cur' : ''} ${
       out ? 'cbt-out' : (asleep ? 'cbt-asleep' : '')}">
       <div class="cbt-c-header">
         <span class="cbt-name">${esc(c.name)}</span>
+        ${lado(c) === 'aliado' ? '<span class="cbt-selo-aliado" title="Luta ao seu lado, mas não é do grupo: o motor joga por ele">aliado</span>' : ''}
         ${c.is_current ? '<span class="cbt-arrow">▶</span>' : ''}
       </div>
       <div class="cbt-meta">
@@ -197,8 +205,8 @@
     ensureDom();
     document.getElementById('cbt-end-overlay').classList.add('hidden');
 
-    const enemies = (snap.combatants || []).filter(c => !c.is_party);
-    const party   = (snap.combatants || []).filter(c => c.is_party);
+    const enemies = (snap.combatants || []).filter(c => !comOGrupo(c));
+    const party   = (snap.combatants || []).filter(comOGrupo);
 
     document.getElementById('cbt-round').textContent = `— Rodada ${snap.round || 1}`;
 
@@ -296,7 +304,7 @@
     faixa.innerHTML = zonas.map(z => {
       const dentro = (snap.combatants || []).filter(c => c.zona === z && !isOut(c.status));
       const fichas = dentro.map(c =>
-        `<span class="cbt-pin ${c.is_party ? 'cbt-pin-aliado' : 'cbt-pin-inimigo'}`
+        `<span class="cbt-pin ${comOGrupo(c) ? 'cbt-pin-aliado' : 'cbt-pin-inimigo'}`
         + `${c.is_current ? ' cbt-pin-vez' : ''}">${esc(c.name)}</span>`).join('');
       const aqui = (atual && atual.zona === z) ? ' cbt-zona-aqui' : '';
       return `<div class="cbt-zona${aqui}" title="${esc(desc[z] || '')}">`
@@ -322,8 +330,11 @@
     }
 
     if (!snap.current_is_party) {
-      titleEl.textContent = 'Turno do Inimigo';
-      promptEl.innerHTML  = `<span class="cbt-enemy-msg">“${esc(snap.current)} avança nas sombras…”</span>`;
+      const aliado = lado(cur) === 'aliado';
+      titleEl.textContent = aliado ? 'Turno do Aliado' : 'Turno do Inimigo';
+      promptEl.innerHTML  = `<span class="cbt-enemy-msg">${aliado
+        ? `“${esc(snap.current)} entra na luta ao seu lado…”`
+        : `“${esc(snap.current)} avança nas sombras…”`}</span>`;
       btnEl.innerHTML = '';
       return;
     }
@@ -673,7 +684,7 @@
             // combatente, e sair depois provoca ataque de oportunidade.
             const ocupada = (snap.combatants || [])
               .filter(c => c.zona === o.z && !isOut(c.status)
-                        && c.is_party !== (cur && cur.is_party))
+                        && comOGrupo(c) !== comOGrupo(cur))
               .map(c => c.name);
             const risco = ocupada.length ? ` <small>· ${esc(ocupada.join(', '))}</small>` : '';
             return `<button class="cbt-btn" onclick="window.Combat._mover('${esc(o.z).replace(/'/g,"\\'")}',${dash})">`

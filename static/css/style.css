@@ -2240,6 +2240,16 @@ body.combat-on { overflow: hidden; }
   color: var(--cbt-dark);
 }
 .cbt-arrow { color: var(--cbt-acento, var(--cbt-red)); animation: cbt-pulse 1.5s infinite; }
+/* NPC que luta do seu lado sem ser do grupo (memory.lado_no_combate): fica na
+   sua coluna, com o selo dizendo que quem joga por ele é o motor. */
+.cbt-card.cbt-npc-aliado { border-left-style: dashed; }
+.cbt-selo-aliado {
+  margin-right: auto; margin-left: var(--esp-2);
+  font-size: 0.66rem; text-transform: uppercase; letter-spacing: .06em;
+  padding: 1px 6px; border-radius: 8px;
+  border: 1px solid var(--cbt-line, rgba(0,0,0,.15));
+  color: var(--cbt-muted, #6b6257);
+}
 
 .cbt-meta {
   display: flex; justify-content: space-between;

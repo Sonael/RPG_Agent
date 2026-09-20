@@ -3009,14 +3009,14 @@ def _inimigos_na_zona(char_name: str, zona: str = "") -> list[str]:
     zona = zona or _zona_de(char_name)
     if not zona:
         return []
-    eu_grupo = memory.is_party_member(eu)
+    eu_grupo = memory.luta_com_o_grupo(eu)
     cs = memory.campaign.get("combat_state") or {}
     presos = []
     for nome in cs.get("initiative_order", []) or []:
         outro = chars.get(memory.char_key(nome))
         if not outro or outro is eu:
             continue
-        if memory.is_party_member(outro) == eu_grupo:
+        if memory.luta_com_o_grupo(outro) == eu_grupo:
             continue
         if (outro.get("status", "vivo") or "").lower() in OUT_OF_COMBAT_STATUSES:
             continue
@@ -3120,7 +3120,7 @@ def set_battlefield(zones: str, description: str = "") -> str:
         for nome in cs.get("initiative_order", []) or []:
             ch = chars.get(memory.char_key(nome))
             if ch and _zona_de(nome) not in atuais:
-                _por_zona(nome, atuais[0] if memory.is_party_member(ch) else atuais[-1])
+                _por_zona(nome, atuais[0] if memory.luta_com_o_grupo(ch) else atuais[-1])
         if any(descs):
             cs["zona_desc"] = {n: (descs[i] if i < len(descs) else "")
                                for i, n in enumerate(atuais)}
@@ -3132,20 +3132,83 @@ def set_battlefield(zones: str, description: str = "") -> str:
     cs["zona_desc"] = {n: (descs[i] if i < len(descs) else "")
                        for i, n in enumerate(nomes)}
 
-    # Posicionamento inicial: grupo na frente, inimigos no fundo. É o arranjo
-    # de quase todo encontro, e sem um padrão o campo nasceria vazio.
+    # Posicionamento inicial: grupo e aliados na frente, inimigos no fundo. É
+    # o arranjo de quase todo encontro, e sem um padrão o campo nasceria vazio.
     chars = memory.campaign.get("characters", {})
     cs["posicoes"] = {}
     for nome in cs.get("initiative_order", []) or []:
         ch = chars.get(memory.char_key(nome))
         if not ch:
             continue
-        _por_zona(nome, nomes[0] if memory.is_party_member(ch) else nomes[-1])
+        _por_zona(nome, nomes[0] if memory.luta_com_o_grupo(ch) else nomes[-1])
 
     _log_combat_event("battlefield", msg="Campo dividido em zonas: " + " → ".join(nomes),
                       zonas=nomes)
     memory.save_campaign()
     return describe_battlefield()
+
+
+def set_combat_side(name: str, side: str) -> str:
+    """
+    Diz de que lado um personagem luta: "aliado", "inimigo" ou "grupo".
+
+    O motor já deduz sozinho (criatura de spawn_monster é inimigo; personagem
+    da história que entra na luta é aliado; NPC hostil ao grupo é inimigo).
+    Use esta ferramenta quando a dedução não bastar:
+
+      • o NPC que escoltava o grupo trai no meio da luta
+        → set_combat_side("Pip", "inimigo")
+      • o vilão que já era personagem da história entra lutando contra vocês
+        → set_combat_side("Barão Corvo", "inimigo") ANTES de roll_initiative()
+      • o inimigo se rende e passa a lutar com o grupo
+        → set_combat_side("Goblin 2", "aliado")
+
+    O aliado luta ao lado do grupo mas NÃO é do grupo: não ganha XP, não sobe
+    de nível e não entra na divisão do saque. Para trazer alguém para o grupo
+    de verdade, use recruit_character().
+
+    Args:
+        name: Nome do personagem.
+        side: "aliado", "inimigo" ou "grupo".
+    """
+    lado = (side or "").strip().lower()
+    apelidos = {"aliada": "aliado", "amigo": "aliado", "amiga": "aliado",
+                "inimiga": "inimigo", "hostil": "inimigo",
+                "party": "grupo", "jogador": "grupo"}
+    lado = apelidos.get(lado, lado)
+    if lado not in memory.LADOS:
+        return ('Erro: lado inválido. Use "aliado", "inimigo" ou "grupo".')
+
+    char, err = _get_char(name)
+    if not char:
+        return err
+
+    if lado == "grupo" and not memory.is_party_member(char):
+        return (f'Erro: "grupo" é para quem está no grupo do jogador. Para {char.get("name", name)} '
+                f'lutar ao lado do grupo sem entrar nele, use side="aliado"; para trazer de vez, '
+                f'use recruit_character().')
+
+    char["lado"] = lado
+    # Status e lado eram a mesma coisa: quem lutava contra o grupo ficava com
+    # status "inimigo". Agora o lado é dele; o status volta a ser só o estado
+    # (vivo, ferido, morto) de quem não é mais inimigo.
+    if lado == "inimigo":
+        if (char.get("status") or "vivo").lower() not in OUT_OF_COMBAT_STATUSES:
+            char["status"] = "inimigo"
+    elif (char.get("status") or "").lower() == "inimigo":
+        char["status"] = "vivo"
+    memory.save_campaign()
+
+    onde = ""
+    cs = memory.campaign.get("combat_state") or {}
+    if cs.get("is_active") and _zonas_ativas():
+        zonas = _zonas()
+        alvo  = zonas[0] if lado != "inimigo" else zonas[-1]
+        if _zona_de(char.get("name", name)) != alvo:
+            _por_zona(char.get("name", name), alvo)
+            memory.save_campaign()
+            onde = f" Reposicionado em {alvo}."
+    return f"{char.get('name', name)} agora luta como {lado}.{onde}"
 
 
 def describe_battlefield() -> str:
@@ -3172,7 +3235,7 @@ def describe_battlefield() -> str:
                 continue
             caido = ((ch.get("status", "vivo") or "").lower() in OUT_OF_COMBAT_STATUSES
                      or int((ch.get("sheet") or {}).get("vida_atual", 0) or 0) <= 0)
-            marca = "[grupo]" if memory.is_party_member(ch) else "[inimigo]"
+            marca = f"[{memory.lado_no_combate(ch)}]"
             ocupantes.append(f"{marca} {ch.get('name', nome)}" + (" (fora)" if caido else ""))
         desc = descs.get(z) or ""
         linhas.append(f"  • **{z}**{' — ' + desc if desc else ''}: "
@@ -3565,7 +3628,7 @@ def _provoke_opportunity_attacks(leaving_name: str, motivo: str = "fugir") -> st
     saindo   = chars.get(memory.char_key(leaving_name))
     if not saindo:
         return ""
-    saindo_e_grupo = memory.is_party_member(saindo)
+    saindo_e_grupo = memory.luta_com_o_grupo(saindo)
     zona_saida     = _zona_de(leaving_name) if _zonas_ativas() else ""
 
     linhas = []
@@ -3574,7 +3637,7 @@ def _provoke_opportunity_attacks(leaving_name: str, motivo: str = "fugir") -> st
         if not oponente or oponente is saindo:
             continue
         # Só inimigos do lado oposto reagem.
-        if memory.is_party_member(oponente) == saindo_e_grupo:
+        if memory.luta_com_o_grupo(oponente) == saindo_e_grupo:
             continue
         if (oponente.get("status", "vivo") or "").lower() in OUT_OF_COMBAT_STATUSES:
             continue
@@ -7126,7 +7189,8 @@ def _derrotados_citados(reason: str) -> list[dict]:
     palavras = set(re.findall(r"[a-z0-9]+", motivo))
     achados = []
     for ch in memory.campaign.get("characters", {}).values():
-        if not isinstance(ch, dict) or memory.is_party_member(ch):
+        # Aliado caído não é inimigo derrotado: não conta para XP.
+        if not isinstance(ch, dict) or memory.luta_com_o_grupo(ch):
             continue
         if (ch.get("status", "") or "").lower() not in DEFEATED_STATUSES:
             continue
@@ -9952,6 +10016,22 @@ def _default_npc_sheet() -> dict:
     }
 
 
+def _marcar_lado_na_entrada(char: dict) -> None:
+    """
+    Congela o lado de quem entra na luta (memory.lado_no_combate).
+
+    A dedução lê o status ("inimigo") — e o status do inimigo vira "morto"
+    assim que ele cai. Sem congelar, o goblin derrotado deixava de ser inimigo
+    no meio da luta, e matar todos não encerrava o combate. Quem é do grupo
+    não é marcado: entrar e sair do grupo é decisão do jogo, não da luta.
+    """
+    if not isinstance(char, dict):
+        return
+    if char.get("lado") or memory.is_party_member(char):
+        return
+    char["lado"] = memory.lado_no_combate(char)
+
+
 def _combatente_para_a_luta(name: str) -> tuple[dict, bool]:
     """O personagem pronto para lutar: quem não existe ou não tem ficha ganha a
     ficha padrão de NPC. Devolve (personagem, se a ficha foi criada agora)."""
@@ -9963,12 +10043,17 @@ def _combatente_para_a_luta(name: str) -> tuple[dict, bool]:
             "description": "NPC — registrado ao iniciar combate (ficha padrão).",
             "traits":      "",
             "status":      "inimigo",
+            # Nome que a campanha não conhecia e entrou na luta: inimigo.
+            # Quem já era personagem da história entra como aliado, a menos
+            # que o mestre marque (memory.lado_no_combate, set_combat_side).
+            "lado":        "inimigo",
             "notes":       "",
             "sheet":       _default_npc_sheet(),
             "inventario":  [],
             "habilidades": [],
         }
         return memory.campaign["characters"][key], True
+    _marcar_lado_na_entrada(char)
     if char.get("sheet") is None:
         char["sheet"]       = _default_npc_sheet()
         char["inventario"]  = char.get("inventario") or []
@@ -10041,7 +10126,7 @@ def _entrar_no_combate_em_andamento(names: list[str], cs: dict) -> str:
             idx += 1
         quando = "age ainda nesta rodada" if pos > idx else "age a partir da próxima rodada"
         if len(zonas) > 1 and _zona_de(name) not in zonas:
-            _por_zona(name, zonas[0] if memory.is_party_member(char) else zonas[-1])
+            _por_zona(name, zonas[0] if memory.luta_com_o_grupo(char) else zonas[-1])
         linhas.append(f"  + {name}: {r['log']} — {quando}"
                       + (" (ficha padrão)" if criado else ""))
 
@@ -10053,11 +10138,18 @@ def _entrar_no_combate_em_andamento(names: list[str], cs: dict) -> str:
     return "\n".join(linhas)
 
 
-def roll_initiative(characters_names: str) -> str:
+def roll_initiative(characters_names: str, allies: str = "") -> str:
     """
     Rola iniciativa para todos os participantes do combate (aliados e inimigos).
     Ordena do maior para o menor resultado e salva no combat_state.
     DEVE ser chamada no INÍCIO de todo combate.
+
+    QUEM LUTA DO LADO DO GRUPO: o grupo do jogador entra sozinho do lado dele.
+    Todo NPC que entrar na luta é tratado como INIMIGO, a não ser que você o
+    cite em `allies` — é assim que o mercador que o grupo escolta, o guarda
+    que socorre ou o companheiro emprestado lutam com vocês em vez de contra.
+    O lado fica gravado; para mudar depois (traição, rendição) use
+    set_combat_side(). A resposta mostra quem entrou de cada lado.
 
     Para inimigos GENÉRICOS desconhecidos, cria fichas padrão automaticamente
     (HP 12, CA 12). Para CHEFES importantes, chame create_character_sheet()
@@ -10069,6 +10161,9 @@ def roll_initiative(characters_names: str) -> str:
 
     Args:
         characters_names: Nomes separados por vírgula. Ex: "Aria, Goblin, Orc Líder"
+        allies:           NPCs que lutam AO LADO do grupo, separados por vírgula.
+                          Ex: allies="Pip" numa escolta. Eles não entram no
+                          grupo: sem XP, sem nível e sem saque.
     """
     names = (
         characters_names if isinstance(characters_names, list)
@@ -10076,6 +10171,18 @@ def roll_initiative(characters_names: str) -> str:
     )
     if not names:
         return "Informe ao menos um personagem."
+
+    # Marca os aliados ANTES de montar a ordem: o lado de cada um é congelado
+    # ao entrar na luta (_marcar_lado_na_entrada).
+    for nome in (allies if isinstance(allies, list)
+                 else [n.strip() for n in (allies or "").split(",")]):
+        if not nome:
+            continue
+        aliado = memory.campaign["characters"].get(memory.char_key(nome))
+        if aliado and not memory.is_party_member(aliado):
+            aliado["lado"] = "aliado"
+            if (aliado.get("status") or "").lower() == "inimigo":
+                aliado["status"] = "vivo"
 
     # Luta já rolando: rolar de novo zerava a ordem, a rodada e o log no meio
     # do combate. Numa campanha o mestre chamou roll_initiative três vezes
@@ -10128,6 +10235,19 @@ def roll_initiative(characters_names: str) -> str:
         marker = " ◀ PRIMEIRO" if i == 0 else ""
         lines.append(f"  {i + 1}. {r['name']}: {r['log']}{marker}")
     lines.append(f"\nRodada 1 — vez de: **{results[0]['name']}**")
+
+    # Quem entrou de cada lado, em voz alta: o erro de lado é invisível até
+    # alguém atacar quem não devia, e aqui ele aparece antes do primeiro turno.
+    por_lado = {"grupo": [], "aliado": [], "inimigo": []}
+    for r in results:
+        ch = memory.campaign["characters"].get(memory.char_key(r["name"]))
+        por_lado[memory.lado_no_combate(ch)].append(r["name"])
+    lines.append("\nLados — grupo: " + (", ".join(por_lado["grupo"]) or "ninguém")
+                 + (f" · aliados: {', '.join(por_lado['aliado'])}" if por_lado["aliado"] else "")
+                 + " · contra: " + (", ".join(por_lado["inimigo"]) or "ninguém"))
+    if por_lado["inimigo"]:
+        lines.append("Se algum deles luta COM o grupo, corrija agora: "
+                     "set_combat_side(nome, \"aliado\").")
 
     if auto_created:
         lines.append(
@@ -12037,6 +12157,8 @@ def spawn_monster(
             "description": f"{m.get('size','')} {monster_type} — CR {cr_label}.",
             "traits":      "",
             "status":      "inimigo",
+            # Criatura de luta nasce do lado inimigo (memory.lado_no_combate).
+            "lado":        "inimigo",
             "notes":       "",
             "sheet":       sheet,
             "inventario":  [],
@@ -12154,14 +12276,14 @@ def _npc_tentar_curar(npc: dict, npc_name: str) -> str:
 
     cs      = memory.campaign.get("combat_state", {}) or {}
     chars   = memory.campaign.get("characters", {})
-    do_lado = memory.is_party_member(npc)
+    do_lado = memory.luta_com_o_grupo(npc)
 
     ferido, pior = None, 1.0
     for nome in cs.get("initiative_order", []) or []:
         outro = chars.get(memory.char_key(nome))
         if not outro:
             continue
-        if memory.is_party_member(outro) != do_lado:
+        if memory.luta_com_o_grupo(outro) != do_lado:
             continue
         if (outro.get("status", "vivo") or "").lower() in OUT_OF_COMBAT_STATUSES:
             continue
@@ -12271,7 +12393,7 @@ def _npc_recuar_para_atirar(npc: dict, npc_name: str) -> str:
     # Recua para o lado oposto ao grosso do inimigo: se o NPC é do fundo da
     # trilha, afasta-se para o fundo; se está na ponta, tenta o outro sentido.
     candidatos = []
-    if memory.is_party_member(npc):
+    if memory.luta_com_o_grupo(npc):
         candidatos = [i - 1, i + 1]
     else:
         candidatos = [i + 1, i - 1]
@@ -12407,11 +12529,18 @@ def _executar_turno_npc(npc_name: str = "") -> str:
                 f"{oportunidade}{advance}"
             )
 
-    # Monta lista de alvos válidos: membros do grupo vivos e em pé.
+    # Monta lista de alvos válidos: o lado oposto ao do NPC, vivo e em pé. Um
+    # aliado (o mercador que você escolta) mira nos inimigos, não no grupo.
     OUT = ("morto", "estabilizado", "inconsciente", "fugiu", "exilado")
+    meu_lado = memory.luta_com_o_grupo(npc)
+    # Só quem está NA luta: a lista varria a campanha inteira e o motor
+    # chegou a mandar um aliado atacar um NPC que estava noutra cidade.
+    na_luta = [chars.get(memory.char_key(n)) for n in (cs.get("initiative_order") or [])]
     targets = []
-    for p_char in chars.values():
-        if not memory.is_party_member(p_char):
+    for p_char in na_luta:
+        if not p_char:
+            continue
+        if memory.luta_com_o_grupo(p_char) == meu_lado:
             continue
         if p_char.get("status", "vivo").lower() in OUT:
             continue
@@ -12734,7 +12863,7 @@ def _gastar_lendarias_dos_chefes(quem_comeca: str) -> list[str]:
         if memory.char_key(nome) == memory.char_key(quem_comeca):
             continue                      # nunca no próprio turno
         chefe = chars.get(memory.char_key(nome))
-        if not chefe or memory.is_party_member(chefe):
+        if not chefe or memory.luta_com_o_grupo(chefe):
             continue
         lend = (chefe.get("sheet") or {}).get("lendarias")
         if not isinstance(lend, dict) or not lend.get("opcoes"):
@@ -12764,11 +12893,11 @@ def _alvo_de_lendaria(chefe: dict) -> str:
     """Adversário consciente com menos PV — o alvo que um chefe escolheria."""
     cs    = memory.campaign.get("combat_state") or {}
     chars = memory.campaign.get("characters", {})
-    lado  = memory.is_party_member(chefe)
+    lado  = memory.luta_com_o_grupo(chefe)
     melhor, menos = "", None
     for nome in cs.get("initiative_order", []) or []:
         outro = chars.get(memory.char_key(nome))
-        if not outro or memory.is_party_member(outro) == lado:
+        if not outro or memory.luta_com_o_grupo(outro) == lado:
             continue
         if (outro.get("status", "vivo") or "").lower() in OUT_OF_COMBAT_STATUSES:
             continue
@@ -13015,7 +13144,7 @@ def _alvos_de_item(ator_nome: str, ficha: dict) -> dict:
         if status in ("morto", "fugiu"):
             continue
         eu = memory.char_key(nm) == memory.char_key(ator_nome)
-        if ficha["efeito"] == "cura" and not memory.is_party_member(ch):
+        if ficha["efeito"] == "cura" and not memory.luta_com_o_grupo(ch):
             continue
         if ficha["efeito"] == "arremesso" and eu:
             continue
@@ -13207,6 +13336,9 @@ def _combatant_snapshot(name: str) -> dict | None:
         "name":       ch.get("name", name),
         "status":     (ch.get("status", "vivo") or "vivo"),
         "is_party":   bool(memory.is_party_member(ch)),
+        # "grupo" | "aliado" | "inimigo": a tela pinta o aliado do seu lado,
+        # mas quem o joga é o motor (is_party continua sendo só o grupo).
+        "lado":       memory.lado_no_combate(ch),
         # Onda 3 — posição no campo. "" quando o combate não usa zonas.
         "zona":       _zona_de(ch.get("name", name)),
         "trancado":   _inimigos_na_zona(ch.get("name", name)),
@@ -13678,7 +13810,9 @@ def combat_action(action: str, actor: str = "", target: str = "",
             ch = memory.campaign["characters"].get(memory.char_key(nm))
             if not ch:
                 continue
-            is_p = bool(memory.is_party_member(ch))
+            # O aliado conta do lado do grupo: com ele no lado errado, matar
+            # todos os inimigos não encerrava a luta.
+            is_p = bool(memory.luta_com_o_grupo(ch))
             # DEFEATED (não OUT): uma criatura DORMINDO está incapacitada mas
             # ainda viva — não conta como derrotada, então não encerra a luta.
             out  = (ch.get("status", "") or "").lower() in DEFEATED_STATUSES
@@ -13699,6 +13833,7 @@ def combat_action(action: str, actor: str = "", target: str = "",
                 if not snp:
                     continue
                 linha = {"name": snp["name"], "is_party": snp["is_party"],
+                         "lado": snp["lado"],
                          "hp": snp["hp"], "hp_max": snp["hp_max"],
                          "status": snp["status"]}
                 if snp["status"].lower() in DEFEATED_STATUSES:
@@ -13738,7 +13873,7 @@ def combat_recap_payload() -> str:
     desfecho = res.get("outcome", "fim")
     finais = []
     for c in (res.get("sobreviventes", []) + res.get("caidos", [])):
-        lado = "grupo" if c.get("is_party") else "inimigo"
+        lado = c.get("lado") or ("grupo" if c.get("is_party") else "inimigo")
         finais.append(f"{c.get('name')} [{lado}]: {c.get('status')} "
                       f"({c.get('hp')}/{c.get('hp_max')} HP)")
 
@@ -13820,6 +13955,7 @@ DND_TOOLS = [
     execute_npc_turn,
     # Onda 3 — posicionamento por zonas
     set_battlefield,
+    set_combat_side,
     describe_battlefield,
     move_combatant,
     # Onda 3 — chefes: recarga e ações lendárias

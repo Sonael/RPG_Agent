@@ -917,6 +917,18 @@ NPCs GENÉRICOS COM NOME DE MONSTRO CONHECIDO (goblin, orc, zombie, bandit, wolf
      cria "Goblin 1", "Goblin 2", "Goblin 3" automaticamente.
   → DEPOIS: roll_initiative("Aria, Goblin 1, Goblin 2, Goblin 3")
 
+DE QUE LADO CADA UM LUTA — SEMPRE DIGA QUEM LUTA COM O GRUPO:
+  → O grupo do jogador entra do lado dele. Todo o resto entra como INIMIGO.
+  → NPC que luta AO LADO do grupo (o mercador que vocês escoltam, o guarda
+     que socorre, o companheiro emprestado) tem de ser declarado:
+     roll_initiative("Aria, Pip, Goblin 1, Goblin 2", allies="Pip")
+     Ele NÃO entra no grupo: sem XP, sem nível, sem saque.
+  → Esqueceu, ou o lado mudou no meio da luta (traição, rendição)?
+     set_combat_side("Pip", "aliado") / set_combat_side("Pip", "inimigo").
+     A resposta de roll_initiative mostra quem ficou de cada lado — confira
+     ali antes do primeiro turno.
+  → Para trazer alguém para o grupo de verdade: recruit_character().
+
 NPCs IMPORTANTES (chefes, aliados, personagens com história e classe D&D):
   → Chame create_character_sheet() ANTES do combate com classe e raça reais.
      Exemplo — capitão mercenário nível 5:

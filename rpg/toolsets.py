@@ -138,6 +138,8 @@ def _campanha_usa_dnd(camp) -> bool:
 #   • spawn_monster / set_npc_strategy — usadas ANTES da luta começar.
 #   • set_battlefield / set_recharge_ability / set_legendary_actions — também
 #     montagem do encontro, chamadas antes do primeiro turno.
+#   • set_combat_side — de que lado cada um luta; montagem do encontro, e a
+#     traição no meio da luta muda o lado sem passar pela tela.
 #   • describe_battlefield — leitura pura; a narração final precisa dela.
 #   • modify_hp / apply_condition — dano e condições fora de combate
 #     continuam sendo responsabilidade da narração.
