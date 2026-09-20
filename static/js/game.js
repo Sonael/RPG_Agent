@@ -264,9 +264,11 @@ async function sendToAgent(text, registrar, interno, aoTexto) {
           if (STATE_TOOLS.has(ev.tool_name)) refreshMemory();
         }
         else if (ev.type === 'correction') {
-          const n = ev.violations?.length || 1;
+          // O que aparecia aqui era recado de motor: "Verificador: 2
+          // violação(ões) detectada(s)". O jogador só precisa saber que a
+          // cena está sendo refeita.
           const corrId = appendTyping();
-          updateTyping(corrId, `Verificador: ${n} violação(ões) detectada(s) — corrigindo...`);
+          updateTyping(corrId, 'O mestre confere as regras e refaz a cena…');
           window._correctionTypId = corrId;
         }
         else if (ev.type === 'text') {

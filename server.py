@@ -27,7 +27,8 @@ from rpg import database
 from rpg.auth import require_auth, register as auth_register, login as auth_login, refresh_session
 from rpg.agent import create_agent, get_campaign_config
 from rpg.session import APP_NAME, create_runner
-from rpg.validator import validate
+from rpg.validator import SO_PARA_O_MESTRE, validate
+from rpg.validator import para_o_jogador as validator_para_o_jogador
 
 
 # ---------------------------------------------------------------------------
@@ -2308,12 +2309,12 @@ def chat():
 
                     result = validate(response_text)
                     violations = [
-                        {"severity": v.severity, "rule": v.rule, "message": v.message, "detail": v.detail}
+                        {"severity": v.severity, "rule": v.rule, "message": v.message,
+                         "detail": v.detail, "titulo": v.titulo, "jogador": v.jogador}
                         for v in result.violations
                     ]
-                    # Só para o mestre: o jogador não tem como fazer o relógio andar.
-                    SO_PARA_O_MESTRE = ("time_not_advanced",)
-
+                    # Só para o mestre (validator.SO_PARA_O_MESTRE): o jogador
+                    # não tem como fazer o relógio andar.
                     # Fecha o ciclo da manutenção de memória.
                     #
                     # Estes avisos ("Fulano parece novo mas não foi salvo",
@@ -2334,9 +2335,13 @@ def chat():
 
                     yield f"data: {json.dumps({'type': 'text', 'content': response_text})}\n\n"
 
-                    violations = [v for v in violations if v["rule"] not in SO_PARA_O_MESTRE]
-                    if violations:
-                        yield f"data: {json.dumps({'type': 'violations', 'violations': violations})}\n\n"
+                    # Para a tela vai o texto do JOGADOR: o painel dele falava
+                    # de ferramentas ("o agente deveria ter chamado
+                    # save_character"), que é recado de mestre. Aviso sem
+                    # texto de jogador fica só nas pendências.
+                    do_jogador = validator_para_o_jogador(violations)
+                    if do_jogador:
+                        yield f"data: {json.dumps({'type': 'violations', 'violations': do_jogador})}\n\n"
 
                     # Safety net: verifica level ups que o LLM pode ter perdido
                     leveled_up = _check_all_level_ups()

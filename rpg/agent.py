@@ -1244,22 +1244,34 @@ def _pendencias_block() -> str:
             elif n >= limite:
                 linhas.append(f"• {n} turnos sem {texto}")
 
-        for aviso in (_m.campaign.get("_pendencias") or [])[:6]:
-            linhas.append(f"• Da sua resposta anterior: {aviso}")
+        # Estes vêm de heurística de texto (rpg/validator.py) e ERRAM: nome de
+        # passagem vira "lugar novo", figurante vira "personagem sem ficha".
+        # Entram marcados como suspeita — tratá-los como fato fazia o mestre
+        # registrar lugar e gente que a história nunca teve.
+        suspeitas = [f"• Suspeita sobre a sua resposta anterior: {a}"
+                     for a in (_m.campaign.get("_pendencias") or [])[:6]]
 
-        if not linhas:
+        if not linhas and not suspeitas:
             return ""
 
-        return (
-            "\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            "PENDÊNCIAS DE MEMÓRIA (verificado pelo sistema, não é opinião)\n"
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            + "\n".join(linhas)
-            + "\nResolva o que fizer sentido NESTE turno, junto com a narração "
-              "— são chamadas de ferramenta, não texto para o jogador ler. "
-              "Se algum item não se aplicar (ex.: o grupo não saiu do lugar), "
-              "ignore-o em silêncio."
-        )
+        bloco = "\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        if linhas:
+            bloco += ("PENDÊNCIAS DE MEMÓRIA (contado pelo sistema, não é opinião)\n"
+                      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                      + "\n".join(linhas) + "\n")
+        if suspeitas:
+            bloco += ("SUSPEITAS DO VERIFICADOR (heurística de texto — ERRA MUITO)\n"
+                      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                      + "\n".join(suspeitas)
+                      + "\nConfira na SUA narração antes de agir. Nome de passagem, "
+                        "figurante de uma fala e apelido não viram registro: NÃO "
+                        "invente lugar, pessoa nem detalhe só para atender a uma "
+                        "suspeita. Na dúvida, ignore em silêncio.\n")
+        return (bloco
+                + "Resolva o que fizer sentido NESTE turno, junto com a narração "
+                  "— são chamadas de ferramenta, não texto para o jogador ler. "
+                  "Se algum item não se aplicar (ex.: o grupo não saiu do lugar), "
+                  "ignore-o em silêncio.")
     except Exception:
         return ""
 

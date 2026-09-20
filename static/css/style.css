@@ -5955,9 +5955,15 @@ body.loot-on { overflow: hidden; }
 .sb-avisos-erro { border-color: var(--ink-sys); color: var(--ink-sys); }
 .sb-avisos-lista { margin-top: var(--esp-2); display: flex; flex-direction: column; gap: var(--esp-2); }
 .sb-avisos-lista .violation-item { margin: 0; padding: var(--esp-2) 0; font-size: 12px; line-height: 1.4; }
-.sb-avisos-lista .violation-rule { font-size: 11px; letter-spacing: .02em; color: var(--text-muted); }
+/* O aviso é escrito para o jogador: título curto, o que houve e o trecho da
+   narração. Nada de nome de regra nem de ferramenta. */
+.sb-avisos-lista .violation-rule {
+  font-size: 11.5px; letter-spacing: .02em; font-weight: 700;
+  color: var(--text-muted); word-break: normal;
+}
 .sb-avisos-lista .violation-msg { font-size: 12.5px; }
-.sb-avisos-lista .violation-detail { font-size: 11.5px; }
+/* O trecho já vem entre aspas do validador (_snippet). */
+.sb-avisos-lista .violation-detail { font-size: 11.5px; font-style: italic; }
 .sb-aviso-cabeca { display: flex; justify-content: space-between; gap: 6px; }
 .sb-aviso-fechar { background: none; border: none; cursor: pointer; color: var(--text-muted); }
 

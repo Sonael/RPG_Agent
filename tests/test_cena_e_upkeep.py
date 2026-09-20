@@ -225,7 +225,13 @@ def test_bloco_vazio_quando_esta_tudo_em_dia(campanha):
     assert _pendencias_block() == ""
 
 
-def test_avisos_do_validador_voltam_para_o_mestre(campanha):
+def test_avisos_do_validador_voltam_como_suspeita(campanha):
+    """
+    São heurística de texto, e erram: nome de passagem vira "lugar novo",
+    figurante vira "personagem sem ficha". Chegavam ao mestre sob o carimbo
+    "verificado pelo sistema, não é opinião" — convite a registrar lugar e
+    gente que a história nunca teve.
+    """
     from rpg.agent import _pendencias_block
 
     campanha["_turno"] = 0
@@ -233,8 +239,32 @@ def test_avisos_do_validador_voltam_para_o_mestre(campanha):
     campanha["_pendencias"] = ["'Dayene' parece ser um personagem novo mas não foi salvo."]
 
     bloco = _pendencias_block()
-    assert "Da sua resposta anterior" in bloco
+    assert "SUSPEITAS DO VERIFICADOR" in bloco
+    assert "Suspeita sobre a sua resposta anterior" in bloco
     assert "Dayene" in bloco
+    assert "NÃO invente lugar, pessoa nem detalhe" in bloco
+    # E não entra no bloco dos contadores, que é fato.
+    assert "PENDÊNCIAS DE MEMÓRIA" not in bloco
+
+
+def test_o_que_e_contado_e_o_que_e_suspeita_ficam_separados(campanha):
+    from rpg.agent import _pendencias_block
+
+    campanha["_turno"] = 0
+    campanha.pop("_upkeep", None)
+    memory.marcar_upkeep("resumo")
+    memory.marcar_upkeep("diario")
+    memory.marcar_upkeep("mundo")
+    for _ in range(7):
+        memory.avancar_turno()
+    campanha["_pendencias"] = ["Local 'Ponte Quebrada' mencionado mas não registrado na memória."]
+
+    bloco = _pendencias_block()
+    contado, _, suspeito = bloco.partition("SUSPEITAS DO VERIFICADOR")
+    assert "PENDÊNCIAS DE MEMÓRIA (contado pelo sistema" in contado
+    assert "7 turnos sem update_story_summary()" in contado
+    assert "Ponte Quebrada" not in contado, "suspeita não pode virar contagem"
+    assert "Ponte Quebrada" in suspeito
 
 
 def test_campanha_nova_nao_e_cobrada(campanha):

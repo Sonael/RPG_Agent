@@ -234,17 +234,24 @@ def test_contadores(abrir):
 def test_avisos_so_quando_ha_algum(abrir):
     pg, erros = abrir()
     assert pg.is_hidden("#sb-avisos")
+    # O que chega do servidor é o texto do jogador, com um título curto.
     pg.evaluate("""() => renderViolations([
-        {severity: 'erro', rule: 'dano_sem_ferramenta', message: 'Dano narrado sem modify_hp.', detail: ''},
-        {severity: 'aviso', rule: 'unknown_location', message: 'Local não registrado.', detail: 'Porto'}])""")
+        {severity: 'erro', rule: 'dead_character_active', titulo: 'Alguém que já morreu aparece em cena',
+         message: 'A campanha registra Bruna como morta, mas ela age agora.', detail: 'Bruna ergue a espada'},
+        {severity: 'aviso', rule: 'unknown_location', titulo: 'Lugar novo ainda fora do mapa',
+         message: '“Ponte Quebrada” ainda não está no mapa da campanha.', detail: 'a Ponte Quebrada'}])""")
     pg.wait_for_selector("#sb-avisos-botao", timeout=3000)
-    assert "2 avisos do verificador" in pg.inner_text("#sb-avisos-botao")
+    assert "2 avisos sobre a história" in pg.inner_text("#sb-avisos-botao")
     assert "sb-avisos-erro" in pg.get_attribute("#sb-avisos-botao", "class")
     assert pg.locator("#sb-avisos .violation-item").count() == 0, "a lista começa fechada"
     pg.click("#sb-avisos-botao")
     assert pg.locator("#sb-avisos .violation-item").count() == 2
     pg.click("#sb-avisos .sb-aviso-fechar >> nth=0")
-    assert "1 aviso do verificador" in pg.inner_text("#sb-avisos-botao")
+    assert "1 aviso sobre a história" in pg.inner_text("#sb-avisos-botao")
+    # O painel mostra o título e o texto do jogador, nunca o nome da regra.
+    lista = pg.inner_text("#sb-avisos .violation-item")
+    assert "Lugar novo ainda fora do mapa" in lista
+    assert "unknown_location" not in lista, lista
     pg.click("#sb-avisos button:has-text('Limpar todos')")
     assert pg.is_hidden("#sb-avisos")
     assert not erros, erros[:3]

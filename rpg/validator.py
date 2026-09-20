@@ -18,10 +18,22 @@ from rpg import memory
 
 @dataclass
 class Violation:
+    """
+    Uma inconsistência achada na resposta do mestre.
+
+    Há DOIS textos de propósito. `message` é para o mestre (vai nas
+    pendências da instrução do turno seguinte) e pode falar de ferramentas:
+    "chame save_character". `jogador` é o que aparece no painel do jogo, e
+    fala da história, não do motor — o jogador não chama ferramenta nenhuma,
+    e ler "o agente deveria ter chamado save_character automaticamente" só
+    mostra a engrenagem. Sem `jogador`, o aviso é só do mestre.
+    """
     severity: str          # "erro" | "aviso"
     rule:     str          # identificador da regra
-    message:  str          # descrição legível
-    detail:   str = ""     # contexto adicional (trecho do texto, etc.)
+    message:  str          # o que o mestre lê (pode citar ferramentas)
+    detail:   str = ""     # trecho da narração, para os dois
+    titulo:   str = ""     # rótulo curto para o painel do jogo
+    jogador:  str = ""     # o que o jogador lê; vazio = não aparece para ele
 
 
 @dataclass
@@ -52,9 +64,23 @@ class ValidationResult:
 # Utilitários de texto
 # ---------------------------------------------------------------------------
 
-# Status que indicam que o personagem não deve mais interagir normalmente
-_DEAD_STATUSES = {"morto", "falecido", "assassinado", "eliminado", "destruído"}
-_GONE_STATUSES = {"desaparecido", "preso", "capturado", "exilado", "partido"}
+# Status que indicam que o personagem não deve mais interagir normalmente.
+# São RADICAIS, sem a vogal final: o mestre escreve "morta", "desaparecida",
+# "presa", e procurar "morto" deixava passar metade dos personagens.
+_DEAD_STATUSES = {"mort", "falecid", "assassinad", "eliminad", "destruid"}
+_GONE_STATUSES = {"desaparecid", "pres", "capturad", "exilad", "partid"}
+
+def _status_comeca_com(status: str, radicais: set) -> bool:
+    """
+    O status bate com algum radical, palavra por palavra.
+
+    Palavra inteira, e não pedaço: "morto em combate" e "morta" contam, e um
+    status como "impressionado" não vira "preso".
+    """
+    return any(palavra.startswith(r)
+               for palavra in _normalize(status).split()
+               for r in radicais)
+
 
 def _normalize(text) -> str:
     """Lowercase sem acentos para comparação fuzzy simples.
@@ -98,8 +124,7 @@ def _check_dead_characters(response: str, c: dict) -> list[Violation]:
     chars = c.get("characters", {})
 
     for data in chars.values():
-        status_norm = _normalize(data.get("status", ""))
-        if not any(s in status_norm for s in _DEAD_STATUSES):
+        if not _status_comeca_com(data.get("status", ""), _DEAD_STATUSES):
             continue
         if not _name_in_text(data["name"], response):
             continue
@@ -117,6 +142,10 @@ def _check_dead_characters(response: str, c: dict) -> list[Violation]:
             rule="dead_character_active",
             message=f"'{data['name']}' está marcado como '{data['status']}' mas aparece ativo na narrativa.",
             detail=_snippet(response, data["name"]),
+            titulo="Alguém que já morreu aparece em cena",
+            jogador=(f"A campanha registra {data['name']} como {data['status']}, "
+                     f"mas a cena mostra {data['name']} agindo agora. "
+                     "Se for lembrança, visão ou fantasma, é só seguir."),
         ))
 
     return violations
@@ -137,8 +166,7 @@ def _check_gone_characters(response: str, c: dict) -> list[Violation]:
     }
 
     for data in chars.values():
-        status_norm = _normalize(data.get("status", ""))
-        if not any(s in status_norm for s in _GONE_STATUSES):
+        if not _status_comeca_com(data.get("status", ""), _GONE_STATUSES):
             continue
         if not _name_in_text(data["name"], response):
             continue
@@ -150,6 +178,9 @@ def _check_gone_characters(response: str, c: dict) -> list[Violation]:
                 rule="gone_character_present",
                 message=f"'{data['name']}' ({data['status']}) parece interagir presencialmente.",
                 detail=_snippet(response, data["name"]),
+                titulo="Alguém que não deveria estar aqui",
+                jogador=(f"A campanha registra {data['name']} como {data['status']}, "
+                         "mas a cena mostra essa pessoa aqui, em carne e osso."),
             ))
 
     return violations
@@ -165,10 +196,12 @@ def _check_unknown_locations(response: str, c: dict) -> list[Violation]:
     known_locs  = {_normalize(k).replace("_", " ") for k in c.get("locations", {}).keys()}
     known_chars = {_normalize(k).replace("_", " ") for k in c.get("characters", {}).keys()}
 
-    # Padrão: "na Taverna do Corvo", "o Castelo de Ferro", etc.
-    # Captura substantivos próprios (iniciais maiúsculas consecutivas)
+    # Padrão: "na Taverna do Corvo", "rumo ao Castelo de Ferro".
+    # Só com preposição de lugar: com o artigo solto ("o", "a") qualquer nome
+    # próprio virava lugar — "o Mestre de Guilda Brom" entrava como lugar novo.
     pattern = re.compile(
-        r'(?:na|no|ao|à|em|pelo|pela|para o|para a|o|a)\s+'
+        r'(?:\b(?:n[ao]|ao|à|em|pel[ao]|para [ao]|até [ao]|rumo a[o]?|dentro d[ao]'
+        r'|sa(?:i|iu|íram|iram) d[ao]|chega(?:m|ram)? a[o]?))\s+'
         r'([A-ZÁÀÃÂÉÈÊÍÌÎÓÒÕÔÚÙÛÇ][a-záàãâéèêíìîóòõôúùûç]+'
         r'(?:\s+d[aeo]\s+[A-ZÁÀÃÂÉÈÊÍÌÎÓÒÕÔÚÙÛÇ][a-záàãâéèêíìîóòõôúùûç]+)?'
         r'(?:\s+[A-ZÁÀÃÂÉÈÊÍÌÎÓÒÕÔÚÙÛÇ][a-záàãâéèêíìîóòõôúùûç]+)*)'
@@ -199,8 +232,13 @@ def _check_unknown_locations(response: str, c: dict) -> list[Violation]:
         violations.append(Violation(
             severity="aviso",
             rule="unknown_location",
-            message=f"Local '{loc_name}' mencionado mas não registrado na memória.",
-            detail="Considere chamar save_location se for um local importante.",
+            message=(f"Local '{loc_name}' mencionado mas não registrado na memória. "
+                     "Considere chamar save_location se for um local importante."),
+            detail=_snippet(response, loc_name),
+            titulo="Lugar novo ainda fora do mapa",
+            jogador=(f"“{loc_name}” apareceu na história e ainda não está no mapa da "
+                     "campanha. Pode ser só um nome de passagem; se virar um lugar "
+                     "de verdade, o mestre registra."),
         ))
 
     return violations
@@ -244,6 +282,9 @@ def _check_flag_contradictions(response: str, c: dict) -> list[Violation]:
                     rule="flag_contradiction",
                     message=f"Flag '{key}={value}' pode estar sendo contradita.",
                     detail=_snippet(response, key_words),
+                    titulo="A cena contradiz o que está anotado",
+                    jogador=(f"A campanha anota “{key.replace('_', ' ')}: {value}”, "
+                             "e a cena parece dizer o contrário."),
                 ))
                 break
 
@@ -283,8 +324,13 @@ def _check_new_characters_unsaved(response: str, c: dict) -> list[Violation]:
         violations.append(Violation(
             severity="aviso",
             rule="unsaved_character",
-            message=f"'{name}' parece ser um personagem novo mas não foi salvo.",
-            detail="O agente deveria ter chamado save_character automaticamente.",
+            message=(f"'{name}' parece ser um personagem novo mas não foi salvo. "
+                     "O agente deveria ter chamado save_character automaticamente."),
+            detail=_snippet(response, name),
+            titulo="Gente nova ainda sem ficha",
+            jogador=(f"“{name}” entrou na história agora e ainda não tem ficha na "
+                     "campanha. Pode ser figurante de uma cena só; se essa pessoa "
+                     "voltar, o mestre registra."),
         ))
 
     return violations
@@ -328,6 +374,31 @@ def _check_time_passed(response: str, c: dict) -> list[Violation]:
         message=(f"A narração fez o tempo passar (\"{achado.group(0)}\") e o relógio não andou. "
                  "Se o tempo passou mesmo, chame advance_time(horas, motivo)."),
     )]
+
+
+# Avisos que o jogador não tem como resolver nem conferir: o relógio só anda
+# por ferramenta do mestre.
+SO_PARA_O_MESTRE = ("time_not_advanced",)
+
+
+def para_o_jogador(violations: list[dict]) -> list[dict]:
+    """
+    O que o painel do jogo recebe, a partir dos avisos já em dicionário.
+
+    Regra única: aparece quem tem texto de jogador. É o que mantém o relógio
+    parado (e qualquer outro recado de motor) fora da tela, sem depender de
+    uma segunda lista de exceções.
+
+    Fica aqui, e não na rota, para poder ser testado sem subir o servidor: é
+    esta função que garante que o texto de mestre ("chame save_character")
+    não vaza para a tela do jogador.
+    """
+    return [
+        {"severity": v["severity"], "rule": v["rule"], "titulo": v.get("titulo", ""),
+         "message": v.get("jogador", ""), "detail": v.get("detail", "")}
+        for v in violations
+        if v.get("jogador")
+    ]
 
 
 def validate(response: str) -> ValidationResult:

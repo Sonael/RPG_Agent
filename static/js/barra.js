@@ -406,11 +406,11 @@
     caixa.innerHTML = `
       <button id="sb-avisos-botao" class="sb-avisos-botao${erro ? ' sb-avisos-erro' : ''}" type="button"
               aria-expanded="${_avisosAbertos}" onclick="window.Barra.alternarAvisos()">
-        ${svg(ICONES.aviso, 16)} ${_avisos.length} ${_avisos.length === 1 ? 'aviso' : 'avisos'} do verificador</button>
+        ${svg(ICONES.aviso, 16)} ${_avisos.length} ${_avisos.length === 1 ? 'aviso' : 'avisos'} sobre a história</button>
       ${_avisosAbertos ? `<div class="sb-avisos-lista">
         ${_avisos.map((v, i) => `
           <div class="violation-item ${esc(v.severity)}">
-            <div class="sb-aviso-cabeca"><span class="violation-rule">${esc(v.rule)}</span>
+            <div class="sb-aviso-cabeca"><span class="violation-rule">${esc(v.titulo || v.rule)}</span>
               <button class="sb-aviso-fechar" type="button" aria-label="Dispensar aviso"
                       onclick="window.Barra.dispensarAviso(${i})">✕</button></div>
             <div class="violation-msg">${esc(v.message)}</div>
