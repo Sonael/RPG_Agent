@@ -23,6 +23,14 @@
   let _last = {};
   let _aba = 'ativa';
   let _confirmandoAbandono = '';
+  // O caderno do jogador: qual missão está aberta para edição e se o
+  // formulário de missão nova está na tela.
+  let _editando = '';
+  let _criando = false;
+  // O que está digitado na missão em edição. Acrescentar, remover e mover um
+  // objetivo redesenham o cartão: sem o rascunho, o título e a descrição que
+  // o jogador acabou de escrever se perderiam.
+  let _rascunho = null;
 
   const esc = (s) => (window.escapeHtml ? window.escapeHtml(s) : String(s == null ? '' : s));
   const q = (id) => document.getElementById(id);
@@ -47,6 +55,8 @@
                   aria-label="Fechar" title="Fechar">✕</button>
           <h1 class="lcl-title" id="msn-titulo">O Livro de Missões</h1>
           <div id="msn-abas" class="msn-abas" role="tablist"></div>
+          <button id="msn-nova-btn" class="lcl-btn lcl-btn-sec msn-nova-btn" type="button"
+                  onclick="window.Missoes._nova()">Nova missão</button>
         </header>
         <div id="msn-lista" class="msn-lista"></div>
         <div class="lcl-rodape">
@@ -88,6 +98,76 @@
     return `<div class="msn-linha"><span class="msn-rotulo">Encomendada por</span> ${nome}</div>`;
   }
 
+  // ---- Edição (o caderno do jogador) -------------------------------
+  const campo = (rotulo, id, valor, tag) => `
+    <label class="msn-campo"><span>${rotulo}</span>
+      ${tag === 'textarea'
+        ? `<textarea id="${id}" rows="2">${esc(valor || '')}</textarea>`
+        : `<input id="${id}" type="text" value="${esc(valor || '')}">`}
+    </label>`;
+
+  function objetivosEditaveis(m) {
+    const t = aspas(m.titulo);
+    const linhas = m.objetivos.map(o => `
+      <li class="msn-objetivo msn-objetivo-edit">
+        <input class="msn-obj-texto" data-indice="${o.indice}" type="text" value="${esc(o.texto)}"
+               aria-label="Objetivo ${o.indice + 1}">
+        <button class="msn-obj-btn" type="button" title="Subir" aria-label="Subir objetivo"
+                onclick="window.Missoes._objMover('${t}',${o.indice},'cima')">↑</button>
+        <button class="msn-obj-btn" type="button" title="Descer" aria-label="Descer objetivo"
+                onclick="window.Missoes._objMover('${t}',${o.indice},'baixo')">↓</button>
+        <button class="msn-obj-btn msn-obj-tirar" type="button" title="Remover" aria-label="Remover objetivo"
+                onclick="window.Missoes._objRemover('${t}',${o.indice})">✕</button>
+      </li>`).join('');
+    return `
+      <ul class="msn-objetivos msn-objetivos-edit">${linhas}</ul>
+      <div class="msn-obj-novo">
+        <input id="msn-obj-novo" type="text" placeholder="Novo objetivo" aria-label="Novo objetivo"
+               onkeydown="if(event.key==='Enter'){event.preventDefault();window.Missoes._objNovo('${t}');}">
+        <button class="lcl-btn lcl-btn-sec" type="button"
+                onclick="window.Missoes._objNovo('${t}')">Acrescentar</button>
+      </div>`;
+  }
+
+  function cartaoEditando(m) {
+    const r = _rascunho || {};
+    return `
+      <article class="lcl-item msn-cartao msn-editando" data-titulo="${esc(m.titulo)}">
+        ${campo('Título', 'msn-ed-titulo', r.titulo)}
+        ${campo('Descrição', 'msn-ed-descricao', r.descricao, 'textarea')}
+        <div class="msn-campos-lado">
+          ${campo('Recompensa', 'msn-ed-recompensa', r.recompensa)}
+          ${campo('Encomendada por', 'msn-ed-quem', r.quem_deu)}
+        </div>
+        ${objetivosEditaveis(m)}
+        <div class="lcl-item-acoes">
+          <button class="lcl-btn lcl-btn-ir" type="button"
+                  onclick="window.Missoes._salvar('${aspas(m.titulo)}')">Salvar</button>
+          <button class="lcl-btn lcl-btn-sec" type="button"
+                  onclick="window.Missoes._cancelar()">Cancelar</button>
+        </div>
+        <p class="msn-aviso-edicao">O mestre recebe o que você mudou quando a tela fechar.</p>
+      </article>`;
+  }
+
+  function formularioNova() {
+    return `
+      <article class="lcl-item msn-cartao msn-editando msn-nova">
+        <div class="lcl-item-cabeca"><span class="lcl-item-nome">Missão sua</span></div>
+        ${campo('Título', 'msn-nv-titulo', '')}
+        ${campo('Descrição', 'msn-nv-descricao', '', 'textarea')}
+        ${campo('Objetivos (um por linha ou separados por ;)', 'msn-nv-objetivos', '', 'textarea')}
+        <div class="msn-campos-lado">
+          ${campo('Recompensa', 'msn-nv-recompensa', '')}
+          ${campo('Encomendada por', 'msn-nv-quem', '')}
+        </div>
+        <div class="lcl-item-acoes">
+          <button class="lcl-btn lcl-btn-ir" type="button" onclick="window.Missoes._criar()">Criar missão</button>
+          <button class="lcl-btn lcl-btn-sec" type="button" onclick="window.Missoes._cancelar()">Cancelar</button>
+        </div>
+      </article>`;
+  }
+
   function objetivos(m) {
     if (!m.objetivos.length) return '';
     const ativa = m.status === 'ativa';
@@ -102,6 +182,7 @@
   }
 
   function cartao(m) {
+    if (_editando === m.titulo) return cartaoEditando(m);
     const ativa = m.status === 'ativa';
     const cap = m.cap_inicio
       ? `cap. ${esc(m.cap_inicio)}${m.cap_fim ? ` a ${esc(m.cap_fim)}` : ''}` : '';
@@ -112,6 +193,8 @@
         onclick="window.Missoes._entregar('${aspas(m.titulo)}','${aspas(m.quem_deu.nome)}')">Falar com ${esc(m.quem_deu.nome)}</button>`);
     }
     if (ativa) {
+      acoes.push(`<button class="lcl-btn lcl-btn-sec msn-editar" type="button"
+        title="Editar esta missão" onclick="window.Missoes._editar('${aspas(m.titulo)}')">Editar</button>`);
       const confirmando = _confirmandoAbandono === m.titulo;
       acoes.push(`<button class="lcl-btn lcl-btn-sec msn-abandonar${confirmando ? ' msn-confirmar' : ''}"
         onclick="window.Missoes._abandonar('${aspas(m.titulo)}')">${confirmando ? 'Confirmar abandono' : 'Abandonar'}</button>`);
@@ -142,9 +225,14 @@
     const lista = (_last.missoes || []).filter(m => status.includes(m.status));
     const vazio = { ativa: 'Nenhuma missão ativa.', concluida: 'Nenhuma missão concluída ainda.',
                     encerrada: 'Nenhuma missão falhada ou abandonada.' }[_aba];
-    q('msn-lista').innerHTML = lista.length
-      ? lista.map(cartao).join('')
-      : `<div class="lcl-vazio msn-vazio">${vazio}</div>`;
+    q('msn-lista').innerHTML = (_criando ? formularioNova() : '')
+      + (lista.length
+        ? lista.map(cartao).join('')
+        : (_criando ? '' : `<div class="lcl-vazio msn-vazio">${vazio}</div>`));
+    const nova = q('msn-nova-btn');
+    if (nova) nova.classList.toggle('hidden', _criando || !!_editando);
+    const foco = q('msn-nv-titulo') || (_editando ? q('msn-ed-titulo') : null);
+    if (foco && document.activeElement !== foco) foco.focus();
   }
 
   function mensagem(txt, erro) {
@@ -159,6 +247,8 @@
     ensureDom();
     q('msn-titulo').textContent = window.nomeDaTela('titulo_missoes', 'O Livro de Missões');
     _confirmandoAbandono = '';
+    _editando = '';
+    _criando = false;
     if (!_open) {
       q('missoes-overlay').classList.remove('hidden');
       document.body.classList.add('missoes-on');
@@ -214,7 +304,9 @@
       _busy = false;
       if (res) {
         mensagem(res.message || '', res.ok === false);
-        if (res.snapshot) render(res.snapshot);
+        // Recusa não redesenha: o que o jogador digitou continua na tela
+        // para ele corrigir (título repetido, objetivo vazio).
+        if (res.snapshot && res.ok !== false) render(res.snapshot);
       }
       return res;
     } catch (_) {
@@ -227,6 +319,119 @@
   async function marcar(titulo, indice, feito) {
     const res = await agir({ action: feito ? 'marcar' : 'desmarcar', quest: titulo, objective: indice });
     if (res && res.ok !== false && typeof window.refreshMemory === 'function') window.refreshMemory();
+  }
+
+  // ---- O caderno do jogador ----------------------------------------
+  const valor = (id) => (q(id) ? q(id).value : '');
+
+  function editar(titulo) {
+    const m = (_last.missoes || []).find(x => x.titulo === titulo);
+    if (!m) return;
+    _editando = titulo;
+    _criando = false;
+    _confirmandoAbandono = '';
+    _rascunho = { titulo: m.titulo, descricao: m.descricao || '',
+                  recompensa: m.recompensa || '', quem_deu: (m.quem_deu || {}).nome || '' };
+    render(_last);
+    mensagem('');
+  }
+
+  // O que está na tela agora vira rascunho: chamado antes de tudo o que
+  // redesenha o cartão.
+  function lerCampos() {
+    if (!_editando || !q('msn-ed-titulo')) return;
+    _rascunho = {
+      titulo: valor('msn-ed-titulo'), descricao: valor('msn-ed-descricao'),
+      recompensa: valor('msn-ed-recompensa'), quem_deu: valor('msn-ed-quem'),
+    };
+  }
+
+  function nova() {
+    _criando = true;
+    _editando = '';
+    render(_last);
+    mensagem('');
+  }
+
+  function cancelar() {
+    _editando = '';
+    _criando = false;
+    _rascunho = null;
+    render(_last);
+    mensagem('');
+  }
+
+  // O texto digitado nos objetivos é gravado antes de qualquer mudança de
+  // estrutura: mover, remover e acrescentar redesenham o cartão, e o que
+  // estivesse digitado se perderia.
+  async function gravarTextos(titulo) {
+    lerCampos();
+    const m = (_last.missoes || []).find(x => x.titulo === titulo);
+    if (!m) return true;
+    for (const campo of [...document.querySelectorAll('.msn-obj-texto')]) {
+      const i = Number(campo.dataset.indice);
+      const o = m.objetivos.find(x => x.indice === i);
+      const texto = campo.value.trim();
+      if (!o || !texto || texto === o.texto) continue;
+      const res = await agir({ action: 'objetivo_texto', quest: titulo, objective: i, text: texto });
+      if (!res || res.ok === false) return false;
+    }
+    return true;
+  }
+
+  async function objNovo(titulo) {
+    const texto = valor('msn-obj-novo').trim();
+    if (!texto) { mensagem('Escreva o objetivo antes.', true); return; }
+    if (!(await gravarTextos(titulo))) return;
+    const res = await agir({ action: 'objetivo_novo', quest: titulo, text: texto });
+    if (res && res.ok !== false && typeof window.refreshMemory === 'function') window.refreshMemory();
+  }
+
+  async function objRemover(titulo, indice) {
+    if (!(await gravarTextos(titulo))) return;
+    const res = await agir({ action: 'objetivo_remover', quest: titulo, objective: indice });
+    if (res && res.ok !== false && typeof window.refreshMemory === 'function') window.refreshMemory();
+  }
+
+  async function objMover(titulo, indice, direcao) {
+    if (!(await gravarTextos(titulo))) return;
+    await agir({ action: 'objetivo_mover', quest: titulo, objective: indice, text: direcao });
+  }
+
+  async function salvar(titulo) {
+    if (!(await gravarTextos(titulo))) return;
+    const r = _rascunho || {};
+    const campos = {
+      titulo: (r.titulo || '').trim(), descricao: (r.descricao || '').trim(),
+      recompensa: (r.recompensa || '').trim(), quem_deu: (r.quem_deu || '').trim(),
+    };
+    const res = await agir({ action: 'editar', quest: titulo, fields: campos });
+    if (!res || res.ok === false) return;
+    _editando = '';
+    _rascunho = null;
+    render(res.snapshot || _last);
+    mensagem('Missão atualizada.');
+    if (typeof window.refreshMemory === 'function') window.refreshMemory();
+  }
+
+  async function criar() {
+    const campos = {
+      titulo: valor('msn-nv-titulo').trim(),
+      descricao: valor('msn-nv-descricao').trim(),
+      // Uma por linha ou separadas por ';': o motor aceita ';'.
+      objetivos: valor('msn-nv-objetivos').split('\n').join(';'),
+      recompensa: valor('msn-nv-recompensa').trim(),
+      quem_deu: valor('msn-nv-quem').trim(),
+    };
+    if (!campos.titulo) { mensagem('A missão precisa de um título.', true); return; }
+    const res = await agir({ action: 'nova', fields: campos });
+    if (!res || res.ok === false) return;
+    _criando = false;
+    _aba = 'ativa';
+    render(res.snapshot || _last);
+    mensagem(`Missão "${campos.titulo}" criada.`);
+    if (typeof window.refreshMemory === 'function') window.refreshMemory();
+    destacar(campos.titulo);
   }
 
   async function abandonar(titulo) {
@@ -269,8 +474,19 @@
   window.Missoes = {
     _abrir: abrir,
     _fechar: () => fechar(false),
-    _aba: (id) => { _aba = id; _confirmandoAbandono = ''; render(_last); mensagem(''); },
+    _aba: (id) => {
+      _aba = id; _confirmandoAbandono = ''; _editando = ''; _criando = false;
+      render(_last); mensagem('');
+    },
     _marcar: marcar,
+    _editar: editar,
+    _nova: nova,
+    _cancelar: cancelar,
+    _salvar: salvar,
+    _criar: criar,
+    _objNovo: objNovo,
+    _objRemover: objRemover,
+    _objMover: objMover,
     _abandonar: abandonar,
     _entregar: entregar,
     _verPessoa: (nome) => { fechar(false); if (window.Personagens) window.Personagens._abrir(nome); },

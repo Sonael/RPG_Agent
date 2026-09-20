@@ -167,3 +167,144 @@ def test_abandonar_pede_confirmacao(pagina):
     pg.wait_for_function("() => document.querySelectorAll('#msn-lista .msn-cartao').length === 2",
                          timeout=5000)
     assert "Falhadas e abandonadas 2" in pg.inner_text("#msn-abas")
+
+
+# ---------------------------------------------------------------------------
+# O caderno do jogador: editar a missão na tela e criar a sua
+# ---------------------------------------------------------------------------
+
+def _editar(pg, titulo):
+    pg.evaluate("() => window.Missoes._abrir('')")
+    _esperar_lista(pg)
+    pg.click(f"{_cartao(titulo)} .msn-editar")
+    pg.wait_for_selector("#msn-ed-titulo", timeout=5000)
+
+
+def test_editar_missao_muda_os_campos_e_os_objetivos(pagina):
+    pg, erros = pagina
+    _editar(pg, "A dívida de Torbin")
+    pg.fill("#msn-ed-titulo", "A dívida do velho Torbin")
+    pg.fill("#msn-ed-recompensa", "O anel de sinete")
+    # Um objetivo novo, e o de cima reescrito.
+    pg.fill("#msn-obj-novo", "Falar com o agiota")
+    pg.click("#missoes-overlay .msn-obj-novo .lcl-btn")
+    pg.wait_for_selector("#missoes-overlay .msn-objetivo-edit:nth-child(2)", timeout=5000)
+    pg.fill("#missoes-overlay .msn-obj-texto >> nth=0", "Descobrir quem cobra a dívida do pai")
+    pg.click("#missoes-overlay .lcl-btn-ir:has-text('Salvar')")
+
+    cartao = _cartao("A dívida do velho Torbin")
+    pg.wait_for_selector(cartao, timeout=5000)
+    texto = pg.inner_text(cartao)
+    assert "O anel de sinete" in texto
+    assert "Descobrir quem cobra a dívida do pai" in texto
+    assert "Falar com o agiota" in texto
+    assert pg.locator(f"{cartao} .msn-objetivo").count() == 2
+    assert not erros, erros[:3]
+
+
+def test_remover_e_reordenar_objetivo(pagina):
+    pg, erros = pagina
+    _editar(pg, "Escoltar a Princesa Elara")
+    antes = pg.eval_on_selector_all("#missoes-overlay .msn-obj-texto", "els => els.map(e => e.value)")
+    assert len(antes) == 3
+    # Sobe o último e apaga o primeiro da nova ordem.
+    pg.click("#missoes-overlay .msn-objetivo-edit >> nth=2 >> .msn-obj-btn >> nth=0")
+    pg.wait_for_function(
+        """(esperado) => [...document.querySelectorAll('#missoes-overlay .msn-obj-texto')]
+             .map(e => e.value)[1] === esperado""", arg=antes[2], timeout=5000)
+    pg.click("#missoes-overlay .msn-objetivo-edit >> nth=0 >> .msn-obj-tirar")
+    pg.wait_for_function(
+        "() => document.querySelectorAll('#missoes-overlay .msn-obj-texto').length === 2", timeout=5000)
+    depois = pg.eval_on_selector_all("#missoes-overlay .msn-obj-texto", "els => els.map(e => e.value)")
+    assert depois == [antes[2], antes[1]], (antes, depois)
+    assert not erros, erros[:3]
+
+
+def test_criar_missao_propria_e_avisar_o_mestre_ao_fechar(pagina):
+    pg, erros = pagina
+    pg.evaluate("() => window.Missoes._abrir('')")
+    _esperar_lista(pg)
+    pg.click("#msn-nova-btn")
+    pg.wait_for_selector("#msn-nv-titulo", timeout=5000)
+    pg.fill("#msn-nv-titulo", "Achar um mestre de armas")
+    pg.fill("#msn-nv-descricao", "Alguém que treine o grupo.")
+    pg.fill("#msn-nv-objetivos", "Perguntar na taverna\nVisitar o quartel")
+    pg.click("#missoes-overlay .lcl-btn-ir:has-text('Criar missão')")
+
+    cartao = _cartao("Achar um mestre de armas")
+    pg.wait_for_selector(cartao, timeout=5000)
+    assert "Perguntar na taverna" in pg.inner_text(cartao)
+    assert pg.locator(f"{cartao} .msn-objetivo").count() == 2
+    assert "Ativas 4" in pg.inner_text("#msn-abas")
+
+    pg.click("#missoes-overlay .lcl-fechar")
+    pg.wait_for_function("() => window.__enviados.length === 1", timeout=5000)
+    aviso = pg.evaluate("() => window.__enviados[0]")
+    assert "criou a missão 'Achar um mestre de armas'" in aviso, aviso
+    assert not erros, erros[:3]
+
+
+def test_titulo_repetido_avisa_e_nao_grava(pagina):
+    pg, erros = pagina
+    _editar(pg, "A dívida de Torbin")
+    pg.fill("#msn-ed-titulo", "escoltar a princesa elara")
+    pg.click("#missoes-overlay .lcl-btn-ir:has-text('Salvar')")
+    pg.wait_for_function(
+        "() => document.getElementById('msn-msg').textContent.includes('Já existe')", timeout=5000)
+    # Continua em edição, com o que foi digitado, e nada foi gravado.
+    assert pg.input_value("#msn-ed-titulo") == "escoltar a princesa elara"
+    pg.click("#missoes-overlay .lcl-btn-sec:has-text('Cancelar')")
+    pg.wait_for_selector(_cartao("A dívida de Torbin"), timeout=5000)
+    assert not erros, erros[:3]
+
+
+def test_missao_encerrada_nao_tem_editar(pagina):
+    pg, _ = pagina
+    pg.evaluate("() => window.Missoes._abrir('Ratos no porão')")
+    pg.wait_for_selector(_cartao("Ratos no porão"), timeout=5000)
+    assert pg.locator(f"{_cartao('Ratos no porão')} .msn-editar").count() == 0
+
+
+def test_nova_missao_nao_bate_no_fechar_nem_nas_abas(pagina):
+    """O botão nasceu no alto à direita e ficava por baixo do X de fechar."""
+    pg, _ = pagina
+    pg.evaluate("() => window.Missoes._abrir('')")
+    _esperar_lista(pg)
+    # As abas de verdade, não a faixa delas: a faixa ocupa a largura toda.
+    caixas = pg.evaluate("""() => [document.getElementById('msn-nova-btn'),
+                                   document.querySelector('#msn-frame .lcl-close'),
+                                   ...document.querySelectorAll('#msn-abas .msn-aba')]
+        .map(e => e.getBoundingClientRect())
+        .map(r => ({l: r.left, r: r.right, t: r.top, b: r.bottom}))""")
+    nova = caixas[0]
+
+    def encostam(a, b):
+        return a["l"] < b["r"] - 1 and b["l"] < a["r"] - 1 and a["t"] < b["b"] - 1 and b["t"] < a["b"] - 1
+
+    for outro in caixas[1:]:
+        assert not encostam(nova, outro), (nova, outro)
+    # E está dentro do cabeçalho.
+    cab = pg.evaluate("""() => { const r = document.querySelector('#msn-frame .lcl-header')
+        .getBoundingClientRect(); return {l: r.left, r: r.right, t: r.top, b: r.bottom}; }""")
+    assert cab["l"] <= nova["l"] and nova["r"] <= cab["r"] + 1, (nova, cab)
+    assert cab["t"] <= nova["t"] and nova["b"] <= cab["b"] + 1, (nova, cab)
+
+
+def test_recusa_no_formulario_novo_nao_apaga_o_que_foi_escrito(pagina):
+    """Redesenhar no erro limpava o formulário inteiro e o jogador perdia o
+    que tinha digitado."""
+    pg, erros = pagina
+    pg.evaluate("() => window.Missoes._abrir('')")
+    _esperar_lista(pg)
+    pg.click("#msn-nova-btn")
+    pg.wait_for_selector("#msn-nv-titulo", timeout=5000)
+    pg.fill("#msn-nv-titulo", "escoltar a princesa elara")
+    pg.fill("#msn-nv-descricao", "Levar a princesa por outro caminho.")
+    pg.fill("#msn-nv-objetivos", "Achar um barqueiro")
+    pg.click("#missoes-overlay .lcl-btn-ir:has-text('Criar missão')")
+    pg.wait_for_function(
+        "() => document.getElementById('msn-msg').textContent.includes('Já existe')", timeout=5000)
+    assert pg.input_value("#msn-nv-descricao") == "Levar a princesa por outro caminho."
+    assert pg.input_value("#msn-nv-objetivos") == "Achar um barqueiro"
+    assert pg.locator("#msn-lista .msn-cartao").count() == 4    # os 3 + o formulário
+    assert not erros, erros[:3]

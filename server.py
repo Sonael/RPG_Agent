@@ -3270,8 +3270,11 @@ def quests_action_route():
         objetivo = int(d.get("objective", -1))
     except (TypeError, ValueError):
         objetivo = -1
+    campos = d.get("fields")
     return jsonify(missoes.quest_action(action, quest=(d.get("quest") or "").strip(),
-                                        objective=objetivo))
+                                        objective=objetivo,
+                                        text=(d.get("text") or ""),
+                                        fields=campos if isinstance(campos, dict) else None))
 
 
 @app.route("/api/loot/state", methods=["GET"])

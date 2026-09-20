@@ -5417,8 +5417,39 @@ body.loot-on { overflow: hidden; }
 .msn-abandonar { color: var(--lcl-muted); }
 .msn-abandonar.msn-confirmar { border-color: var(--lcl-red); color: var(--lcl-red); font-weight: 700; }
 .msn-vazio { padding: var(--esp-8) 0; }
+/* O caderno do jogador: editar a missão e criar a sua (missoes.js). */
+/* No rodapé do cabeçalho, à direita: em cima ele batia no X de fechar. */
+.msn-nova-btn { position: absolute; right: var(--esp-6); bottom: var(--esp-4); }
+.msn-editando { border-color: var(--lcl-dark); display: flex; flex-direction: column; gap: var(--esp-2); }
+.msn-campo { display: flex; flex-direction: column; gap: 2px; font-size: 0.86rem; }
+.msn-campo > span {
+  font-size: 0.7rem; text-transform: uppercase; letter-spacing: .05em; color: var(--lcl-muted);
+}
+.msn-campo input, .msn-campo textarea, .msn-obj-novo input, .msn-obj-texto {
+  font-family: 'Lora', serif; font-size: 0.9rem; color: var(--lcl-text);
+  background: var(--lcl-bg); border: 1px solid var(--lcl-line); border-radius: 6px;
+  padding: var(--esp-1) var(--esp-2); width: 100%;
+}
+.msn-campo textarea { resize: vertical; }
+.msn-campos-lado { display: flex; gap: var(--esp-3); }
+.msn-campos-lado .msn-campo { flex: 1 1 0; min-width: 0; }
+.msn-objetivos-edit { gap: var(--esp-1); }
+.msn-objetivo-edit { display: flex; align-items: center; gap: var(--esp-1); }
+.msn-obj-btn {
+  flex: 0 0 auto; cursor: pointer; line-height: 1;
+  background: none; border: 1px solid var(--lcl-line); border-radius: 6px;
+  color: var(--lcl-muted); padding: 4px 7px; font-size: 0.8rem;
+}
+.msn-obj-btn:hover { border-color: var(--lcl-dark); color: var(--lcl-dark); }
+.msn-obj-tirar:hover { border-color: var(--lcl-red); color: var(--lcl-red); }
+.msn-obj-novo { display: flex; gap: var(--esp-2); align-items: center; }
+.msn-aviso-edicao { margin: 0; font-size: 0.76rem; font-style: italic; color: var(--lcl-muted); }
+@media (max-width: 900px) {
+  .msn-nova-btn { position: static; margin-top: var(--esp-2); }
+}
 @media (max-width: 760px) {
   .msn-lista { padding: var(--esp-3) var(--esp-4); }
+  .msn-campos-lado { flex-direction: column; gap: var(--esp-2); }
 }
 
 /* ═══════════════════════════════════════════════════════════════════
