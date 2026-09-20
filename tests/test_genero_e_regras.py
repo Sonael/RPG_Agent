@@ -251,3 +251,21 @@ def test_memoria_manda_a_configuracao_com_as_regras():
 def test_configuracao_aceita_o_dnd_antigo():
     cfg = agent.get_campaign_config("dnd")
     assert cfg["label"] == "Fantasia / Aventura · D&D"
+
+
+# A hora do mundo nasce com a campanha: quem cria ou importa sem relógio começa
+# na manhã do dia 1, e a barra mostra o tempo desde o primeiro turno.
+
+def test_campanha_criada_sem_relogio_comeca_na_manha_do_dia_1():
+    import server
+
+    nova = server._payload_de_campanha("Nova", {"campaign_type": "fantasia"}, {})
+    assert nova["relogio"] == {"dia": 1, "hora": 8}
+
+
+def test_campanha_importada_mantem_o_relogio_que_trouxe():
+    import server
+
+    vinda = server._payload_de_campanha("Vinda", {"campaign_type": "fantasia",
+                                                  "relogio": {"dia": 12, "hora": 21}}, {})
+    assert vinda["relogio"] == {"dia": 12, "hora": 21}

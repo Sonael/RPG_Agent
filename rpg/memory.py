@@ -150,6 +150,10 @@ class _CampaignProxy:
 # `campaign` agora é um proxy resolvido por contexto (não um dict global).
 campaign = _CampaignProxy()
 
+# Onde o relógio do mundo começa: manhã do primeiro dia. Toda campanha tem
+# hora desde o primeiro turno; o mestre move daí com advance_time().
+RELOGIO_INICIAL = {"dia": 1, "hora": 8}
+
 
 def _defaults() -> dict:
     return {
@@ -179,10 +183,10 @@ def _defaults() -> dict:
         # DESCARTADO na leitura seguinte — foi o que aconteceu com missões,
         # relógio e lojas até esta correção.
         #
-        # relogio vazio = a campanha nunca chamou advance_time(). É diferente
-        # de "dia 1, 8h": a linha de Tempo na lateral só aparece quando o
-        # relógio existe de verdade.
-        "relogio":              {},
+        # A hora do mundo existe desde o primeiro turno (_migrate_relogio):
+        # antes ela só nascia no primeiro advance_time(), e até lá a linha de
+        # Tempo não aparecia na barra.
+        "relogio":              dict(RELOGIO_INICIAL),
         "quests":               {},
         "lojas":                {},
         # Manutenção de memória (ver memory.marcar_upkeep). O prefixo _ marca
@@ -390,6 +394,21 @@ def _migrate_regras_e_genero() -> None:
     campaign["dnd_mode"] = dnd
 
 
+def _migrate_relogio() -> None:
+    """
+    Toda campanha tem uma hora do dia, desde o primeiro turno.
+
+    O relógio nascia vazio e só passava a existir quando o mestre chamava
+    advance_time() — o que ele só é cobrado de fazer depois de dez turnos.
+    Até lá a linha do tempo não aparecia na barra, e o jogador não tinha como
+    saber que horas eram na história. Agora a campanha começa no Dia 1, às 8h,
+    e as que foram criadas antes ganham o mesmo começo ao carregar.
+    """
+    rel = campaign.get("relogio")
+    if not isinstance(rel, dict) or not rel:
+        campaign["relogio"] = dict(RELOGIO_INICIAL)
+
+
 def normalizar_campanha() -> None:
     """
     As correções que TODA campanha carregada recebe, num lugar só:
@@ -408,6 +427,7 @@ def normalizar_campanha() -> None:
     for char in campaign.get("characters", {}).values():
         _migrate_sheet_fields(char)
     _migrate_regras_e_genero()
+    _migrate_relogio()
     _migrate_combat_state()
     _migrate_spell_descriptions()
     _migrate_mana_pool()
@@ -460,6 +480,58 @@ def turnos_sem(chave: str) -> int:
     if chave not in marcas:
         return -1
     return turno_atual() - int(marcas.get(chave) or 0)
+
+
+LADOS = ("grupo", "aliado", "inimigo")
+
+
+def lado_no_combate(char: dict) -> str:
+    """
+    De que lado um personagem luta: "grupo", "aliado" ou "inimigo".
+
+    O combate tinha dois lados: quem estava no grupo do jogador, e todo o
+    resto. Escoltar um mercador virava luta contra ele — o NPC entrava na
+    iniciativa, caía na zona dos inimigos e o motor o mandava atacar o grupo.
+
+    Agora existe o aliado: luta ao lado do grupo, mas não é do grupo (não
+    ganha XP, não sobe de nível, não entra no saque e não é jogado pelo
+    jogador — o motor age por ele, como age pelos inimigos).
+
+    A dedução, em ordem:
+      1. char["lado"], quando o mestre marcou (roll_initiative(allies=...) ou
+         set_combat_side);
+      2. quem é do grupo (is_party_member) é "grupo";
+      3. quem foi criado como criatura de luta é "inimigo" (spawn_monster e a
+         ficha padrão do roll_initiative gravam status "inimigo");
+      4. NPC de quem a campanha já gosta (atitude >= 30) é "aliado"; NPC
+         hostil (atitude <= -30) é "inimigo";
+      5. no resto, "inimigo" — o padrão antigo, e o seguro: numa ficha comum
+         o mercador que o grupo escolta e a rival que veio duelar são
+         idênticos, e adivinhar "aliado" transformaria todo duelo numa luta
+         sem inimigo. Quem luta ao lado do grupo é declarado: roll_initiative
+         (allies=...) ou set_combat_side.
+    """
+    if not isinstance(char, dict):
+        return "inimigo"
+    lado = (char.get("lado") or "").strip().lower()
+    if lado in LADOS:
+        return lado
+    if is_party_member(char):
+        return "grupo"
+    if (char.get("status") or "").strip().lower() == "inimigo":
+        return "inimigo"
+    try:
+        atitude = int(char.get("atitude", 0) or 0)
+    except (TypeError, ValueError):
+        atitude = 0
+    if atitude >= 30:
+        return "aliado"
+    return "inimigo"
+
+
+def luta_com_o_grupo(char: dict) -> bool:
+    """Está do lado do jogador nesta luta (do grupo ou aliado)."""
+    return lado_no_combate(char) != "inimigo"
 
 
 def is_party_member(char: dict) -> bool:

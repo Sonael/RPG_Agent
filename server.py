@@ -1028,7 +1028,9 @@ def _payload_de_campanha(name: str, dados: dict, personagens: dict) -> dict:
         # Onda 4 — mundo, missões e economia. Sem estas linhas, exportar e
         # reimportar uma campanha jogava fora tudo o que o grupo construiu:
         # o diário de missões, a hora do mundo, as lojas abertas.
-        "relogio":              dados.get("relogio", {}),
+        # Sem relógio no arquivo, a campanha começa na manhã do dia 1: a hora
+        # do mundo existe desde o primeiro turno (memory.RELOGIO_INICIAL).
+        "relogio":              dados.get("relogio") or dict(memory.RELOGIO_INICIAL),
         "quests":               dados.get("quests", {}),
         "lojas":                dados.get("lojas", {}),
         # O romance no nível da campanha: segredos, encontros marcados e as

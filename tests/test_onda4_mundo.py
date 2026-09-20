@@ -548,3 +548,23 @@ def test_campanha_sem_onda4_nao_ganha_ruido_no_contexto(campanha):
     assert "Missões ativas" not in ctx
     assert "Atitude dos NPCs" not in ctx
     assert "Tempo: Dia 1, 08h (manhã) — o relógio ainda não andou" in ctx
+
+
+# A hora do mundo existe desde o primeiro turno: sem ela, a linha de Tempo não
+# aparecia na barra até o mestre chamar advance_time() — o que ele só é cobrado
+# de fazer depois de dez turnos.
+
+def test_campanha_nova_ja_tem_relogio(campanha):
+    assert memory._defaults()["relogio"] == {"dia": 1, "hora": 8}
+
+
+def test_campanha_antiga_sem_relogio_ganha_a_manha_do_dia_1(campanha):
+    campanha.pop("relogio", None)
+    memory.normalizar_campanha()
+    assert campanha["relogio"] == {"dia": 1, "hora": 8}
+
+
+def test_relogio_que_ja_andou_nao_volta_para_o_comeco(campanha):
+    campanha["relogio"] = {"dia": 9, "hora": 23}
+    memory.normalizar_campanha()
+    assert campanha["relogio"] == {"dia": 9, "hora": 23}

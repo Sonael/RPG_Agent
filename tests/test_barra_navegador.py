@@ -124,6 +124,19 @@ def test_relance_onde_capitulo_e_hora_numa_linha(abrir):
     assert not erros, erros[:3]
 
 
+# Campanha recém-criada: o mestre ainda não avançou o tempo nenhuma vez, e a
+# hora precisa aparecer assim mesmo (memory.RELOGIO_INICIAL).
+
+def test_campanha_nova_ja_mostra_a_hora(abrir, estado):
+    sem_relogio = copy.deepcopy(estado)
+    sem_relogio["relogio"] = {}
+    pg, erros = abrir(sem_relogio)
+    assert "hidden" not in (pg.get_attribute("#sb-tempo", "class") or "")
+    assert pg.inner_text("#sb-tempo-texto") == "Dia 1, 08h"
+    assert "manhã" in pg.get_attribute("#sb-tempo", "title")
+    assert not erros, erros[:3]
+
+
 def test_local_capitulo_e_hora_abrem_as_telas(abrir):
     pg, _ = abrir()
     pg.click("#sb-location")
