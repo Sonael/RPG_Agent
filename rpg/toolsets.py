@@ -155,7 +155,10 @@ class FerramentasDoTurno(BaseToolset):
 
     def __init__(self, funcoes):
         super().__init__()
-        self._todas = [FunctionTool(f) for f in funcoes]
+        # Cada ferramenta entra com o conversor de argumentos (rpg/argumentos):
+        # o modelo manda difficulty="12" e a conta quebrava no meio.
+        from rpg.argumentos import com_tipos
+        self._todas = [FunctionTool(com_tipos(f)) for f in funcoes]
         self._por_nome = {t.name: t for t in self._todas}
 
     async def get_tools(self, readonly_context=None):
