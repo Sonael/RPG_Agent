@@ -2135,8 +2135,12 @@ HEALING_KEYWORDS = {
 # ---------------------------------------------------------------------------
 CONTROL_SPELL_EFFECTS: dict[str, dict] = {
     # Nível 1
-    "sleep":                 {"condition": "Dormindo",     "pool": True},
-    "color spray":           {"condition": "Cego",         "pool": True},
+    # O "dado" das magias de pool é o tamanho do pool de HP, e o SRD o
+    # escreve de um jeito que nenhuma leitura de dano pega ("Roll 5d8; the
+    # total is how many hit points of creatures this spell can affect").
+    # Sem ele aqui, Sleep dormia zero criaturas.
+    "sleep":                 {"condition": "Dormindo",     "pool": True, "dado": "5d8"},
+    "color spray":           {"condition": "Cego",         "pool": True, "dado": "6d10"},
     # Nível 2
     "hold person":           {"condition": "Paralisado",   "pool": False},
     "blindness/deafness":    {"condition": "Cego",         "pool": False},
@@ -2212,7 +2216,146 @@ def _is_healing_ability(hab: dict) -> bool:
         any(k in name for k in HEALING_KEYWORDS)
         or "restaura" in desc or "cura" in desc
         or "recupera" in desc or "heal" in desc
+        # O SRD escreve cura assim, em inglês, e nenhuma das palavras acima
+        # aparece: "A creature you touch regains a number of hit points".
+        or "regains" in desc or "hit points" in desc
     )
+
+
+# ── O QUE O DADO DA HABILIDADE SIGNIFICA ──────────────────────────────────
+# Três defeitos vinham de tratar todo dado como dano:
+#
+#  • habilidade SEM dado rolava 1d6 e tirava vida de quem fosse o alvo. O
+#    _parse_dice cai em (1,6,0) quando não entende a fórmula, e "" não é
+#    fórmula. Na campanha medida eram 25 habilidades assim — Segunda Fôlego,
+#    Canalizar Divindade, Mending, Inflict Wounds —, e benzer um aliado o
+#    machucava;
+#  • Bênção guardava "1d4", que é o bônus que ela DÁ aos ataques, não dano:
+#    lançá-la no companheiro tirava 1d4 de vida dele;
+#  • magia de dano aprendida pelo Open5e chegava sem dado nenhum, porque a
+#    API não tem campo de dano para magias — ele está no texto.
+#
+# Agora o dado tem tipo, e o tipo decide o que acontece com a vida do alvo.
+_DADO = r"(\d+\s*d\s*\d+(?:\s*[+-]\s*\d+)?)"
+_DANO_NO_TEXTO = re.compile(
+    _DADO + r"[^.;]{0,40}?\b(?:damage|dano)\b"
+    r"|\b(?:deals?|causa|inflige|sofre)\b[^.;]{0,40}?" + _DADO,
+    re.IGNORECASE)
+_CURA_NO_TEXTO = re.compile(
+    r"\b(?:regains?|heals?|restaura\w*|recupera\w*|cura\w*)\b[^.;]{0,60}?" + _DADO
+    + r"|" + _DADO + r"[^.;]{0,40}?\b(?:hit points|pontos de vida)\b",
+    re.IGNORECASE)
+
+
+def _primeiro_dado(achado) -> str:
+    """O grupo que casou, de qualquer um dos lados da alternativa."""
+    if not achado:
+        return ""
+    return " ".join((next(g for g in achado.groups() if g)).split()).replace(" ", "")
+
+
+def dado_de_dano_no_texto(texto: str) -> str:
+    """"8d6 fire damage" → "8d6". "adiciona 1d4 aos ataques" → ""."""
+    return _primeiro_dado(_DANO_NO_TEXTO.search(texto or ""))
+
+
+def dado_de_cura_no_texto(texto: str) -> str:
+    """"regains hit points equal to 1d8 + mod" → "1d8"."""
+    return _primeiro_dado(_CURA_NO_TEXTO.search(texto or ""))
+
+
+def efeito_do_dado(hab: dict) -> str:
+    """
+    O que o dado desta habilidade faz: 'cura', 'dano', 'bonus' ou 'nenhum'.
+
+    'bonus' é o caso da Bênção e da Orientação: o dado existe e é rolado — o
+    jogador quer ver o número —, mas ele NÃO entra na vida de ninguém.
+    """
+    if not isinstance(hab, dict):
+        return "nenhum"
+    # Magia de controle é o que a tabela do motor disser que ela é — o dado
+    # dela é pool ou duração, nunca ferida.
+    _ctrl = _get_control_effect(hab)
+    if _ctrl is not None:
+        return "pool" if _ctrl.get("pool") else "condicao"
+    texto = f"{hab.get('nome', '')} {hab.get('descricao', '')}"
+    tem_dado = bool((hab.get("dado") or "").strip())
+    if _is_healing_ability(hab):
+        return "cura" if tem_dado or dado_de_cura_no_texto(texto) else "nenhum"
+    if tem_dado:
+        # Dado guardado sem nada no texto ligando-o a dano é bônus, não ferida.
+        return "dano" if dado_de_dano_no_texto(texto) or not hab.get("descricao") else "bonus"
+    return "dano" if dado_de_dano_no_texto(texto) else "nenhum"
+
+
+# ── A SALVAGUARDA DA MAGIA ────────────────────────────────────────────────
+# Até aqui ela só acontecia se o MESTRE passasse saving_throw_stat e a CD na
+# chamada. Quando ele esquecia — e esquecer é o problema medido deste
+# projeto —, a Bola de Fogo causava dano cheio em todo mundo, sem teste
+# nenhum. O SRD diz qual é o teste no texto da magia; dá para ler de lá.
+_SAVE_NO_TEXTO = re.compile(
+    r"\b(?:on\s+a\s+|make\s+a\s+|succeed\s+on\s+a\s+)?"
+    r"(strength|dexterity|constitution|intelligence|wisdom|charisma|"
+    r"for[çc]a|destreza|constitui[çc][ãa]o|intelig[êe]ncia|sabedoria|carisma)"
+    r"\s+(?:saving\s+throw|save)"
+    r"|salvaguarda\s+de\s+"
+    r"(for[çc]a|destreza|constitui[çc][ãa]o|intelig[êe]ncia|sabedoria|carisma)",
+    re.IGNORECASE)
+_SAVE_PT = {
+    "strength": "forca", "dexterity": "destreza", "constitution": "constituicao",
+    "intelligence": "inteligencia", "wisdom": "sabedoria", "charisma": "carisma",
+}
+
+
+def salvaguarda_da_habilidade(hab: dict) -> str:
+    """O atributo do teste de resistência desta habilidade, ou ""."""
+    guardada = _norm_txt((hab or {}).get("salvaguarda", "") or "")
+    if guardada:
+        return _SAVE_PT.get(guardada, guardada)
+    achado = _SAVE_NO_TEXTO.search(f"{(hab or {}).get('descricao', '')}")
+    if not achado:
+        return ""
+    bruto = _norm_txt(next(g for g in achado.groups() if g))
+    return _SAVE_PT.get(bruto, bruto)
+
+
+def _rolar_salvaguarda(alvo: dict, atributo: str, cd: int) -> tuple[bool, str]:
+    """
+    O alvo resiste? Mesma conta da salvaguarda de item arremessado, para
+    qualquer atributo: d20 + modificador (+ proficiência quando a classe tem
+    a salvaguarda).
+    """
+    s = alvo.get("sheet") or {}
+    status = (alvo.get("status") or "").lower()
+    conds = {_norm_txt(c.get("nome", "") if isinstance(c, dict) else str(c))
+             for c in (s.get("condicoes") or [])}
+    if atributo == "destreza" and (conds & set(_FALHA_AUTOMATICA_EM_DES)
+                                   or status in ("inconsciente", "dormindo")):
+        return False, f"falha automática na salvaguarda de DES (CD {cd})"
+    mod = _modifier(int(s.get(atributo, 10) or 10))
+    classe = (s.get("classe") or "").lower()
+    if atributo in CLASS_DATA.get(classe, {}).get("saves", []):
+        mod += int(s.get("proficiencia", 2) or 2)
+    d20 = random.randint(1, 20)
+    total = d20 + mod
+    sigla = _ATRIBUTO_SIGLA.get(atributo, atributo[:3].upper())
+    return total >= cd, f"salvaguarda de {sigla}: {d20}{mod:+d} = {total} vs CD {cd}"
+
+
+def dado_efetivo(hab: dict) -> str:
+    """
+    A fórmula que vale. Quando a ficha não tem dado — o caso de toda magia
+    vinda do Open5e, que não expõe dano —, ele é lido do texto do SRD.
+    """
+    guardado = (hab.get("dado") or "").strip()
+    if guardado:
+        return guardado
+    _ctrl = _get_control_effect(hab)
+    if _ctrl is not None:
+        # Pool tem o seu tamanho na tabela; condição pura não rola nada.
+        return _ctrl.get("dado", "")
+    texto = f"{hab.get('nome', '')} {hab.get('descricao', '')}"
+    return dado_de_cura_no_texto(texto) if _is_healing_ability(hab) else dado_de_dano_no_texto(texto)
 
 # ---------------------------------------------------------------------------
 # Tabela de armaduras — usada por equip_item para recalcular CA
@@ -5805,18 +5948,34 @@ def use_ability(
     if _rec:
         _gastar_recarga(char, _rec)
 
-    n_dice, sides, bonus = _parse_dice(hab.get("dado", "1d6"))
-    rolls      = [random.randint(1, sides) for _ in range(n_dice)]
-    total_dano = sum(rolls) + bonus
+    # O dado só existe se a habilidade tiver um — e só vira ferida se o texto
+    # disser que é dano (ver efeito_do_dado). Sem isso, benzer um aliado
+    # tirava 1d6 de vida dele.
+    _efeito = efeito_do_dado(hab)
+    _formula = dado_efetivo(hab)
+    if _formula:
+        n_dice, sides, bonus = _parse_dice(_formula)
+        rolls      = [random.randint(1, sides) for _ in range(n_dice)]
+        total_dano = sum(rolls) + bonus
+    else:
+        n_dice, sides, bonus = 0, 0, 0
+        rolls, total_dano = [], 0
 
     target_str = f" em {target_name}" if target_name else ""
     detail     = " + ".join(str(r) for r in rolls)
     bonus_str  = f" + {bonus}" if bonus > 0 else (f" - {abs(bonus)}" if bonus < 0 else "")
 
+    if _formula:
+        rotulo = {"cura": "cura", "dano": "dano", "bonus": "bônus"}.get(_efeito, "")
+        _linha_dado = (f"   {n_dice}d{sides}: [{detail}]{bonus_str} = **{total_dano}**"
+                       + (f" ({rotulo})" if rotulo else "") + "\n")
+    else:
+        _linha_dado = ""
+
     result = (
         f"{char['name']} usa {hab['nome']}{target_str}!\n"
         f"   Custo: {custo} mana | Mana restante: {s['mana_atual']}/{s['mana_max']}\n"
-        f"   {n_dice}d{sides}: [{detail}]{bonus_str} = **{total_dano}**\n"
+        f"{_linha_dado}"
         f"   Efeito: {hab['descricao']}"
     )
 
@@ -5914,6 +6073,34 @@ def use_ability(
         if target and target.get("sheet"):
             st = target["sheet"]
 
+            # ── A MAGIA TEM TESTE E O MESTRE NÃO PEDIU ───────────────────
+            # O SRD diz qual é o teste; quando o alvo é um NPC, o motor rola
+            # e resolve na hora. Antes, mestre que esquecia a salvaguarda
+            # fazia a Bola de Fogo causar dano cheio em todo mundo, sempre.
+            # Contra personagem do JOGADOR continua sendo ele quem rola: a
+            # pausa abaixo pede o dado, e a bandeja abre sozinha.
+            _save_auto = salvaguarda_da_habilidade(hab)
+            if (_save_auto and not saving_throw_stat
+                    and (_efeito == "dano" or ctrl_effect is not None)):
+                _conj = _conjuracao(s) or {}
+                _cd = int(_conj.get("cd") or (8 + int(s.get("proficiencia", 2) or 2)))
+                if memory.is_party_member(target):
+                    # Personagem do jogador: o dado é dele. Cai na pausa
+                    # abaixo, com o teste e a CD que o SRD manda.
+                    saving_throw_stat, saving_throw_dc = _save_auto, _cd
+                else:
+                    _passou, _linha = _rolar_salvaguarda(target, _save_auto, _cd)
+                    result += f"\n   {target['name']}: {_linha}"
+                    if ctrl_effect is not None:
+                        if _passou:
+                            result += f" — resistiu, {ctrl_effect['condition']} não pega."
+                            memory.save_campaign()
+                            return result + (_auto_advance_turn(char_name) if end_turn else "")
+                    else:
+                        total_dano = total_dano // 2 if _passou else total_dano
+                        result += (f" — passou: metade do dano ({total_dano})"
+                                   if _passou else f" — falhou: dano cheio ({total_dano})")
+
             # ── MODO INTERATIVO: saving throw → PAUSA, não aplica efeito ──────
             if saving_throw_stat and saving_throw_dc > 0:
                 memory.save_campaign()
@@ -5944,7 +6131,13 @@ def use_ability(
             # ── MODO AUTOMÁTICO: aplica efeito imediatamente ─────────────────
             hp_antes = st["vida_atual"]
 
-            if _is_healing_ability(hab):
+            # Dado que não é dano nem cura (o 1d4 da Bênção, o da Orientação)
+            # é rolado e mostrado, e a vida de ninguém muda. Habilidade sem
+            # dado nenhum também não encosta em vida.
+            if _efeito in ("bonus", "nenhum") and ctrl_effect is None:
+                result += f"\n   {target['name']}: sem mudança na vida."
+
+            elif _is_healing_ability(hab):
                 st["vida_atual"] = min(_hp_max_efetivo(st), st["vida_atual"] + total_dano)
                 result += f"\n   {target['name']}: {hp_antes} → {st['vida_atual']}/{st['vida_max']}"
                 if hp_antes == 0:
@@ -11390,6 +11583,20 @@ def learn_spell(char_name: str, spell_name: str) -> str:
 
     desc_raw   = spell.get("desc", "Sem descrição disponível.")
     desc_clean = " ".join(desc_raw.split())[:300]
+
+    # O Open5e NÃO tem campo de dano para magia — conferido na API: `damage`
+    # vem nulo em todas elas, inclusive Bola de Fogo. O dado está escrito no
+    # texto ("8d6 fire damage", "regains ... 1d8"), e é de lá que ele sai.
+    # Sem isto, toda magia aprendida chegava sem dado e o motor rolava 1d6.
+    _texto_todo = " ".join(f"{desc_raw} {spell.get('higher_level', '') or ''}".split())
+    if not dado:
+        dado = (dado_de_cura_no_texto(_texto_todo)
+                if _is_healing_ability({"nome": nome_srd, "descricao": _texto_todo})
+                else dado_de_dano_no_texto(_texto_todo))
+    # O teste de resistência também está no texto, e é o que faz a magia ter
+    # defesa: sem ele, o mestre que esquecesse de pedir o teste aplicava dano
+    # cheio em todo mundo.
+    _save = salvaguarda_da_habilidade({"descricao": _texto_todo})
     escola     = spell.get("school", "")
     ritual     = " (ritual)"       if _sim_do_srd(spell.get("ritual"))        else ""
     concentr   = " (concentração)" if _sim_do_srd(spell.get("concentration")) else ""
@@ -11409,6 +11616,11 @@ def learn_spell(char_name: str, spell_name: str) -> str:
         # do SRD, "Bola de Fogo" e "Fireball" eram duas magias diferentes.
         "nivel_magia": spell_level,
         "nome_srd":   nome_srd,
+        # Campo booleano em vez de só a palavra na descrição: é o que
+        # _requires_concentration prefere quando existe.
+        "concentracao": bool(_sim_do_srd(spell.get("concentration"))
+                             or spell.get("requires_concentration")),
+        **({"salvaguarda": _save} if _save else {}),
     })
     memory.save_campaign()
 
@@ -11416,6 +11628,7 @@ def learn_spell(char_name: str, spell_name: str) -> str:
         f"{char['name']} aprendeu **{spell_name}** "
         f"(nível {spell_level}, {mana} mana{ritual}{concentr})!\n"
         f"   {escola} · Dado: {dado or 'sem dano direto'}"
+        + (f" · Resistência: {_ATRIBUTO_PT.get(_save, _save)}" if _save else "")
     )
 
 
