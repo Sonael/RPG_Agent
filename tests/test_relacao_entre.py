@@ -44,11 +44,21 @@ def campanha(tmp_path, monkeypatch):
 # O modelo
 # ---------------------------------------------------------------------------
 
-def test_relacao_e_direcional(campanha):
+def test_o_armazenamento_e_direcional(campanha):
+    """O módulo guarda um lado por vez; quem espelha é quem escreve (o
+    fechamento do turno e a tela). É o que deixa o lado avesso possível."""
     entre.ajustar("Helena", "Selene", -20, "o controle velado")
     assert entre.de_quem("Helena")[0]["valor"] == -20
-    # Selene não sentiu nada: quem se incomodou foi Helena.
     assert entre.de_quem("Selene") == []
+
+
+def test_existe_e_valor_entre(campanha):
+    assert entre.existe("Helena", "Selene") is False
+    assert entre.valor_entre("Helena", "Selene") == 0
+    entre.ajustar("Helena", "Selene", 0, "se conheceram")
+    assert entre.existe("Helena", "Selene") is True
+    assert entre.valor_entre("Helena", "Selene") == 0
+    assert entre.existe("Selene", "Helena") is False
 
 
 def test_o_que_sente_nao_mexe_na_atitude_com_o_grupo(campanha):
@@ -151,10 +161,41 @@ def test_a_linha_muda_a_relacao(campanha):
     assert any("relacao" in f for f in relatorio["feitos"])
 
 
+def test_uma_linha_mexe_nos_dois_lados(campanha):
+    """
+    "a relação de helena para selene não atualizou, eu acho que só está
+    atualizando em um personagem quando na verdade era para atualizar nos 2,
+    afinal é a relação das duas." A ficha de Selene tinha +25 com Helena e a
+    de Helena não tinha nada com Selene.
+    """
+    epilogo.processar(_bloco("relação: Selene → Helena +25 — se elogiaram depois da luta"))
+    assert entre.valor_entre("Selene", "Helena") == 25
+    assert entre.valor_entre("Helena", "Selene") == 25
+    assert entre.de_quem("Helena")[0]["motivo"] == "se elogiaram depois da luta"
+
+
 def test_seta_dos_dois_lados(campanha):
     epilogo.processar(_bloco("relação: Selene ↔ Sonael +30 — amigos de infância"))
     assert entre.de_quem("Selene")[0]["valor"] == 30
     assert entre.de_quem("Sonael")[0]["valor"] == 30
+
+
+def test_a_volta_escrita_a_mao_nao_e_sobrescrita(campanha):
+    """O caso que deu origem às relações: ela se ofendeu, ele nem percebeu."""
+    epilogo.processar(_bloco(
+        "relação: Helena → Selene -20 — odiou o controle velado",
+        "relação: Selene → Helena 0 — não notou nada"))
+    assert entre.valor_entre("Helena", "Selene") == -20
+    assert entre.valor_entre("Selene", "Helena") == 0
+
+
+def test_o_espelho_nao_gasta_o_teto_do_turno(campanha):
+    """Duas linhas continuam sendo duas linhas, mesmo virando quatro escritas."""
+    epilogo.processar(_bloco(
+        "relação: Helena → Selene -10 — a sugestão",
+        "relação: Sonael → Helena +10 — achou graça"))
+    assert entre.valor_entre("Selene", "Helena") == -10
+    assert entre.valor_entre("Helena", "Sonael") == 10
 
 
 @pytest.mark.parametrize("seta", ["->", "→", "<->"])
@@ -197,9 +238,72 @@ def test_o_bloco_sai_da_tela(campanha):
     assert "Helena → Selene" not in limpo
 
 
+# ---------------------------------------------------------------------------
+# O jogador precisa VER que a relação mudou
+# ---------------------------------------------------------------------------
+# "eu fiz Helena e Selene se elogiarem para subir a relação delas, porém o
+# sistema não avisou no chat que ela ganhou pontos na relação." O registro
+# acontecia (o +25 estava na ficha), mas em silêncio — enquanto a mudança de
+# atitude sempre saiu como linha no chat.
+
+def test_a_mudanca_de_relacao_vira_aviso_para_o_jogador(campanha):
+    _, relatorio = epilogo.processar(
+        _bloco("relação: Helena → Selene +25 — admiração e respeito mútuo"))
+    aviso = "\n".join(relatorio["avisos"])
+    assert "Helena e Selene" in aviso        # das duas, não de uma para a outra
+    assert "+25" in aviso
+    assert "amizade" in aviso
+    assert "admiração e respeito mútuo" in aviso
+
+
+def test_relacao_dos_dois_lados_avisa_uma_vez(campanha):
+    """Uma relação, uma linha no chat — não a mesma coisa dita duas vezes."""
+    _, relatorio = epilogo.processar(_bloco("relação: Selene ↔ Sonael +20 — se entenderam"))
+    assert len(relatorio["avisos"]) == 1
+
+
+def test_quando_os_lados_diferem_o_aviso_mostra_a_direcao(campanha):
+    _, relatorio = epilogo.processar(_bloco(
+        "relação: Helena → Selene -20 — odiou o controle velado",
+        "relação: Selene → Helena 0 — não notou nada"))
+    assert len(relatorio["avisos"]) == 2
+    assert "Helena → Selene" in relatorio["avisos"][0]
+    assert " e " not in relatorio["avisos"][0].split(":")[0]
+
+
+def test_turno_sem_relacao_nao_avisa_nada(campanha):
+    _, relatorio = epilogo.processar(_bloco("lugar: Residência de Selene — sala clara"))
+    assert relatorio["avisos"] == []
+
+
+def test_relacao_recusada_nao_avisa(campanha):
+    campanha["characters"]["brom"] = {"name": "Brom", "status": "vivo"}
+    _, relatorio = epilogo.processar(_bloco("relação: Helena → Brom +20 — do nada"))
+    assert relatorio["avisos"] == []
+    assert relatorio["recusados"]
+
+
+def test_sem_bloco_nenhum_o_relatorio_ainda_tem_avisos(campanha):
+    _, relatorio = epilogo.processar("Só a narração, sem fechamento.")
+    assert relatorio["avisos"] == []
+
+
+def test_o_servidor_manda_o_aviso_para_a_tela():
+    import inspect
+    import server
+    fonte = inspect.getsource(server.chat)
+    assert "registro.get(\"avisos\")" in fonte
+    assert "'tool_name': \"relacao\"" in fonte or '"tool_name": "relacao"' in fonte
+    # Depois da cena: o cartão confirma o que acabou de ser narrado.
+    assert fonte.index("'type': 'text'") < fonte.index('"tool_name": "relacao"')
+
+
 def test_o_prompt_ensina_a_linha():
     from rpg import agent
-    assert "relação:" in agent._EPILOGO_OBRIGATORIO
-    assert "↔" in agent._EPILOGO_OBRIGATORIO
-    # O mestre precisa saber que isto NÃO é a atitude com o grupo.
-    assert "adjust_attitude" in agent._EPILOGO_OBRIGATORIO
+    texto = agent._EPILOGO_OBRIGATORIO
+    assert "relação:" in texto
+    # Que a relação é das duas, e como fazer os lados diferirem.
+    assert "DAS DUAS" in texto
+    assert "as duas direções" in texto
+    # E que isto NÃO é a atitude com o grupo.
+    assert "adjust_attitude" in texto

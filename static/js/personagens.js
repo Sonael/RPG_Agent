@@ -550,7 +550,8 @@
     if (typeof window.showConfirm === 'function') {
       const ok = await window.showConfirm(
         `Tirar a relação com ${com}?`,
-        `O que ${_last.nome} sentia por ${com} sai da memória, com o histórico.`,
+        `A relação entre ${_last.nome} e ${com} sai da memória dos dois lados, `
+        + 'com o histórico.',
         'warning', 'Tirar');
       if (!ok) return;
     }

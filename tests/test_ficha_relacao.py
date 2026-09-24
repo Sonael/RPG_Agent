@@ -107,11 +107,27 @@ def test_o_mesmo_valor_nao_inventa_historico(campanha):
 
 
 def test_criar_uma_relacao_entre_dois(campanha):
+    """Nasce dos dois lados: é a relação DAS DUAS pessoas."""
     f = personagens.editar_relacao(
         "Selene", {"para": "Sonael", "valor": 60, "motivo": "amigos de infância"})
     assert f["entre"][0]["nome"] == "Sonael"
     assert f["entre"][0]["valor"] == 60
-    # É direcional: Sonael ainda não disse nada.
+    outro = personagens.ficha("Sonael")["entre"]
+    assert outro and outro[0]["nome"] == "Selene" and outro[0]["valor"] == 60
+
+
+def test_o_outro_lado_que_ja_existe_nao_e_mexido(campanha):
+    """Ela gosta dele e ele não gosta dela: isso é história, não engano."""
+    entre.ajustar("Sonael", "Selene", -30, "ficou com raiva")
+    personagens.editar_relacao("Selene", {"para": "Sonael", "valor": 60})
+    assert entre.valor_entre("Selene", "Sonael") == 60
+    assert entre.valor_entre("Sonael", "Selene") == -30
+
+
+def test_apagar_tira_os_dois_lados(campanha):
+    personagens.editar_relacao("Selene", {"para": "Sonael", "valor": 60})
+    personagens.editar_relacao("Selene", {"para": "Sonael", "apagar": True})
+    assert personagens.ficha("Selene")["entre"] == []
     assert personagens.ficha("Sonael")["entre"] == []
 
 

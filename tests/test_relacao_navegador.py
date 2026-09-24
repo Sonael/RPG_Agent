@@ -224,6 +224,28 @@ def test_ajustar_a_atitude_pela_ficha(pagina):
 
 
 # ---------------------------------------------------------------------------
+# O aviso no chat
+# ---------------------------------------------------------------------------
+
+def test_mudanca_de_relacao_aparece_no_chat(pagina):
+    """
+    "eu fiz Helena e Selene se elogiarem para subir a relação delas, porém o
+    sistema não avisou no chat." O registro acontecia calado, e a mudança de
+    atitude sempre teve a sua linha.
+    """
+    pg, erros, _ = pagina
+    texto = pg.evaluate(
+        "([t, c]) => { const row = appendDiceResultLog(t, c); return row ? row.innerText : null; }",
+        ["relacao", "Helena e Selene: +0 → +25 (amizade) — admiração e respeito mútuo revelados"])
+    assert texto is not None, "o aviso de relação não virou cartão no chat"
+    assert "Relação" in texto            # a etiqueta, não "Sistema"
+    assert "Helena e Selene" in texto    # das duas, não de uma para a outra
+    assert "+25" in texto and "amizade" in texto
+    assert "admiração e respeito mútuo" in texto
+    assert not erros, erros[:3]
+
+
+# ---------------------------------------------------------------------------
 # Apagar quem o combate deixou para trás
 # ---------------------------------------------------------------------------
 

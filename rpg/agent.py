@@ -168,7 +168,7 @@ tempo: <quantas horas passaram — "2h — viagem pela trilha">
 lugar: <lugar novo que você acabou de descrever — "Ponte Quebrada (dentro de: Vale) — tábuas podres">
 gente: <pessoa nova que apareceu — "Aldric — ferreiro da vila">
 fato: <verdade nova do mundo — "ponte_atravessada=sim">
-relação: <o que mudou entre duas pessoas — "Helena → Selene -20 — odiou o controle velado">
+relação: <o que mudou entre duas pessoas — "Helena → Selene +25 — se elogiaram depois da luta">
 [[/registro]]
 
 COMO PREENCHER
@@ -184,11 +184,16 @@ COMO PREENCHER
   pode repetir aqui sem medo — o sistema não registra duas vezes.
 
 A LINHA DE RELAÇÃO
-• A seta diz a direção: "Helena → Selene" é o que HELENA passou a sentir.
-  Use "↔" quando valer para os dois lados ("Selene ↔ Sonael +30 — amigos de
-  infância").
-• O número é o QUANTO MUDOU, com sinal, no máximo 30 para cada lado. Uma cena
-  não transforma ódio em amor.
+• A relação é DAS DUAS pessoas: uma linha muda os dois lados. "Selene →
+  Helena +25" sobe o que Selene sente por Helena E o que Helena sente por
+  Selene.
+• Para o sentimento ser DIFERENTE de um lado para o outro — ela se ofendeu e
+  ele nem percebeu —, escreva as duas direções, cada uma com o seu número:
+      relação: Helena → Selene -20 — odiou o controle velado
+      relação: Selene → Helena 0 — não notou nada
+  A direção que você escrever nunca é sobrescrita pela outra.
+• O número é o QUANTO MUDOU, com sinal, no máximo 30. Uma cena não transforma
+  ódio em amor.
 • Isto é entre DUAS PESSOAS. O que alguém sente pelo grupo continua sendo
   adjust_attitude, e a lealdade do companheiro continua sendo
   ajustar_lealdade — não use a linha de relação para elas.

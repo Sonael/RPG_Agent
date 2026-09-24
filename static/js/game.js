@@ -40,6 +40,8 @@ const STATE_TOOLS = new Set([
   'learn_spell',
   // Mochila: o que entra, sai ou é conferido aparece com ela aberta.
   'add_item', 'remove_item', 'identify_item', 'buy_item', 'sell_item',
+  // Fechamento do turno: a relação mudou, e a ficha aberta tem de mostrar.
+  'relacao',
 ]);
 
 function _condInfo(cd) {
@@ -838,6 +840,10 @@ function _appendDiceResultLog(toolName, content) {
     short_rest:       { badge: 'Descanso Curto',                color: 'var(--green)' },
     long_rest:        { badge: 'Descanso Longo',                color: 'var(--green)' },
     advance_turn:     { badge: 'Turno Avançado',                color: 'var(--ink-sys)' },
+    // Não é ferramenta do mestre: é o fechamento do turno dizendo o que mudou
+    // entre duas pessoas. Entra aqui porque, para o jogador, é a mesma coisa
+    // que a linha de atitude — algo que ele provocou e quer ver acontecer.
+    relacao:          { badge: 'Relação',                       color: '#7b5ea7' },
   };
   const cfg = labels[toolName] || { badge: 'Sistema', color: 'var(--text-muted)' };
 

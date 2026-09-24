@@ -2432,6 +2432,18 @@ def chat():
 
                     yield f"data: {json.dumps({'type': 'text', 'content': response_text})}\n\n"
 
+                    # O que o fechamento do turno mudou entre duas pessoas vai
+                    # para o chat, DEPOIS da cena. O jogador provoca isso de
+                    # propósito ("fiz as duas se elogiarem") e não via nada
+                    # acontecer — enquanto a mudança de atitude sempre avisou.
+                    # O resto do fechamento (lugar, gente, hora) aparece
+                    # sozinho na barra e no mapa, e não vira cartão.
+                    if registro.get("avisos"):
+                        pacote = json.dumps({"type": "tool_result",
+                                             "tool_name": "relacao",
+                                             "content": "\n".join(registro["avisos"])})
+                        yield f"data: {pacote}\n\n"
+
                     # Para a tela vai o texto do JOGADOR: o painel dele falava
                     # de ferramentas ("o agente deveria ter chamado
                     # save_character"), que é recado de mestre. Aviso sem

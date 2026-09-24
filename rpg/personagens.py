@@ -257,11 +257,22 @@ def editar_relacao(nome: str, dados: dict) -> dict:
     if dados.get("para"):
         alvo = str(dados["para"]).strip()
         if dados.get("apagar"):
+            # Some dos dois lados: meia relação registrada é justamente o que
+            # fazia a ficha de uma parecer vazia enquanto a da outra tinha
+            # tudo.
             resposta = entre.remover(nome_real, alvo)
+            if entre.existe(alvo, nome_real):
+                entre.remover(alvo, nome_real)
         else:
             valor, erro = _inteiro(dados.get("valor"), "relação")
             if erro:
                 return {"erro": erro}
+            # Relação nova nasce dos dois lados, como no fechamento do turno:
+            # é a relação DAS DUAS pessoas. O que já existe do outro lado não
+            # é mexido — se ela gosta dele e ele não gosta dela, isso é a
+            # história deles, não engano.
+            if not entre.existe(alvo, nome_real):
+                entre.definir(alvo, nome_real, valor, motivo)
             resposta = entre.definir(nome_real, alvo, valor, motivo)
         if str(resposta).startswith("Erro:"):
             return {"erro": resposta[6:].strip()}

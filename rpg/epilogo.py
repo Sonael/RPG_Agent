@@ -57,9 +57,12 @@ TETO = {"lugar": 3, "gente": 3, "fato": 2, "local": 1, "tempo": 1, "relacao": 2}
 
 # "Helena → Selene -20 — odiou o controle velado"
 # "Selene ↔ Sonael +30 — amigos de infância"
+# O sinal é opcional porque "Selene → Helena 0 — não notou nada" é uma linha
+# legítima: ela declara que ESTE lado não mudou, e é assim que o mestre faz um
+# sentimento valer só de um lado.
 _RELACAO_RE = re.compile(
     r"^\s*(?P<a>[^→↔<>-]+?)\s*(?P<seta>→|↔|->|<->|<-->)\s*(?P<b>.+?)\s*"
-    r"(?P<delta>[+-]\s*\d{1,3})\s*(?:[—–:]|\s-\s)?\s*(?P<motivo>.*)$"
+    r"(?P<delta>[+-]?\s*\d{1,3})\s*(?:[—–:]|\s-\s)?\s*(?P<motivo>.*)$"
 )
 # Uma cena não vira ódio em amor: o passo de um turno tem teto.
 PASSO_MAXIMO = 30
@@ -152,6 +155,9 @@ def aplicar(campos: dict[str, list[str]], narracao: str) -> dict:
 
     feitos: list[str] = []
     recusados: list[str] = []
+    # O que o JOGADOR precisa ver no chat. `feitos` é log de motor
+    # ("relacao('Helena'→'Selene',+25)"); aqui vai a frase dele.
+    avisos: list[str] = []
 
     def recusa(campo, valor, porque):
         recusados.append(f"{campo}={valor!r}: {porque}")
@@ -227,6 +233,16 @@ def aplicar(campos: dict[str, list[str]], narracao: str) -> dict:
     # relação é uma linha de texto, como o resto do fechamento.
     from rpg import entre as _entre
 
+    # Uma relação é DAS DUAS pessoas: o que muda entre elas muda para as duas.
+    # Antes, "Selene → Helena +25" deixava a ficha de Helena vazia, e o jogador
+    # que fez as duas se elogiarem via a relação só de um lado — parecia bug,
+    # e era. Cada linha passa a mexer nos dois sentidos.
+    #
+    # O lado avesso continua possível, e é o que explica o caso que deu origem
+    # a tudo isto ("Helena odiou a sugestão de Selene", sem Selene notar):
+    # basta o mestre escrever a OUTRA direção na mesma lista, com o número
+    # dela. Uma direção escrita à mão nunca é sobrescrita pelo espelho.
+    linhas = []
     for valor in campos.get("relacao", [])[:TETO["relacao"]]:
         m = _RELACAO_RE.match(valor)
         if not m:
@@ -240,15 +256,33 @@ def aplicar(campos: dict[str, list[str]], narracao: str) -> dict:
         if abs(delta) > PASSO_MAXIMO:
             recusa("relacao", f"{a} → {b}", f"passo maior que {PASSO_MAXIMO} num turno só")
             continue
-        motivo = (m.group("motivo") or "").strip(" —–:-")
-        mutua = m.group("seta") in ("↔", "<->", "<-->")
+        linhas.append((a, b, delta, (m.group("motivo") or "").strip(" —–:-")))
+
+    escritas = {(_norm(a), _norm(b)) for a, b, _, _ in linhas}
+
+    for a, b, delta, motivo in linhas:
+        # O espelho só entra quando o mestre NÃO escreveu a volta.
+        espelhar = (_norm(b), _norm(a)) not in escritas
         try:
-            for de, para in ([(a, b), (b, a)] if mutua else [(a, b)]):
-                resposta = _entre.ajustar(de, para, delta, motivo)
-                if str(resposta).startswith("Erro:"):
-                    recusa("relacao", f"{de} → {para}", resposta[6:].strip())
-                else:
-                    feitos.append(f"relacao({de!r}→{para!r},{delta:+d})")
+            antes = _entre.valor_entre(a, b)
+            resposta = _entre.ajustar(a, b, delta, motivo)
+            if str(resposta).startswith("Erro:"):
+                recusa("relacao", f"{a} → {b}", resposta[6:].strip())
+                continue
+            feitos.append(f"relacao({a!r}→{b!r},{delta:+d})")
+
+            if espelhar:
+                volta = _entre.ajustar(b, a, delta, motivo)
+                if not str(volta).startswith("Erro:"):
+                    feitos.append(f"relacao({b!r}→{a!r},{delta:+d})")
+
+            # A relação é a única coisa do fechamento que o jogador PROVOCA de
+            # propósito ("fiz as duas se elogiarem"). Ela mudava em silêncio, e
+            # a mudança de atitude sempre avisou — parecia que nada aconteceu.
+            depois = _entre.valor_entre(a, b)
+            entre_os_dois = f"{a} e {b}" if espelhar else f"{a} → {b}"
+            avisos.append(f"{entre_os_dois}: {antes:+d} → {depois:+d} "
+                          f"({_entre.faixa(depois)})" + (f" — {motivo}" if motivo else ""))
         except Exception as e:
             recusa("relacao", f"{a} → {b}", f"falhou: {e}")
 
@@ -267,7 +301,7 @@ def aplicar(campos: dict[str, list[str]], narracao: str) -> dict:
 
     if feitos:
         memory.save_campaign()
-    return {"feitos": feitos, "recusados": recusados}
+    return {"feitos": feitos, "recusados": recusados, "avisos": avisos}
 
 
 def processar(texto: str) -> tuple[str, dict]:
@@ -277,7 +311,7 @@ def processar(texto: str) -> tuple[str, dict]:
     """
     limpo, campos = extrair(texto)
     relatorio = {"tinha_bloco": bool(campos) or ABRE.strip("[]") in (texto or "").lower(),
-                 "campos": campos, "feitos": [], "recusados": []}
+                 "campos": campos, "feitos": [], "recusados": [], "avisos": []}
     if campos:
         relatorio.update(aplicar(campos, limpo))
     return limpo, relatorio

@@ -16,8 +16,14 @@ jogador via a companheira de lealdade 90 virar "neutro" por causa de uma briga
 com outra pessoa.
 
 Aqui cada personagem guarda o que sente por CADA outro, com o porquê de cada
-mudança. É direcional de propósito: Helena pode desgostar de Selene sem que
-Selene desgoste de Helena — é justamente aí que mora o drama.
+mudança. O armazenamento é direcional: Helena pode desgostar de Selene sem que
+Selene desgoste de Helena — é aí que mora o drama.
+
+Mas uma relação é DAS DUAS pessoas, e quem escreve nela (o fechamento do turno
+e a tela) muda os dois lados por padrão. Meia relação registrada é o que fazia
+a ficha de uma parecer vazia enquanto a da outra tinha tudo. O lado avesso
+continua possível: quem escreve a volta com outro número tem a sua vontade
+respeitada, e o espelho não passa por cima.
 
 QUEM ESCREVE
 ────────────
@@ -154,6 +160,25 @@ def remover(de: str, para: str) -> str:
     mapa.pop(chave)
     memory.save_campaign()
     return f"Relação de {ch.get('name')} com {_nome_real(para)} apagada."
+
+
+def existe(de: str, para: str) -> bool:
+    """Se `de` já tem alguma coisa registrada sobre `para` (mesmo que zero)."""
+    ch = _pessoa(de)
+    outro = _pessoa(para)
+    if not ch or not outro:
+        return False
+    return memory.char_key(outro.get("name", para)) in (ch.get("entre") or {})
+
+
+def valor_entre(de: str, para: str) -> int:
+    """O quanto `de` sente por `para` agora (0 quando nunca houve nada)."""
+    ch = _pessoa(de)
+    outro = _pessoa(para)
+    if not ch or not outro:
+        return 0
+    dados = (ch.get("entre") or {}).get(memory.char_key(outro.get("name", para)))
+    return _num(dados.get("valor")) if isinstance(dados, dict) else 0
 
 
 def de_quem(nome: str) -> list[dict]:
