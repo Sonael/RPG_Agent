@@ -50,10 +50,23 @@ _BLOCO_RE = re.compile(
     re.IGNORECASE | re.DOTALL,
 )
 
-CAMPOS = ("local", "tempo", "lugar", "gente", "fato")
-TETO = {"lugar": 3, "gente": 3, "fato": 2, "local": 1, "tempo": 1}
+CAMPOS = ("local", "tempo", "lugar", "gente", "fato", "relacao")
+# Como o campo aparece ESCRITO no bloco: a leitura tira o acento, o prompt não.
+ESCRITO = {"relacao": "relação"}
+TETO = {"lugar": 3, "gente": 3, "fato": 2, "local": 1, "tempo": 1, "relacao": 2}
 
-_LINHA_RE = re.compile(r"^\s*[-*•]?\s*([a-zç]+)\s*:\s*(.+?)\s*$", re.IGNORECASE)
+# "Helena → Selene -20 — odiou o controle velado"
+# "Selene ↔ Sonael +30 — amigos de infância"
+_RELACAO_RE = re.compile(
+    r"^\s*(?P<a>[^→↔<>-]+?)\s*(?P<seta>→|↔|->|<->|<-->)\s*(?P<b>.+?)\s*"
+    r"(?P<delta>[+-]\s*\d{1,3})\s*(?:[—–:]|\s-\s)?\s*(?P<motivo>.*)$"
+)
+# Uma cena não vira ódio em amor: o passo de um turno tem teto.
+PASSO_MAXIMO = 30
+
+# O nome do campo aceita acento: "relação:" é o que o mestre escreve, e
+# [a-z] deixava a linha inteira de fora sem dizer por quê.
+_LINHA_RE = re.compile(r"^\s*[-*•]?\s*([A-Za-zÀ-ÿ]+)\s*:\s*(.+?)\s*$")
 # "2h — viagem", "2 horas: viagem", "3h de caminhada"
 _TEMPO_RE = re.compile(r"^\s*(\d{1,2})\s*(?:h|hs|hora|horas)?\b\s*[—–:-]?\s*(.*)$", re.IGNORECASE)
 # "Ponte Quebrada (dentro de: Vale) — tábuas podres"
@@ -85,7 +98,8 @@ def extrair(texto: str) -> tuple[str, dict[str, list[str]]]:
             continue
         campo, valor = _norm(m.group(1)), m.group(2).strip()
         campo = {"lugares": "lugar", "pessoas": "gente", "pessoa": "gente",
-                 "npc": "gente", "hora": "tempo", "fatos": "fato"}.get(campo, campo)
+                 "npc": "gente", "hora": "tempo", "fatos": "fato",
+                 "relacoes": "relacao", "relacionamento": "relacao"}.get(campo, campo)
         if campo not in CAMPOS or not valor or valor in ("-", "—", "nenhum", "nada"):
             continue
         campos.setdefault(campo, []).append(valor)
@@ -206,6 +220,37 @@ def aplicar(campos: dict[str, list[str]], narracao: str) -> dict:
             feitos.append(f"save_character({nome!r})")
         except Exception as e:
             recusa("gente", nome, f"falhou: {e}")
+
+    # ---- relação entre duas pessoas ---------------------------------------
+    # Sem ferramenta nova para o mestre, de propósito: a mesa dele já tem 117
+    # e a lição medida é que ferramenta a mais é ferramenta esquecida. Aqui a
+    # relação é uma linha de texto, como o resto do fechamento.
+    from rpg import entre as _entre
+
+    for valor in campos.get("relacao", [])[:TETO["relacao"]]:
+        m = _RELACAO_RE.match(valor)
+        if not m:
+            recusa("relacao", valor, "use 'Fulano → Beltrano ±N — motivo'")
+            continue
+        a, b = _partes(m.group("a"))[0], _partes(m.group("b"))[0]
+        delta = int(m.group("delta").replace(" ", ""))
+        if not (_tem_evidencia(a, narracao) and _tem_evidencia(b, narracao)):
+            recusa("relacao", f"{a} → {b}", "os dois nomes precisam aparecer na narração")
+            continue
+        if abs(delta) > PASSO_MAXIMO:
+            recusa("relacao", f"{a} → {b}", f"passo maior que {PASSO_MAXIMO} num turno só")
+            continue
+        motivo = (m.group("motivo") or "").strip(" —–:-")
+        mutua = m.group("seta") in ("↔", "<->", "<-->")
+        try:
+            for de, para in ([(a, b), (b, a)] if mutua else [(a, b)]):
+                resposta = _entre.ajustar(de, para, delta, motivo)
+                if str(resposta).startswith("Erro:"):
+                    recusa("relacao", f"{de} → {para}", resposta[6:].strip())
+                else:
+                    feitos.append(f"relacao({de!r}→{para!r},{delta:+d})")
+        except Exception as e:
+            recusa("relacao", f"{a} → {b}", f"falhou: {e}")
 
     # ---- fato do mundo ----------------------------------------------------
     for valor in campos.get("fato", [])[:TETO["fato"]]:

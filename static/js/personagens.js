@@ -19,6 +19,7 @@
 
   let _open = false;
   let _last = {};
+  let _ajustando = '';      // '', 'atitude', 'lealdade', 'entre:Nome', 'entre:novo'
 
   const esc = (s) => (window.escapeHtml ? window.escapeHtml(s) : String(s == null ? '' : s));
   const q = (id) => document.getElementById(id);
@@ -47,6 +48,10 @@
               <h2 class="lcl-secao" id="psn-relacao-titulo">Relação com o grupo</h2>
               <div id="psn-relacao"></div>
             </div>
+            <div id="psn-entre-bloco">
+              <h2 class="lcl-secao" id="psn-entre-titulo">Com quem convive</h2>
+              <div id="psn-entre"></div>
+            </div>
             <h2 class="lcl-secao psn-secao-sabe" id="psn-sabe-titulo">O que o grupo sabe</h2>
             <div id="psn-sabe" class="lcl-lista"></div>
             <h2 class="lcl-secao psn-secao-sabe" id="psn-cenas-titulo">Últimas cenas com ele</h2>
@@ -62,6 +67,9 @@
           <div id="psn-msg" class="lcl-msg" aria-live="polite"></div>
           <button id="psn-editar" class="lcl-btn lcl-btn-sec hidden"
                   onclick="window.Personagens._editar()">Editar personagem</button>
+          <button id="psn-apagar" class="lcl-btn lcl-btn-apagar hidden"
+                  onclick="window.Personagens._apagar()"
+                  title="Tira este personagem da memória da campanha">Apagar</button>
           <button class="lcl-fechar" onclick="window.Personagens._fechar()">Fechar</button>
         </div>
       </div>`;
@@ -123,7 +131,101 @@
         ${(a.efeitos || []).length ? `<ul class="psn-efeitos">${
           a.efeitos.map(e => `<li>${esc(e)}</li>`).join('')}</ul>` : ''}
       </div>
-      ${hist}`;
+      ${hist}
+      ${_ajustando === 'atitude'
+        ? painel('atitude', a.valor, 'Atitude com o grupo')
+        : botaoAjustar('atitude')}`;
+  }
+
+  // ---- Ajuste pelo jogador -----------------------------------------
+  // Uma edição por vez, guardada aqui: quem desenha é o render, então não há
+  // DOM costurado à mão nem tela que discorda de si mesma.
+  //
+  // Por que o jogador edita isto: na partida medida, o mestre pôs a
+  // companheira em "neutro" por causa de uma briga com OUTRA pessoa, com a
+  // lealdade dela em 90. Quem sabe o que aconteceu na mesa é quem jogou.
+  function painel(alvo, valor, rotulo) {
+    return `
+      <div class="psn-ajuste" data-alvo="${esc(alvo)}">
+        <label class="psn-ajuste-linha">${esc(rotulo)}
+          <input type="number" class="psn-ajuste-valor" min="-100" max="100" step="5" value="${valor}">
+        </label>
+        <input type="text" class="psn-ajuste-motivo" maxlength="120"
+               placeholder="Por quê? (fica no histórico)">
+        <div class="psn-ajuste-botoes">
+          <button class="lcl-btn lcl-btn-sec" onclick="window.Personagens._salvarAjuste()">Salvar</button>
+          <button class="lcl-btn" onclick="window.Personagens._fecharAjuste()">Cancelar</button>
+        </div>
+      </div>`;
+  }
+
+  function botaoAjustar(alvo) {
+    return `<button class="lcl-btn lcl-btn-sec psn-ajustar"
+                    onclick="window.Personagens._ajustar('${aspas(alvo)}')">Ajustar</button>`;
+  }
+
+  // ---- Relação com cada um -----------------------------------------
+  // O que ele sente por OUTRA pessoa, não pelo grupo. Cada linha abre a
+  // edição: o número, o porquê, e apagar. Quem manda na mesa é o jogador —
+  // o mestre escreve pelo fechamento do turno, e erra às vezes.
+  function entre(f) {
+    const lista = f.entre || [];
+    const nomes = (_nomesDaCampanha() || []).filter(
+      n => n.toLowerCase() !== (f.nome || '').toLowerCase());
+    const linhas = lista.map(r => {
+      const pos = Math.max(0, Math.min(100, (r.valor + 100) / 2));
+      return `
+      <div class="psn-entre-item" data-com="${esc(r.nome)}">
+        <div class="psn-atitude-topo">
+          <button class="psn-entre-nome" type="button"
+                  onclick="window.Personagens._abrir('${aspas(r.nome)}')"
+                  title="Abrir a ficha de ${esc(r.nome)}">${esc(r.nome)}</button>
+          <span class="psn-atitude-rotulo">${esc(r.rotulo)}</span>
+          <span class="psn-atitude-valor">${r.valor >= 0 ? '+' : ''}${r.valor}</span>
+        </div>
+        <div class="psn-barra" role="img" aria-label="Relação ${r.valor} de -100 a 100">
+          <div class="psn-barra-meio"></div>
+          <div class="psn-barra-marca" style="left:${pos}%"></div>
+        </div>
+        ${r.motivo ? `<p class="psn-conduta">${esc(r.motivo)}</p>` : ''}
+        ${(r.historico || []).length ? `<ul class="psn-historico">${r.historico.map(h => `
+          <li><span class="psn-delta ${h.delta >= 0 ? 'psn-sobe' : 'psn-desce'}">${h.delta >= 0 ? '+' : ''}${h.delta}</span>
+              ${esc(h.motivo)}${h.capitulo ? ` <small>cap. ${esc(h.capitulo)}</small>` : ''}</li>`).join('')}</ul>` : ''}
+        ${_ajustando === `entre:${r.nome}`
+          ? painel(`entre:${r.nome}`, r.valor, `O que ${f.nome} sente por ${r.nome}`)
+          : `<div class="psn-entre-acoes">
+               ${botaoAjustar(`entre:${r.nome}`)}
+               <button class="lcl-btn lcl-btn-apagar"
+                       onclick="window.Personagens._apagarEntre('${aspas(r.nome)}')">Tirar</button>
+             </div>`}
+      </div>`;
+    }).join('');
+
+    const novo = !nomes.length ? '' : (_ajustando === 'entre:novo' ? `
+      <div class="psn-entre-novo">
+        <label class="psn-ajuste-linha">Com
+          <select id="psn-entre-quem" aria-label="Com quem">
+            ${nomes.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('')}
+          </select>
+        </label>
+        ${painel('entre:novo', 0, 'Quanto')}
+      </div>` : `
+      <div class="psn-entre-novo">
+        <button class="lcl-btn lcl-btn-sec"
+                onclick="window.Personagens._ajustar('entre:novo')">Registrar uma relação</button>
+      </div>`);
+
+    return (linhas || `<div class="lcl-vazio">Nada registrado entre ${esc(f.nome)} e o resto do elenco.</div>`) + novo;
+  }
+
+  // Os nomes que a tela já tem em mãos, sem ir ao servidor de novo.
+  function _nomesDaCampanha() {
+    const mem = window._lastMem || {};
+    const nomes = []
+      .concat((mem.party || []).map(p => p.name || ''))
+      .concat((mem.characters || []).map(c => c.name || ''))
+      .filter(Boolean);
+    return Array.from(new Set(nomes)).sort((a, b) => a.localeCompare(b, 'pt-BR'));
   }
 
   // No romance: afeto e confiança, o vínculo e o porquê das últimas mudanças,
@@ -217,6 +319,9 @@
           <div class="psn-barra-meio"></div><div class="psn-barra-marca" style="left:${pos}%"></div></div>
         <div class="psn-barra-pontas"><span>partir</span><span>até o fim</span></div></div>
         ${l.objetivo ? `<p class="rel-seg-linha"><span>Quer</span> ${esc(l.objetivo)}</p>` : ''}
+        ${_ajustando === 'lealdade'
+          ? painel('lealdade', l.lealdade.valor, 'Lealdade')
+          : botaoAjustar('lealdade')}
         ${arco}` : ''}
       ${titulos ? `<ul class="rel-segs psn-titulos">${titulos}</ul>` : ''}`;
   }
@@ -277,10 +382,12 @@
       q('psn-desc').textContent = 'Este personagem ainda não foi registrado pelo mestre.';
       q('psn-tracos').textContent = '';
       q('psn-relacao-bloco').classList.add('hidden');
+      q('psn-entre-bloco').classList.add('hidden');
       q('psn-sabe').innerHTML = '';
       q('psn-cenas').innerHTML = '';
       q('psn-ligacoes').innerHTML = '';
       q('psn-editar').classList.add('hidden');
+      q('psn-apagar').classList.add('hidden');
       return;
     }
     q('psn-nome').textContent = _last.nome;
@@ -290,6 +397,7 @@
     q('psn-desc').textContent = _last.descricao || '';
     q('psn-tracos').textContent = _last.tracos ? `Traços: ${_last.tracos}` : '';
     q('psn-relacao-bloco').classList.toggle('hidden', !_last.atitude && !_last.relacao);
+    q('psn-entre-bloco').classList.remove('hidden');
     q('psn-relacao-titulo').textContent = _last.relacao ? 'Relação com você' : 'Relação com o grupo';
     q('psn-laco').innerHTML = laco(_last);
     q('psn-sabe-titulo').textContent = window.frase('sabe', 'O que o grupo sabe');
@@ -297,6 +405,8 @@
     q('psn-cenas-titulo').textContent = `Últimas cenas com ${_last.nome}`;
     q('psn-relacao').innerHTML = _last.relacao
       ? relacaoDoRomance(_last.relacao, gestos(_last)) : relacao(_last.atitude);
+    q('psn-entre-titulo').textContent = `Como ${_last.nome} se dá com os outros`;
+    q('psn-entre').innerHTML = entre(_last);
     const sabe = _last.conhecido || [];
     q('psn-sabe').innerHTML = sabe.length
       ? `<ul class="psn-sabe-lista">${sabe.map(s => `<li>${esc(s)}</li>`).join('')}</ul>`
@@ -304,6 +414,10 @@
     q('psn-cenas').innerHTML = cenas(_last);
     q('psn-ligacoes').innerHTML = ligacoes(_last);
     q('psn-editar').classList.remove('hidden');
+    // Apagar é para a figuração que o combate deixa para trás — o inimigo
+    // morto que continua na lista. Quem é do grupo não some por um clique:
+    // para isso existe o editor.
+    q('psn-apagar').classList.toggle('hidden', !!_last.do_grupo);
     mensagem('');
   }
 
@@ -326,6 +440,7 @@
       _open = true;
     }
     mensagem('Carregando…');
+    _ajustando = '';
     try {
       render(await getState(nome));
     } catch (_) {
@@ -363,9 +478,93 @@
     window.openEditModal('character', alvo, lista[i]);
   }
 
+  // O inimigo morto ficava na lista até o jogador abrir o editor de ficha e
+  // achar o botão lá dentro. Aqui é um clique, com pergunta antes: apagar é
+  // sem volta, e o mestre não tem como desfazer.
+  async function apagar() {
+    const nome = _last.nome || '';
+    if (!nome || _last.do_grupo) return;
+    if (typeof window.showConfirm === 'function') {
+      const ok = await window.showConfirm(
+        `Apagar ${nome}?`,
+        'Ele sai da memória da campanha: some da lista, do mapa e do que o mestre lembra. Não dá para desfazer.',
+        'danger', 'Apagar');
+      if (!ok) return;
+    } else if (!confirm(`Apagar ${nome}? Não dá para desfazer.`)) {
+      return;
+    }
+    mensagem('Apagando…');
+    try {
+      const f = (window.authFetch || fetch);
+      const r = await f(`${window.API || ''}/api/memory/characters/${encodeURIComponent(nome)}`,
+                        { method: 'DELETE' });
+      if (!r.ok) { mensagem('O servidor não apagou. Tente de novo.', true); return; }
+      fechar();
+      if (typeof window.refreshMemory === 'function') window.refreshMemory();
+      if (window.Elenco && typeof window.Elenco.sync === 'function') window.Elenco.sync();
+      if (typeof window.showToast === 'function') window.showToast(`${nome} foi apagado.`);
+    } catch (_) {
+      mensagem('Falha de conexão.', true);
+    }
+  }
+
+  async function enviarRelacao(corpo) {
+    mensagem('Salvando…');
+    try {
+      const f = (window.authFetch || fetch);
+      const r = await f(`${window.API || ''}/api/characters/relacao`, {
+        method: 'POST',
+        body: JSON.stringify({ nome: _last.nome, ...corpo }),
+      });
+      const d = await r.json();
+      if (!r.ok || d.erro) { mensagem(d.erro || 'Não deu para salvar.', true); return; }
+      _ajustando = '';
+      render(d);
+      if (typeof window.refreshMemory === 'function') window.refreshMemory();
+    } catch (_) {
+      mensagem('Falha de conexão.', true);
+    }
+  }
+
+  function salvarAjuste() {
+    const painelEl = document.querySelector('#pessoa-overlay .psn-ajuste');
+    if (!painelEl) return;
+    const alvo = painelEl.getAttribute('data-alvo') || '';
+    const valor = Number(painelEl.querySelector('.psn-ajuste-valor').value);
+    const motivo = painelEl.querySelector('.psn-ajuste-motivo').value || '';
+    if (!Number.isFinite(valor)) { mensagem('Escreva um número de -100 a 100.', true); return; }
+
+    if (alvo === 'atitude') return enviarRelacao({ atitude: valor, motivo });
+    if (alvo === 'lealdade') return enviarRelacao({ lealdade: valor, motivo });
+    if (alvo === 'entre:novo') {
+      const sel = q('psn-entre-quem');
+      if (!sel || !sel.value) { mensagem('Escolha com quem.', true); return; }
+      return enviarRelacao({ para: sel.value, valor, motivo });
+    }
+    if (alvo.indexOf('entre:') === 0) {
+      return enviarRelacao({ para: alvo.slice(6), valor, motivo });
+    }
+  }
+
+  async function apagarEntre(com) {
+    if (typeof window.showConfirm === 'function') {
+      const ok = await window.showConfirm(
+        `Tirar a relação com ${com}?`,
+        `O que ${_last.nome} sentia por ${com} sai da memória, com o histórico.`,
+        'warning', 'Tirar');
+      if (!ok) return;
+    }
+    enviarRelacao({ para: com, apagar: true });
+  }
+
   window.Personagens = {
     _abrir: abrir,
     _fechar: fechar,
+    _apagar: apagar,
+    _ajustar: (alvo) => { _ajustando = alvo; render(_last); },
+    _fecharAjuste: () => { _ajustando = ''; render(_last); },
+    _salvarAjuste: salvarAjuste,
+    _apagarEntre: apagarEntre,
     _ir: (lugar) => enviar(`Vamos até ${lugar}.`),
     _falar: (nome) => enviar(`Quero falar com ${nome}.`),
     _dizer: (fala) => enviar(fala),

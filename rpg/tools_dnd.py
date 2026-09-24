@@ -5739,11 +5739,37 @@ def use_ability(
         available = ", ".join(h["nome"] for h in habs) if habs else "nenhuma"
         return f"'{char_name}' não conhece '{ability_name}'. Habilidades disponíveis: {available}."
 
+    # ── Traço não é ação ──────────────────────────────────────────────────
+    # Tradição Arcana, Arquétipo, Aumento de Atributo: são ESCOLHAS de ficha.
+    # Usá-las gastava o turno e produzia a linha sem sentido que apareceu na
+    # partida ("Sonael usou Tradição Arcana em Mineiro Corrompido 2").
+    if _e_traco_passivo(hab.get("nome", "")) or _e_traco_passivo(ability_name):
+        return (
+            f"Erro: '{hab.get('nome', ability_name)}' é um traço da ficha de "
+            f"{char['name']}, não uma ação — não se usa em ninguém e não gasta "
+            f"o turno. Ele já vale sozinho; narre o efeito, se houver."
+        )
+
     # ── Coerção de alvo por modo da habilidade ────────────────────────────
     # Self-only (Segunda Fôlego, Fúria, Surto de Ação…) sempre afeta o
     # próprio conjurador, ignorando o que a UI/LLM passou como target.
     if _is_self_only_ability(hab.get("nome", "")) or _is_self_only_ability(ability_name):
         target_name = char["name"]
+
+    # ── Alcance da habilidade ─────────────────────────────────────────────
+    # Cone e toque nascem no conjurador: só pegam quem está na zona dele. Só
+    # o ataque com arma conferia isso, e por isso Burning Hands acertava
+    # inimigo do outro lado da câmara. A recusa vem ANTES de gastar mana.
+    _motivo_zona = _habilidade_nasce_no_conjurador(hab, ability_name)
+    if _motivo_zona and target_name and _norm_txt(target_name) != _norm_txt(char["name"]):
+        _dist = _distancia(char["name"], target_name.split(",")[0].strip())
+        if _dist:
+            _za, _zb = _zona_de(char["name"]), _zona_de(target_name.split(",")[0].strip())
+            return (
+                f"Erro: FORA DE ALCANCE: {hab['nome']} {_motivo_zona} e só pega "
+                f"quem está em **{_za}**; {target_name} está em **{_zb}**. "
+                f"Mova-se até lá ou escolha outro alvo. Nada foi gasto."
+            )
 
     s     = char["sheet"]
     custo = hab.get("custo_mana", 0)
@@ -11524,9 +11550,12 @@ def suggest_encounter(party_level: int, party_size: int = 4, difficulty: str = "
     horde_list = _fetch_open5e_monsters(horde_cr)
 
     lines = [header]
+    sugeridos: list[str] = []            # para a medição, mais abaixo
 
     if boss_list:
-        lines.append(_open5e_monster_to_block(_rnd.choice(boss_list), "OPÇÃO A — Chefão Solitário"))
+        chefe = _rnd.choice(boss_list)
+        sugeridos.append(chefe.get("name", ""))
+        lines.append(_open5e_monster_to_block(chefe, "OPÇÃO A — Chefão Solitário"))
     else:
         lines.append(_enc_block("OPÇÃO A — Chefão Solitário", 1, boss_cr, budget))
 
@@ -11534,6 +11563,7 @@ def suggest_encounter(party_level: int, party_size: int = 4, difficulty: str = "
 
     if mid_list:
         m = _rnd.choice(mid_list)
+        sugeridos.append(m.get("name", ""))
         lines.append(_open5e_monster_to_block(m, f"OPÇÃO B — Bando ×3: {m.get('name','?')}"))
     else:
         lines.append(_enc_block("OPÇÃO B — Bando Médio", 3, mid_cr, budget))
@@ -11542,9 +11572,20 @@ def suggest_encounter(party_level: int, party_size: int = 4, difficulty: str = "
 
     if horde_list:
         h = _rnd.choice(horde_list)
+        sugeridos.append(h.get("name", ""))
         lines.append(_open5e_monster_to_block(h, f"OPÇÃO C — Horda ×{horde_cnt}: {h.get('name','?')}"))
     else:
         lines.append(_enc_block(f"OPÇÃO C — Horda ×{horde_cnt}", horde_cnt, horde_cr, budget))
+
+    # A sugestão fica anotada para a medição: na partida de 91 turnos o mestre
+    # pediu o encontro balanceado e criou os próprios monstros por fora. Antes
+    # de obrigar alguma coisa, é preciso saber se aquilo foi uma vez ou é a
+    # regra. Medir não muda o jogo (ver rpg/medicao.py).
+    try:
+        from rpg import medicao
+        medicao.registrar_sugestao([n for n in sugeridos if n], budget)
+    except Exception:
+        pass
 
     # Instrução interna à LLM — filtrada antes de exibir na UI (server.py).
     lines += ["", "[[llm]]Use os stats em create_character_sheet ANTES de roll_initiative.",
@@ -12166,6 +12207,14 @@ def spawn_monster(
         }
         created_names.append(name)
 
+    # Para a medição: qual monstro do SRD foi realmente chamado à mesa. É o
+    # que permite comparar com o encontro que o sistema sugeriu.
+    try:
+        from rpg import medicao
+        medicao.registrar_inimigo(m.get("name", "") or monster_name)
+    except Exception:
+        pass
+
     memory.save_campaign()
 
     names_str  = ", ".join(created_names)
@@ -12717,7 +12766,8 @@ _ABILITY_BONUS_PATTERNS = (
     "healing word", "palavra curativa", "palavra de cura",
     "misty step", "passo brumoso",
     "second wind", "segunda folego", "segundo folego",
-    "action surge", "surto de acao",
+    # Surto de Ação saiu daqui: pela regra ele não custa ação NENHUMA — ele
+    # DEVOLVE uma. Ver _e_surto_de_acao, logo abaixo.
     "cunning action", "acao astuta",
     "bardic inspiration", "inspiracao de bardo",
     "spiritual weapon", "arma espiritual",
@@ -12737,6 +12787,67 @@ def _ability_action_type(name: str) -> str:
         if _norm_txt(p) in n:
             return "bonus"
     return "acao"
+
+
+# ── Surto de Ação ─────────────────────────────────────────────────────────
+# "Você pode se superar por um momento: no seu turno, pode tomar uma ação
+# adicional." Ele não custa Ação nem Bônus — dá uma Ação a mais. O motor
+# tratava como Ação Bônus e não devolvia nada, então o guerreiro gastava o
+# Bônus e continuava com a mesma ação de antes: pelo jogo, usar Surto de Ação
+# era pior do que não usar.
+_SURTO_DE_ACAO = ("action surge", "surto de acao")
+
+
+def _e_surto_de_acao(nome: str) -> bool:
+    n = _norm_txt(nome)
+    return bool(n) and any(p in n for p in _SURTO_DE_ACAO)
+
+
+# ── Traços que não são ação ───────────────────────────────────────────────
+# A ficha guarda numa lista só o que se USA (Segunda Fôlego, Fúria) e o que se
+# ESCOLHE (Tradição Arcana, Arquétipo, Aumento de Atributo). O segundo grupo
+# não tem alvo nem efeito: quando o mestre "usava" um deles, saía no log a
+# linha sem sentido que o jogador viu — "Sonael usou Tradição Arcana em
+# Mineiro Corrompido 2" — e ainda gastava o turno dele.
+_TRACOS_PASSIVOS = (
+    "tradicao", "arquetipo", "aumento de atributo", "aumento no valor de atributo",
+    "estilo de luta", "especializacao", "caminho", "juramento", "circulo druidico",
+    "dominio divino", "patrono", "origem magica", "escola arcana", "linhagem",
+    "colegio", "conclave", "proficiencia", "pacto", "subclasse",
+)
+
+
+def _e_traco_passivo(nome: str) -> bool:
+    n = _norm_txt(nome)
+    return bool(n) and any(p in n for p in _TRACOS_PASSIVOS)
+
+
+# ── Onde a habilidade nasce ───────────────────────────────────────────────
+# Burning Hands é "Self (15-foot cone)": o cone sai das MÃOS do conjurador.
+# O motor só conferia alcance de ataque com arma, então a magia de cone
+# acertava alguém do outro lado da câmara.
+_HABILIDADE_NA_PROPRIA_ZONA = (
+    "burning hands", "maos flamejantes", "maos ardentes",
+    "thunderwave", "onda trovejante",
+    "color spray", "borrifo prismatico", "jorro de cores",
+    "cone of cold", "cone de frio",
+    "breath weapon", "sopro",
+)
+
+
+def _habilidade_nasce_no_conjurador(hab: dict | None, nome: str) -> str:
+    """
+    Devolve o motivo (texto curto) quando a habilidade só alcança a própria
+    zona; "" quando ela pode atravessar o campo.
+    """
+    alcance = _norm_txt((hab or {}).get("alcance") or "")
+    if alcance.startswith("self") or alcance.startswith("pessoal"):
+        return "sai do próprio conjurador"
+    if alcance.startswith("touch") or alcance.startswith("toque"):
+        return "é de toque"
+    if not alcance and any(p in _norm_txt(nome) for p in _HABILIDADE_NA_PROPRIA_ZONA):
+        return "sai do próprio conjurador"
+    return ""
 
 
 # ── Habilidades que afetam SOMENTE o conjurador (sem picker de alvo) ──────
@@ -13565,14 +13676,29 @@ def combat_action(action: str, actor: str = "", target: str = "",
                                     f"A Ação/Bônus deste turno NÃO foi gasta."),
                         "snapshot": combat_snapshot(),
                     }
-            slot = "bonus" if _ability_action_type(ability) == "bonus" else "acao"
-            err = _use_slot(eco, slot)
-            if err:
-                return {"ok": False, "message": err, "snapshot": combat_snapshot()}
+            # Surto de Ação não custa ação nenhuma: ele DEVOLVE a Ação do
+            # turno. Uma vez por turno, senão viraria turno infinito.
+            surto = _e_surto_de_acao(ability)
+            if surto and eco.get("surto_usado"):
+                return {"ok": False,
+                        "message": f"Erro: {actor} já usou Surto de Ação neste turno.",
+                        "snapshot": combat_snapshot()}
+
+            slot = None if surto else ("bonus" if _ability_action_type(ability) == "bonus" else "acao")
+            if slot:
+                err = _use_slot(eco, slot)
+                if err:
+                    return {"ok": False, "message": err, "snapshot": combat_snapshot()}
             msg = use_ability(actor, ability, target, end_turn=False)
             if msg.startswith(("Erro:", "Aviso:")):
-                eco[slot + "_usada"] = False
+                if slot:
+                    eco[slot + "_usada"] = False
                 return {"ok": False, "message": msg, "snapshot": combat_snapshot()}
+            if surto:
+                eco["acao_usada"] = False
+                eco["surto_usado"] = True
+                msg += ("\n   Surto de Ação: a Ação deste turno volta a estar "
+                        "disponível — ataque de novo, conjure ou corra.")
 
         elif a == "item":
             item_name = (item or weapon or "").strip()

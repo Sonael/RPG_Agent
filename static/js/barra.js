@@ -288,14 +288,27 @@
                     title="Abrir a ficha de ${esc(p.nome)}">${esc(p.nome)}</button>
             ${p.papel ? `<span class="sb-heroi-papel">${esc(p.papel)}</span>` : ''}
           </div>`);
+        // Quem conjura mostra mana embaixo da vida, na mesma linha do herói:
+        // a mana estava só na ficha, e quem joga mago precisa dela a cada
+        // magia, não a cada abertura de tela. Quem não conjura não ganha
+        // barra vazia.
         linhas = herois.map(h => `
           <div class="sb-heroi${h.morto ? ' sb-heroi-morto' : ''}" data-nome="${esc(h.nome)}">
             <button class="sb-heroi-nome" type="button" onclick="window.Barra.verHeroi('${aspas(h.nome)}')"
                     title="Abrir a ficha de ${esc(h.nome)}">${esc(h.nome)}</button>
-            <span class="sb-heroi-vida ${classeDaVida(h)}" role="img"
-                  aria-label="Vida ${h.vida.atual} de ${h.vida.max}"><span data-barra="${esc(`sb:${h.nome}:vida`)}"
-                  style="width:${h.vida.pct}%"></span></span>
-            <span class="sb-heroi-num" data-num="${esc(`sb:${h.nome}:vida`)}" data-valor="${h.vida.atual}">${h.vida.atual}/${h.vida.max}${h.vida.temp ? `<small>+${h.vida.temp}</small>` : ''}</span>
+            <span class="sb-heroi-barras">
+              <span class="sb-heroi-vida ${classeDaVida(h)}" role="img"
+                    aria-label="Vida ${h.vida.atual} de ${h.vida.max}"><span data-barra="${esc(`sb:${h.nome}:vida`)}"
+                    style="width:${h.vida.pct}%"></span></span>
+              ${h.mana && h.mana.max ? `<span class="sb-heroi-mana" role="img"
+                    aria-label="Mana ${h.mana.atual} de ${h.mana.max}"><span data-barra="${esc(`sb:${h.nome}:mana`)}"
+                    style="width:${h.mana.pct}%"></span></span>` : ''}
+            </span>
+            <span class="sb-heroi-nums">
+              <span class="sb-heroi-num" data-num="${esc(`sb:${h.nome}:vida`)}" data-valor="${h.vida.atual}">${h.vida.atual}/${h.vida.max}${h.vida.temp ? `<small>+${h.vida.temp}</small>` : ''}</span>
+              ${h.mana && h.mana.max ? `<span class="sb-heroi-num sb-heroi-num-mana" title="Mana"
+                    data-num="${esc(`sb:${h.nome}:mana`)}" data-valor="${h.mana.atual}">${h.mana.atual}/${h.mana.max}</span>` : ''}
+            </span>
             ${marcasDoHeroi(h) ? `<span class="sb-heroi-marcas">${marcasDoHeroi(h)}</span>` : ''}
           </div>`).concat(semFicha);
       }

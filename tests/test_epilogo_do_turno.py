@@ -202,8 +202,10 @@ def test_o_prompt_manda_fechar_todo_turno(campanha):
     # vale, não o da criação.
     instrucao = agente.instruction() if callable(agente.instruction) else agente.instruction
     assert "[[registro]]" in instrucao and "[[/registro]]" in instrucao
+    # Todo campo que o servidor sabe aplicar tem de estar ensinado no prompt —
+    # pelo nome como ele é ESCRITO, com acento ("relação:").
     for campo in epilogo.CAMPOS:
-        assert f"{campo}:" in instrucao, campo
+        assert f"{epilogo.ESCRITO.get(campo, campo)}:" in instrucao, campo
     # É a última coisa que ele lê antes de escrever.
     assert instrucao.rstrip().endswith("você vai escrever.")
     # E diz o que NÃO entra no bloco.

@@ -14,7 +14,7 @@ mestre registra com add_character_knowledge). As `notes` ficam como caderno
 do mestre e NÃO entram na ficha: o editor sugeria "objetivos secretos" ali,
 e mostrar isso ao jogador era spoiler.
 """
-from rpg import locais, memory
+from rpg import entre, locais, memory
 
 _FORA_DE_ALCANCE = ("morto", "desaparecido", "preso", "exilado", "fugiu")
 MAX_CONHECIDO = 30
@@ -136,6 +136,8 @@ def ficha(nome: str) -> dict:
     nome_real = ch.get("name", nome)
     status = ch.get("status", "") or "vivo"
     do_grupo = bool(memory.is_party_member(ch))
+    protagonista = (locais.norm(memory.campaign.get("protagonist", "") or "")
+                    == locais.norm(nome_real))
 
     valor = atitude_de(ch)
     rotulo, conduta = _faixa_atitude(valor)
@@ -188,11 +190,24 @@ def ficha(nome: str) -> dict:
         # Fantasia: o laço do companheiro (lealdade, objetivo, arco) e os
         # títulos que o mundo deu a ele.
         **_mundo_da_pessoa(ch),
-        "atitude": None if (do_grupo or romance) else {
+        # A atitude de quem é do GRUPO também aparece: o jogador via a relação
+        # do companheiro só na tela do Mundo, e a ficha — que é onde ele olha
+        # antes de falar com alguém — não dizia nada. Os efeitos de regra (CD
+        # dos testes sociais, preço da loja) continuam só para quem não é do
+        # grupo, porque é só lá que eles valem.
+        #
+        # O protagonista fica de fora: atitude dele com o próprio grupo não
+        # quer dizer nada.
+        "atitude": None if (romance or protagonista) else {
             "valor": valor, "rotulo": rotulo, "conduta": conduta,
             "historico": historico,
-            "efeitos": _efeitos_da_atitude(valor) if _usa_regras() else [],
+            "efeitos": [] if do_grupo else (_efeitos_da_atitude(valor) if _usa_regras() else []),
         },
+        # O que esta pessoa sente por CADA outra (rpg/entre.py). A atitude
+        # acima é o sentimento pelo grupo; esta lista é o que acontece entre
+        # duas pessoas, que era o buraco: "Helena odiou a sugestão de Selene"
+        # descontava do número do grupo por falta de lugar melhor.
+        "entre": entre.de_quem(nome_real),
         "missoes": missoes,
         # A lista curta é a da tela; `encontros` diz quantas existem ao todo,
         # para ela poder dizer "as 5 mais recentes de 12".
@@ -203,6 +218,82 @@ def ficha(nome: str) -> dict:
         "pode_falar": (not do_grupo and bool(alcance)
                        and status.lower() not in _FORA_DE_ALCANCE),
     }
+
+
+def _inteiro(valor, campo: str):
+    """Devolve (numero, erro). Vazio e texto não viram 0 calado."""
+    try:
+        return max(-100, min(100, int(valor))), ""
+    except (TypeError, ValueError):
+        return 0, f"O valor de {campo} precisa ser um número de -100 a 100."
+
+
+def editar_relacao(nome: str, dados: dict) -> dict:
+    """
+    O jogador mexendo na relação, pela ficha. Três coisas, uma por chamada:
+
+      {"atitude": 35, "motivo": "..."}           o que ele sente pelo GRUPO
+      {"lealdade": 90, "motivo": "..."}          se ele fica quando custa caro
+      {"para": "Selene", "valor": -25, ...}      o que ele sente por ALGUÉM
+      {"para": "Selene", "apagar": true}
+
+    Por que isso é do jogador e não só do mestre: a mesa dele é quem sabe o
+    que aconteceu. Na partida medida, o mestre pôs Helena em "neutro" por uma
+    briga com Selene enquanto a lealdade dela era 90 — e não havia como
+    corrigir sem abrir o editor de ficha inteiro.
+
+    O motivo entra no histórico como qualquer outra mudança: daqui a dez
+    capítulos ninguém lembra por que o número é esse.
+    """
+    from rpg.tools import adjust_attitude, atitude_de
+    from rpg import lacos
+
+    ch = _personagem(nome)
+    if not ch:
+        return {"erro": f"Personagem '{nome}' não encontrado."}
+    nome_real = ch.get("name", nome)
+    motivo = " ".join(str(dados.get("motivo") or "").split()) or "ajustado pelo jogador"
+
+    if dados.get("para"):
+        alvo = str(dados["para"]).strip()
+        if dados.get("apagar"):
+            resposta = entre.remover(nome_real, alvo)
+        else:
+            valor, erro = _inteiro(dados.get("valor"), "relação")
+            if erro:
+                return {"erro": erro}
+            resposta = entre.definir(nome_real, alvo, valor, motivo)
+        if str(resposta).startswith("Erro:"):
+            return {"erro": resposta[6:].strip()}
+        return ficha(nome_real)
+
+    if "atitude" in dados:
+        valor, erro = _inteiro(dados.get("atitude"), "atitude")
+        if erro:
+            return {"erro": erro}
+        # Pelo delta, de propósito: é o mesmo caminho da ferramenta do mestre,
+        # então o histórico e o afeto do romance continuam coerentes.
+        adjust_attitude(nome_real, valor - atitude_de(ch), motivo)
+        return ficha(nome_real)
+
+    if "lealdade" in dados:
+        valor, erro = _inteiro(dados.get("lealdade"), "lealdade")
+        if erro:
+            return {"erro": erro}
+        try:
+            atual = int(ch.get("lealdade") or 0)
+        except (TypeError, ValueError):
+            atual = 0
+        if valor != atual:
+            # A recusa do laço vem em frases ("Lealdade e arco são dos
+            # companheiros, não do protagonista."), sem prefixo fixo. Quem diz
+            # se pegou é o número: se não mudou, a frase É o motivo.
+            resposta = lacos.ajustar_lealdade(nome_real, valor - atual, motivo)
+            if int(ch.get("lealdade") or 0) != valor:
+                return {"erro": str(resposta)}
+        return ficha(nome_real)
+
+    return {"erro": "Nada para mudar."}
 
 
 # ---------------------------------------------------------------------------

@@ -61,6 +61,10 @@
               <h2 class="lcl-secao">Quem é</h2>
               <div id="hro-quem"></div>
             </div>
+            <div id="hro-relacao-bloco" class="hidden">
+              <h2 class="lcl-secao">Relações</h2>
+              <div id="hro-relacao"></div>
+            </div>
           </section>
         </div>
 
@@ -275,8 +279,48 @@
     mensagem('Carregando…');
     try {
       render(await getState());
+      relacoes();
     } catch (_) {
       mensagem('Falha de conexão.', true);
+    }
+  }
+
+  // A ficha do companheiro é ESTA tela (o índice manda quem tem ficha para
+  // cá), e ela não dizia nada sobre a relação: o jogador só via isso na tela
+  // do Mundo. Aqui vai o resumo — atitude com o grupo, lealdade e o que ele
+  // sente por cada um — e o botão que leva ao lugar onde se ajusta.
+  async function relacoes() {
+    const bloco = q('hro-relacao-bloco');
+    if (!bloco) return;
+    bloco.classList.add('hidden');
+    try {
+      const f = (window.authFetch || fetch);
+      const r = await f(`${window.API || ''}/api/characters/sheet?nome=${encodeURIComponent(_quem)}`);
+      const d = await r.json();
+      if (!d || !d.existe) return;
+
+      const partes = [];
+      if (d.atitude) {
+        partes.push(`<p class="hro-relacao-linha"><span>Com o grupo</span>
+          <strong>${esc(d.atitude.rotulo)}</strong> (${d.atitude.valor >= 0 ? '+' : ''}${d.atitude.valor})</p>`);
+      }
+      if (d.laco && d.laco.lealdade) {
+        partes.push(`<p class="hro-relacao-linha"><span>Lealdade</span>
+          <strong>${esc(d.laco.lealdade.faixa)}</strong> (${d.laco.lealdade.valor >= 0 ? '+' : ''}${d.laco.lealdade.valor})</p>`);
+      }
+      (d.entre || []).slice(0, 4).forEach(rel => {
+        partes.push(`<p class="hro-relacao-linha"><span>Com ${esc(rel.nome)}</span>
+          <strong>${esc(rel.rotulo)}</strong> (${rel.valor >= 0 ? '+' : ''}${rel.valor})${
+            rel.motivo ? ` — ${esc(rel.motivo)}` : ''}</p>`);
+      });
+      if (!partes.length) return;
+
+      partes.push(`<button class="lcl-btn lcl-btn-sec" onclick="window.Herois._relacoes()"
+                    title="Abrir a ficha de relação, onde dá para ajustar">Ver e ajustar</button>`);
+      q('hro-relacao').innerHTML = partes.join('');
+      bloco.classList.remove('hidden');
+    } catch (_) {
+      // Relação é informação extra: se não veio, a ficha continua inteira.
     }
   }
 
@@ -316,7 +360,8 @@
     sync,
     _abrir: abrir,
     _fechar: fechar,
-    _trocar: (n) => { _quem = n; getState().then(render).catch(() => {}); },
+    _trocar: (n) => { _quem = n; getState().then(render).then(relacoes).catch(() => {}); },
+    _relacoes: () => { const quem = _quem; fechar(); if (window.Personagens) window.Personagens._abrir(quem); },
     _tela: tela,
     _corrigir: corrigir,
     _estado: () => _last,

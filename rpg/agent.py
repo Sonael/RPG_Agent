@@ -168,19 +168,32 @@ tempo: <quantas horas passaram — "2h — viagem pela trilha">
 lugar: <lugar novo que você acabou de descrever — "Ponte Quebrada (dentro de: Vale) — tábuas podres">
 gente: <pessoa nova que apareceu — "Aldric — ferreiro da vila">
 fato: <verdade nova do mundo — "ponte_atravessada=sim">
+relação: <o que mudou entre duas pessoas — "Helena → Selene -20 — odiou o controle velado">
 [[/registro]]
 
 COMO PREENCHER
 • Só o que mudou NESTA cena. Nada mudou? Escreva o bloco com os campos que
   couberem e deixe de fora os que não têm o que dizer. O bloco vazio também
   vale — mas ele TEM de estar lá.
-• Uma linha por item. Três lugares, três pessoas e dois fatos por turno, no
-  máximo.
+• Uma linha por item. Três lugares, três pessoas, dois fatos e duas relações
+  por turno, no máximo.
 • Só o que você narrou de verdade: o sistema confere se o nome aparece no
   seu texto e ignora o que não aparece.
 • Você não precisa chamar save_location, save_character, update_world_state,
   advance_time nem set_flag: o bloco faz isso. Se já chamou durante a cena,
   pode repetir aqui sem medo — o sistema não registra duas vezes.
+
+A LINHA DE RELAÇÃO
+• A seta diz a direção: "Helena → Selene" é o que HELENA passou a sentir.
+  Use "↔" quando valer para os dois lados ("Selene ↔ Sonael +30 — amigos de
+  infância").
+• O número é o QUANTO MUDOU, com sinal, no máximo 30 para cada lado. Uma cena
+  não transforma ódio em amor.
+• Isto é entre DUAS PESSOAS. O que alguém sente pelo grupo continua sendo
+  adjust_attitude, e a lealdade do companheiro continua sendo
+  ajustar_lealdade — não use a linha de relação para elas.
+• Amizade antiga que você acabou de revelar também entra aqui: se a cena diz
+  que eles se conhecem desde a infância, a relação não pode continuar em zero.
 
 O QUE NÃO ENTRA NO BLOCO
 Dado, vida, mana, XP, combate, loja, missão e nível continuam sendo

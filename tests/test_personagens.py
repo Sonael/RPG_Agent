@@ -70,12 +70,23 @@ def test_pode_falar_so_quem_esta_perto_e_vivo(cliviate):
     assert morto["local"]["alcance"] == "aqui" and morto["pode_falar"] is False
 
 
-def test_membro_do_grupo_esta_no_local_atual_e_sem_atitude(cliviate):
+def test_membro_do_grupo_esta_no_local_atual(cliviate):
     f = personagens.ficha("Alden")
     assert f["do_grupo"] is True
     assert f["local"]["nome"] == "Praça de Cliviate"
-    assert f["atitude"] is None
     assert f["pode_falar"] is False
+
+
+def test_membro_do_grupo_agora_mostra_a_atitude(cliviate):
+    """
+    A ficha escondia a atitude de quem é do grupo, e o jogador só a via na
+    tela do Mundo — justamente a relação de quem convive com ele o tempo
+    todo. Os efeitos de REGRA (preço de loja, CD de teste social) continuam
+    fora: eles valem para quem não é do grupo.
+    """
+    f = personagens.ficha("Alden")
+    assert f["atitude"] is not None
+    assert f["atitude"]["efeitos"] == []
 
 
 # ---------------------------------------------------------------------------

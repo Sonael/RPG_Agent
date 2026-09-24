@@ -1410,6 +1410,15 @@ def get_scene_context(extra_characters: str = "", extra_locations: str = "") -> 
             sabido = [f for f in (ch.get("conhecido") or []) if isinstance(f, str)]
             if sabido:
                 lines.append("  Grupo sabe: " + "; ".join(s[:60] for s in sabido[-3:]))
+            # O que ele sente por OUTRAS pessoas da cena (rpg/entre.py). Sem
+            # isto, o mestre escreve a relação no fechamento do turno e no
+            # turno seguinte não sabe mais que ela existe — e a companheira
+            # que odeia a outra volta a tratá-la com carinho.
+            if ch.get("entre"):
+                from rpg import entre as _entre
+                linha = _entre.para_o_mestre(ch.get("name", ""))
+                if linha:
+                    lines.append("  " + linha)
         titulo = (
             "Personagens conhecidos (a campanha INTEIRA — ainda não há grupo "
             "nem local para filtrar; quem está na cena quem decide é você)"

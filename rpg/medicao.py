@@ -56,6 +56,59 @@ def cobrancas_do_jogador(texto: str) -> list[str]:
     return [nome for nome, rx in _COBRANCAS.items() if rx.search(texto)]
 
 
+# ── O encontro sugerido e o encontro que aconteceu ────────────────────────
+# Na partida medida, o sistema calculou o orçamento de XP e ofereceu três
+# opções balanceadas — e o mestre criou os próprios cultistas por fora. Antes
+# de OBRIGAR alguma coisa, é preciso saber se foi uma vez ou se é a regra.
+# Estas duas funções só anotam; quem decide continua sendo o mestre.
+
+def _caderno() -> dict:
+    return memory.campaign.setdefault("_encontro", {})
+
+
+def registrar_sugestao(nomes, orcamento=0) -> None:
+    try:
+        _caderno().update({"sugeridos": [str(n) for n in (nomes or []) if n],
+                           "orcamento": int(orcamento or 0),
+                           "turno": memory.turno_atual()})
+    except Exception:
+        pass
+
+
+def registrar_inimigo(nome: str) -> None:
+    try:
+        criados = _caderno().setdefault("criados", [])
+        if nome and str(nome) not in criados:
+            criados.append(str(nome))
+    except Exception:
+        pass
+
+
+def _encontro_do_turno() -> dict:
+    """
+    O que houve de encontro neste turno, esvaziando o que já foi contado — a
+    sugestão fica de pé (ela pode ser seguida no turno seguinte), o que foi
+    criado não.
+    """
+    try:
+        caderno = _caderno()
+        criados = list(caderno.get("criados") or [])
+        caderno["criados"] = []
+        if not criados and "sugeridos" not in caderno:
+            return {}
+        sugeridos = [s.lower() for s in (caderno.get("sugeridos") or [])]
+        seguiu = None
+        if criados and sugeridos:
+            seguiu = any(any(s in c.lower() or c.lower() in s for s in sugeridos)
+                         for c in criados)
+        return {"sugeridos": caderno.get("sugeridos") or [],
+                "criados": criados,
+                "seguiu": seguiu,
+                "turno_da_sugestao": caderno.get("turno")}
+    except Exception:
+        return {}
+
+
 def registrar_turno(mensagem_do_jogador: str, ferramentas, registro: dict) -> None:
     if os.environ.get("MEDICAO_DESLIGADA"):
         return
@@ -74,6 +127,9 @@ def registrar_turno(mensagem_do_jogador: str, ferramentas, registro: dict) -> No
                 "recusados": registro.get("recusados") or [],
             },
         }
+        encontro = _encontro_do_turno()
+        if encontro:
+            linha["encontro"] = encontro
         ARQUIVO.parent.mkdir(parents=True, exist_ok=True)
         with ARQUIVO.open("a", encoding="utf-8") as saida:
             saida.write(json.dumps(linha, ensure_ascii=False) + "\n")
@@ -96,6 +152,11 @@ def resumo(caminho: Path | None = None) -> dict:
     com_bloco = [t for t in turnos if (t.get("fechamento") or {}).get("tinha_bloco")]
     feitos = sum(len((t.get("fechamento") or {}).get("feitos") or []) for t in turnos)
     recusados = sum(len((t.get("fechamento") or {}).get("recusados") or []) for t in turnos)
+    # Encontros: de todas as vezes em que inimigos entraram na mesa, quantas
+    # vieram do encontro que o sistema tinha acabado de sugerir.
+    com_inimigo = [t for t in turnos if (t.get("encontro") or {}).get("criados")]
+    julgados = [t for t in com_inimigo if (t.get("encontro") or {}).get("seguiu") is not None]
+    seguiram = [t for t in julgados if t["encontro"]["seguiu"]]
     return {
         "turnos": len(turnos),
         "digitados": len(digitados),
@@ -105,4 +166,8 @@ def resumo(caminho: Path | None = None) -> dict:
         "porcentagem_com_bloco": round(100 * len(com_bloco) / len(turnos), 1) if turnos else 0.0,
         "registros_feitos": feitos,
         "registros_recusados": recusados,
+        "turnos_com_inimigo_novo": len(com_inimigo),
+        "turnos_com_sugestao_na_mesa": len(julgados),
+        "seguiram_a_sugestao": len(seguiram),
+        "porcentagem_que_seguiu": round(100 * len(seguiram) / len(julgados), 1) if julgados else 0.0,
     }

@@ -24,6 +24,7 @@ from google.genai import types as gtypes
 # sempre o Flask; o código da aplicação vem sempre de `rpg.*`.
 from rpg import memory
 from rpg import database
+from rpg import eco
 from rpg import epilogo
 from rpg import medicao
 from rpg.auth import require_auth, register as auth_register, login as auth_login, refresh_session
@@ -74,6 +75,25 @@ def _dbg_block(value, title: str = "") -> None:
 # eventos e flags. No log mostramos o resultado COMPLETO (não truncado), pois
 # é exatamente "como o agente sabe o que está acontecendo".
 _CONTEXT_TOOLS = {"get_scene_context", "get_full_context"}
+
+
+def _resultado_para_a_tela(nome: str, conteudo) -> str:
+    """
+    O que do resultado da ferramenta chega ao chat do jogador.
+
+    As ferramentas de CONTEXTO não chegam: a saída delas é o retrato do mundo
+    que o mestre lê para se situar ("[Cap.1 | Colinas Cinzentas] / Cena: … /
+    Status D&D: …"), e o jogador estava recebendo esse retrato inteiro a cada
+    turno em que o mestre se reancorava. Ele já vê tudo isso na barra lateral,
+    escrito para gente.
+
+    Das demais sai o que está marcado como instrução interna ao modelo
+    ([[llm]]…[[/llm]]) — a LLM já consumiu o conteúdo completo pela
+    function_response; este caminho é só o eco visual.
+    """
+    if nome in _CONTEXT_TOOLS:
+        return ""
+    return re.sub(r'\s*\[\[llm\]\][\s\S]*?\[\[/llm\]\]\s*', '\n', str(conteudo)).strip()
 
 
 # ---------------------------------------------------------------------------
@@ -1939,6 +1959,10 @@ _PREFIXOS_INTERNOS = (
     ("[GRIMÓRIO RESOLVIDO NA TELA", "tela"), ("[DADO DO JOGADOR", "dado"),
     ("[SAQUE RESOLVIDO NA TELA", "tela"), ("[SAQUE DEIXADO NA TELA", "tela"),
     ("[MISSÕES ATUALIZADAS NA TELA", "tela"),
+    # A mensagem de retomada é o mundo inteiro escrito para o mestre. Ela vai
+    # sem registrar hoje, mas campanhas antigas a têm gravada no histórico e
+    # ela reaparecia na tela como se o jogador a tivesse digitado.
+    ("Estamos retomando uma aventura em andamento", "comando"),
 )
 
 
@@ -2204,16 +2228,7 @@ def chat():
                                     # "INCONSCIENTE", XP concedido, level up).
                                     _dbg(f"  [OBSERV] {fr.name} → {_short(conteudo, 600)}")
                                 if conteudo:
-                                    # Remove trechos marcados como instrução interna
-                                    # ao modelo ([[llm]]…[[/llm]]) antes de exibir
-                                    # na UI. A LLM já consumiu o conteúdo completo
-                                    # via function_response; este queue só serve
-                                    # para o stream visual de tool_result.
-                                    visible = re.sub(
-                                        r'\s*\[\[llm\]\][\s\S]*?\[\[/llm\]\]\s*',
-                                        '\n',
-                                        str(conteudo),
-                                    ).strip()
+                                    visible = _resultado_para_a_tela(fr.name, conteudo)
                                     if visible:
                                         result_q.put(("tool_result", {"tool_name": fr.name, "content": visible}))
 
@@ -2326,6 +2341,16 @@ def chat():
                     tools_called       = content.get("tools_called", set())
                     combat_was_active  = content.get("combat_was_active", False)
                     dead_before        = content.get("dead_before", set())
+
+                    # ── Eco do motor ──────────────────────────────────────
+                    # O mestre às vezes copia para dentro da narração o bloco
+                    # que acabou de ler ("COMBATE ATIVO — ESTADO ATUAL",
+                    # "INSTRUÇÃO CRÍTICA", o retrato da cena). Pedir para não
+                    # fazer isso não basta — a instrução já pede. Aqui o eco
+                    # sai antes de o texto chegar à tela E ao histórico.
+                    response_text, ecos = eco.tirar_ecos(response_text)
+                    if ecos:
+                        _dbg(f"  [ECO] cortado do texto do mestre: {ecos}")
 
                     # ── Fechamento do turno ───────────────────────────────
                     # O mestre anota no fim o que mudou na cena; aqui o bloco
@@ -3272,6 +3297,24 @@ def character_sheet_route():
     """Ficha do personagem: relação com o grupo, ligações, o que o grupo sabe."""
     from rpg import personagens
     return jsonify(personagens.ficha((request.args.get("nome") or "").strip()))
+
+
+@app.route("/api/characters/relacao", methods=["POST"])
+@require_auth
+def character_relation_route():
+    """
+    O jogador corrigindo a relação pela ficha: atitude com o grupo, lealdade
+    do companheiro ou o que ele sente por outra pessoa (ver
+    personagens.editar_relacao). Devolve a ficha já atualizada, para a tela
+    redesenhar sem uma segunda ida ao servidor.
+    """
+    from rpg import personagens
+    dados = request.json or {}
+    resultado = personagens.editar_relacao((dados.get("nome") or "").strip(), dados)
+    if resultado.get("erro"):
+        return jsonify(resultado), 400
+    memory.save_campaign()
+    return jsonify(resultado)
 
 
 @app.route("/api/locations/state", methods=["GET"])

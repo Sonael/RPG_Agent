@@ -547,7 +547,8 @@ html.anim-on .sb-mudou { animation: sbMudou 1.2s ease-out; }
   25%  { box-shadow: 0 0 0 3px rgba(184,153,71,.45); background-color: rgba(184,153,71,.18); }
   100% { box-shadow: 0 0 0 0 rgba(184,153,71,0); }
 }
-html.anim-on .sb-heroi-vida > span[data-barra], html.anim-on .sb-missao-trilho > span[data-barra] { transition: width .7s ease-out; }
+html.anim-on .sb-heroi-vida > span[data-barra], html.anim-on .sb-heroi-mana > span[data-barra],
+html.anim-on .sb-missao-trilho > span[data-barra] { transition: width .7s ease-out; }
 html.anim-on .sb-heroi-num.num-subiu { animation: numSobe .7s ease-out; }
 html.anim-on .sb-heroi-num.num-desceu { animation: numDesce .7s ease-out; }
 html.anim-on .sb-missao-conta.num-subiu { display: inline-block; animation: numSobe .7s ease-out; }
@@ -4961,6 +4962,36 @@ body.local-on, body.pessoa-on, body.heroi-on, body.missoes-on, body.mapa-on, bod
 .lcl-btn-ir { background: var(--lcl-ink); border-color: var(--lcl-ink); color: var(--lcl-paper); }
 .lcl-btn-ir:hover:not(:disabled) { background: var(--lcl-ink); filter: brightness(0.82); }
 .lcl-btn-sec { color: var(--lcl-dark); }
+/* Apagar é sem volta: fica na cor do perigo, e só se pinta quando o ponteiro
+   está em cima — não deve puxar o olho antes da hora. */
+.lcl-btn-apagar { color: var(--lcl-red); border-color: var(--lcl-red); }
+.lcl-btn-apagar:hover:not(:disabled) { background: var(--lcl-red); color: var(--lcl-paper); }
+
+/* Relação com cada um, na ficha: uma entrada por pessoa, com o ajuste do
+   jogador aberto no lugar dos botões. */
+.psn-entre-item { display: flex; flex-direction: column; gap: 4px; padding: var(--esp-2) 0; border-bottom: 1px solid var(--page-edge); }
+.psn-entre-item:last-of-type { border-bottom: none; }
+.psn-entre-nome {
+  background: none; border: none; padding: 0; cursor: pointer; text-align: left;
+  font-family: 'Playfair Display', serif; font-weight: 700; color: var(--lcl-text);
+}
+.psn-entre-nome:hover { text-decoration: underline; text-underline-offset: 3px; }
+.psn-entre-acoes, .psn-ajuste-botoes, .psn-entre-novo { display: flex; flex-wrap: wrap; gap: var(--esp-1); align-items: center; }
+.psn-entre-novo { margin-top: var(--esp-2); }
+.psn-ajuste { display: flex; flex-direction: column; gap: var(--esp-1); margin-top: var(--esp-1); }
+.psn-ajuste-linha { display: flex; align-items: center; gap: var(--esp-1); font-size: 0.82rem; color: var(--lcl-muted); }
+.psn-ajuste input, .psn-ajuste-linha select {
+  font-family: inherit; font-size: 0.85rem; padding: 4px 8px; border-radius: 6px;
+  border: 1px solid var(--page-edge); background: var(--lcl-paper); color: var(--lcl-text);
+}
+.psn-ajuste-valor { width: 6em; }
+.psn-ajuste-motivo { width: 100%; }
+.psn-ajustar { align-self: flex-start; margin-top: var(--esp-1); }
+
+/* Resumo da relação na ficha do herói, com o caminho para ajustar. */
+#hro-relacao { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.hro-relacao-linha { margin: 0; font-size: 0.85rem; color: var(--lcl-text); }
+.hro-relacao-linha span { color: var(--lcl-muted); }
 /* Pedir ao mestre: mesma tinta do "Ir até lá", outra classe, porque o
    .lcl-btn-ir é o botão de andar e a tela é medida por ele. */
 .lcl-btn-pedir { background: var(--lcl-ink); border-color: var(--lcl-ink); color: var(--lcl-paper); }
@@ -5922,6 +5953,13 @@ body.loot-on { overflow: hidden; }
 .sb-heroi-vida > span { display: block; height: 100%; border-radius: 999px; background: #2e7d32; }
 .sb-vida-alerta > span { background: #b89947; }
 .sb-vida-perigo > span { background: var(--ink-sys); }
+/* Vida e mana empilhadas na mesma célula: a linha do herói continua com três
+   colunas, e quem não conjura não ganha uma barra vazia. */
+.sb-heroi-barras { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.sb-heroi-mana { display: block; height: 4px; border-radius: 999px; background: rgba(0,0,0,0.09); overflow: hidden; }
+.sb-heroi-mana > span { display: block; height: 100%; border-radius: 999px; background: var(--ink-user); }
+.sb-heroi-nums { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.25; }
+.sb-heroi-num-mana { font-size: 11px; color: var(--ink-user); }
 .sb-heroi-num { min-width: 3.4em; text-align: right; font-family: 'Lora', serif; font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .sb-heroi-num small { margin-left: 2px; color: var(--ink-user); }
 .sb-heroi-marcas { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px; }
