@@ -207,7 +207,13 @@ def ficha(nome: str) -> dict:
         # acima é o sentimento pelo grupo; esta lista é o que acontece entre
         # duas pessoas, que era o buraco: "Helena odiou a sugestão de Selene"
         # descontava do número do grupo por falta de lugar melhor.
-        "entre": entre.de_quem(nome_real),
+        #
+        # No romance, o par com o protagonista NÃO aparece aqui: ele tem casa
+        # própria logo acima (afeto e confiança). Duas caixas para a mesma
+        # relação, com números diferentes, é pior do que uma.
+        "entre": [r for r in entre.de_quem(nome_real)
+                  if not (romance and locais.norm(r["nome"])
+                          == locais.norm(memory.campaign.get("protagonist", "") or ""))],
         "missoes": missoes,
         # A lista curta é a da tela; `encontros` diz quantas existem ao todo,
         # para ela poder dizer "as 5 mais recentes de 12".
@@ -256,6 +262,28 @@ def editar_relacao(nome: str, dados: dict) -> dict:
 
     if dados.get("para"):
         alvo = str(dados["para"]).strip()
+        # No romance, a relação com o protagonista é o afeto da tela de
+        # Relações. Gravá-la em entre.py deixaria o jogador editando um número
+        # que nenhuma tela mostra — ele mexeria e nada mudaria à frente dele.
+        romance_com_voce = (
+            (memory.campaign.get("campaign_type") or "") == "romance"
+            and locais.norm(memory.campaign.get("protagonist", "") or "")
+            in (locais.norm(nome_real), locais.norm(alvo))
+        )
+        if romance_com_voce and not dados.get("apagar"):
+            from rpg import relacoes
+            outro = (alvo if locais.norm(nome_real)
+                     == locais.norm(memory.campaign.get("protagonist", "") or "") else nome_real)
+            ch_outro = _personagem(outro)
+            if not ch_outro:
+                return {"erro": f"Personagem '{outro}' não encontrado."}
+            valor, erro = _inteiro(dados.get("valor"), "relação")
+            if erro:
+                return {"erro": erro}
+            delta = valor - relacoes.afeto_de(ch_outro)
+            if delta:
+                relacoes.ajustar(outro, afeto=delta, motivo=motivo)
+            return ficha(nome_real)
         if dados.get("apagar"):
             # Some dos dois lados: meia relação registrada é justamente o que
             # fazia a ficha de uma parecer vazia enquanto a da outra tinha

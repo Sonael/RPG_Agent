@@ -287,6 +287,15 @@ def aplicar(campos: dict[str, list[str]], narracao: str) -> dict:
     # a tudo isto ("Helena odiou a sugestão de Selene", sem Selene notar):
     # basta o mestre escrever a OUTRA direção na mesma lista, com o número
     # dela. Uma direção escrita à mão nunca é sobrescrita pelo espelho.
+    romance = (memory.campaign.get("campaign_type") or "") == "romance"
+    protagonista = _norm(memory.campaign.get("protagonist", "") or "")
+
+    def _na_cena(nome: str) -> bool:
+        # O protagonista está SEMPRE na cena, e o mestre escreve "você" no
+        # lugar do nome dele metade do tempo. Cobrar o nome dele na narração
+        # recusaria a relação mais importante do jogo.
+        return (protagonista and _norm(nome) == protagonista) or _tem_evidencia(nome, narracao)
+
     linhas = []
     for valor in campos.get("relacao", [])[:TETO["relacao"]]:
         m = _RELACAO_RE.match(valor)
@@ -295,7 +304,7 @@ def aplicar(campos: dict[str, list[str]], narracao: str) -> dict:
             continue
         a, b = _partes(m.group("a"))[0], _partes(m.group("b"))[0]
         delta = int(m.group("delta").replace(" ", ""))
-        if not (_tem_evidencia(a, narracao) and _tem_evidencia(b, narracao)):
+        if not (_na_cena(a) and _na_cena(b)):
             recusa("relacao", f"{a} → {b}", "os dois nomes precisam aparecer na narração")
             continue
         if abs(delta) > PASSO_MAXIMO:
@@ -306,6 +315,28 @@ def aplicar(campos: dict[str, list[str]], narracao: str) -> dict:
     escritas = {(_norm(a), _norm(b)) for a, b, _, _ in linhas}
 
     for a, b, delta, motivo in linhas:
+        # No ROMANCE, a relação com o protagonista tem casa própria: afeto e
+        # confiança (rpg/relacoes.py), que é o que a tela de Relações mostra.
+        # Escrever isso em entre.py criaria dois números para a mesma coisa,
+        # em dois lugares, nenhum sabendo do outro. O fechamento entrega na
+        # casa certa; o mestre não precisa escolher.
+        if romance and protagonista and protagonista in (_norm(a), _norm(b)):
+            outro = b if _norm(a) == protagonista else a
+            if not delta:
+                continue
+            try:
+                from rpg import relacoes as _relacoes
+                resposta = _relacoes.ajustar(outro, afeto=delta, motivo=motivo)
+            except Exception as e:
+                recusa("relacao", f"{a} → {b}", f"falhou: {e}")
+                continue
+            if "não encontrado" in resposta or resposta.startswith(("Informe", "Nada")):
+                recusa("relacao", outro, resposta)
+            else:
+                feitos.append(f"ajustar_relacao({outro!r},afeto={delta:+d})")
+                avisos.append(resposta)
+            continue
+
         # O espelho só entra quando o mestre NÃO escreveu a volta.
         espelhar = (_norm(b), _norm(a)) not in escritas
         try:

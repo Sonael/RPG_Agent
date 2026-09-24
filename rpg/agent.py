@@ -214,6 +214,17 @@ ferramenta chamada na hora, ANTES da narração: o resultado delas muda o que
 você vai escrever.
 """
 
+_EPILOGO_NO_ROMANCE = """
+A LINHA DE RELAÇÃO NESTE GÊNERO
+• Aqui a relação com o PROTAGONISTA tem dois eixos, afeto e confiança, e é ela
+  que a tela de Relações mostra. Uma linha de relação que envolva ele mexe no
+  AFETO — o sistema entrega no lugar certo, você não precisa escolher.
+• Quando a CONFIANÇA também mudar (uma promessa cumprida, uma mentira
+  descoberta), chame ajustar_relacao: a linha do fechamento só move um eixo.
+• Entre duas outras pessoas — a irmã, o rival, a amiga de infância — a linha
+  vale como em qualquer gênero.
+"""
+
 _BASE_MEMORY_RULES = """
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 CONTEXTO — como consultar a memória
@@ -1515,6 +1526,8 @@ def create_agent(model, campaign_type: str = "fantasia", dnd_mode: bool | None =
         # Por último, sempre: o fechamento do turno é a última coisa que ele lê
         # antes de escrever, e a última que ele escreve.
         instr += _EPILOGO_OBRIGATORIO
+        if (_memory.campaign.get("campaign_type") or "") == "romance":
+            instr += _EPILOGO_NO_ROMANCE
         return instr
 
     # Conjunto de ferramentas resolvido a cada turno (ver rpg/toolsets.py).
