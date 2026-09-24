@@ -61,6 +61,12 @@ _stub_database()
 # Modo offline por padrão: nenhum teste sai para a rede sem pedir.
 os.environ.setdefault("RPG_SRD_OFFLINE", "1")
 os.environ.setdefault("RPG_SRD_CACHE_DISABLED", "1")
+# A medição fica desligada na suíte. Os testes de navegador sobem um servidor
+# DE VERDADE, e cada turno deles escrevia uma linha em campanhas/medicao.jsonl
+# — o arquivo de quem joga. O número que deveria dizer "o mestre esqueceu?"
+# vinha com 11 linhas de teste em 17. Quem mede a medição liga de volta
+# (monkeypatch.delenv), apontando o arquivo para um tmp_path.
+os.environ.setdefault("MEDICAO_DESLIGADA", "1")
 
 
 @pytest.fixture(autouse=True)

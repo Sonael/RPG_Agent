@@ -50,10 +50,11 @@ _BLOCO_RE = re.compile(
     re.IGNORECASE | re.DOTALL,
 )
 
-CAMPOS = ("local", "tempo", "lugar", "gente", "fato", "relacao")
+CAMPOS = ("local", "tempo", "lugar", "gente", "fato", "relacao", "cena", "capitulo")
 # Como o campo aparece ESCRITO no bloco: a leitura tira o acento, o prompt não.
-ESCRITO = {"relacao": "relação"}
-TETO = {"lugar": 3, "gente": 3, "fato": 2, "local": 1, "tempo": 1, "relacao": 2}
+ESCRITO = {"relacao": "relação", "capitulo": "capítulo"}
+TETO = {"lugar": 3, "gente": 3, "fato": 2, "local": 1, "tempo": 1, "relacao": 2,
+        "cena": 1, "capitulo": 1}
 
 # "Helena → Selene -20 — odiou o controle velado"
 # "Selene ↔ Sonael +30 — amigos de infância"
@@ -102,7 +103,9 @@ def extrair(texto: str) -> tuple[str, dict[str, list[str]]]:
         campo, valor = _norm(m.group(1)), m.group(2).strip()
         campo = {"lugares": "lugar", "pessoas": "gente", "pessoa": "gente",
                  "npc": "gente", "hora": "tempo", "fatos": "fato",
-                 "relacoes": "relacao", "relacionamento": "relacao"}.get(campo, campo)
+                 "relacoes": "relacao", "relacionamento": "relacao",
+                 "evento": "cena", "acontecimento": "cena",
+                 "cap": "capitulo"}.get(campo, campo)
         if campo not in CAMPOS or not valor or valor in ("-", "—", "nenhum", "nada"):
             continue
         campos.setdefault(campo, []).append(valor)
@@ -112,17 +115,54 @@ def extrair(texto: str) -> tuple[str, dict[str, list[str]]]:
 
 
 def _tem_evidencia(nome: str, narracao: str) -> bool:
-    """O nome precisa aparecer na narração do turno. Sem isso, não registra."""
+    """
+    O nome precisa aparecer na narração do turno. Sem isso, não registra — é
+    o que impede o bloco de virar porta para inventar gente e lugar que a
+    história não teve.
+
+    "APARECER" NÃO É "COINCIDIR". A primeira medição real mostrou o custo de
+    exigir o nome inteiro: três dos cinco registros recusados eram o nome
+    completo do bloco contra a forma curta da cena —
+
+        bloco:    gente: Mestre Alquimista Faelar
+        narração: "Atrás do balcão, o velho Faelar ergue os olhos."
+
+    Perder esse registro é pior do que aceitar um nome um pouco inflado: o
+    mestre está batizando o que ACABOU de narrar. Basta uma palavra distinta
+    do nome aparecer na cena.
+    """
     n = _norm(nome)
     if not n:
         return False
     texto = _norm(narracao)
+
+    palavras = [p for p in n.split() if len(p) >= 4]
+    if not palavras:
+        # Nome curto ("Pip", "Bo"): só vale inteiro e como palavra, senão
+        # "Pip" se daria por citado numa cena que falou de uma pipa.
+        return bool(re.search(rf"\b{re.escape(n)}\b", texto))
+
     if n in texto:
         return True
-    # "Ponte Quebrada" vale se a narração disse "a Ponte Quebrada, de tábuas":
-    # todas as palavras grandes do nome aparecem.
-    palavras = [p for p in n.split() if len(p) >= 4]
-    return bool(palavras) and all(p in texto for p in palavras)
+    # As palavras de peso primeiro: "Torre do Mago Sombrio" não se dá por
+    # citada só porque a cena tinha um mago.
+    grandes = [p for p in palavras if len(p) >= 5]
+    return any(re.search(rf"\b{re.escape(p)}", texto) for p in (grandes or palavras))
+
+
+def _quem_aparece(narracao: str, limite: int = 6) -> list[str]:
+    """
+    Os personagens conhecidos citados nesta narração. É o que faz o
+    acontecimento aparecer na ficha de cada um deles ("últimas cenas com…").
+    """
+    achados = []
+    for ch in (memory.campaign.get("characters") or {}).values():
+        nome = (ch or {}).get("name", "")
+        if nome and _tem_evidencia(nome, narracao):
+            achados.append(nome)
+        if len(achados) >= limite:
+            break
+    return achados
 
 
 def _ja_existe(colecao: str, nome: str) -> bool:
@@ -183,8 +223,13 @@ def aplicar(campos: dict[str, list[str]], narracao: str) -> dict:
             recusa("tempo", valor, "não dá para ler as horas")
             continue
         horas = int(m.group(1))
-        if not 1 <= horas <= 24:
-            recusa("tempo", valor, "fora de 1 a 24 horas")
+        # "0h — ajuste de laços" é o mestre dizendo que a cena não gastou
+        # tempo. Isso não é erro: é a resposta certa para uma conversa de dois
+        # minutos. Era recusado e entrava na conta de registro falhado.
+        if horas == 0:
+            continue
+        if horas > 24:
+            recusa("tempo", valor, "mais de 24 horas num turno só")
             continue
         motivo = m.group(2).strip() or "o tempo da cena"
         try:
@@ -285,6 +330,46 @@ def aplicar(campos: dict[str, list[str]], narracao: str) -> dict:
                           f"({_entre.faixa(depois)})" + (f" — {motivo}" if motivo else ""))
         except Exception as e:
             recusa("relacao", f"{a} → {b}", f"falhou: {e}")
+
+    # ---- a cena que virou acontecimento -----------------------------------
+    # Medido na campanha de 91 turnos: 3 eventos e 4 entradas de diário. A
+    # linha do tempo é o que a ficha do personagem, a do local e o bloco de
+    # cena leem para lembrar o que já houve — vazia, o mestre repete encontros
+    # e esquece consequências.
+    for valor in campos.get("cena", [])[:TETO["cena"]]:
+        resumo, consequencia = _partes(valor)
+        if len(resumo) < 12:
+            recusa("cena", valor, "resumo curto demais para virar acontecimento")
+            continue
+        try:
+            tl.save_event(resumo,
+                          characters_involved=", ".join(_quem_aparece(narracao)),
+                          location=memory.campaign.get("current_location", ""),
+                          consequence=consequencia)
+            feitos.append(f"save_event({resumo[:40]!r})")
+        except Exception as e:
+            recusa("cena", resumo, f"falhou: {e}")
+
+    # ---- virada de capítulo -----------------------------------------------
+    # O capítulo ficou em 1 durante 91 turnos. Só o passo seguinte é aceito:
+    # capítulo é numeração de história, não campo livre.
+    for valor in campos.get("capitulo", [])[:TETO["capitulo"]]:
+        m = re.search(r"\d{1,3}", valor)
+        if not m:
+            recusa("capitulo", valor, "escreva só o número do capítulo novo")
+            continue
+        novo = int(m.group(0))
+        atual = int(memory.campaign.get("chapter", 1) or 1)
+        if novo == atual:
+            continue
+        if novo != atual + 1:
+            recusa("capitulo", valor, f"o capítulo vai de {atual} para {atual + 1}, um de cada vez")
+            continue
+        try:
+            tl.update_world_state(chapter=novo)
+            feitos.append(f"update_world_state(chapter={novo})")
+        except Exception as e:
+            recusa("capitulo", valor, f"falhou: {e}")
 
     # ---- fato do mundo ----------------------------------------------------
     for valor in campos.get("fato", [])[:TETO["fato"]]:

@@ -2005,6 +2005,14 @@ body.combat-on { overflow: hidden; }
   background: rgba(0,0,0,0.02); border-radius: 6px;
   border: 1px solid var(--page-edge);
 }
+/* O mestre pediu o dado: a bandeja abre sozinha e diz por quê. */
+.bandeja-pedido {
+  margin-bottom: var(--esp-3); padding: 6px 10px; border-radius: 6px;
+  border: 1px solid var(--ink-user); color: var(--ink-user);
+  background: rgba(0,0,0,0.02);
+  font-family: 'Lora', serif; font-size: 13px;
+}
+#dice-tray-btn.dado-pedido { color: var(--ink-user); border-color: var(--ink-user); }
 .bandeja-linha { display: flex; align-items: center; gap: var(--esp-2); }
 .bandeja-botoes { display: flex; gap: var(--esp-2); flex-wrap: wrap; }
 .bandeja-nota {

@@ -11,6 +11,8 @@ Três coisas anotadas jogando:
      outro na cara do jogador;
   • "desse pra editar isso": quem sabe o que aconteceu na mesa é quem jogou.
 """
+import copy
+
 import pytest
 
 from rpg import entre, memory, personagens
@@ -19,6 +21,9 @@ from rpg import entre, memory, personagens
 @pytest.fixture
 def campanha(monkeypatch):
     monkeypatch.setattr(memory, "save_campaign", lambda *a, **k: None)
+    # Guarda e devolve: a campanha ativa é global, e um teste que a deixa pela
+    # metade derruba outro arquivo, longe da causa.
+    guardado = copy.deepcopy({k: v for k, v in memory.campaign.items()})
     memory.campaign.clear()
     memory.campaign.update({
         "name": "Teste", "chapter": 2, "protagonist": "Sonael",
@@ -36,7 +41,9 @@ def campanha(monkeypatch):
         "locations": {}, "events": [], "quests": {}, "flags": {},
         "conversation_history": [],
     })
-    return memory.campaign
+    yield memory.campaign
+    memory.campaign.clear()
+    memory.campaign.update(guardado)
 
 
 # ---------------------------------------------------------------------------

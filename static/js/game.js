@@ -265,6 +265,9 @@ async function sendToAgent(text, registrar, interno, aoTexto) {
           appendDiceResultLog(ev.tool_name, ev.content);
           if (STATE_TOOLS.has(ev.tool_name)) refreshMemory();
         }
+        else if (ev.type === 'pede_dado') {
+          abrirBandejaDeDados(ev.cd);
+        }
         else if (ev.type === 'correction') {
           // O que aparecia aqui era recado de motor: "Verificador: 2
           // violação(ões) detectada(s)". O jogador só precisa saber que a
@@ -912,6 +915,35 @@ function toggleDiceTray() {
   tray.classList.toggle('hidden', !_diceTrayOpen);
 }
 
+// O mestre pediu o d20. A bandeja abre sozinha, com a CD à vista quando ele
+// disse uma: ela ficava atrás de um ícone que ninguém achava — zero usos numa
+// campanha de 91 turnos —, e agora a regra do jogo depende dela.
+// Não passa pelo toggle porque este abre ANTES de o turno terminar de chegar,
+// e lá `waiting` ainda é true.
+function abrirBandejaDeDados(cd) {
+  const tray = document.getElementById('dice-tray');
+  const btn  = document.getElementById('dice-tray-btn');
+  if (!tray || tray.dataset.semDnd === '1') return;
+  _diceTrayOpen = true;
+  tray.classList.remove('hidden');
+  if (btn) {
+    btn.classList.add('dado-pedido');
+    btn.title = cd ? `O mestre pediu um d20 (CD ${cd})` : 'O mestre pediu um d20';
+  }
+  const alvo = document.getElementById('dice-cd');
+  if (alvo) {
+    alvo.textContent = cd ? `O mestre pediu um d20 — CD ${cd}` : 'O mestre pediu um d20';
+    alvo.classList.remove('hidden');
+  }
+}
+
+function limparPedidoDeDado() {
+  const btn = document.getElementById('dice-tray-btn');
+  if (btn) { btn.classList.remove('dado-pedido'); btn.title = 'Rolar dado (jogador)'; }
+  const alvo = document.getElementById('dice-cd');
+  if (alvo) alvo.classList.add('hidden');
+}
+
 function rollPlayerDie(sides) {
   if (waiting) return;
   const modifier = parseInt(document.getElementById('dice-modifier')?.value) || 0;
@@ -921,6 +953,7 @@ function rollPlayerDie(sides) {
   const isFumble = sides === 20 && rawRoll === 1;
 
   if (_diceTrayOpen) toggleDiceTray();
+  limparPedidoDeDado();          // o pedido do mestre foi atendido
 
   const modStr = modifier !== 0 ? ` ${modifier >= 0 ? '+' : ''}${modifier}` : '';
   const statusLabel = isCrit ? '<br><span class="sys-highlight">CRÍTICO NATURAL</span>' : isFumble ? '<br><span class="sys-highlight">FALHA CRÍTICA</span>' : '';
@@ -1183,7 +1216,11 @@ function renderMemory(mem) {
   const diceTrayBtn = document.getElementById('dice-tray-btn');
   if (diceTrayBtn) {
     diceTrayBtn.style.display = isDnd ? '' : 'none';
-    if (!isDnd) { const tray = document.getElementById('dice-tray'); if (tray && !tray.classList.contains('hidden')) tray.classList.add('hidden'); }
+    const tray = document.getElementById('dice-tray');
+    // A bandeja que abre sozinha (o mestre pedindo o d20) precisa saber que
+    // esta campanha não rola dado nenhum.
+    if (tray) tray.dataset.semDnd = isDnd ? '0' : '1';
+    if (!isDnd && tray && !tray.classList.contains('hidden')) tray.classList.add('hidden');
   }
 
   const dndCmds = ['/ficha', '/inventario', '/habilidades', '/status', '/condicoes', '/combate', '/rolar'];

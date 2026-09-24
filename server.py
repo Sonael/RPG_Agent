@@ -1148,6 +1148,13 @@ def create_campaign():
     if database.campaign_exists(g.user_id, name):
         return jsonify({"error": f"Já existe uma campanha com o nome '{name}'"}), 409
 
+    # O jogador trocou, no wizard, nomes que a IA tinha inventado. O mundo
+    # inteiro já tinha sido escrito com os antigos: os eventos do diário
+    # contavam a história de alguém que não existe mais. A troca vale para
+    # TODO texto da campanha que está nascendo (ver rpg/renomear.py).
+    from rpg import renomear
+    campaign_data = renomear.aplicar(campaign_data, data.get("renomes"))
+
     # Normaliza chaves de personagens para lowercase + normaliza sheet.classe
     from rpg.tools_dnd import reconcile_character_archetypes, normalize_edited_character
     raw_chars = campaign_data.get("characters", {})
@@ -2428,6 +2435,14 @@ def chat():
                             v["message"] for v in violations
                             if v["rule"] in ("unsaved_character", "unknown_location") + SO_PARA_O_MESTRE
                         ][:6]
+                        # O fechamento do turno só conserta o esquecimento se
+                        # ele VIER. Na primeira medição real ele veio em 3 de
+                        # 6 respostas, então a conta de quantas vezes seguidas
+                        # ele faltou volta ao mestre no turno seguinte — é
+                        # fato contado, não suspeita de heurística.
+                        memory.campaign["_sem_fechamento"] = (
+                            0 if registro.get("tinha_bloco")
+                            else int(memory.campaign.get("_sem_fechamento") or 0) + 1)
                         memory.save_campaign()
 
                     yield f"data: {json.dumps({'type': 'text', 'content': response_text})}\n\n"
@@ -2442,6 +2457,19 @@ def chat():
                         pacote = json.dumps({"type": "tool_result",
                                              "tool_name": "relacao",
                                              "content": "\n".join(registro["avisos"])})
+                        yield f"data: {pacote}\n\n"
+
+                    # O mestre pediu o dado ao jogador: abre a bandeja. Ela
+                    # existe desde sempre atrás de um ícone ao lado do campo
+                    # de texto, e foi usada ZERO vezes numa campanha de 91
+                    # turnos. Agora que a regra obriga o mestre a pedir o d20
+                    # em vez de inventar o resultado, esconder a bandeja
+                    # seria trocar um problema por um atrito.
+                    if _PEDIU_O_DADO_RE.search(response_text or ""):
+                        cd = re.search(r"\bCD\s*(\d{1,2})\b", response_text or "",
+                                       re.IGNORECASE)
+                        pacote = json.dumps({"type": "pede_dado",
+                                             "cd": int(cd.group(1)) if cd else 0})
                         yield f"data: {pacote}\n\n"
 
                     # Para a tela vai o texto do JOGADOR: o painel dele falava

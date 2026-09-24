@@ -32,6 +32,8 @@ from rpg.toolsets import (
     FERRAMENTAS_SO_DO_MODO_DND,
     FERRAMENTAS_SO_DO_ROMANCE,
     FERRAMENTAS_SO_DA_FANTASIA,
+    FERRAMENTAS_SO_EM_COMBATE,
+    FERRAMENTAS_SO_COM_LOJA,
 )
 
 TOTAL = len(ALL_TOOLS)
@@ -40,8 +42,14 @@ N_ROMANCE = len(FERRAMENTAS_SO_DO_ROMANCE)
 N_FANTASIA = len(FERRAMENTAS_SO_DA_FANTASIA)
 
 
-def esperado(genero: str, dnd: bool = True, tela: bool = False) -> int:
-    """Quantas ferramentas uma campanha recebe: o total menos o que não é dela."""
+def esperado(genero: str, dnd: bool = True, tela: bool = False,
+             em_combate: bool = False, com_loja: bool = False) -> int:
+    """
+    Quantas ferramentas uma campanha recebe: o total menos o que não é dela.
+
+    A cena parada, sem luta e sem loja por perto, é o caso NORMAL — por isso
+    os dois filtros de momento entram como padrão aqui.
+    """
     n = TOTAL
     if not dnd:
         n -= N_DND
@@ -51,6 +59,11 @@ def esperado(genero: str, dnd: bool = True, tela: bool = False) -> int:
         n -= N_FANTASIA
     if tela:
         n -= len(FERRAMENTAS_SO_DO_MODO_NARRADO)
+    if not em_combate:
+        n -= len(FERRAMENTAS_SO_EM_COMBATE - (FERRAMENTAS_SO_DO_MODO_NARRADO if tela else frozenset())
+                 - (FERRAMENTAS_SO_DO_MODO_DND if not dnd else frozenset()))
+    if not com_loja:
+        n -= len(FERRAMENTAS_SO_COM_LOJA - (FERRAMENTAS_SO_DO_MODO_DND if not dnd else frozenset()))
     return n
 
 
@@ -308,6 +321,88 @@ def test_erro_ao_ler_a_campanha_entrega_tudo(conjunto, monkeypatch):
     monkeypatch.setitem(__import__("sys").modules, "rpg.memory", _MemoriaFalsa)
     monkeypatch.setattr(rpg, "memory", _MemoriaFalsa)
     assert len(entregues(conjunto)) == TOTAL
+
+
+# ---------------------------------------------------------------------------
+# O momento da cena: luta em andamento e loja por perto
+# ---------------------------------------------------------------------------
+# A mesa tem 117 ferramentas. Fora de combate, as de turno não são só peso de
+# schema: são porta para erro — o mestre que chama next_turn sem luta recebe
+# recusa e gasta o turno com isso.
+
+@pytest.fixture
+def em_luta(dnd):
+    dnd["combat_state"] = {"is_active": True, "initiative_order": ["Alden", "Goblin"],
+                           "current_turn_index": 0, "round": 1}
+    return dnd
+
+
+@pytest.mark.parametrize("ferramenta", sorted(FERRAMENTAS_SO_EM_COMBATE))
+def test_fora_de_combate_a_ferramenta_de_turno_some(dnd, conjunto, ferramenta):
+    assert ferramenta not in nomes(entregues(conjunto))
+
+
+@pytest.mark.parametrize("ferramenta", sorted(FERRAMENTAS_SO_EM_COMBATE))
+def test_com_a_luta_em_andamento_ela_volta(em_luta, conjunto, ferramenta):
+    assert ferramenta in nomes(entregues(conjunto))
+
+
+@pytest.mark.parametrize("ferramenta", [
+    "roll_initiative",        # é ela que ABRE a luta
+    "set_battlefield",        # montagem do encontro
+    "spawn_monster",
+    "set_combat_side",
+    "end_combat",             # escape de uma luta que não fechou direito
+    "roll_death_save",        # uma queda fora de combate derruba alguém
+    "resolve_saving_throw",
+    "modify_hp",
+])
+def test_o_que_precisa_existir_fora_da_luta(dnd, conjunto, ferramenta):
+    assert ferramenta in nomes(entregues(conjunto))
+
+
+def test_combate_ativo_e_o_que_manda(dnd, conjunto):
+    """initiative_order cheia com is_active falso é luta acabada."""
+    dnd["combat_state"] = {"is_active": False, "initiative_order": ["Alden"]}
+    assert "next_turn" not in nomes(entregues(conjunto))
+
+
+def test_sem_loja_por_perto_nao_se_compra(dnd, conjunto):
+    dnd["lojas"] = {}
+    disponiveis = nomes(entregues(conjunto))
+    assert "buy_item" not in disponiveis and "sell_item" not in disponiveis
+    # Abrir a loja continua possível: é assim que a cena de mercado começa.
+    assert "open_shop" in disponiveis
+
+
+def test_loja_no_local_do_grupo_libera_a_compra(dnd, conjunto):
+    dnd["current_location"] = "Cliviate"
+    dnd["lojas"] = {"forja": {"nome": "Forja", "local": "Cliviate", "estoque": []}}
+    assert "buy_item" in nomes(entregues(conjunto))
+
+
+def test_loja_em_outro_lugar_nao_libera(dnd, conjunto):
+    dnd["current_location"] = "Floresta das Brumas"
+    dnd["lojas"] = {"forja": {"nome": "Forja", "local": "Cliviate", "estoque": []}}
+    assert "buy_item" not in nomes(entregues(conjunto))
+
+
+def test_loja_sem_local_conta_como_aqui(dnd, conjunto):
+    """Loja gravada sem lugar é de campanha antiga: na dúvida, não corta."""
+    dnd["current_location"] = "Cliviate"
+    dnd["lojas"] = {"forja": {"nome": "Forja", "estoque": []}}
+    assert "buy_item" in nomes(entregues(conjunto))
+
+
+def test_a_fase_muda_o_conjunto_e_volta(dnd, conjunto):
+    """O conjunto precisa ser estável DENTRO da fase — é o que salva o cache."""
+    fora = nomes(entregues(conjunto))
+    assert fora == nomes(entregues(conjunto))
+    dnd["combat_state"] = {"is_active": True, "initiative_order": ["Alden"]}
+    dentro = nomes(entregues(conjunto))
+    assert dentro > fora
+    dnd["combat_state"] = {"is_active": False, "initiative_order": []}
+    assert nomes(entregues(conjunto)) == fora
 
 
 def test_o_agente_recebe_o_conjunto_e_nao_a_lista(campanha):

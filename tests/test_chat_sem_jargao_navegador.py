@@ -56,6 +56,33 @@ def pagina():
             parar()
 
 
+def test_a_bandeja_abre_quando_o_mestre_pede_o_dado(pagina):
+    """
+    Ela vivia atrás de um ícone que ninguém achava: zero usos em 91 turnos. A
+    regra do teste de habilidade agora depende dela.
+    """
+    pg, erros = pagina
+    pg.evaluate("() => abrirBandejaDeDados(13)")
+    assert pg.is_visible("#dice-tray")
+    assert "CD 13" in pg.inner_text("#dice-cd")
+    assert "dado-pedido" in (pg.get_attribute("#dice-tray-btn", "class") or "")
+    # Rolar atende o pedido e apaga o destaque.
+    pg.evaluate("() => rollPlayerDie(20)")
+    assert "dado-pedido" not in (pg.get_attribute("#dice-tray-btn", "class") or "")
+    assert pg.is_hidden("#dice-cd")
+    assert not erros, erros[:3]
+
+
+def test_bandeja_sem_regras_nao_abre(pagina):
+    """Campanha sem D&D não rola dado nenhum."""
+    pg, _ = pagina
+    pg.evaluate("() => { document.getElementById('dice-tray').classList.add('hidden');"
+                " document.getElementById('dice-tray').dataset.semDnd = '1'; }")
+    pg.evaluate("() => abrirBandejaDeDados(0)")
+    assert pg.is_hidden("#dice-tray")
+    pg.evaluate("() => { document.getElementById('dice-tray').dataset.semDnd = '0'; }")
+
+
 def test_toda_ferramenta_tem_nome_em_portugues(pagina):
     """O rótulo vem de TOOL_LABEL; sem ele, o jogador lê o nome da função."""
     pg, erros = pagina

@@ -104,6 +104,57 @@ FERRAMENTAS_SO_DA_FANTASIA = frozenset({
 GENEROS_DA_FANTASIA = ("fantasia", "dark_fantasy")
 
 
+# ── O MOMENTO DA CENA ─────────────────────────────────────────────────────
+# Ferramentas que só existem DENTRO de uma luta em andamento. Fora dela não
+# são só peso de schema: são porta para erro — o mestre que chama next_turn
+# sem combate recebe recusa e gasta um turno com isso.
+#
+# A lista é curta de propósito, e o que ficou de fora tem razão:
+#   • roll_initiative e set_battlefield ABREM a luta; sem elas não há como
+#     começar;
+#   • spawn_monster, set_combat_side, set_legendary_actions são montagem do
+#     encontro, antes do primeiro turno;
+#   • roll_death_save e resolve_saving_throw acontecem fora de combate (uma
+#     queda, um veneno);
+#   • modify_hp e apply_condition são da narração comum;
+#   • end_combat fica SEMPRE: é o escape de uma luta que não fechou direito,
+#     e é justamente quando o estado está torto que ela precisa existir.
+FERRAMENTAS_SO_EM_COMBATE = frozenset({
+    "next_turn", "execute_npc_turn", "move_combatant",
+    "legendary_action", "describe_battlefield", "get_combat_status",
+})
+
+# Comprar e vender pedem uma loja aberta; open_shop e list_shop ficam sempre,
+# porque são elas que abrem.
+FERRAMENTAS_SO_COM_LOJA = frozenset({"buy_item", "sell_item"})
+
+
+def _combate_ativo(camp) -> bool:
+    estado = camp.get("combat_state") or {}
+    return bool(isinstance(estado, dict) and estado.get("is_active"))
+
+
+def _loja_aberta(camp) -> bool:
+    """
+    Alguma loja ao alcance do grupo. Não é "o jogador está comprando": é a
+    diferença entre uma cena de mercado e uma masmorra.
+    """
+    lojas = camp.get("lojas") or {}
+    if not isinstance(lojas, dict) or not lojas:
+        return False
+    from rpg import locais
+    aqui = locais.norm(camp.get("current_location", "") or "")
+    if not aqui:
+        return True                  # sem saber onde o grupo está, não corta
+    for loja in lojas.values():
+        if not isinstance(loja, dict):
+            continue
+        onde = locais.norm(loja.get("local", "") or "")
+        if not onde or onde == aqui or aqui in onde or onde in aqui:
+            return True
+    return False
+
+
 def _nomes_das_ferramentas_dnd() -> frozenset:
     from rpg.tools_dnd import DND_TOOLS
     return frozenset(f.__name__ for f in DND_TOOLS) - _CARVE_OUT_GENERICAS
@@ -174,6 +225,8 @@ class FerramentasDoTurno(BaseToolset):
             romance = (camp.get("campaign_type") or "") == "romance"
             # "dnd" é a fantasia com regras de antes da separação.
             fantasia = (camp.get("campaign_type") or "") in GENEROS_DA_FANTASIA + ("dnd",)
+            em_combate = _combate_ativo(camp)
+            com_loja = _loja_aberta(camp)
         except Exception:
             # Falha de forma segura: sem contexto de campanha, entrega tudo.
             return list(self._todas)
@@ -190,22 +243,30 @@ class FerramentasDoTurno(BaseToolset):
             excluir |= FERRAMENTAS_SO_DO_ROMANCE
         if not fantasia:
             excluir |= FERRAMENTAS_SO_DA_FANTASIA
+        # O momento da cena. Muda poucas vezes por sessão (uma luta, um
+        # mercado), e é essa raridade que permite filtrar sem estragar o
+        # cache do prefixo: dentro da fase o conjunto é idêntico.
+        if not em_combate:
+            excluir |= FERRAMENTAS_SO_EM_COMBATE
+        if not com_loja:
+            excluir |= FERRAMENTAS_SO_COM_LOJA
 
         if not excluir:
-            self._log(modo, usa_dnd, self._todas)
+            self._log(modo, usa_dnd, em_combate, com_loja, self._todas)
             return list(self._todas)
 
         entregues = [t for t in self._todas if t.name not in excluir]
-        self._log(modo, usa_dnd, entregues)
+        self._log(modo, usa_dnd, em_combate, com_loja, entregues)
         return entregues
 
     _ultimo_log = None
 
-    def _log(self, modo: str, usa_dnd: bool, entregues: list) -> None:
+    def _log(self, modo: str, usa_dnd: bool, em_combate: bool, com_loja: bool,
+             entregues: list) -> None:
         """Mostra o conjunto no terminal quando ele MUDA (não a cada turno)."""
         if not _DEBUG:
             return
-        chave = (modo, usa_dnd, len(entregues))
+        chave = (modo, usa_dnd, em_combate, com_loja, len(entregues))
         if chave == FerramentasDoTurno._ultimo_log:
             return
         FerramentasDoTurno._ultimo_log = chave
@@ -215,6 +276,10 @@ class FerramentasDoTurno(BaseToolset):
             motivos.append("campanha não-D&D")
         if modo == "tela":
             motivos.append("combate na tela")
+        if not em_combate:
+            motivos.append("fora de combate")
+        if not com_loja:
+            motivos.append("sem loja por perto")
         extra = f" (−{removidas}: {', '.join(motivos)})" if removidas else ""
         print(f"  [FERRAMENTAS] modo={modo} dnd={usa_dnd} → "
               f"{len(entregues)}/{len(self._todas)} entregues{extra}", flush=True)

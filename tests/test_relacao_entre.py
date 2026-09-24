@@ -12,6 +12,8 @@ Helena não esfriou com o grupo; esfriou com SELENE. E a mesma partida tinha o
 contrário: uma amizade de infância narrada em cena que continuou valendo zero,
 porque não havia onde escrevê-la.
 """
+import copy
+
 import pytest
 
 from rpg import entre, epilogo, memory
@@ -20,6 +22,10 @@ from rpg import entre, epilogo, memory
 @pytest.fixture
 def campanha(tmp_path, monkeypatch):
     monkeypatch.setattr(memory, "save_campaign", lambda *a, **k: None)
+    # A campanha ativa é global: montar uma aqui e ir embora deixava o teste
+    # seguinte sem as chaves que ele espera ("quests", "lojas", "relogio"), e
+    # a falha saía longe da causa. Guarda e devolve.
+    guardado = copy.deepcopy({k: v for k, v in memory.campaign.items()})
     memory.campaign.clear()
     memory.campaign.update({
         "name": "Teste",
@@ -37,7 +43,9 @@ def campanha(tmp_path, monkeypatch):
         "locations": {}, "events": [], "quests": {}, "flags": {},
         "conversation_history": [],
     })
-    return memory.campaign
+    yield memory.campaign
+    memory.campaign.clear()
+    memory.campaign.update(guardado)
 
 
 # ---------------------------------------------------------------------------

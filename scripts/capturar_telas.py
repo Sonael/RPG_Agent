@@ -52,6 +52,9 @@ sys.path.insert(0, str(RAIZ))
 
 # O servidor não deve cuspir os logs de debug do agente durante a captura.
 os.environ.setdefault("RPG_DEBUG", "0")
+# Captura de telas não é partida: os turnos daqui não podem entrar no arquivo
+# de medição de quem joga (campanhas/medicao.jsonl).
+os.environ.setdefault("MEDICAO_DESLIGADA", "1")
 # Nenhuma delas é usada de verdade (os clientes são dublês), mas o import de
 # database.py/auth.py fica mais previsível com as variáveis presentes.
 os.environ.setdefault("SUPABASE_URL", "http://localhost/supabase-falso")

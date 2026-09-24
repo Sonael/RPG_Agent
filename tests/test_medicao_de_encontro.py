@@ -10,6 +10,7 @@ foi uma vez ou é a regra?
 A medição não muda o jogo: ela anota, falha em silêncio e sai do caminho com
 MEDICAO_DESLIGADA=1.
 """
+import copy
 import json
 
 import pytest
@@ -20,13 +21,20 @@ from rpg import medicao, memory
 @pytest.fixture
 def arquivo(tmp_path, monkeypatch):
     monkeypatch.setattr(memory, "save_campaign", lambda *a, **k: None)
+    # Guarda e devolve a campanha ativa: ela é global, e deixá-la pela metade
+    # derruba outro arquivo de teste, longe da causa.
+    guardado = copy.deepcopy({k: v for k, v in memory.campaign.items()})
     memory.campaign.clear()
     memory.campaign.update({"name": "Teste", "chapter": 1, "turno": 1,
                             "conversation_history": []})
     alvo = tmp_path / "medicao.jsonl"
     monkeypatch.setattr(medicao, "ARQUIVO", alvo)
+    # A suíte nasce com a medição desligada (conftest); quem a testa liga de
+    # volta, apontando para o tmp_path acima.
     monkeypatch.delenv("MEDICAO_DESLIGADA", raising=False)
-    return alvo
+    yield alvo
+    memory.campaign.clear()
+    memory.campaign.update(guardado)
 
 
 def _linhas(arquivo):

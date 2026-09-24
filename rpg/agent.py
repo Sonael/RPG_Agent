@@ -169,6 +169,8 @@ lugar: <lugar novo que você acabou de descrever — "Ponte Quebrada (dentro de:
 gente: <pessoa nova que apareceu — "Aldric — ferreiro da vila">
 fato: <verdade nova do mundo — "ponte_atravessada=sim">
 relação: <o que mudou entre duas pessoas — "Helena → Selene +25 — se elogiaram depois da luta">
+cena: <o acontecimento desta cena, se houve — "Resgataram o herbologista na mina — a guilda passou a confiar neles">
+capítulo: <só quando a história vira de capítulo, e só o número seguinte — "2">
 [[/registro]]
 
 COMO PREENCHER
@@ -180,8 +182,14 @@ COMO PREENCHER
 • Só o que você narrou de verdade: o sistema confere se o nome aparece no
   seu texto e ignora o que não aparece.
 • Você não precisa chamar save_location, save_character, update_world_state,
-  advance_time nem set_flag: o bloco faz isso. Se já chamou durante a cena,
-  pode repetir aqui sem medo — o sistema não registra duas vezes.
+  advance_time, set_flag nem save_event: o bloco faz isso. Se já chamou
+  durante a cena, pode repetir aqui sem medo — o sistema não registra duas
+  vezes.
+• "cena:" é para o que a história vai lembrar depois — um resgate, uma
+  traição, um trato fechado. Conversa de passagem não é acontecimento: uma
+  por turno, no máximo, e só quando houve.
+• "capítulo:" só quando a história realmente virou de capítulo, e só para o
+  número seguinte. O sistema recusa pulo.
 
 A LINHA DE RELAÇÃO
 • A relação é DAS DUAS pessoas: uma linha muda os dois lados. "Selene →
@@ -1292,6 +1300,22 @@ def _pendencias_block() -> str:
         # -1 = nunca feito. Numa campanha recém-criada isso é normal, então só
         # cobra depois que a história já andou.
         turno = _m.turno_atual()
+
+        # O fechamento do turno é obrigatório e mesmo assim falta. Medido na
+        # primeira partida com ele: veio em 3 de 6 respostas. A cobrança abre
+        # a lista porque é a que faz todas as outras deixarem de existir — um
+        # bloco no fim registra local, tempo, lugar, gente, fato e relação de
+        # uma vez.
+        faltou = int(_m.campaign.get("_sem_fechamento") or 0)
+        if faltou == 1:
+            linhas.append("• A sua resposta anterior terminou SEM o bloco "
+                          "[[registro]]. Ele é obrigatório em TODA resposta, "
+                          "inclusive nesta.")
+        elif faltou > 1:
+            linhas.append(f"• {faltou} respostas suas seguidas terminaram SEM o "
+                          "bloco [[registro]]. É por isso que o mundo para de "
+                          "lembrar das coisas. Feche ESTE turno.")
+
         for chave, limite, texto in (
             ("resumo", 5, "update_story_summary() — o resumo vivo da história"),
             ("diario", 8, "add_diary_entry() — o diário da campanha"),

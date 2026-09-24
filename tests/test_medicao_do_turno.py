@@ -70,6 +70,19 @@ def test_cada_turno_deixa_uma_linha(arquivo):
     assert linha["fechamento"]["campos"] == {"lugar": 1}
 
 
+def test_a_suite_nao_escreve_no_arquivo_de_quem_joga():
+    """
+    Sem isto, os testes de NAVEGADOR — que sobem um servidor de verdade —
+    gravam uma linha por turno em campanhas/medicao.jsonl, o arquivo de quem
+    joga. Aconteceu: das 17 primeiras linhas medidas, 11 eram de teste, e a
+    porcentagem de turnos com fechamento saiu pela metade do que era.
+    """
+    import os
+    assert os.environ.get("MEDICAO_DESLIGADA") == "1", (
+        "a suíte precisa nascer com a medição desligada (tests/conftest.py); "
+        "quem testa a medição liga de volta apontando para um tmp_path")
+
+
 def test_desligada_por_variavel_de_ambiente(arquivo, monkeypatch):
     monkeypatch.setenv("MEDICAO_DESLIGADA", "1")
     medicao.registrar_turno("qualquer coisa", set(), {"tinha_bloco": False})

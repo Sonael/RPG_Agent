@@ -1804,6 +1804,10 @@ async function generateLore() {
           : (_racaGenerica.includes(racaRaw) ? 'humanoide' : racaRaw);
         const char = {
           name:        c.name        || '',
+          // O nome com que a IA escreveu o resto do mundo (resumo, cena,
+          // eventos). Se o jogador trocar, o servidor troca nos textos também
+          // — senão o diário nasce contando a história de outra pessoa.
+          _nomeDaIa:   c.name        || '',
           description: c.description || '',
           traits:      c.traits      || '',
           status:      'vivo',
@@ -3590,11 +3594,18 @@ async function createCampaignFromWizard() {
   document.getElementById('wz-err').textContent = '';
 
   try {
+    // Os nomes que o jogador trocou depois de a IA gerar o mundo. O servidor
+    // usa isto para acertar os textos que já falavam dos nomes antigos
+    // (resumo, cena, eventos, descrições) — ver rpg/renomear.py.
+    const renomes = wzChars
+      .filter(c => c._nomeDaIa && c.name.trim() && c._nomeDaIa !== c.name.trim())
+      .map(c => [c._nomeDaIa, c.name.trim()]);
+
     // 1. Cria a campanha no banco
     const createRes = await authFetch(`${API}/api/campaigns`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, campaign: campaignPayload }),
+      body: JSON.stringify({ name, campaign: campaignPayload, renomes }),
     });
     const createData = await createRes.json();
     if (!createRes.ok) throw new Error(createData.error || 'Erro ao criar campanha');
