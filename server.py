@@ -130,6 +130,41 @@ _MANA_CHANGE_RE = re.compile(
     r'mana[:\s]+\d+\s*[→]\s*\d+',
     re.IGNORECASE,
 )
+
+# ── Teste de habilidade ────────────────────────────────────────────────────
+# Numa campanha real de 91 turnos, o mestre mencionou teste três vezes e não
+# rolou nenhuma: descreveu "O Desafio do Martelo de Aço (Teste de Força)" como
+# ficção e, quando o teste era inevitável, devolveu a decisão ao jogador —
+# "Deseja rolar para ela ou narrar o resultado?". Quem rola é o mestre.
+_CHECK_TOOLS = {"make_skill_check", "social_check", "attack_roll",
+                "resolve_saving_throw", "roll_dice", "use_ability"}
+_CHECK_NARRADO_RE = re.compile(
+    r'\b(?:teste\s+de\s+(?:for[çc]a|destreza|constitui[çc][ãa]o|intelig[êe]ncia|'
+    r'sabedoria|carisma|atletismo|acrobacia|furtividade|percep[çc][ãa]o|'
+    r'investiga[çc][ãa]o|persuas[ãa]o|intimida[çc][ãa]o|engana[çc][ãa]o|'
+    r'sobreviv[êe]ncia|arcanismo|medicina|pontaria|prestidigita[çc][ãa]o)'
+    r'|\bCD\s*\d+'
+    r'|\brolagem\s+de\s+d20\b)',
+    re.IGNORECASE,
+)
+# PEDIR o dado ao jogador é o fluxo certo para personagem jogável: o mestre
+# narra o teste e espera o "[DADO DO JOGADOR …] rolei X". Isso NÃO é violação.
+_PEDIU_O_DADO_RE = re.compile(
+    r'\brol(?:e|em|a|ar)\b(?:[^.!?]{0,40}\b(?:d20|dado|dados)\b)'
+    r'|\bd20\b[^.!?]{0,30}\brol'
+    r'|\bbandeja\s+de\s+dados\b'
+    r'|\bqual\s+(?:foi\s+)?o\s+(?:resultado|n[úu]mero)\b'
+    r'|\bme\s+(?:diga|dê|de)\s+o\s+(?:resultado|n[úu]mero)\b',
+    re.IGNORECASE,
+)
+# Oferecer NARRAR no lugar de rolar é abrir mão do dado — aí é violação, mesmo
+# que ele tenha pedido a rolagem na mesma frase ("rolar ou narrar?").
+_CHECK_DEVOLVIDO_RE = re.compile(
+    r'\bnarrar\s+o\s+resultado\b'
+    r'|(?:prefere|quer|deseja|gostaria\s+de)\s+que\s+eu\s+(?:apenas\s+)?narre'
+    r'|\bou\s+(?:prefere|quer|deseja)\s+(?:que\s+eu\s+)?narr',
+    re.IGNORECASE,
+)
 # Detecta quando o agente narra que um personagem aprendeu uma magia/habilidade
 # sem ter chamado learn_spell() ou learn_ability()
 _SPELL_LEARNED_RE = re.compile(
@@ -407,6 +442,27 @@ def _verify_agent_response(
             "Narrou resultado de ataque ('acertou', 'errou o golpe') "
             "sem chamar attack_roll(). O dado decide — não a narrativa."
         )
+
+    # 3b. Teste narrado e nunca rolado; e teste devolvido ao jogador.
+    #     Pedir o d20 ao jogador e esperar é o fluxo certo (ele responde com
+    #     "[DADO DO JOGADOR …] rolei X"): só conta como violação quando o
+    #     mestre cita o teste, não rola NADA e nem pede o dado.
+    if not _CHECK_TOOLS.intersection(tools_called):
+        if _CHECK_NARRADO_RE.search(text) and not _PEDIU_O_DADO_RE.search(text):
+            violations.append(
+                "Narrou um teste de habilidade (ou citou uma CD) e não rolou nada: "
+                "chame make_skill_check(char_name, attribute, difficulty) — ou "
+                "social_check() quando for conversa. Se o teste é de um personagem "
+                "do jogador, PEÇA o d20 a ele e espere a resposta. O dado decide o "
+                "resultado, nunca a narração."
+            )
+        if _CHECK_DEVOLVIDO_RE.search(text):
+            violations.append(
+                "Ofereceu ao jogador narrar o resultado em vez de rolar. Essa "
+                "escolha não existe: o teste é resolvido no dado. Peça o d20 (ou "
+                "chame make_skill_check para um NPC) e narre o que a ferramenta "
+                "devolver."
+            )
 
     # 4. Mana modificada narrativamente
     if (not _MANA_TOOLS.intersection(tools_called)
