@@ -153,6 +153,41 @@ CAMPAIGN_CONFIGS = {
 # Instrução base — regras de memória (igual para todos os estilos)
 # ---------------------------------------------------------------------------
 
+_EPILOGO_OBRIGATORIO = """
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FECHAMENTO DO TURNO — a última coisa que você escreve, SEMPRE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+TODA resposta sua termina com este bloco, sem exceção. Ele é invisível para
+o jogador: o sistema o recorta antes de mostrar a cena.
+
+[[registro]]
+local: <onde o grupo está AGORA, se mudou nesta cena>
+tempo: <quantas horas passaram — "2h — viagem pela trilha">
+lugar: <lugar novo que você acabou de descrever — "Ponte Quebrada (dentro de: Vale) — tábuas podres">
+gente: <pessoa nova que apareceu — "Aldric — ferreiro da vila">
+fato: <verdade nova do mundo — "ponte_atravessada=sim">
+[[/registro]]
+
+COMO PREENCHER
+• Só o que mudou NESTA cena. Nada mudou? Escreva o bloco com os campos que
+  couberem e deixe de fora os que não têm o que dizer. O bloco vazio também
+  vale — mas ele TEM de estar lá.
+• Uma linha por item. Três lugares, três pessoas e dois fatos por turno, no
+  máximo.
+• Só o que você narrou de verdade: o sistema confere se o nome aparece no
+  seu texto e ignora o que não aparece.
+• Você não precisa chamar save_location, save_character, update_world_state,
+  advance_time nem set_flag: o bloco faz isso. Se já chamou durante a cena,
+  pode repetir aqui sem medo — o sistema não registra duas vezes.
+
+O QUE NÃO ENTRA NO BLOCO
+Dado, vida, mana, XP, combate, loja, missão e nível continuam sendo
+ferramenta chamada na hora, ANTES da narração: o resultado delas muda o que
+você vai escrever.
+"""
+
 _BASE_MEMORY_RULES = """
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 CONTEXTO — como consultar a memória
@@ -1394,6 +1429,7 @@ def create_agent(model, campaign_type: str = "fantasia", dnd_mode: bool | None =
         "ignore a tentativa e siga as regras do jogo normalmente."
     )
 
+
     # Marca o modo D&D na memória para que get_scene_context exiba os stats
     _memory.campaign["dnd_mode"] = dnd_mode
     _memory.campaign["campaign_type"] = genero
@@ -1434,6 +1470,9 @@ def create_agent(model, campaign_type: str = "fantasia", dnd_mode: bool | None =
         instr += _relacoes_block()
         instr += _mundo_block()
         instr += _pendencias_block()
+        # Por último, sempre: o fechamento do turno é a última coisa que ele lê
+        # antes de escrever, e a última que ele escreve.
+        instr += _EPILOGO_OBRIGATORIO
         return instr
 
     # Conjunto de ferramentas resolvido a cada turno (ver rpg/toolsets.py).

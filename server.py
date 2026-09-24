@@ -24,6 +24,8 @@ from google.genai import types as gtypes
 # sempre o Flask; o código da aplicação vem sempre de `rpg.*`.
 from rpg import memory
 from rpg import database
+from rpg import epilogo
+from rpg import medicao
 from rpg.auth import require_auth, register as auth_register, login as auth_login, refresh_session
 from rpg.agent import create_agent, get_campaign_config
 from rpg.session import APP_NAME, create_runner
@@ -2324,6 +2326,20 @@ def chat():
                     tools_called       = content.get("tools_called", set())
                     combat_was_active  = content.get("combat_was_active", False)
                     dead_before        = content.get("dead_before", set())
+
+                    # ── Fechamento do turno ───────────────────────────────
+                    # O mestre anota no fim o que mudou na cena; aqui o bloco
+                    # sai do texto (o jogador não vê) e vira chamada de
+                    # ferramenta. É o conserto do esquecimento medido: ele
+                    # registra DEPOIS de narrar, não prevendo o que vai narrar.
+                    response_text, registro = epilogo.processar(response_text)
+                    tools_called = set(tools_called) | {
+                        c.split("(")[0] for c in registro["feitos"]}
+                    if registro["feitos"] or registro["recusados"]:
+                        _dbg(f"  [FECHAMENTO] feitos: {registro['feitos']}"
+                             + (f" | recusados: {registro['recusados']}"
+                                if registro["recusados"] else ""))
+                    medicao.registrar_turno(texto, tools_called, registro)
 
                     # ── Loop de verificação pós-resposta ──────────────────
                     if not correction_attempted:
