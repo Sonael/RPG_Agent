@@ -5412,6 +5412,108 @@ def _weapon_damage_type(weapon: str) -> str:
     return ""
 
 
+# ── A ARMA NA MÃO ─────────────────────────────────────────────────────────
+# Três coisas que o motor não olhava, e por isso o equipamento não pesava na
+# luta: a espada +1 não somava nada, a besta atirava para sempre sem virote, e
+# uma arma que o personagem não tem funcionava igual a uma que ele tem.
+
+_MAGICO_NO_NOME = re.compile(r"(?:^|\s)\+\s*([123])\b")
+_MAGICO_NA_DESCRICAO = re.compile(
+    r"\+\s*([123])\s*(?:em|de|no|nos|para)?\s*(?:ataque|dano|acerto|attack|damage)"
+    r"|(?:b[ôo]nus|bonus)\s*(?:m[áa]gico\s*)?(?:de\s*)?\+\s*([123])",
+    re.IGNORECASE)
+
+
+def _item_do_inventario(char: dict, nome: str) -> dict | None:
+    alvo = _norm_txt(nome)
+    for it in (char.get("inventario") or []):
+        if isinstance(it, dict) and _norm_txt(it.get("nome", "")) == alvo:
+            return it
+    return None
+
+
+def _bonus_magico_da_arma(char: dict, weapon: str) -> int:
+    """
+    O +1/+2/+3 de uma arma mágica, do nome ("Espada Longa +1") ou da descrição
+    gravada no inventário ("+2 em ataque e dano"). Zero quando não há.
+    """
+    achado = _MAGICO_NO_NOME.search(weapon or "")
+    if achado:
+        return int(achado.group(1))
+    item = _item_do_inventario(char, weapon)
+    if item:
+        achado = _MAGICO_NO_NOME.search(item.get("nome", "")) or \
+                 _MAGICO_NA_DESCRICAO.search(item.get("descricao", "") or "")
+        if achado:
+            return int(next(g for g in achado.groups() if g))
+    return 0
+
+
+def _nota_de_posse(char: dict, weapon: str, matched_hab) -> str:
+    """
+    Aviso quando um personagem do GRUPO ataca com o que não tem. Não recusa:
+    bater com uma cadeira, com a tocha ou com o punho é jogo legítimo, e a
+    recusa atrapalharia mais do que o aviso. Monstro não entra: as armas dele
+    vêm do stat block, não do inventário.
+    """
+    if matched_hab or not memory.is_party_member(char) or not weapon:
+        return ""
+    if _item_do_inventario(char, weapon):
+        return ""
+    equipados = {_norm_txt(v) for v in (char.get("sheet", {}).get("equipamentos") or {}).values() if v}
+    if _norm_txt(weapon) in equipados:
+        return ""
+    if _npc_attack_dice(char.get("sheet") or {}, weapon):
+        return ""
+    return (f"Aviso: '{weapon}' não está no inventário nem equipado em "
+            f"{char.get('name', '')} — improviso ou item esquecido?")
+
+
+# Cada arma de tiro come a sua munição. Nome do SRD em inglês e em português,
+# porque a ficha guarda os dois conforme a origem.
+_MUNICAO_DA_ARMA = (
+    (("besta", "crossbow"),           ("virote", "virotes", "bolt", "bolts")),
+    (("arco", "bow", "longbow", "shortbow"), ("flecha", "flechas", "arrow", "arrows")),
+    (("funda", "sling"),              ("bala", "balas", "pedra", "pedras", "bullet", "bullets")),
+    (("zarabatana", "blowgun"),       ("dardo", "dardos", "agulha", "needle", "needles")),
+)
+
+
+def _gastar_municao(char: dict, weapon: str) -> tuple[str, str]:
+    """
+    Gasta uma munição do inventário. Devolve (recusa, nota).
+
+    A recusa só acontece quando a munição EXISTE na ficha e acabou: quem nunca
+    registrou virote nenhum continua atirando, porque travar a luta por uma
+    mochila mal preenchida seria pior do que a regra que se quer aplicar. Uma
+    vez que a munição está anotada, ela passa a valer de verdade.
+    """
+    nome = _norm_txt(weapon or "")
+    if not nome or not memory.is_party_member(char):
+        return "", ""
+    tipos = next((munis for chaves, munis in _MUNICAO_DA_ARMA
+                  if any(c in nome for c in chaves)), None)
+    if not tipos:
+        return "", ""
+
+    for it in (char.get("inventario") or []):
+        if not isinstance(it, dict):
+            continue
+        n = _norm_txt(it.get("nome", ""))
+        if not any(t in n for t in tipos):
+            continue
+        qtd = int(it.get("qtd", 0) or 0)
+        if qtd <= 0:
+            return (f"Erro: {char.get('name')} não tem mais {it.get('nome')} para "
+                    f"a {weapon}. Recolha as que atirou ou compre mais."), ""
+        it["qtd"] = qtd - 1
+        if it["qtd"] <= 0:
+            (char.get("inventario") or []).remove(it)
+            return "", f"Última {it.get('nome')} gasta — a {weapon} está sem munição."
+        return "", f"{it.get('nome')}: {it['qtd']} restantes."
+    return "", ""
+
+
 def attack_roll(
     attacker_name: str,
     target_name: str,
@@ -5628,9 +5730,16 @@ def attack_roll(
     # ── Crítico Aprimorado / Superior (Campeão) ─────────────────────────────
     crit_min = _crit_threshold(attacker)
 
+    # ── A arma existe? Tem munição? É mágica? ───────────────────────────────
+    _mag = _bonus_magico_da_arma(attacker, weapon)
+    _nota_arma = _nota_de_posse(attacker, weapon, matched_hab)
+    _recusa_mun, _nota_mun = _gastar_municao(attacker, weapon)
+    if _recusa_mun:
+        return _recusa_mun
+
     # ── Rolagem do ataque ───────────────────────────────────────────────────
     d20, roll_log = _roll_d20_with_adv(advantage, disadvantage)
-    attack_total  = d20 + mod + prof + style_atk_bonus
+    attack_total  = d20 + mod + prof + style_atk_bonus + _mag
     target_ca     = st["ca"]
     critico       = force_crit or (d20 >= crit_min)
     falha_critica = (not force_crit) and (d20 == 1)
@@ -5643,8 +5752,13 @@ def attack_roll(
         result += "   " + "\n   ".join(cond_notes) + "\n"
     if style_note:
         result += f"   {style_note}\n"
+    for _nota in (_nota_arma, _nota_mun):
+        if _nota:
+            result += f"   {_nota}\n"
     _atk_style_str = f" +{style_atk_bonus}(estilo)" if style_atk_bonus else ""
-    result += f"   {roll_log} +{mod}(mod) +{prof}(prof){_atk_style_str} = **{attack_total}** vs CA {target_ca}\n"
+    _atk_mag_str = f" +{_mag}(mágica)" if _mag else ""
+    result += (f"   {roll_log} +{mod}(mod) +{prof}(prof){_atk_style_str}{_atk_mag_str} "
+               f"= **{attack_total}** vs CA {target_ca}\n")
 
     if falha_critica:
         result += "   ERRO CRÍTICO! O ataque falha miseravelmente."
@@ -5685,13 +5799,17 @@ def attack_roll(
 
         extra_dmg = style_dmg_bonus + favored_bonus
         # Dano da ARMA (sem o Golpe Divino, que tem tipo próprio e vira um
-        # componente separado logo abaixo).
-        dmg_arma = max(1, sum(rolls) + mod + _hab_bonus + extra_dmg)
+        # componente separado logo abaixo). O bônus mágico entra aqui: uma
+        # espada +1 soma +1 no ataque E no dano, que é o que faz dela uma
+        # espada +1 — antes ela era uma espada com nome comprido.
+        dmg_arma = max(1, sum(rolls) + mod + _hab_bonus + extra_dmg + _mag)
         dmg    = dmg_arma + gd_total
         detail = " + ".join(str(r) for r in rolls)
         bonus_str = f" +{_hab_bonus}" if _hab_bonus > 0 else (f" {_hab_bonus}" if _hab_bonus < 0 else "")
         if extra_dmg:
             bonus_str += f" +{extra_dmg}(estilo/favor)"
+        if _mag:
+            bonus_str += f" +{_mag}(mágica)"
         if gd_total:
             bonus_str += f" +{gd_total}(golpe divino)"
 
