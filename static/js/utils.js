@@ -54,7 +54,9 @@ function getTokens() {
 }
 
 function setTokens(access, refresh) {
-  localStorage.setItem('rpg_access_token', access);
+  // Guarda só o que veio: uma resposta capenga não pode apagar o que já
+  // estava aqui e transformar um tropeço em logout.
+  if (access) localStorage.setItem('rpg_access_token', access);
   if (refresh) localStorage.setItem('rpg_refresh_token', refresh);
 }
 
@@ -74,47 +76,146 @@ function requireAuth() {
 }
 
 // O Supabase GIRA o refresh token: cada uso invalida o anterior e devolve um
-// novo. E a tela dispara várias chamadas ao mesmo tempo — o /api/chat, que é
-// longo, mais um refreshMemory() a cada tool_result, mais o Combat.sync() que
-// vem junto com ele. Quando o access token vence, TODAS levam 401 quase juntas
-// e cada uma tentava renovar com o MESMO refresh token. A primeira vencia; as
-// outras recebiam "Invalid Refresh Token: Already Used" e derrubavam a sessão
-// inteira — inclusive a que acabara de ser renovada com sucesso.
+// novo. Isso faz da renovação um recurso de UMA bala. Quem gasta a bala e
+// perde a resposta — a rede caiu, o computador dormiu, duas abas pediram ao
+// mesmo tempo — fica com um papel velho na mão, e a próxima tentativa volta
+// "Invalid Refresh Token: Already Used". O jogador cai no login no meio da
+// cena, que é o pior momento possível.
 //
-// Daí o sintoma: o jogo funcionava, e de repente caía no login no meio da
-// cena. Não era o token "não resetar" — era resetar mais de uma vez.
+// Três coisas guardam essa bala:
+//
+// 1. RENOVAR ANTES DE PRECISAR. O token diz quando vence (o exp do JWT).
+//    Faltando pouco, a renovação acontece ANTES de a chamada sair, em vez de
+//    gastarmos um 401 para descobrir o óbvio. É isto que conserta a tela que
+//    ficou aberta uma hora: ao voltar, a sessão se renova sozinha, calada,
+//    antes de o jogador escrever qualquer coisa.
+// 2. UMA RENOVAÇÃO POR NAVEGADOR, NÃO POR ABA. A promessa em voo resolve as
+//    chamadas simultâneas da MESMA aba; a trava do navigator.locks resolve a
+//    segunda aba (e a janela do aplicativo instalado), que tem o seu próprio
+//    JavaScript e o mesmo localStorage. Duas abas renovando com o mesmo papel
+//    é o caminho conhecido para o Supabase matar a sessão inteira por suspeita
+//    de reuso.
+// 3. "O SERVIDOR DISSE NÃO" É DIFERENTE DE "NÃO DEU PARA PERGUNTAR". Só o 401
+//    do /api/auth/refresh desloga. Queda de rede, 500 e 429 deixam a sessão de
+//    pé: o jogador tenta de novo e segue jogando.
+const MARGEM_DE_RENOVACAO = 120;   // segundos antes do vencimento
+
 let _renovacaoEmVoo = null;
 
-// Uma renovação por vez. Quem chegar durante ela espera a MESMA promessa em
-// vez de abrir a sua, então o refresh token só é gasto uma vez.
-function renovarSessao() {
+// Relógio do computador muito errado transformaria o item 1 num moedor de
+// tokens: todo token nasceria vencido e cada chamada gastaria uma renovação.
+// Ao primeiro sinal disso — o token recém-nascido já chega vencido — o
+// proativo se desliga e o jogo volta a renovar só no 401, que funciona com
+// qualquer relógio.
+let _renovacaoProativa = true;
+
+// Quantos segundos faltam para o token vencer, ou null quando não dá para
+// saber (token que não é JWT, navegador sem atob, payload estranho). null
+// nunca vira motivo para renovar: na dúvida, deixa o 401 decidir.
+function _segundosAteVencer(token) {
+  try {
+    if (typeof atob !== 'function') return null;
+    const partes = String(token || '').split('.');
+    if (partes.length < 2) return null;
+    const corpo = partes[1].replace(/-/g, '+').replace(/_/g, '/');
+    const dados = JSON.parse(atob(corpo + '==='.slice((corpo.length + 3) % 4)));
+    if (!dados || typeof dados.exp !== 'number') return null;
+    return dados.exp - Math.floor(Date.now() / 1000);
+  } catch (_) {
+    return null;
+  }
+}
+
+// Navegador antigo sem Web Locks faz o trabalho sem trava — volta a ser o
+// comportamento de antes, que já era o melhor que dava para fazer.
+//
+// E a trava tem prazo: o navegador CONGELA abas paradas, e uma aba congelada
+// segurando a trava deixaria as outras esperando para sempre — o jogo pendura
+// em vez de renovar, que é pior do que o problema que a trava resolve. Depois
+// de 5 segundos a renovação sai sem trava.
+function _comTravaEntreAbas(tarefa) {
+  const travas = (typeof navigator !== 'undefined') ? navigator.locks : null;
+  if (!travas || !travas.request) return Promise.resolve().then(tarefa);
+
+  let sinal = null;
+  try { sinal = AbortSignal.timeout(5000); } catch (_) { sinal = null; }
+
+  // "Começou" separa não conseguir a trava de a tarefa ter falhado: sem isso,
+  // um erro DENTRO da renovação a faria acontecer duas vezes — e duas
+  // renovações é exatamente o que não pode.
+  let comecou = false;
+  const embrulho = function () { comecou = true; return tarefa(); };
+  const pedido = sinal
+    ? travas.request('rpg_renovacao', { signal: sinal }, embrulho)
+    : travas.request('rpg_renovacao', embrulho);
+
+  return pedido.catch(function (e) {
+    if (comecou) throw e;
+    return tarefa();
+  });
+}
+
+// Devolve { token, definitivo }. definitivo=true é o servidor dizendo que
+// este refresh token não vale mais — só aí é hora de pedir login de novo.
+function renovarSessao(tokenVencido) {
   if (_renovacaoEmVoo) return _renovacaoEmVoo;
 
-  _renovacaoEmVoo = (async () => {
-    // Lido agora, não no início da requisição: se outra chamada renovou no
-    // meio do caminho, o token guardado já é o novo.
+  const emVoo = _comTravaEntreAbas(async () => {
+    // Lido aqui dentro, com a trava na mão: se outra aba renovou enquanto
+    // esperávamos, o trabalho já está feito e o papel não se gasta duas vezes.
+    const guardado = localStorage.getItem('rpg_access_token');
+    if (tokenVencido && guardado && guardado !== tokenVencido) {
+      return { token: guardado, definitivo: false };
+    }
+
     const refresh = localStorage.getItem('rpg_refresh_token');
-    if (!refresh) return null;
+    if (!refresh) return { token: null, definitivo: true };
+
+    let res;
     try {
-      const res = await fetch(`${API}/api/auth/refresh`, {
+      res = await fetch(`${API}/api/auth/refresh`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refresh_token: refresh })
       });
-      if (!res.ok) return null;
-      const data = await res.json();
-      if (!data.access_token) return null;
-      setTokens(data.access_token, data.refresh_token);
-      return data.access_token;
     } catch (_) {
-      return null;   // rede caiu: não é motivo para deslogar
+      return { token: null, definitivo: false };   // não deu para perguntar
     }
-  })();
 
-  // O finally limpa a referência, mas quem já está esperando segue com a
-  // promessa em mãos — só as chamadas FUTURAS abrem uma renovação nova.
-  _renovacaoEmVoo.finally(() => { _renovacaoEmVoo = null; });
-  return _renovacaoEmVoo;
+    if (res.status === 401) return { token: null, definitivo: true };
+    if (!res.ok) return { token: null, definitivo: false };
+
+    let data;
+    try { data = await res.json(); } catch (_) { return { token: null, definitivo: false }; }
+    if (!data || !data.access_token) return { token: null, definitivo: false };
+
+    setTokens(data.access_token, data.refresh_token);
+    return { token: data.access_token, definitivo: false };
+  }).catch(() => ({ token: null, definitivo: false }));
+
+  // Quem já está esperando segue com a promessa em mãos — só as chamadas
+  // FUTURAS abrem uma renovação nova.
+  _renovacaoEmVoo = emVoo;
+  emVoo.finally(() => { if (_renovacaoEmVoo === emVoo) _renovacaoEmVoo = null; });
+  return emVoo;
+}
+
+// O token que a chamada vai levar, renovado por antecipação se estiver perto
+// do fim. Nunca devolve nulo por causa de uma renovação frustrada: se não
+// deu, manda o que tem e deixa o 401 decidir.
+async function _tokenDaVez() {
+  const atual = localStorage.getItem('rpg_access_token');
+  if (!atual || !_renovacaoProativa) return atual;
+
+  const faltam = _segundosAteVencer(atual);
+  if (faltam === null || faltam > MARGEM_DE_RENOVACAO) return atual;
+
+  const r = await renovarSessao(atual);
+  if (!r.token) return atual;
+
+  const faltamAgora = _segundosAteVencer(r.token);
+  if (faltamAgora !== null && faltamAgora <= MARGEM_DE_RENOVACAO) _renovacaoProativa = false;
+  return r.token;
 }
 
 function _encerrarSessao() {
@@ -126,7 +227,7 @@ function _encerrarSessao() {
 
 async function authFetch(url, opts = {}) {
   const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
-  const usado = localStorage.getItem('rpg_access_token');
+  const usado = await _tokenDaVez();
   if (usado) headers['Authorization'] = `Bearer ${usado}`;
 
   const response = await fetch(url, { ...opts, headers });
@@ -136,18 +237,44 @@ async function authFetch(url, opts = {}) {
   // renovar: basta repetir com o token novo. Sem esta comparação, uma
   // requisição que saiu ANTES da renovação gastaria um refresh token à toa.
   let novo = localStorage.getItem('rpg_access_token');
-  if (novo === usado) novo = await renovarSessao();
+  let definitivo = false;
+  if (novo === usado) {
+    const r = await renovarSessao(usado);
+    novo = r.token;
+    definitivo = r.definitivo;
+  }
 
   if (!novo) {
-    // Só derruba a sessão se ninguém conseguiu renovar. Se o token guardado
-    // mudou, alguém renovou e esta chamada apenas perdeu a corrida — deslogar
-    // aqui jogaria fora uma sessão válida.
-    if (localStorage.getItem('rpg_access_token') === usado) _encerrarSessao();
+    // Só derruba a sessão quando o servidor disse que o refresh token morreu,
+    // e só se ninguém tiver renovado no meio-tempo. Rede fora não é sessão
+    // morta, e deslogar aqui custaria o turno do jogador.
+    if (definitivo && localStorage.getItem('rpg_access_token') === usado) _encerrarSessao();
     return response;
   }
 
   headers['Authorization'] = `Bearer ${novo}`;
   return fetch(url, { ...opts, headers });
+}
+
+// Voltar para a aba depois de um tempo parado é o momento clássico do token
+// vencido. Renovar aqui é o que faz a hora esquecida não custar nada: quando
+// o jogador volta a escrever, o token já é outro.
+function _renovarAoVoltar() {
+  if (!_renovacaoProativa) return;
+  const atual = localStorage.getItem('rpg_access_token');
+  if (!atual) return;
+  const faltam = _segundosAteVencer(atual);
+  if (faltam !== null && faltam <= MARGEM_DE_RENOVACAO) renovarSessao(atual);
+}
+
+if (typeof document !== 'undefined' && document.addEventListener) {
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) _renovarAoVoltar();
+  });
+}
+if (typeof window !== 'undefined' && window.addEventListener) {
+  window.addEventListener('focus', _renovarAoVoltar);
+  window.addEventListener('online', _renovarAoVoltar);
 }
 
 // ═══════════════════════════════════════

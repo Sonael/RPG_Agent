@@ -7,10 +7,26 @@ from flask import request, g, jsonify
 from gotrue import SyncGoTrueClient as AuthClient 
 
 def _client() -> AuthClient:
-    """Instancia o cliente de autenticação usando a URL do projeto."""
+    """
+    Instancia o cliente de autenticação usando a URL do projeto.
+
+    SEM VIDA PRÓPRIA, de propósito. O gotrue é um porte do JavaScript e traz o
+    hábito do navegador: ao guardar uma sessão, liga um cronômetro em segundo
+    plano para renovar o token sozinho e mantém a sessão numa gaveta interna.
+    Na aba do jogador isso faz sentido — ela é dona da sessão. Aqui não: o dono
+    do refresh token é o JOGADOR, no localStorage dele, e o Supabase gira o
+    papel a cada uso. Um cronômetro do lado do servidor gastando o mesmo papel
+    devolveria ao jogador, na chamada seguinte, o erro que o tira do meio da
+    partida: "Invalid Refresh Token: Already Used".
+
+    Como cada requisição cria um cliente novo, o cronômetro também seria uma
+    linha de execução viva por login, sem ninguém para desligá-la.
+    """
     return AuthClient(
         url=f"{os.environ['SUPABASE_URL']}/auth/v1",
-        headers={"apikey": os.environ["SUPABASE_ANON_KEY"]}
+        headers={"apikey": os.environ["SUPABASE_ANON_KEY"]},
+        auto_refresh_token=False,
+        persist_session=False,
     )
 
 def register(email: str, password: str) -> dict:
