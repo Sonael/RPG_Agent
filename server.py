@@ -2321,6 +2321,16 @@ def chat():
     future.add_done_callback(on_thread_done)
 
     def generate():
+        # Uma gravação por turno. Cada ferramenta do motor chama
+        # save_campaign() ao terminar, e um turno com cinco ações gravava sete
+        # vezes o documento inteiro (169 KB cada), lendo o banco antes de cada
+        # uma. Aqui as gravações do turno viram uma só, no fim — e o `finally`
+        # do escopo grava mesmo se o turno morrer no meio ou o jogador fechar
+        # a aba.
+        with memory.gravacao_adiada():
+            yield from _turno()
+
+    def _turno():
         correction_attempted = False   # Máximo de 1 correção por resposta
 
         while True:

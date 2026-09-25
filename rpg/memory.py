@@ -17,6 +17,7 @@ Vínculo de contexto:
   • session/end            → memory.unbind(user_id)
 """
 
+import contextlib
 import json
 import contextvars
 
@@ -37,6 +38,25 @@ _active_key: "contextvars.ContextVar[str | None]" = contextvars.ContextVar(
 )
 
 _FALLBACK_KEY = "__no_session__"
+
+# ---------------------------------------------------------------------------
+# Gravação adiada — uma ida ao banco por turno, não sete
+# ---------------------------------------------------------------------------
+# Cada ferramenta do motor chama save_campaign() quando termina, e um turno
+# normal aciona várias: um turno com cinco ações gravava SETE vezes, 169 KB
+# cada, e cada gravação ainda lia a campanha antes (a trava contra sobrescrever
+# com memória vazia). Eram catorze idas à rede dentro do tempo de resposta do
+# jogador, todas para o MESMO documento, que só a última versão importa.
+#
+# Com o adiamento, as ferramentas continuam chamando save_campaign() — nada
+# muda para quem escreve motor — mas a escrita de verdade acontece UMA vez, no
+# fim do turno.
+#
+# As duas marcas são por CHAVE DE SESSÃO e moram no módulo, não num
+# ContextVar: as ferramentas rodam na thread do agente, e um ContextVar
+# copiado para lá não devolveria a marca para quem fecha o escopo.
+_ADIADAS: set[str] = set()      # sessões com gravação adiada agora
+_SUJAS: set[str] = set()        # sessões com mudança esperando flush
 
 
 def _session_key(user_id: str, campaign_name: str) -> str:
@@ -638,45 +658,86 @@ def load_campaign() -> bool:
 
 MAX_HISTORY_SAVED = 200
 
+@contextlib.contextmanager
+def gravacao_adiada():
+    """
+    Junta as gravações de um turno numa só.
+
+    Dentro do escopo, save_campaign() apenas MARCA que há mudança; a escrita
+    acontece ao sair, uma vez. Escopos aninhados não gravam antes da hora: só
+    o mais externo fecha.
+
+    Sair SEMPRE grava, inclusive por exceção ou por o jogador fechar a aba no
+    meio do stream — o `finally` corre de qualquer jeito. O que se perde, se o
+    processo morrer no meio do turno, é o turno; antes se perdia metade dele,
+    que é pior de arrumar do que nenhum.
+    """
+    chave = _active_key.get() or _FALLBACK_KEY
+    ja_estava = chave in _ADIADAS
+    _ADIADAS.add(chave)
+    try:
+        yield
+    finally:
+        if not ja_estava:
+            _ADIADAS.discard(chave)
+            if chave in _SUJAS:
+                _SUJAS.discard(chave)
+                _persistir(chave)
+
+
 def save_campaign() -> None:
     """
-    Persiste o estado da campanha no Supabase com as travas de segurança originais.
+    Persiste o estado da campanha no Supabase com as travas de segurança
+    originais — ou, dentro de um escopo de gravação adiada, só marca que há o
+    que gravar (ver gravacao_adiada).
+    """
+    chave = _active_key.get() or _FALLBACK_KEY
+    if chave in _ADIADAS:
+        _SUJAS.add(chave)
+        return
+    _persistir(chave)
+
+
+def _persistir(chave: str) -> None:
+    """
+    A gravação de verdade. Trabalha pela CHAVE, e não pelo contexto ativo,
+    porque o flush pode acontecer noutra thread que não a que mexeu na
+    campanha.
     """
     from rpg import database
 
+    camp = _STORE.get(chave)
+    uid, name = _META.get(chave, (None, None))
+
     # TRAVA 1: Só salva se tiver nome definido
-    if not campaign or not campaign.get("name"):
+    if not camp or not camp.get("name"):
         print("[ALERTA] Tentativa de salvar abortada: Memória sem nome de campanha.")
         return
 
-    # TRAVA 2: Protege contra sobrescrever dados existentes com memória vazia
-    uid  = current_user_id()
-    name = current_campaign_name()
-    if uid and name:
-        try:
-            existing = database.get_campaign(uid, name)
-            if existing:
-                has_history = len(campaign.get("conversation_history", [])) > 0
-                has_summary = len(campaign.get("story_summary", "")) > 0
-                has_chars   = len(campaign.get("characters", {})) > 0
-                if not has_history and not has_summary and not has_chars:
-                    print(f"Aviso: [PROTEÇÃO] Bloqueado sobrescrever '{campaign['name']}' com dados vazios.")
-                    return
-        except Exception:
-            pass  # Se não conseguir checar, deixa salvar
+    # TRAVA 2: memória vazia não sobrescreve o que está gravado.
+    #
+    # Antes isto custava uma LEITURA do banco por gravação, só para saber se
+    # já existia linha lá. A pergunta certa é outra e não precisa de rede: uma
+    # campanha sem histórico, sem resumo e sem personagem não tem o que
+    # salvar — exista linha ou não. Quem cria a linha da campanha nova é a
+    # rota de criação, que chama database.save_campaign direto.
+    if not (camp.get("conversation_history") or camp.get("story_summary")
+            or camp.get("characters")):
+        print(f"Aviso: [PROTEÇÃO] Nada a salvar em '{camp['name']}': memória vazia.")
+        return
 
     # Limita o histórico
-    hist = campaign.get("conversation_history", [])
+    hist = camp.get("conversation_history", [])
     if len(hist) > MAX_HISTORY_SAVED:
-        campaign["conversation_history"] = hist[-MAX_HISTORY_SAVED:]
+        camp["conversation_history"] = hist[-MAX_HISTORY_SAVED:]
 
     if not uid or not name:
         print("[ALERTA] Save abortado: contexto de sessão não vinculado.")
         return
 
     try:
-        database.save_campaign(uid, name, dict(campaign))
-        print(f"Campanha '{campaign['name']}' persistida no Supabase.")
+        database.save_campaign(uid, name, dict(camp))
+        print(f"Campanha '{camp['name']}' persistida no Supabase.")
     except Exception as e:
         print(f"Erro crítico ao salvar no Supabase: {e}")
 
