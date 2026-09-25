@@ -741,10 +741,17 @@
       + habs.map(h => {
           const mode = h.target_mode || 'single';
           const modeTag = mode === 'self' ? ' <small>· em si</small>'
-                        : mode === 'pool' ? ' <small>· área</small>' : '';
-          return `<button class="cbt-btn" ${dis(h.tipo_acao)} title="${esc(h.descricao)}" `
+                        : (mode === 'pool' || mode === 'area' || mode === 'area_self')
+                          ? ' <small>· área</small>' : '';
+          // Usos por descanso: o contador aparece como a mana, e o botão
+          // morre no zero — recusar depois do clique é pior que não oferecer.
+          const temUsos = h.usos_max != null;
+          const gasto = temUsos && h.usos <= 0;
+          const usosTag = temUsos ? ` <small>· ${h.usos}/${h.usos_max}</small>` : '';
+          return `<button class="cbt-btn" ${gasto ? 'disabled' : dis(h.tipo_acao)} title="${esc(h.descricao)}" `
             + `onclick="window.Combat._selHab('${esc(h.nome).replace(/'/g,"\\'")}','${mode}')">`
             + `${esc(h.nome)}${h.custo_mana ? ` <small>(${h.custo_mana} mana)</small>` : ''}`
+            + usosTag
             + `${h.dado ? ` <small>· ${esc(h.dado)}</small>` : ''}`
             + `${modeTag}`
             + ` <em class="cbt-eco-tag eco-${h.tipo_acao}">${tag(h.tipo_acao)}</em></button>`;
@@ -818,10 +825,14 @@
       act({ action: 'ability', actor: cur.name, ability: name, target: cur.name });
       return;
     }
-    if (mode === 'pool') {
+    // Pool e área-que-nasce-no-conjurador não escolhem alvo: o motor sabe
+    // onde a magia cai (a zona de quem conjura, ou os inimigos do pool).
+    if (mode === 'pool' || mode === 'area_self') {
       act({ action: 'ability', actor: cur.name, ability: name, target: '' });
       return;
     }
+    // Área posta à distância: o picker escolhe UMA criatura e a magia pega a
+    // zona dela inteira — inclusive aliados que estejam lá.
     showTargets('ability', { ability: name });
   }
   function _target(name) {

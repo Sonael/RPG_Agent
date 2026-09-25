@@ -153,6 +153,11 @@
       i.nome_srd && i.nome_srd.toLowerCase() !== i.nome.toLowerCase()
         ? `<span class="inv-marca inv-marca-srd" title="Nome deste item no SRD de D&amp;D 5e">SRD: ${esc(i.nome_srd)}</span>` : '',
       i.a_identificar ? '<span class="inv-marca inv-marca-identificar">a identificar</span>' : '',
+      // Nome mágico, nenhuma descrição: nem o jogador nem o motor sabem o que
+      // o item faz. Identificar não resolve (ele não está no SRD) — quem
+      // resolve é o mestre, perguntado em cena.
+      i.efeito_desconhecido
+        ? '<span class="inv-marca inv-marca-sem-efeito" title="Ninguém declarou o que este item faz. Pergunte ao mestre em cena.">efeito não declarado</span>' : '',
     ].join('');
     const botoes = i.opcoes_de_equipar.map(o => {
       // A prévia é o que torna a troca uma decisão: "CA 12 → 16" ao lado do

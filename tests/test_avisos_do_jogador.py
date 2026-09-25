@@ -42,6 +42,24 @@ def _por_regra(texto):
     return {v.rule: v for v in validator.validate(texto).violations}
 
 
+# As duas regras de heurística pura — lugar fora do mapa e gente sem ficha —
+# só cobram na REPETIÇÃO. Nome que aparece uma vez é cenário: "a estrada sobe
+# rumo ao Passo de Vhar" não pede um verbete de mapa. Nome que volta em outro
+# turno é lugar (ou gente) de verdade que o mestre esqueceu de registrar.
+#
+# `_voltando` é o que o jogo faz: a mesma cena aparece em dois turnos.
+
+def _voltando_lista(texto):
+    memory.campaign["_turno"] = (memory.campaign.get("_turno") or 0) + 1
+    validator.validate(texto)
+    memory.campaign["_turno"] = memory.campaign["_turno"] + 1
+    return validator.validate(texto).violations
+
+
+def _voltando(texto):
+    return {v.rule: v for v in _voltando_lista(texto)}
+
+
 def test_morto_em_cena_fala_de_historia_e_nao_de_ferramenta(campanha_com_gente):
     v = _por_regra("Bruna ergue a espada e avança contra vocês.")["dead_character_active"]
     assert v.severity == "erro"
@@ -53,21 +71,32 @@ def test_morto_em_cena_fala_de_historia_e_nao_de_ferramenta(campanha_com_gente):
     assert "Bruna" in v.detail
 
 
-def test_gente_nova_e_lugar_novo_nao_pedem_nada_ao_jogador(campanha_com_gente):
+def test_a_primeira_mencao_nao_vira_aviso(campanha_com_gente):
+    """
+    Cena nova cita nome próprio o tempo todo. Cobrar ficha e verbete de mapa
+    na primeira aparição enchia o painel de aviso falso — o jogador aprende a
+    ignorar o painel, e o mestre registra figurante que nunca mais volta.
+    """
     achados = _por_regra("Aldric, o ferreiro, aponta para a Ponte Quebrada.")
+    assert "unsaved_character" not in achados
+    assert "unknown_location" not in achados
+
+
+def test_gente_e_lugar_que_voltam_nao_pedem_nada_ao_jogador(campanha_com_gente):
+    achados = _voltando("Aldric, o ferreiro, aponta para a Ponte Quebrada.")
     novo = achados["unsaved_character"]
-    assert novo.titulo == "Gente nova ainda sem ficha"
+    assert novo.titulo == "Gente que voltou e ainda não tem ficha"
     assert "Aldric" in novo.jogador
-    # Sem promessa: a heurística erra, e prometer registro faria o jogador
-    # cobrar do mestre coisa que não vai (nem deve) acontecer.
-    assert "Pode ser figurante" in novo.jogador
+    # Sem promessa: prometer registro faria o jogador cobrar do mestre coisa
+    # que não vai (nem deve) acontecer por conta de um aviso.
     assert "já foi avisado" not in novo.jogador
     assert not any(t in novo.jogador for t in FERRAMENTAS), novo.jogador
     # O texto do mestre continua dizendo o que ele tem de fazer.
     assert "save_character" in novo.message
 
     lugar = achados["unknown_location"]
-    assert lugar.titulo == "Lugar novo ainda fora do mapa"
+    assert lugar.titulo == "Lugar que voltou e ainda não está no mapa"
+    assert "Ponte Quebrada" in lugar.jogador
     assert not any(t in lugar.jogador for t in FERRAMENTAS), lugar.jogador
     assert "save_location" in lugar.message
     assert lugar.detail and "save_location" not in lugar.detail
@@ -100,6 +129,9 @@ def test_todo_aviso_do_jogador_tem_titulo_e_nenhum_cita_ferramenta(campanha_com_
     texto = ("Bruna ergue a espada. Caio entra na sala e diz que trouxe o pão. "
              "Aldric, o ferreiro, aponta para a Ponte Quebrada. "
              "O portao do castelo está aberto de par em par.")
+    memory.campaign["_turno"] = (memory.campaign.get("_turno") or 0) + 1
+    validator.validate(texto)                    # a cena volta no turno seguinte
+    memory.campaign["_turno"] += 1
     for v in validator.validate(texto).violations:
         if not v.jogador:
             continue
@@ -139,7 +171,11 @@ def test_status_comum_nao_vira_aviso(campanha_com_gente, status):
 # O que o servidor manda para a tela (validator.para_o_jogador): é aqui que o
 # texto de mestre deixa de vazar para o painel do jogo.
 
-def _payload(texto):
+def _payload(texto, voltando=False):
+    if voltando:
+        memory.campaign["_turno"] = (memory.campaign.get("_turno") or 0) + 1
+        validator.validate(texto)
+        memory.campaign["_turno"] += 1
     brutos = [
         {"severity": v.severity, "rule": v.rule, "message": v.message,
          "detail": v.detail, "titulo": v.titulo, "jogador": v.jogador}
@@ -149,7 +185,8 @@ def _payload(texto):
 
 
 def test_a_tela_recebe_o_texto_do_jogador_e_nao_o_do_mestre(campanha_com_gente):
-    brutos, tela = _payload("Aldric, o ferreiro, aponta para a Ponte Quebrada.")
+    brutos, tela = _payload("Aldric, o ferreiro, aponta para a Ponte Quebrada.",
+                            voltando=True)
     assert tela, brutos
     for aviso in tela:
         assert aviso["titulo"]
@@ -179,10 +216,10 @@ def test_aviso_so_do_mestre_nao_chega_a_tela(campanha_com_gente):
 # próprio virava lugar, inclusive gente — "o Mestre de Guilda Brom".
 
 def test_lugar_novo_so_com_preposicao_de_lugar(campanha_com_gente):
-    achados = _por_regra("O Mestre de Guilda Brom carimba o contrato e resmunga.")
+    achados = _voltando("O Mestre de Guilda Brom carimba o contrato e resmunga.")
     assert "unknown_location" not in achados, achados.get("unknown_location")
 
-    achados = _por_regra("O grupo entra na Ponte Quebrada ao amanhecer.")
+    achados = _voltando("O grupo entra na Ponte Quebrada ao amanhecer.")
     assert "unknown_location" in achados
     assert "Ponte Quebrada" in achados["unknown_location"].jogador
 
@@ -196,16 +233,22 @@ def test_lugar_novo_so_com_preposicao_de_lugar(campanha_com_gente):
     ("O Conselho decidiu pela guerra.", False),
 ])
 def test_o_que_conta_como_lugar_e_o_que_nao(campanha_com_gente, frase, esperado):
-    achou = "unknown_location" in _por_regra(frase)
+    achou = "unknown_location" in _voltando(frase)
     assert achou is esperado, frase
 
 
 def test_o_texto_do_jogador_nao_promete_registro(campanha_com_gente):
-    achados = _por_regra("O grupo entra na Ponte Quebrada e encontra Aldric, o ferreiro.")
+    """
+    O aviso conta um fato ("voltou e continua fora do mapa") e para aí. Se
+    prometesse registro, o jogador ficaria cobrando do mestre um efeito que
+    aviso nenhum produz.
+    """
+    achados = _voltando("O grupo entra na Ponte Quebrada e encontra Aldric, o ferreiro.")
     for regra in ("unknown_location", "unsaved_character"):
         jogador = achados[regra].jogador
-        assert "Pode ser" in jogador, jogador
+        assert "já apareceu mais de uma vez" in jogador, jogador
         assert "já foi avisado" not in jogador and "no próximo turno" not in jogador, jogador
+        assert "será" not in jogador and "vai ser" not in jogador, jogador
 
 
 def test_uma_cena_de_verdade_gera_um_aviso_e_nao_seis(campanha_com_gente):
@@ -226,6 +269,6 @@ def test_uma_cena_de_verdade_gera_um_aviso_e_nao_seis(campanha_com_gente):
         "Mestre de Guilda Brom carimba um último contrato, resmungando sobre a patrulha "
         "que voltou da Floresta Sombria. Vocês seguem para a Ponte Quebrada ao amanhecer."
     )
-    lugares = [v for v in validator.validate(cena).violations if v.rule == "unknown_location"]
+    lugares = [v for v in _voltando_lista(cena) if v.rule == "unknown_location"]
     assert len(lugares) == 1, [v.jogador for v in lugares]
     assert "Ponte Quebrada" in lugares[0].jogador

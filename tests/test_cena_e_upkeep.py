@@ -208,9 +208,14 @@ def test_bloco_de_pendencias_cobra_com_numero(campanha):
 
     bloco = _pendencias_block()
     assert "PENDÊNCIAS DE MEMÓRIA" in bloco
+    # O resumo continua sendo ferramenta e é cobrado pelo nome dela. Local,
+    # cena e diário saem do fechamento, e a cobrança pede a LINHA — pedir a
+    # ferramenta aqui e o bloco lá em cima eram duas ordens para a mesma coisa.
     assert "7 turnos sem update_story_summary()" in bloco    # limite 5
-    assert "7 turnos sem update_world_state()" in bloco      # limite 6
-    assert "add_diary_entry()" not in bloco                  # limite 8, ainda não
+    assert "7 turnos sem o local e a cena atuais" in bloco   # limite 6
+    assert "'local:'" in bloco and "'cena:'" in bloco
+    assert "update_world_state()" not in bloco
+    assert "diário" not in bloco                             # limite 8, ainda não
 
 
 def test_bloco_vazio_quando_esta_tudo_em_dia(campanha):
@@ -239,10 +244,13 @@ def test_avisos_do_validador_voltam_como_suspeita(campanha):
     campanha["_pendencias"] = ["'Dayene' parece ser um personagem novo mas não foi salvo."]
 
     bloco = _pendencias_block()
-    assert "SUSPEITAS DO VERIFICADOR" in bloco
-    assert "Suspeita sobre a sua resposta anterior" in bloco
+    # O cabeçalho deixou de ser "SUSPEITAS DO VERIFICADOR": as duas regras que
+    # alimentam esta lista passaram a só falar de nome que VOLTOU (apareceu em
+    # dois turnos). Continua sendo heurística sobre prosa, mas de um sinal
+    # melhor — e o texto agora diz o que é, em vez de pedir desconfiança.
+    assert "O QUE JÁ VOLTOU E CONTINUA FORA DA MEMÓRIA" in bloco
     assert "Dayene" in bloco
-    assert "NÃO invente lugar, pessoa nem detalhe" in bloco
+    assert "NÃO invente detalhe" in bloco
     # E não entra no bloco dos contadores, que é fato.
     assert "PENDÊNCIAS DE MEMÓRIA" not in bloco
 
@@ -260,7 +268,7 @@ def test_o_que_e_contado_e_o_que_e_suspeita_ficam_separados(campanha):
     campanha["_pendencias"] = ["Local 'Ponte Quebrada' mencionado mas não registrado na memória."]
 
     bloco = _pendencias_block()
-    contado, _, suspeito = bloco.partition("SUSPEITAS DO VERIFICADOR")
+    contado, _, suspeito = bloco.partition("O QUE JÁ VOLTOU E CONTINUA FORA")
     assert "PENDÊNCIAS DE MEMÓRIA (contado pelo sistema" in contado
     assert "7 turnos sem update_story_summary()" in contado
     assert "Ponte Quebrada" not in contado, "suspeita não pode virar contagem"

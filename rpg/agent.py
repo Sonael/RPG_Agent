@@ -170,6 +170,7 @@ gente: <pessoa nova que apareceu — "Aldric — ferreiro da vila">
 fato: <verdade nova do mundo — "ponte_atravessada=sim">
 relação: <o que mudou entre duas pessoas — "Helena → Selene +25 — se elogiaram depois da luta">
 cena: <o acontecimento desta cena, se houve — "Resgataram o herbologista na mina — a guilda passou a confiar neles">
+diário: <a página do diário, quando a cena mereceu uma — "A descida na mina — o ar ficou doce e errado, e a picareta parou de bater lá embaixo.">
 capítulo: <só quando a história vira de capítulo, e só o número seguinte — "2">
 [[/registro]]
 
@@ -188,6 +189,9 @@ COMO PREENCHER
 • "cena:" é para o que a história vai lembrar depois — um resgate, uma
   traição, um trato fechado. Conversa de passagem não é acontecimento: uma
   por turno, no máximo, e só quando houve.
+• "diário:" é a mesma cena contada para o JOGADOR reler depois, com a voz da
+  narração e não a do sistema: "Título — o que aconteceu". Uma por turno, e
+  só quando a cena mereceu uma página. O diário é dele.
 • "capítulo:" só quando a história realmente virou de capítulo, e só para o
   número seguinte. O sistema recusa pulo.
 
@@ -240,23 +244,31 @@ Reserve get_full_context() exclusivamente para:
 REGRAS DE MEMÓRIA — siga sempre, sem exceção
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-SALVAR:
-• Personagem novo aparecer → save_character imediatamente.
-• Local novo ser descrito → save_location imediatamente.
-• Novo personagem importante entrar na vida do protagonista → add_party_member.
-• Fim de cena importante ou virada na história → save_event.
-• Decisão relevante que afeta o futuro → set_flag.
+SALVAR — a maior parte já é o FECHAMENTO DO TURNO, no fim desta instrução.
+Estas nove coisas saem de lá, escrevendo uma linha, e você NÃO precisa chamar
+a ferramenta durante a cena:
+
+    local, tempo, lugar, gente, fato, relação, cena, diário, capítulo
+
+Chamar a ferramenta na hora continua certo quando você precisa do RESULTADO
+para continuar escrevendo — a ficha de alguém para consultar, o dado de um
+teste, o dano de um golpe. Fora isso, deixe para o fechamento: é lá que você
+sabe o que a cena teve, porque ela já aconteceu.
+
+O que o bloco NÃO faz, e continua com você:
+• Alguém entra de vez no grupo → add_party_member.
 • A cada 3–5 turnos → update_story_summary com o resumo atualizado.
-• Ao mudar de local ou iniciar nova cena → update_world_state.
-• Ao final de cada cena marcante → add_diary_entry com título e narração.
+• Alguém muda de lugar → set_character_location(nome, local).
+• O grupo DESCOBRE algo sobre alguém → add_character_knowledge(nome, fato).
 
 MAPA — o jogador vê os locais numa ficha e navega por ela:
 • Lugar que fica DENTRO de outro (taverna na cidade, sala no castelo) →
   save_location(..., dentro_de="Cidade"). Lojas de open_shop já entram
   sozinhas dentro do local delas.
-• Personagem num lugar → save_character(..., local="Forja de Cliviate"); quando
-  ele mudar de lugar → set_character_location(nome, local). É o que aparece
-  em "Quem está aqui".
+• Gente nova já entra no local ATUAL pela linha 'gente:' do fechamento; só
+  chame save_character(..., local="Forja de Cliviate") quando ela estiver em
+  OUTRO lugar. Quando alguém mudar de lugar → set_character_location(nome,
+  local). É o que aparece em "Quem está aqui".
 • O jogador vê a FICHA de cada personagem: descrição, traços, onde está, a
   atitude com o histórico do porquê (adjust_attitude — sempre com reason),
   as missões que ele deu e os eventos em que aparece. As `notes` são o SEU
@@ -292,9 +304,10 @@ sociais contra esse NPC — convencer quem te deve a vida não custa o mesmo que
 convencer quem você roubou. Passe target_name em social_check() para que isso
 seja aplicado.
 
-TEMPO — advance_time(horas, motivo) sempre que a ficção consumir tempo:
+TEMPO — a linha 'tempo:' do fechamento sempre que a ficção consumir tempo:
 viagem, vigília, pesquisa, espera. Sem isso o mundo fica parado às 8h do dia 1
-para sempre, e o descanso longo (um por 24 horas) perde o sentido.
+para sempre, e o descanso longo (um por 24 horas) perde o sentido. Só chame
+advance_time() na hora quando precisar da hora nova para continuar narrando.
 
 CONSULTAR ANTES DE NARRAR:
 • Personagem já conhecido → get_character para checar status e traços.
@@ -1340,13 +1353,18 @@ def _pendencias_block() -> str:
                           "bloco [[registro]]. É por isso que o mundo para de "
                           "lembrar das coisas. Feche ESTE turno.")
 
+        # O texto de cada cobrança diz COMO resolver, e para o que o bloco
+        # cobre isso é uma LINHA do fechamento, não a ferramenta. Cobrar a
+        # ferramenta aqui e mandar usar o bloco lá em cima são duas ordens
+        # para a mesma coisa — e a resposta vinha com as duas ou com nenhuma.
         for chave, limite, texto in (
             ("resumo", 5, "update_story_summary() — o resumo vivo da história"),
-            ("diario", 8, "add_diary_entry() — o diário da campanha"),
-            ("mundo",  6, "update_world_state() — local e cena atuais"),
+            ("diario", 8, "uma página de diário — a linha 'diário:' do fechamento"),
+            ("mundo",  6, "o local e a cena atuais — as linhas 'local:' e "
+                          "'cena:' do fechamento"),
             # O relógio só anda quando o mestre manda; parado, o encontro
             # marcado nunca chega e o descanso longo nunca volta a valer.
-            ("relogio", 10, "advance_time() — o relógio do mundo "
+            ("relogio", 10, "o relógio do mundo — a linha 'tempo:' do fechamento "
                             f"(parado em {_hora_da_campanha(_m.campaign)})"),
         ):
             n = _m.turnos_sem(chave)
@@ -1356,12 +1374,12 @@ def _pendencias_block() -> str:
             elif n >= limite:
                 linhas.append(f"• {n} turnos sem {texto}")
 
-        # Estes vêm de heurística de texto (rpg/validator.py) e ERRAM: nome de
-        # passagem vira "lugar novo", figurante vira "personagem sem ficha".
-        # Entram marcados como suspeita — tratá-los como fato fazia o mestre
-        # registrar lugar e gente que a história nunca teve.
-        suspeitas = [f"• Suspeita sobre a sua resposta anterior: {a}"
-                     for a in (_m.campaign.get("_pendencias") or [])[:6]]
+        # Estes vêm de heurística de texto (rpg/validator.py). Eles ERRAVAM
+        # muito — qualquer nome próprio numa preposição de lugar virava "lugar
+        # não registrado" — e por isso entravam como suspeita. Agora só falam
+        # do que VOLTOU: nome que apareceu em dois turnos e continua fora da
+        # memória. Ainda é heurística sobre prosa, mas de um sinal melhor.
+        suspeitas = [f"• {a}" for a in (_m.campaign.get("_pendencias") or [])[:6]]
 
         if not linhas and not suspeitas:
             return ""
@@ -1372,13 +1390,14 @@ def _pendencias_block() -> str:
                       "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
                       + "\n".join(linhas) + "\n")
         if suspeitas:
-            bloco += ("SUSPEITAS DO VERIFICADOR (heurística de texto — ERRA MUITO)\n"
+            bloco += ("O QUE JÁ VOLTOU E CONTINUA FORA DA MEMÓRIA\n"
                       "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
                       + "\n".join(suspeitas)
-                      + "\nConfira na SUA narração antes de agir. Nome de passagem, "
-                        "figurante de uma fala e apelido não viram registro: NÃO "
-                        "invente lugar, pessoa nem detalhe só para atender a uma "
-                        "suspeita. Na dúvida, ignore em silêncio.\n")
+                      + "\nCada um destes apareceu em mais de um turno — não é nome "
+                        "de passagem. Registre no fechamento deste turno (as linhas "
+                        "'lugar:' e 'gente:'). Se mesmo assim for só cenário que se "
+                        "repetiu, ignore em silêncio: NÃO invente detalhe para "
+                        "atender a um aviso.\n")
         return (bloco
                 + "Resolva o que fizer sentido NESTE turno, junto com a narração "
                   "— são chamadas de ferramenta, não texto para o jogador ler. "

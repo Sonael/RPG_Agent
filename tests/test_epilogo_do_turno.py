@@ -160,6 +160,71 @@ def test_fato_vira_flag(mesa):
 
 
 # ---------------------------------------------------------------------------
+# 4b. A página do diário
+#
+# Medido na campanha real: 4 entradas em 91 turnos, e as poucas que existiam
+# falavam de personagens com nome antigo. O diário é o que o jogador abre para
+# lembrar a própria história, e nascia vazio porque add_diary_entry era mais
+# uma ferramenta para lembrar NO MEIO da cena. Escrever a página depois de
+# narrar é a ordem natural — é o que o bloco faz.
+# ---------------------------------------------------------------------------
+
+def test_a_linha_do_diario_e_lida_no_bloco(mesa):
+    """
+    A leitura só conhece os campos de `CAMPOS`. Tirar `diario` de lá faria a
+    linha 'diário:' ser ignorada em silêncio — o mestre escreveria a página e
+    ela não chegaria a lugar nenhum.
+    """
+    texto = ("A ponte cede sob a carroça.\n\n"
+             "[[registro]]\ndiário: A travessia — as tábuas cederam\n[[/registro]]")
+    _, campos = epilogo.extrair(texto)
+    assert campos["diario"] == ["A travessia — as tábuas cederam"]
+
+
+def test_pagina_de_diario_entra_pelo_fechamento(mesa):
+    memory.campaign["diary"] = []
+    r = epilogo.aplicar(
+        {"diario": ["A travessia da ponte — as tábuas cederam e a carroça "
+                    "ficou no rio; o grupo seguiu a pé até o anoitecer"]},
+        "A ponte cede sob a carroça.")
+    assert r["recusados"] == []
+    entrada = memory.campaign["diary"][-1]
+    assert entrada["title"] == "A travessia da ponte"
+    assert "carroça" in entrada["content"]
+    assert entrada["chapter"] == memory.campaign["chapter"]
+
+
+def test_pagina_sem_titulo_ainda_vira_entrada(mesa):
+    """Sem o travessão, o próprio texto vira título curto — nada se perde."""
+    memory.campaign["diary"] = []
+    texto = "O grupo perdeu a carroça na travessia e chegou a pé ao anoitecer"
+    epilogo.aplicar({"diario": [texto]}, "A ponte cede sob a carroça.")
+    entrada = memory.campaign["diary"][-1]
+    assert entrada["content"] == texto
+    assert entrada["title"] and entrada["title"] in texto
+
+
+def test_pagina_curta_demais_e_recusada(mesa):
+    """
+    "Fomos à ponte" não é memória: é legenda. Página curta enche o diário de
+    linha que não ajuda o jogador a lembrar de nada.
+    """
+    memory.campaign["diary"] = []
+    r = epilogo.aplicar({"diario": ["A ponte — caiu"]}, "A ponte cede.")
+    assert memory.campaign["diary"] == []
+    assert any("diario" in x for x in r["recusados"]), r["recusados"]
+
+
+def test_uma_pagina_de_diario_por_turno(mesa):
+    memory.campaign["diary"] = []
+    epilogo.aplicar({"diario": [
+        "A travessia — as tábuas cederam e a carroça ficou no rio para sempre",
+        "O acampamento — a noite passou em silêncio e ninguém dormiu direito",
+    ]}, "A ponte cede; à noite, o acampamento fica em silêncio.")
+    assert len(memory.campaign["diary"]) == 1
+
+
+# ---------------------------------------------------------------------------
 # 5. O caminho inteiro, e a promessa de não derrubar o turno
 # ---------------------------------------------------------------------------
 

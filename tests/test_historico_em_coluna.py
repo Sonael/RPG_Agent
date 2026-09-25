@@ -135,6 +135,12 @@ def banco(monkeypatch):
     linhas: list[dict] = []
     monkeypatch.setattr(database, "_client", lambda: _Cliente(linhas, ()))
     monkeypatch.setattr(database, "_tem_coluna_historico", None)
+    # Este arquivo cobre a COLUNA. A tabela de mensagens veio depois e tem o
+    # seu próprio (test_historico_em_tabela.py); aqui ela é declarada ausente
+    # para que o que se mede seja a coluna, e não as duas coisas juntas.
+    monkeypatch.setattr(database, "_tem_tabela_historico", False)
+    database._TOTAL_GRAVADO.clear()
+    database._ULTIMA_GRAVADA.clear()
     monkeypatch.setattr(database, "_versao_condicional", True)
     return linhas
 
@@ -146,6 +152,12 @@ def banco_sem_filtro_json(monkeypatch):
     monkeypatch.setattr(database, "_client",
                         lambda: _Cliente(linhas, (), filtro_json_funciona=False))
     monkeypatch.setattr(database, "_tem_coluna_historico", None)
+    # Este arquivo cobre a COLUNA. A tabela de mensagens veio depois e tem o
+    # seu próprio (test_historico_em_tabela.py); aqui ela é declarada ausente
+    # para que o que se mede seja a coluna, e não as duas coisas juntas.
+    monkeypatch.setattr(database, "_tem_tabela_historico", False)
+    database._TOTAL_GRAVADO.clear()
+    database._ULTIMA_GRAVADA.clear()
     monkeypatch.setattr(database, "_versao_condicional", True)
     return linhas
 
@@ -156,6 +168,12 @@ def banco_antigo(monkeypatch):
     linhas: list[dict] = []
     monkeypatch.setattr(database, "_client", lambda: _Cliente(linhas, ("historico",)))
     monkeypatch.setattr(database, "_tem_coluna_historico", None)
+    # Este arquivo cobre a COLUNA. A tabela de mensagens veio depois e tem o
+    # seu próprio (test_historico_em_tabela.py); aqui ela é declarada ausente
+    # para que o que se mede seja a coluna, e não as duas coisas juntas.
+    monkeypatch.setattr(database, "_tem_tabela_historico", False)
+    database._TOTAL_GRAVADO.clear()
+    database._ULTIMA_GRAVADA.clear()
     return linhas
 
 

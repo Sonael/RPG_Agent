@@ -1591,6 +1591,38 @@ def delete_campaign(name):
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/campaigns/<name>/historico", methods=["GET"])
+@require_auth
+def historico_da_campanha(name):
+    """
+    O que ficou para trás da janela de conversa.
+
+    A sessão carrega as últimas 200 mensagens — é o que o mestre lê e o que a
+    tela desenha. O resto da campanha fica na tabela `historico_mensagens` e
+    se alcança por aqui: `?antes=<ordem>` traz a página anterior,
+    `?q=<termo>` procura em toda a conversa.
+
+    Sem a tabela criada, devolve vazio: a tela some com o botão e ninguém vê
+    erro por uma DDL que ainda não rodou.
+    """
+    try:
+        termo = (request.args.get("q") or "").strip()
+        if termo:
+            achados = database.historico_busca(g.user_id, name, termo)
+            return jsonify({"mensagens": _historico_para_a_tela(achados),
+                            "busca": termo})
+        antes = request.args.get("antes")
+        pagina = database.historico_pagina(
+            g.user_id, name,
+            antes_de=int(antes) if (antes or "").lstrip("-").isdigit() else None,
+            limite=int(request.args.get("limite") or 50),
+        )
+        pagina["mensagens"] = _historico_para_a_tela(pagina["mensagens"])
+        return jsonify(pagina)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/campaigns/<name>/rename", methods=["POST"])
 @require_auth
 def rename_campaign(name):
@@ -1899,7 +1931,26 @@ def start_session():
         "model_limits": limits,
         "conversation_history": _historico_para_a_tela(
             memory.campaign.get("conversation_history", [])),
+        # Onde a janela começa dentro da conversa inteira. > 0 significa que
+        # há campanha atrás dela, e é o que acende o "ver mensagens
+        # anteriores". 0 quando a tabela de mensagens ainda não existe.
+        "historico_comeca_em": _inicio_da_janela(campaign_name),
     })
+
+
+def _inicio_da_janela(campaign_name: str) -> int:
+    """
+    A `ordem` da primeira mensagem que a sessão carregou.
+
+    A janela são as últimas MAX_HISTORY_SAVED mensagens; o que veio antes
+    delas está na tabela e é alcançado por /historico?antes=.
+    """
+    try:
+        total = database.total_de_mensagens(g.user_id, campaign_name)
+    except Exception:
+        return 0
+    janela = len(memory.campaign.get("conversation_history", []) or [])
+    return max(0, total - janela)
 
 
 def _build_fresh_start_opening() -> str:

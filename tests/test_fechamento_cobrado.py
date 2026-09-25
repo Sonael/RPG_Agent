@@ -82,7 +82,7 @@ def test_a_cobranca_e_fato_e_nao_suspeita(campanha):
     é contada pelo sistema e não pode ir para o mesmo balaio."""
     campanha["_sem_fechamento"] = 2
     bloco = agent._pendencias_block()
-    antes_das_suspeitas = bloco.split("SUSPEITAS")[0]
+    antes_das_suspeitas = bloco.split("O QUE JÁ VOLTOU")[0]
     assert "[[registro]]" in antes_das_suspeitas
 
 
@@ -233,3 +233,49 @@ def test_o_prompt_ensina_os_campos_novos():
     texto = agent._EPILOGO_OBRIGATORIO
     assert "cena:" in texto and "capítulo:" in texto
     assert "save_event" in texto          # o mestre não precisa mais chamar
+
+
+# ---------------------------------------------------------------------------
+# 6. Uma ordem só para cada coisa
+#
+# O fechamento nasceu por cima de um prompt que já mandava chamar ferramenta
+# para as MESMAS oito coisas, e a cobrança de manutenção também cobrava pelo
+# nome da ferramenta ("8 turnos sem add_diary_entry()"). Duas ordens para o
+# mesmo registro: a resposta vinha com as duas (registro duplicado) ou com
+# nenhuma — que foi o que a medição mostrou, metade dos turnos sem bloco.
+# ---------------------------------------------------------------------------
+
+FERRAMENTAS_QUE_O_BLOCO_FAZ = ("add_diary_entry", "advance_time",
+                               "update_world_state", "save_location",
+                               "save_event", "set_flag")
+
+
+def test_a_cobranca_manda_escrever_a_linha_e_nao_chamar_a_ferramenta(campanha):
+    """
+    A cobrança é o texto que o mestre lê no topo do turno. Se ela pede a
+    ferramenta, ganha dela — é a mais específica e a que traz número.
+    """
+    campanha["_turno"] = 30
+    campanha["_upkeep"] = {"diario": 1, "relogio": 1, "mundo": 1, "resumo": 1}
+    bloco = agent._pendencias_block()
+    assert "'diário:'" in bloco and "'tempo:'" in bloco and "'local:'" in bloco
+    for ferramenta in FERRAMENTAS_QUE_O_BLOCO_FAZ:
+        assert ferramenta not in bloco, ferramenta
+    # O resumo NÃO sai do bloco: continua sendo ferramenta, e cobrado assim.
+    assert "update_story_summary" in bloco
+
+
+def test_a_instrucao_diz_de_onde_sai_cada_campo(campanha):
+    from rpg.agent import create_agent
+
+    agente = create_agent("gemini-2.5-flash", "fantasia", dnd_mode=True)
+    instrucao = agente.instruction() if callable(agente.instruction) else agente.instruction
+    salvar = instrucao.split("SALVAR")[1].split("MAPA")[0]
+    # Os oito campos do fechamento aparecem como campo, juntos, na seção que
+    # antes mandava chamar ferramenta para cada um.
+    for campo in epilogo.CAMPOS:
+        assert epilogo.ESCRITO.get(campo, campo) in salvar, campo
+    # E a seção diz o que continua sendo ferramenta, para não sobrar dúvida.
+    for ferramenta in ("add_party_member", "update_story_summary",
+                       "set_character_location", "add_character_knowledge"):
+        assert ferramenta in salvar, ferramenta

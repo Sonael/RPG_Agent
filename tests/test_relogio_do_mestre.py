@@ -86,7 +86,11 @@ def test_relogio_parado_entra_nas_pendencias(relogio):
         for chave in ("resumo", "diario", "mundo"):
             memory.marcar_upkeep(chave)
     bloco = _pendencias_block()
-    assert "10 turnos sem advance_time()" in bloco
+    # A cobrança passou a pedir a LINHA do fechamento, e não a ferramenta: o
+    # relógio anda pelo bloco [[registro]], e mandar chamar advance_time()
+    # aqui era a segunda ordem para a mesma coisa.
+    assert "10 turnos sem o relógio do mundo" in bloco
+    assert "'tempo:'" in bloco
     assert "parado em Dia 1, 21h" in bloco
 
 
@@ -105,7 +109,8 @@ def test_relogio_que_nunca_andou_e_cobrado_depois_de_um_tempo(relogio):
     relogio["_turno"] = 11
     for chave in ("resumo", "diario", "mundo"):
         memory.marcar_upkeep(chave)
-    assert "NUNCA foi chamado nesta campanha: advance_time()" in _pendencias_block()
+    assert ("NUNCA foi chamado nesta campanha: o relógio do mundo"
+            in _pendencias_block())
 
 
 # --- Narração que faz o tempo passar -------------------------------------------

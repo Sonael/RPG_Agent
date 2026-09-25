@@ -56,6 +56,13 @@ def _stub_database() -> None:
     db.campaign_exists = lambda *a, **k: False
     db.versao_de       = lambda data: (data or {}).get("_version")
     db.CAMPO_VERSAO    = "_version"
+    # O histórico em tabela própria (paginação e busca). No dublê a campanha
+    # não tem passado: a janela é tudo o que existe.
+    db.total_de_mensagens = lambda *a, **k: 0
+    db.historico_pagina   = lambda *a, **k: {"mensagens": [], "tem_mais": False,
+                                             "primeira_ordem": None}
+    db.historico_busca    = lambda *a, **k: []
+    db.JANELA_HISTORICO   = 200
 
     # O dublê precisa expor a MESMA superfície do módulo real: memory captura
     # esta exceção ao gravar, e um dublê sem ela quebra todo teste que salva.
@@ -250,3 +257,4 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "slow: teste demorado (fuzzer); pule com -m 'not slow'",
     )
+

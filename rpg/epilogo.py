@@ -50,11 +50,12 @@ _BLOCO_RE = re.compile(
     re.IGNORECASE | re.DOTALL,
 )
 
-CAMPOS = ("local", "tempo", "lugar", "gente", "fato", "relacao", "cena", "capitulo")
+CAMPOS = ("local", "tempo", "lugar", "gente", "fato", "relacao", "cena",
+          "capitulo", "diario")
 # Como o campo aparece ESCRITO no bloco: a leitura tira o acento, o prompt não.
-ESCRITO = {"relacao": "relação", "capitulo": "capítulo"}
+ESCRITO = {"relacao": "relação", "capitulo": "capítulo", "diario": "diário"}
 TETO = {"lugar": 3, "gente": 3, "fato": 2, "local": 1, "tempo": 1, "relacao": 2,
-        "cena": 1, "capitulo": 1}
+        "cena": 1, "capitulo": 1, "diario": 1}
 
 # "Helena → Selene -20 — odiou o controle velado"
 # "Selene ↔ Sonael +30 — amigos de infância"
@@ -380,6 +381,23 @@ def aplicar(campos: dict[str, list[str]], narracao: str) -> dict:
             feitos.append(f"save_event({resumo[:40]!r})")
         except Exception as e:
             recusa("cena", resumo, f"falhou: {e}")
+
+    # ---- a página do diário -----------------------------------------------
+    # Medido: 4 entradas em 91 turnos. O diário é o que o jogador abre para
+    # lembrar a própria história, e ele nascia vazio porque add_diary_entry
+    # era mais uma ferramenta para lembrar no meio da cena.
+    for valor in campos.get("diario", [])[:TETO["diario"]]:
+        titulo, conteudo = _partes(valor)
+        if not conteudo:
+            titulo, conteudo = (titulo[:60], titulo) if len(titulo) >= 25 else (titulo, "")
+        if len(conteudo) < 25:
+            recusa("diario", valor, "página curta demais: escreva 'Título — o que aconteceu'")
+            continue
+        try:
+            tl.add_diary_entry(titulo or conteudo[:50], conteudo)
+            feitos.append(f"add_diary_entry({(titulo or conteudo)[:40]!r})")
+        except Exception as e:
+            recusa("diario", titulo, f"falhou: {e}")
 
     # ---- virada de capítulo -----------------------------------------------
     # O capítulo ficou em 1 durante 91 turnos. Só o passo seguinte é aceito:

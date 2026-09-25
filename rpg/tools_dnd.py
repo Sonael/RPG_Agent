@@ -2342,6 +2342,218 @@ def _rolar_salvaguarda(alvo: dict, atributo: str, cd: int) -> tuple[bool, str]:
     return total >= cd, f"salvaguarda de {sigla}: {d20}{mod:+d} = {total} vs CD {cd}"
 
 
+# ---------------------------------------------------------------------------
+# Área
+# ---------------------------------------------------------------------------
+#
+# Bola de Fogo, Mãos Flamejantes e Sopro do Dragão atingiam UM alvo. O motor
+# lia o dado certo, rolava a salvaguarda certa e aplicava tudo numa criatura
+# só — a magia que existe para pegar o grupo inteiro custava o mesmo e valia
+# um terço.
+#
+# O tabuleiro já tem zonas (set_battlefield), e a zona é a unidade natural de
+# área aqui: "quem está no Pátio" é uma pergunta que o motor sabe responder.
+# Sem zonas em jogo nada muda — a magia cai no caminho de alvo único, como
+# antes. Isso é de propósito: o modo narrado e as campanhas antigas não podem
+# mudar de regra no meio do combate.
+
+_FORMAS_DE_AREA = {
+    "cone": "cone", "radius": "raio", "sphere": "esfera", "line": "linha",
+    "cube": "cubo", "cylinder": "cilindro", "square": "quadrado",
+    "raio": "raio", "esfera": "esfera", "linha": "linha", "cubo": "cubo",
+    "cilindro": "cilindro", "cone de": "cone",
+}
+# "15-foot cone", "20-foot-radius sphere", "30 foot line", "cone de 4,5 m"
+_AREA_RE = re.compile(
+    r"(\d{1,3})(?:[.,]\d)?\s*[-\s]?\s*(?:foot|feet|ft\b|p[ée]s?\b|metros?\b|m\b)"
+    r"\s*[-\s]?\s*(" + "|".join(sorted(_FORMAS_DE_AREA, key=len, reverse=True)) + r")\b",
+    re.IGNORECASE)
+_AREA_PT_RE = re.compile(
+    r"\b(cone|esfera|cubo|linha|cilindro|raio)\s+de\s+(\d{1,3})(?:[.,](\d))?\s*m\b",
+    re.IGNORECASE)
+
+
+def _em_metros(pes: float) -> str:
+    """Pés do SRD em metros de meio em meio, como o resto do jogo escreve."""
+    m = round(pes * 0.3048 * 2) / 2
+    return f"{m:g}".replace(".", ",")
+
+
+def area_da_habilidade(hab: dict) -> str:
+    """
+    A forma e o tamanho da área desta habilidade, ou "" quando ela pega um
+    alvo só.
+
+    Duas fontes, nesta ordem: o campo `alcance` do Open5e, que traz a área
+    entre parênteses ("Self (15-foot cone)"), e o texto da descrição, que é
+    onde ela aparece nas magias de alcance normal ("each creature in a
+    20-foot-radius sphere centered on a point you choose").
+    """
+    if not isinstance(hab, dict):
+        return ""
+    for texto in ((hab.get("alcance") or ""), (hab.get("descricao") or "")):
+        achado = _AREA_RE.search(texto)
+        if achado:
+            forma = _FORMAS_DE_AREA[achado.group(2).lower()]
+            unidade_pt = re.search(r"\d\s*[-\s]?\s*(?:m\b|metros?\b|p[ée]s?\b)", texto,
+                                   re.IGNORECASE)
+            bruto = float(achado.group(1))
+            if unidade_pt and re.search(r"m\b|metro", unidade_pt.group(0), re.IGNORECASE):
+                return f"{forma} de {bruto:g} m".replace(".", ",")
+            return f"{forma} de {_em_metros(bruto)} m"
+        achado = _AREA_PT_RE.search(texto)
+        if achado:
+            medida = achado.group(2) + ("," + achado.group(3) if achado.group(3) else "")
+            return f"{_FORMAS_DE_AREA[achado.group(1).lower()]} de {medida} m"
+    return ""
+
+
+def origem_da_area(hab: dict) -> str:
+    """
+    De onde a área nasce: "self" (cone/linha saindo do conjurador) ou "alvo"
+    (esfera posta à distância, como a Bola de Fogo).
+    """
+    alcance = _norm_txt((hab or {}).get("alcance", "") or "")
+    return "self" if alcance.startswith("self") or alcance.startswith("pessoal") else "alvo"
+
+
+def _alvos_em_area(char_name: str, hab: dict, target_name: str) -> tuple[str, list[dict]]:
+    """
+    Quem a área pega, e em que zona.
+
+    Devolve ("", []) sempre que a regra não se aplica — sem zonas no combate,
+    zona desconhecida, ou habilidade que não é de área. Quem chama cai no
+    caminho de alvo único nesse caso.
+
+    O conjurador fica FORA. No SRD ele estaria dentro da esfera que pusesse em
+    cima de si, mas aqui a área é uma zona inteira e o mestre não escolhe o
+    ponto: cobrar dano dele seria inventar uma decisão que ninguém tomou. Os
+    ALIADOS na zona entram — é isso que faz a magia de área ser uma escolha.
+    """
+    if not area_da_habilidade(hab) or not _zonas_ativas():
+        return "", []
+    if origem_da_area(hab) == "self":
+        zona = _zona_de(char_name)
+    else:
+        primeiro = (target_name or "").split(",")[0].strip()
+        zona = _zona_de(primeiro) if primeiro else ""
+    if not zona:
+        return "", []
+
+    eu = memory.char_key(char_name)
+    chars = memory.campaign.get("characters", {})
+    cs = memory.campaign.get("combat_state") or {}
+    pegos = []
+    for nome in cs.get("initiative_order", []) or []:
+        chave = memory.char_key(nome)
+        if chave == eu:
+            continue
+        alvo = chars.get(chave)
+        if not alvo or not alvo.get("sheet"):
+            continue
+        if (alvo.get("status", "vivo") or "").lower() in OUT_OF_COMBAT_STATUSES:
+            continue
+        if int((alvo.get("sheet") or {}).get("vida_atual", 0) or 0) <= 0:
+            continue
+        if _zona_de(nome) == zona:
+            pegos.append(alvo)
+    return (zona, pegos) if pegos else ("", [])
+
+
+# ---------------------------------------------------------------------------
+# Usos por descanso
+# ---------------------------------------------------------------------------
+#
+# O guerreiro usava Surto de Ação todo turno. O bárbaro entrava em Fúria de
+# novo na luta seguinte, e na outra. A ficha não tinha contador nenhum: a
+# descrição dizia "1 uso por descanso curto" e isso era texto para o mestre
+# ler — nada no motor cobrava.
+#
+# Mana já era recurso (custo_mana, restaurado no descanso longo). As
+# habilidades de classe do SRD que NÃO custam mana ficavam de fora, e são
+# exatamente as que definem o ritmo do dia de aventura.
+#
+# O contador mora em sheet["usos"], com o que SOBRA de cada habilidade.
+# Ausente = cheio, então ficha antiga entra neste mundo com tudo disponível e
+# nenhuma migração.
+
+def _usos_de_furia(nivel: int) -> int:
+    """Tabela do bárbaro no SRD: 2, 3, 4, 5 e 6."""
+    for limite, usos in ((17, 6), (12, 5), (6, 4), (3, 3)):
+        if nivel >= limite:
+            return usos
+    return 2
+
+
+# nome normalizado → (qual descanso devolve, quantos usos por nível)
+_USOS_POR_DESCANSO = {
+    "segunda folego":      ("curto", lambda n: 1),
+    "surto de acao":       ("curto", lambda n: 2 if n >= 17 else 1),
+    "canalizar divindade": ("curto", lambda n: 3 if n >= 18 else (2 if n >= 6 else 1)),
+    "furia":               ("longo", _usos_de_furia),
+    "furia implacavel":    ("longo", lambda n: 1),
+}
+
+
+def _chave_de_uso(nome: str) -> str:
+    """
+    A chave da tabela. "Canalizar Divindade (Arma Sagrada)" e "Canalizar
+    Divindade (Preservar Vida)" são efeitos DIFERENTES do MESMO recurso — o
+    paladino não ganha um uso a mais por conhecer dois efeitos.
+    """
+    n = _norm_txt(nome or "")
+    if n.startswith("canalizar divindade"):
+        return "canalizar divindade"
+    return n if n in _USOS_POR_DESCANSO else ""
+
+
+def usos_maximos(char: dict, nome: str) -> int | None:
+    """Quantos usos a habilidade tem por descanso, ou None quando é livre."""
+    chave = _chave_de_uso(nome)
+    if not chave:
+        return None
+    nivel = int(((char or {}).get("sheet") or {}).get("nivel", 1) or 1)
+    return _USOS_POR_DESCANSO[chave][1](nivel)
+
+
+def usos_restantes(char: dict, nome: str) -> int | None:
+    maximo = usos_maximos(char, nome)
+    if maximo is None:
+        return None
+    guardado = ((char.get("sheet") or {}).get("usos") or {}).get(_chave_de_uso(nome))
+    if guardado is None:
+        return maximo
+    return max(0, min(int(guardado), maximo))
+
+
+def _gastar_uso(char: dict, nome: str) -> None:
+    chave = _chave_de_uso(nome)
+    if not chave:
+        return
+    restam = usos_restantes(char, nome)
+    char.setdefault("sheet", {}).setdefault("usos", {})[chave] = max(0, (restam or 0) - 1)
+
+
+def restaurar_usos(char: dict, descanso: str) -> list[str]:
+    """
+    Devolve os usos que este descanso recupera. O longo devolve tudo — quem
+    descansa a noite inteira também teve a hora do descanso curto.
+
+    Devolve a lista de nomes recuperados, para a linha do descanso na tela.
+    """
+    s = char.get("sheet") or {}
+    usos = s.get("usos")
+    if not isinstance(usos, dict) or not usos:
+        return []
+    voltaram = []
+    for chave in list(usos):
+        quando = (_USOS_POR_DESCANSO.get(chave) or ("longo", None))[0]
+        if descanso == "longo" or quando == "curto":
+            if usos.pop(chave, None) is not None:
+                voltaram.append(chave)
+    return voltaram
+
+
 def dado_efetivo(hab: dict) -> str:
     """
     A fórmula que vale. Quando a ficha não tem dado — o caso de toda magia
@@ -6194,6 +6406,24 @@ def use_ability(
                 f"   Use outra ação nesta rodada."
             )
 
+    # ── USOS POR DESCANSO ──────────────────────────────────────────────────
+    # Surto de Ação, Fúria, Segunda Fôlego e Canalizar Divindade não custam
+    # mana, e por isso não custavam NADA: a ficha não tinha contador e o
+    # guerreiro tinha uma ação extra em todo turno. Como a recarga, a cobrança
+    # vem antes da mana — recusar depois de descontar deixaria o custo pago
+    # por uma ação que não aconteceu.
+    _usos_max = usos_maximos(char, hab.get("nome", ""))
+    if _usos_max is not None:
+        _restam = usos_restantes(char, hab.get("nome", ""))
+        if _restam <= 0:
+            _quando = _USOS_POR_DESCANSO[_chave_de_uso(hab["nome"])][0]
+            return (
+                f"Erro: **{hab['nome']}** de {char['name']} está gasto "
+                f"(0 de {_usos_max}). Volta no descanso {_quando}"
+                + (" (short_rest)." if _quando == "curto" else " (long_rest).")
+                + "\n   Use outra ação nesta rodada. Nada foi gasto."
+            )
+
     if custo > 0:
         if s["mana_atual"] < custo:
             return (
@@ -6201,6 +6431,9 @@ def use_ability(
                 f"Mana: {s['mana_atual']}/{s['mana_max']} (necessário: {custo})"
             )
         s["mana_atual"] -= custo
+
+    if _usos_max is not None:
+        _gastar_uso(char, hab["nome"])
 
     if _rec:
         _gastar_recarga(char, _rec)
@@ -6236,6 +6469,13 @@ def use_ability(
         f"   Efeito: {hab['descricao']}"
     )
 
+    # O recurso gasto aparece na hora, como a mana. Sem isto, o jogador só
+    # descobre que a Fúria acabou quando o motor recusa a próxima.
+    if _usos_max is not None:
+        _quando_volta = _USOS_POR_DESCANSO[_chave_de_uso(hab["nome"])][0]
+        result += (f"\n   Usos: {usos_restantes(char, hab['nome'])}/{_usos_max} "
+                   f"(volta no descanso {_quando_volta})")
+
     # Concentração: só se mantém UMA magia por vez. Antes disto, um clérigo
     # sustentava Bênção, Escudo da Fé e Arma Espiritual ao mesmo tempo.
     if _requires_concentration(hab):
@@ -6247,6 +6487,13 @@ def use_ability(
     # Inicializa lista de afetados por pool spell — usada no log mesmo
     # quando o branch pool não roda (mantém escopo seguro).
     slept: list[str] = []
+
+    # Área: só para dano, e só com zonas em jogo. Sem isso, ("", []) e a
+    # habilidade segue pelo caminho de alvo único — que é como ela se
+    # comportava antes de existir área nenhuma.
+    _zona_area, _alvos_area = ("", [])
+    if _efeito == "dano" and ctrl_effect is None:
+        _zona_area, _alvos_area = _alvos_em_area(char_name, hab, target_name)
 
     # ══════════════════════════════════════════════════════════════════════════
     # POOL SPELLS (Sleep, Color Spray, …)
@@ -6319,6 +6566,47 @@ def use_ability(
             result += f"\n   Pool usado: {pool - remaining} HP | Restante: {remaining} HP"
         else:
             result += "\n   Nenhum alvo foi afetado — todos têm HP alto demais."
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # DANO EM ÁREA (Bola de Fogo, Mãos Flamejantes, Sopro do Dragão…)
+    # Um dado só para a área inteira, como manda o SRD, e uma salvaguarda por
+    # criatura. Quem passa leva metade.
+    #
+    # Aqui o motor rola a salvaguarda de TODO MUNDO, inclusive dos
+    # personagens do jogador — diferente do alvo único, em que a bandeja de
+    # dados abre e quem rola é ele. Uma bandeja por criatura pegaria o combate
+    # inteiro numa fila de pausas; o dado de cada um aparece escrito no
+    # resultado, que é o que a pausa existia para mostrar.
+    # ══════════════════════════════════════════════════════════════════════════
+    elif _alvos_area:
+        _save_area = salvaguarda_da_habilidade(hab)
+        _conj = _conjuracao(s) or {}
+        _cd_area = int(saving_throw_dc
+                       or _conj.get("cd")
+                       or (8 + int(s.get("proficiencia", 2) or 2)))
+        _tipo_area = (_norm_damage_type(hab.get("tipo_dano", "") or "")
+                      or _damage_type_from_text(hab.get("descricao", "")))
+        result += (f"\n   Área: {area_da_habilidade(hab)} em **{_zona_area}** "
+                   f"— {len(_alvos_area)} "
+                   f"{'criatura' if len(_alvos_area) == 1 else 'criaturas'}")
+        for _alvo in _alvos_area:
+            _dano_nele = total_dano
+            _linha_save = ""
+            if _save_area:
+                _passou, _linha_save = _rolar_salvaguarda(_alvo, _save_area, _cd_area)
+                if _passou:
+                    _dano_nele = total_dano // 2
+                _linha_save = (f" ({_linha_save} — "
+                               f"{'metade' if _passou else 'dano cheio'})")
+            _res = _apply_damage(_alvo, _dano_nele, _tipo_area,
+                                 source_name=char["name"], arma_magica=True)
+            _st_alvo = _alvo["sheet"]
+            result += _fmt_notas(_res["notas"])
+            result += (f"\n   {_alvo['name']}: {_res['hp_antes']} → "
+                       f"{_st_alvo['vida_atual']}/{_st_alvo['vida_max']}"
+                       f" (-{_dano_nele}){_linha_save}")
+            if _st_alvo["vida_atual"] == 0:
+                result += _mark_at_zero_hp(_alvo, char["name"])
 
     # ══════════════════════════════════════════════════════════════════════════
     # EFEITOS DE ALVO ÚNICO (cura / condição direta / dano)
@@ -8758,6 +9046,12 @@ def inventory_snapshot(char_name: str = "") -> dict:
             "equipado_em": [_ROTULO_DO_SLOT[x] for x in em if x in _ROTULO_DO_SLOT],
             "opcoes_de_equipar": opcoes,
             "a_identificar": _a_identificar(it),
+            # Item de nome mágico que entrou sem descrição. A marca existia só
+            # para cobrar o MESTRE (server._itens_sem_balanco) e o jogador
+            # carregava a coisa sem nunca saber que ninguém declarou o que ela
+            # faz. Na Mochila isso vira pergunta em cena — que é o jeito de
+            # resolver, porque quem responde é o mestre.
+            "efeito_desconhecido": bool(it.get("efeito_desconhecido")),
             "uso": _uso_na_mochila(alvo, it),
         })
 
@@ -9971,6 +10265,10 @@ def short_rest(char_name: str, hit_dice: int = -1) -> str:
 
     _passar_hora_do_descanso_curto(s)
     g = _gastar_dados_de_vida(char, quantos)
+    # Surto de Ação, Segunda Fôlego e Canalizar Divindade voltam aqui — é a
+    # hora do descanso curto que os devolve no SRD, e sem isto o contador que
+    # o motor passou a cobrar seria uma via de mão única.
+    _usos_voltaram = restaurar_usos(char, "curto")
     memory.save_campaign()
 
     linhas = [f"{char['name']} faz um descanso curto (1 hora — agora {_hora_legivel()})."]
@@ -9983,6 +10281,8 @@ def short_rest(char_name: str, hit_dice: int = -1) -> str:
         linhas.append("   Vida já estava no máximo: nenhum dado gasto.")
     linhas.append(f"   Vida: {g['antes']} → {g['depois']}/{s['vida_max']}{_nota_teto(s)}")
     linhas.append(f"   Dados de vida: {g['restantes']}/{g['maximo']}")
+    if _usos_voltaram:
+        linhas.append("   Recuperado: " + ", ".join(sorted(_usos_voltaram)))
     return "\n".join(linhas)
 
 
@@ -10096,6 +10396,9 @@ def long_rest(char_name: str) -> str:
 
     s["vida_atual"] = _hp_max_efetivo(s)
     s["mana_atual"] = s["mana_max"]
+    # O longo devolve TUDO: quem dorme a noite inteira também teve a hora do
+    # descanso curto.
+    restaurar_usos(char, "longo")
     dados_antes, dados_max = _reserva_de_dados(s)
     s["hit_dice_remaining"] = dados_antes + _dados_devolvidos_no_longo(s)
     s["death_saves_sucessos"] = 0
@@ -13355,10 +13658,15 @@ def _ability_target_mode(name: str, hab: dict | None = None) -> str:
     Retornos:
       "self"   → afeta só o conjurador (sem picker).
       "pool"   → área com pool de HP, múltiplos alvos (Sleep). Sem picker.
-      "area"   → AoE genuíno centrado no conjurador (Burning Hands, etc.).
-                 Hoje o engine ainda trata como single — UI cai em "single"
-                 até existir engine de dano em área. TODO marcado.
+      "area_self" → área que nasce no conjurador (cone das Mãos Flamejantes):
+                 pega a zona dele, sem picker.
+      "area"   → área posta à distância (Bola de Fogo): o picker escolhe uma
+                 criatura, e a magia pega a ZONA dela inteira.
       "single" → alvo único.
+
+    Área só vale com zonas no campo (set_battlefield). Sem elas, use_ability
+    resolve como alvo único e o rótulo da UI seria mentira — por isso os dois
+    modos de área viram "single" quando o combate não tem zonas.
     """
     # 1. Class features SRD — sempre self-only (lista fixa pequena).
     if _is_self_only_ability(name):
@@ -13370,14 +13678,17 @@ def _ability_target_mode(name: str, hab: dict | None = None) -> str:
         if eff is not None and eff.get("pool"):
             return "pool"
 
-    # 3. Fonte primária: campo `alcance` (do Open5e via learn_spell/wizard).
+    # 3. Área — o motor distribui o dano pela zona (ver _alvos_em_area).
+    if hab is not None and area_da_habilidade(hab) and _zonas_ativas():
+        return "area_self" if origem_da_area(hab) == "self" else "area"
+
+    # 4. Fonte primária: campo `alcance` (do Open5e via learn_spell/wizard).
     alcance = ((hab or {}).get("alcance") or "").strip().lower()
     if alcance == "self":
         return "self"
     if alcance.startswith("self (") or alcance.startswith("self("):
-        # AoE centrado no conjurador (cone/sphere/cube/line). Engine ainda
-        # não distribui dano em área, então caímos em "single" por ora.
-        # TODO: quando houver _area_damage no use_ability, retornar "area".
+        # Área saindo do conjurador, mas sem zonas no campo: o motor resolve
+        # como alvo único, e é isso que a UI precisa mostrar.
         return "single"
     if alcance in ("", "n/a", "none"):
         # Sem dado de alcance — pode ser feature de classe ou legado.
@@ -13873,6 +14184,10 @@ def _combatant_snapshot(name: str) -> dict | None:
             # Modo de alvo: "self" | "pool" | "single". A UI usa para decidir
             # se mostra o picker ou despacha direto (self/pool não pedem alvo).
             "target_mode": _ability_target_mode(h.get("nome", ""), h),
+            # Usos por descanso (Surto de Ação, Fúria…). None quando a
+            # habilidade é livre — a tela não desenha contador nesse caso.
+            "usos":     usos_restantes(ch, h.get("nome", "")),
+            "usos_max": usos_maximos(ch, h.get("nome", "")),
         }
         if _ability_is_passive(h):
             passivas.append(entry["nome"])

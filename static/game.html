@@ -130,6 +130,20 @@
           </div>
         </div>
 
+        <!-- A sessão carrega as últimas 200 mensagens. O que veio antes fica
+             na tabela de histórico e chega por aqui: uma página de cada vez,
+             ou por busca. A barra só aparece quando há campanha atrás. -->
+        <div id="hist-barra" class="hidden">
+          <button id="hist-mais" type="button" onclick="window.carregarHistoricoAnterior()">
+            Ver mensagens anteriores
+          </button>
+          <form id="hist-busca-form" onsubmit="return window.buscarNoHistorico(event)">
+            <input id="hist-busca" type="search" placeholder="Procurar na campanha inteira"
+                   aria-label="Procurar no histórico">
+          </form>
+        </div>
+        <div id="hist-achados" class="hidden"></div>
+
         <div id="chat-history"></div>
 
         <div id="input-area">

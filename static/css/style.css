@@ -3672,7 +3672,36 @@ body.inventory-on { overflow: hidden; }
   border: 1px solid var(--inv-line); color: var(--inv-muted);
 }
 .inv-marca-equip { background: var(--inv-leather); border-color: var(--inv-leather); color: var(--inv-sobre); font-weight: 700; }
+/* A campanha atrás da janela de conversa: paginar e procurar. A barra só
+   aparece quando existe alguma coisa antes do que está na tela. */
+#hist-barra {
+  display: flex; gap: var(--esp-2); align-items: center; flex-wrap: wrap;
+  padding: var(--esp-2) 0; margin-bottom: var(--esp-2);
+}
+#hist-barra button {
+  font-family: 'Lora', serif; font-size: 0.8rem; cursor: pointer;
+  border-radius: 6px; padding: var(--esp-1) var(--esp-3);
+  border: 1px solid var(--inv-line); background: transparent; color: inherit;
+}
+#hist-barra button[disabled] { opacity: .6; cursor: default; }
+#hist-busca-form { flex: 1 1 180px; }
+#hist-busca {
+  width: 100%; font-family: 'Lora', serif; font-size: 0.8rem;
+  border-radius: 6px; padding: var(--esp-1) var(--esp-2);
+  border: 1px solid var(--inv-line); background: transparent; color: inherit;
+}
+#hist-achados { margin-bottom: var(--esp-3); font-size: 0.85rem; }
+.hist-vazio { opacity: .7; margin: 0 0 var(--esp-2); }
+.hist-achado {
+  border-left: 2px solid var(--inv-line); padding: var(--esp-1) var(--esp-2);
+  margin-bottom: var(--esp-1); opacity: .85;
+}
+.hist-quem { font-weight: 700; margin-right: var(--esp-2); }
+
 .inv-marca-identificar { border-color: var(--inv-roxo-borda); color: var(--inv-roxo); font-weight: 700; }
+/* Não é erro do jogador nem item quebrado: é uma lacuna que só o mestre
+   preenche. Cor de atenção, não de perigo. */
+.inv-marca-sem-efeito { border-color: var(--inv-leather); color: var(--inv-leather); font-weight: 700; }
 .inv-item-desc { margin: var(--esp-2) 0 0; font-size: 0.82rem; color: var(--inv-muted); line-height: 1.4; }
 .inv-item-acoes { display: flex; gap: var(--esp-2); flex-wrap: wrap; margin-top: var(--esp-2); }
 .inv-btn {

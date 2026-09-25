@@ -83,6 +83,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   } else {
     appendSystem('<p>Nova sessão iniciada.</p>');
   }
+  // O que ficou atrás da janela de 200 mensagens.
+  _histComecaEm = session.historico_comeca_em || 0;
+  _histCampanha = session.campaign || '';
+  atualizarBarraDeHistorico();
 
   document.getElementById('sidebar-overlay').addEventListener('click', () => toggleSidebar(true));
   document.getElementById('edit-overlay').addEventListener('click', function (e) { if (e.target === this) closeEditModal(); });
@@ -1010,6 +1014,99 @@ function renderHistory(history) {
   } finally { _montandoHistorico = false; }
   scrollDown();
 }
+
+// ---------------------------------------------------------------------------
+// O que ficou atrás da janela
+// ---------------------------------------------------------------------------
+// A sessão carrega as últimas 200 mensagens — é o que o mestre lê. Antes, o
+// resto era APAGADO a cada gravação: o turno 300 comia o turno 100. Agora ele
+// fica na tabela de histórico, e daqui se volta nele.
+
+let _histComecaEm = 0;          // ordem da primeira mensagem já na tela
+let _histCampanha = '';
+let _histCarregando = false;
+
+function atualizarBarraDeHistorico() {
+  const barra = document.getElementById('hist-barra');
+  if (!barra) return;
+  barra.classList.toggle('hidden', !(_histComecaEm > 0));
+}
+
+function _msgAntiga(e) {
+  const row = document.createElement('div');
+  if (e.role === 'assistant') {
+    const b = document.createElement('div');
+    b.className = 'msg-bubble'; b.style.opacity = '0.6';
+    b.innerHTML = renderMarkdown(e.text || '');
+    row.className = 'msg-row master';
+    row.innerHTML = '<div class="msg-label">Mestre</div>';
+    row.appendChild(b);
+  } else {
+    row.className = 'msg-row user';
+    row.innerHTML = `<div class="msg-label">Você</div>`
+      + `<div class="msg-bubble" style="opacity:.6">${escapeHtml(e.text || '').replace(/\n/g, '<br>')}</div>`;
+  }
+  return row;
+}
+
+async function carregarHistoricoAnterior() {
+  if (_histCarregando || _histComecaEm <= 0) return;
+  _histCarregando = true;
+  const botao = document.getElementById('hist-mais');
+  if (botao) { botao.disabled = true; botao.textContent = 'A recuperar...'; }
+  try {
+    const nome = encodeURIComponent(_histCampanha);
+    const r = await authFetch(`${API}/api/campaigns/${nome}/historico?antes=${_histComecaEm}&limite=50`);
+    const d = await r.json();
+    const chat = document.getElementById('chat-history');
+    // Prepend na ordem inversa mantém a conversa na ordem em que foi dita.
+    (d.mensagens || []).slice().reverse().forEach(e => {
+      if (e.role === 'user' && e.interno) return;   // não foi dito pelo jogador
+      chat.insertBefore(_msgAntiga(e), chat.firstChild);
+    });
+    if (d.primeira_ordem != null) _histComecaEm = d.primeira_ordem;
+    if (!d.tem_mais || !(d.mensagens || []).length) _histComecaEm = 0;
+  } catch (e) {
+    if (window.showToast) window.showToast('Não deu para recuperar o histórico.');
+  } finally {
+    _histCarregando = false;
+    if (botao) { botao.disabled = false; botao.textContent = 'Ver mensagens anteriores'; }
+    atualizarBarraDeHistorico();
+  }
+}
+
+async function buscarNoHistorico(ev) {
+  if (ev) ev.preventDefault();
+  const campo = document.getElementById('hist-busca');
+  const caixa = document.getElementById('hist-achados');
+  if (!campo || !caixa) return false;
+  const termo = (campo.value || '').trim();
+  if (termo.length < 2) { caixa.classList.add('hidden'); return false; }
+  caixa.classList.remove('hidden');
+  caixa.innerHTML = '<p class="hist-vazio">A procurar...</p>';
+  try {
+    const nome = encodeURIComponent(_histCampanha);
+    const r = await authFetch(`${API}/api/campaigns/${nome}/historico?q=${encodeURIComponent(termo)}`);
+    const d = await r.json();
+    const achados = d.mensagens || [];
+    if (!achados.length) {
+      caixa.innerHTML = `<p class="hist-vazio">Nada com “${escapeHtml(termo)}” na campanha.</p>`;
+      return false;
+    }
+    caixa.innerHTML = `<p class="hist-vazio">${achados.length} `
+      + `${achados.length === 1 ? 'trecho' : 'trechos'} com “${escapeHtml(termo)}”:</p>`
+      + achados.map(e => `<div class="hist-achado"><span class="hist-quem">`
+          + `${e.role === 'assistant' ? 'Mestre' : 'Você'}</span>`
+          + `${escapeHtml((e.text || '').slice(0, 400))}</div>`).join('');
+  } catch (e) {
+    caixa.innerHTML = '<p class="hist-vazio">A busca não respondeu.</p>';
+  }
+  return false;
+}
+
+window.carregarHistoricoAnterior = carregarHistoricoAnterior;
+window.buscarNoHistorico = buscarNoHistorico;
+
 
 function appendUser(text) {
   const row = document.createElement('div'); row.className = 'msg-row user';

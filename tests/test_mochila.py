@@ -390,6 +390,33 @@ def test_acao_de_identificar_traz_o_resultado_em_dados(aria, monkeypatch):
     assert manto["nome_srd"] == "Cloak of Elvenkind" and manto["a_identificar"] is False
 
 
+# Item de nome mágico que entrou SEM descrição ganha `efeito_desconhecido` na
+# entrada. A marca só era lida por server._itens_sem_balanco, para cobrar o
+# MESTRE: o jogador carregava a coisa sem jeito de saber que ninguém declarou
+# o que ela faz — e "Identificar" não resolve, porque ela não está no SRD.
+
+def test_item_sem_efeito_declarado_aparece_marcado_na_mochila(aria):
+    aria["inventario"].append({"nome": "Anel de Vhar", "qtd": 1, "descricao": "",
+                               "custom": True, "efeito_desconhecido": True})
+    itens = {i["nome"]: i for i in td.inventory_snapshot("Aria")["personagem"]["itens"]}
+    assert itens["Anel de Vhar"]["efeito_desconhecido"] is True
+
+
+def test_item_comum_nao_ganha_a_marca(aria):
+    td.add_item("Aria", "Corda de Cânhamo", 1)
+    itens = {i["nome"]: i for i in td.inventory_snapshot("Aria")["personagem"]["itens"]}
+    assert itens["Corda de Cânhamo"]["efeito_desconhecido"] is False
+
+
+def test_a_tela_desenha_a_marca(aria):
+    """A marca só serve se chegar aos olhos: a tela é que mostra."""
+    from pathlib import Path
+    js = Path(__file__).resolve().parents[1] / "static" / "js" / "inventory.js"
+    fonte = js.read_text(encoding="utf-8")
+    assert "efeito_desconhecido" in fonte
+    assert "efeito não declarado" in fonte
+
+
 def test_identificar_sem_conexao_e_ok_falso_na_tela(aria):
     aria["inventario"].append({"nome": "Manto Élfico", "qtd": 1, "descricao": ""})
     r = td.inventory_action("identificar", char="Aria", item="Manto Élfico")

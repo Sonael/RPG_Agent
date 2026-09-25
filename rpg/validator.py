@@ -186,6 +186,48 @@ def _check_gone_characters(response: str, c: dict) -> list[Violation]:
     return violations
 
 
+# ---------------------------------------------------------------------------
+# Só cobra o que VOLTA
+# ---------------------------------------------------------------------------
+# As duas regras de heurística sobre a prosa — lugar novo e gente nova — eram
+# as que mais erravam: qualquer nome próprio numa preposição de lugar virava
+# "lugar não registrado", e o prompt precisava avisar o mestre de que elas
+# "ERRAM MUITO". Aviso em que ninguém confia é ruído com custo.
+#
+# O que separa o nome de passagem do lugar de verdade não é a frase: é a
+# REPETIÇÃO. A taverna que aparece em três turnos e continua fora do mapa é um
+# esquecimento; a que apareceu uma vez é cenário. Agora cada nome é contado por
+# turno, e só vira aviso quando volta.
+#
+# Isto também conversa com o fechamento do turno: o bloco [[registro]] roda
+# ANTES do verificador, então o que o mestre acabou de registrar já está na
+# memória e nem chega aqui.
+MENCOES_PARA_COBRAR = 2
+_MAX_MENCOES_GUARDADAS = 60
+
+
+def _voltou(c: dict, chave: str) -> bool:
+    """
+    Conta em quantos TURNOS diferentes este nome apareceu. True quando já
+    apareceu o bastante para valer um aviso.
+    """
+    turno = c.get("_turno", 0) or 0
+    mapa = c.setdefault("_mencoes", {})
+    if not isinstance(mapa, dict):
+        mapa = {}
+        c["_mencoes"] = mapa
+    vezes, ultimo = (mapa.get(chave) or [0, -1])[:2]
+    if ultimo != turno:
+        vezes, ultimo = vezes + 1, turno
+        mapa[chave] = [vezes, ultimo]
+    if len(mapa) > _MAX_MENCOES_GUARDADAS:
+        # Descarta os mais antigos: a memória de menções é um rascunho, não
+        # um registro.
+        for k in sorted(mapa, key=lambda k: mapa[k][1])[:len(mapa) - _MAX_MENCOES_GUARDADAS]:
+            mapa.pop(k, None)
+    return vezes >= MENCOES_PARA_COBRAR
+
+
 def _check_unknown_locations(response: str, c: dict) -> list[Violation]:
     """
     Detecta menções a locais que parecem ser novos mas não foram salvos.
@@ -228,17 +270,19 @@ def _check_unknown_locations(response: str, c: dict) -> list[Violation]:
 
         found.add(candidate)
 
-    for loc_name in found:
+    for loc_name in sorted(found):
+        if not _voltou(c, f"lugar:{_normalize(loc_name)}"):
+            continue      # apareceu uma vez só: é cenário, não esquecimento
         violations.append(Violation(
             severity="aviso",
             rule="unknown_location",
-            message=(f"Local '{loc_name}' mencionado mas não registrado na memória. "
-                     "Considere chamar save_location se for um local importante."),
+            message=(f"Local '{loc_name}' já apareceu em {MENCOES_PARA_COBRAR} turnos "
+                     "e continua fora do mapa. Registre com save_location — ou com "
+                     "a linha 'lugar:' do fechamento do turno."),
             detail=_snippet(response, loc_name),
-            titulo="Lugar novo ainda fora do mapa",
-            jogador=(f"“{loc_name}” apareceu na história e ainda não está no mapa da "
-                     "campanha. Pode ser só um nome de passagem; se virar um lugar "
-                     "de verdade, o mestre registra."),
+            titulo="Lugar que voltou e ainda não está no mapa",
+            jogador=(f"“{loc_name}” já apareceu mais de uma vez na história e ainda "
+                     "não está no mapa da campanha."),
         ))
 
     return violations
@@ -320,17 +364,19 @@ def _check_new_characters_unsaved(response: str, c: dict) -> list[Violation]:
             if name_norm not in known_all:
                 found.add(name)
 
-    for name in found:
+    for name in sorted(found):
+        if not _voltou(c, f"gente:{_normalize(name)}"):
+            continue      # figurante de uma cena só não vira ficha
         violations.append(Violation(
             severity="aviso",
             rule="unsaved_character",
-            message=(f"'{name}' parece ser um personagem novo mas não foi salvo. "
-                     "O agente deveria ter chamado save_character automaticamente."),
+            message=(f"'{name}' já apareceu em {MENCOES_PARA_COBRAR} turnos e "
+                     "continua sem ficha. Registre com save_character — ou com a "
+                     "linha 'gente:' do fechamento do turno."),
             detail=_snippet(response, name),
-            titulo="Gente nova ainda sem ficha",
-            jogador=(f"“{name}” entrou na história agora e ainda não tem ficha na "
-                     "campanha. Pode ser figurante de uma cena só; se essa pessoa "
-                     "voltar, o mestre registra."),
+            titulo="Gente que voltou e ainda não tem ficha",
+            jogador=(f"“{name}” já apareceu mais de uma vez na história e ainda não "
+                     "tem ficha na campanha."),
         ))
 
     return violations
