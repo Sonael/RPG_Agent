@@ -2068,6 +2068,12 @@ def _historico_para_a_tela(historico: list) -> list:
             tipo = _tipo_de_mensagem_interna(e.get("text", ""))
             if tipo:
                 e = {**e, "interno": tipo}
+        # Rede de segurança: mensagem gravada antes de o epílogo tolerar
+        # fechamento truncado carrega o bloco DENTRO dela, e reapareceria na
+        # tela a cada reabertura da campanha (e voltaria ao mestre no recap,
+        # que passa por aqui). O bloco nunca é assunto do jogador.
+        if isinstance(e, dict) and epilogo.ABRE in (e.get("text") or "").lower():
+            e = {**e, "text": epilogo.sem_bloco(e.get("text") or "")}
         saida.append(e)
     return saida
 

@@ -140,6 +140,17 @@ def campanha():
     memory.campaign["characters"] = {}
     memory.campaign["party"] = []
     memory.campaign["protagonist"] = ""
+    # GÊNERO E REGRAS, pelos padrões de memory._defaults().
+    #
+    # Sem isto, um arquivo que ligasse o romance deixava `campaign_type` em
+    # "romance" para todos os arquivos que rodassem depois dele no mesmo
+    # processo — e como o gênero muda o que a ficha mostra (a atitude some no
+    # romance), a falha saía num teste de fantasia que não tinha nada a ver.
+    # Em série a ordem era estável e ninguém via; com os arquivos em paralelo,
+    # a vizinhança mudou e o problema apareceu, intermitente.
+    padroes = memory._defaults()
+    memory.campaign["campaign_type"] = padroes["campaign_type"]
+    memory.campaign["dnd_mode"] = padroes["dnd_mode"]
     memory.campaign["combat_state"] = {
         "is_active": False, "initiative_order": [], "current_turn_index": 0,
         "round": 1, "turn_resolved": False, "npc_strategies": {},

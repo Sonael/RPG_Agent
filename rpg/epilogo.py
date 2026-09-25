@@ -45,10 +45,33 @@ ABRE = "[[registro]]"
 FECHA = "[[/registro]]"
 
 # Tolerante: cerca de markdown em volta, espaço sobrando, caixa trocada.
+#
+# E tolerante ao fechamento QUE NÃO VEIO. O bloco é a última coisa que o
+# mestre escreve, então é o primeiro pedaço a morrer quando a resposta bate no
+# teto de tokens: o que chega termina em "[[/registro" ou no meio de uma
+# linha. Exigindo o marcador exato, nada casava — e a resposta INTEIRA, com o
+# bloco à mostra, ia para a tela e para o histórico, onde reaparecia a cada
+# vez que o jogador abria a campanha. Aconteceu numa partida de verdade.
+#
+# Agora o fecho é opcional: sem ele, o bloco vai do "[[registro]]" até o fim
+# do texto. É sempre o certo a fazer — depois do marcador de abertura não há
+# mais narração, só campos, e os que chegaram continuam valendo.
 _BLOCO_RE = re.compile(
-    r"`{0,3}\s*\[\[\s*registro\s*\]\]\s*(.*?)\s*\[\[\s*/\s*registro\s*\]\]\s*`{0,3}",
+    r"`{0,3}\s*\[\[\s*registro\s*\]\]\s*(.*?)"
+    r"(?:\s*\[\[\s*/\s*registro\s*\]?\]?\s*`{0,3}|\s*$)",
     re.IGNORECASE | re.DOTALL,
 )
+
+
+def sem_bloco(texto: str) -> str:
+    """
+    O texto sem nenhum bloco de fechamento.
+
+    Rede de segurança para o histórico: mensagem gravada ANTES desta tolerância
+    existir carrega o bloco dentro dela, e sem isto continuaria aparecendo na
+    tela a cada reabertura da campanha — e voltando ao mestre no recap.
+    """
+    return _BLOCO_RE.sub("", texto or "").strip()
 
 CAMPOS = ("local", "tempo", "lugar", "gente", "fato", "relacao", "cena",
           "capitulo", "diario")

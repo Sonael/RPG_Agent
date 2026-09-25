@@ -49,6 +49,14 @@ def test_o_bloco_nao_chega_ao_jogador():
     "```\n[[registro]]\nlocal: Ponte Quebrada\n[[/registro]]\n```",
     "[[ REGISTRO ]]\n- Local: Ponte Quebrada\n[[ /registro ]]",
     "[[registro]]\nlocal:   Ponte Quebrada   \nfato: -\n[[/registro]]",
+    # O bloco é a última coisa que o mestre escreve, então é o primeiro
+    # pedaço a morrer quando a resposta bate no teto de tokens. Aconteceu
+    # numa partida de verdade: o fecho veio como "[[/registro", nada casou, e
+    # a resposta INTEIRA foi para a tela e para o histórico.
+    "[[registro]]\nlocal: Ponte Quebrada\n[[/registro",
+    "[[registro]]\nlocal: Ponte Quebrada\n[[/registro]",
+    "[[registro]]\nlocal: Ponte Quebrada",
+    "[[registro]]\nlocal: Ponte Quebrada\ntempo: 2h — viag",
 ])
 def test_formatos_tortos_ainda_sao_lidos(bloco):
     limpo, campos = epilogo.extrair("A ponte range.\n" + bloco)
@@ -246,6 +254,41 @@ def test_processar_limpa_o_texto_e_registra(mesa):
     assert memory.campaign["relogio"]["hora"] == 10
     assert "ponte quebrada" in memory.campaign["locations"]
     assert "aldric" in memory.campaign["characters"]
+
+
+def test_resposta_cortada_no_meio_do_bloco_nao_vaza(mesa):
+    """
+    O caso real: a resposta bateu no teto de tokens no meio do fechamento. O
+    jogador viu "[[Registro]] local: Salão da Guilda... [[/registro" no chat,
+    e como aquilo foi para o histórico, reaparecia a cada reabertura.
+    """
+    texto = ("Aldric aponta para a Ponte Quebrada.\n\n"
+             "[[registro]]\n"
+             "local: Ponte Quebrada\n"
+             "tempo: 2h — viagem pela trilha\n"
+             "gente: Aldric — ferreiro da vi")
+    limpo, registro = epilogo.processar(texto)
+
+    assert limpo == "Aldric aponta para a Ponte Quebrada."
+    assert "registro" not in limpo.lower()
+    assert registro["tinha_bloco"] is True
+    # E o que CHEGOU continua valendo: metade de um bloco é melhor que nada.
+    assert memory.campaign["current_location"] == "Ponte Quebrada"
+    assert memory.campaign["relogio"]["hora"] == 10
+
+
+def test_o_historico_nao_mostra_bloco_gravado_antes(mesa):
+    """
+    Rede de segurança para o que já está gravado: as mensagens antigas
+    carregam o bloco dentro delas e passariam a limpo pela tela e pelo recap.
+    """
+    import server
+
+    hist = [{"role": "assistant",
+             "text": "A guilda ferve.\n[[registro]]\nlocal: Valenport\n[[/registro"}]
+    tela = server._historico_para_a_tela(hist)
+    assert tela[0]["text"] == "A guilda ferve."
+    assert "registro" not in tela[0]["text"].lower()
 
 
 def test_bloco_torto_nao_derruba_o_turno(mesa):
