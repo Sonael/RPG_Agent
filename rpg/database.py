@@ -165,9 +165,15 @@ def versao_de(data: dict):
 #     );
 #     create index if not exists historico_mensagens_campanha
 #       on historico_mensagens (user_id, campaign_name, ordem desc);
+#     create extension if not exists pg_trgm;
 #     create index if not exists historico_mensagens_busca
-#       on historico_mensagens using gin (to_tsvector('portuguese', content));
+#       on historico_mensagens using gin (content gin_trgm_ops);
 #     alter table historico_mensagens enable row level security;
+#
+# O índice de busca é de TRIGRAMA, e não de to_tsvector: `historico_busca`
+# procura com ILIKE '%termo%' — busca literal, que acha "cavalo" dentro de
+# "cavalos" e não depende de dicionário de idioma. Um índice de tsvector não
+# serve a esse operador e ficaria parado.
 #
 # ENQUANTO O SQL NÃO RODAR, nada muda: a primeira tentativa falha, o módulo
 # anota isso e a conversa continua na coluna `historico`, como está hoje. É a
