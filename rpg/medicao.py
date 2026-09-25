@@ -62,6 +62,26 @@ def cobrancas_do_jogador(texto: str) -> list[str]:
 # de OBRIGAR alguma coisa, é preciso saber se foi uma vez ou se é a regra.
 # Estas duas funções só anotam; quem decide continua sendo o mestre.
 
+def registrar_conflito(campanha: str, esperada, encontrada) -> None:
+    """
+    Duas gravações da mesma campanha se atropelaram (ver database).
+    Uma linha por vez que acontece: é com isso que se decide se vale recusar
+    a segunda gravação ou fundir as duas — hoje ela passa, e alguém perde
+    silenciosamente o que a outra aba fez.
+    """
+    if os.environ.get("MEDICAO_DESLIGADA"):
+        return
+    try:
+        linha = {"quando": time.strftime("%Y-%m-%dT%H:%M:%S"),
+                 "campanha": campanha, "conflito": {"esperada": esperada,
+                                                    "encontrada": encontrada}}
+        ARQUIVO.parent.mkdir(parents=True, exist_ok=True)
+        with ARQUIVO.open("a", encoding="utf-8") as saida:
+            saida.write(json.dumps(linha, ensure_ascii=False) + "\n")
+    except Exception:
+        pass
+
+
 def _caderno() -> dict:
     return memory.campaign.setdefault("_encontro", {})
 

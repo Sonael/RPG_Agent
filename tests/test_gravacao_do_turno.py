@@ -31,9 +31,11 @@ def banco(monkeypatch):
     """Conta o que sai para o banco, sem sair para o banco."""
     conta = {"gravacoes": 0, "leituras": 0, "ultimo": None}
 
-    def _save(uid, name, data):
+    def _save(uid, name, data, versao_esperada=None):
         conta["gravacoes"] += 1
         conta["ultimo"] = data
+        conta["versao_pedida"] = versao_esperada
+        return (versao_esperada or 0) + 1
 
     def _get(uid, name):
         conta["leituras"] += 1
@@ -191,3 +193,64 @@ def test_o_chat_abre_o_escopo_no_turno():
     assert "memory.gravacao_adiada()" in fonte
     # O escopo tem de envolver o turno INTEIRO, não um pedaço.
     assert "yield from _turno()" in fonte
+
+
+# ---------------------------------------------------------------------------
+# Escrita perdida: o conflito deixa de ser invisível
+# ---------------------------------------------------------------------------
+
+def test_a_sessao_devolve_a_versao_que_leu(banco):
+    memory.save_campaign()
+    assert banco["versao_pedida"] is None       # primeira gravação da sessão
+    memory.save_campaign()
+    assert banco["versao_pedida"] == 1          # agora sabe em que versão está
+
+
+def test_fechar_a_sessao_esquece_a_versao(banco):
+    """
+    Sem isto, a sessão seguinte começaria achando estar numa versão que não
+    leu — e a primeira gravação dela pareceria um conflito que não houve.
+    """
+    memory.save_campaign()
+    memory.save_campaign()
+    assert banco["versao_pedida"] == 1
+    memory.unbind("u-teste")
+    memory.bind("u-teste", "Campanha de Teste")
+    memory.campaign.update({"name": "Campanha de Teste",
+                            "characters": {"a": {"name": "A"}}})
+    memory.save_campaign()
+    assert banco["versao_pedida"] is None
+
+
+def test_conflito_e_anotado_e_o_turno_nao_se_perde(banco, monkeypatch, tmp_path):
+    """
+    Duas abas se atropelaram. O turno do jogador é gravado assim mesmo — ele
+    já leu a cena na tela, e recusar aqui jogaria fora o que ele acabou de
+    jogar. O que muda é que o atropelo passa a EXISTIR: no log e na medição.
+    """
+    import json
+
+    from rpg import database, medicao
+
+    monkeypatch.setattr(medicao, "ARQUIVO", tmp_path / "medicao.jsonl")
+    monkeypatch.delenv("MEDICAO_DESLIGADA", raising=False)
+
+    tentativas = {"n": 0}
+
+    def _save(uid, name, data, versao_esperada=None):
+        tentativas["n"] += 1
+        if versao_esperada is not None and tentativas["n"] == 1:
+            raise database.ConflitoDeGravacao(versao_esperada, 99)
+        banco["gravacoes"] += 1
+        banco["ultimo"] = data
+        return 100
+
+    memory.save_campaign()          # fixa a versão desta sessão
+    banco["gravacoes"] = 0
+    monkeypatch.setattr(database, "save_campaign", _save)
+    memory.save_campaign()
+
+    assert banco["gravacoes"] == 1, "o turno do jogador não pode evaporar"
+    linhas = [json.loads(l) for l in
+              (tmp_path / "medicao.jsonl").read_text(encoding="utf-8").splitlines()]
+    assert linhas[-1]["conflito"] == {"esperada": 1, "encontrada": 99}

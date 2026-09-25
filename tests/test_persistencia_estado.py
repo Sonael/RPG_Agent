@@ -96,8 +96,12 @@ def test_o_ciclo_completo_preserva_missao_e_relogio(campanha, monkeypatch):
     banco = {}
     from rpg import database
 
-    monkeypatch.setattr(database, "save_campaign",
-                        lambda uid, nome, dados: banco.__setitem__((uid, nome), dados))
+    # A assinatura real ganhou `versao_esperada` (trava contra escrita perdida)
+    # e devolve a versão gravada — o dublê acompanha.
+    monkeypatch.setattr(
+        database, "save_campaign",
+        lambda uid, nome, dados, versao_esperada=None: (
+            banco.__setitem__((uid, nome), dados), (versao_esperada or 0) + 1)[1])
     monkeypatch.setattr(database, "get_campaign",
                         lambda uid, nome: banco.get((uid, nome)))
     memory.bind("u1", "Ciclo")

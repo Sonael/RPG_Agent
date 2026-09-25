@@ -57,6 +57,9 @@ _FALLBACK_KEY = "__no_session__"
 # copiado para lá não devolveria a marca para quem fecha o escopo.
 _ADIADAS: set[str] = set()      # sessões com gravação adiada agora
 _SUJAS: set[str] = set()        # sessões com mudança esperando flush
+# session_key -> versão da campanha que ESTA sessão leu do banco. É o que
+# permite descobrir que outra aba gravou por cima (ver database.CAMPO_VERSAO).
+_VERSAO: dict[str, int] = {}
 
 
 def _session_key(user_id: str, campaign_name: str) -> str:
@@ -112,6 +115,12 @@ def unbind(user_id: str) -> None:
     if key:
         _STORE.pop(key, None)
         _META.pop(key, None)
+        # A versão lida morre com a sessão. Sem isto, a sessão seguinte
+        # começaria achando que está numa versão que não leu — e a primeira
+        # gravação dela pareceria um conflito que não houve.
+        _VERSAO.pop(key, None)
+        _SUJAS.discard(key)
+        _ADIADAS.discard(key)
     # Também descarta o slot transitório "__none__" do usuário, se houver.
     _STORE.pop(_session_key(user_id, "__none__"), None)
     _active_key.set(None)
@@ -614,6 +623,10 @@ def load_campaign() -> bool:
             campaign["name"] = name
             return False
 
+        # A versão lida fica guardada POR SESSÃO, fora do documento: é com ela
+        # que a próxima gravação prova que ninguém escreveu no meio do caminho.
+        _VERSAO[_active_key.get() or _FALLBACK_KEY] = database.versao_de(data)
+
         defaults = _defaults()
         reset_campaign()
 
@@ -736,8 +749,30 @@ def _persistir(chave: str) -> None:
         return
 
     try:
-        database.save_campaign(uid, name, dict(camp))
+        _VERSAO[chave] = database.save_campaign(uid, name, dict(camp),
+                                                _VERSAO.get(chave))
         print(f"Campanha '{camp['name']}' persistida no Supabase.")
+    except database.ConflitoDeGravacao as conflito:
+        # Outra aba (ou outra tela) gravou esta campanha depois de esta sessão
+        # tê-la lido. Até aqui isso acontecia em silêncio e alguém perdia o
+        # turno sem nunca saber.
+        #
+        # O turno continua sendo gravado, DE PROPÓSITO: recusar agora jogaria
+        # fora a cena que o jogador acabou de jogar e já leu na tela. O que
+        # muda é que o fato passa a existir — no log e na medição. Com número
+        # na mão dá para decidir se vale recusar, ou fundir as duas versões.
+        print(f"[CONFLITO] '{camp['name']}': {conflito}. Outra aba gravou "
+              f"depois desta sessão ler. Gravando assim mesmo.")
+        try:
+            from rpg import medicao
+            medicao.registrar_conflito(camp.get("name", ""), conflito.esperada,
+                                       conflito.encontrada)
+        except Exception:
+            pass
+        try:
+            _VERSAO[chave] = database.save_campaign(uid, name, dict(camp))
+        except Exception as e:
+            print(f"Erro crítico ao salvar no Supabase: {e}")
     except Exception as e:
         print(f"Erro crítico ao salvar no Supabase: {e}")
 

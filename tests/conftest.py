@@ -48,11 +48,23 @@ def _stub_database() -> None:
         return
     db = types.ModuleType("rpg.database")
     db.get_campaign    = lambda *a, **k: None
-    db.save_campaign   = lambda *a, **k: None
+    # Devolve a versão gravada, como o módulo de verdade (ver database.py).
+    db.save_campaign   = lambda *a, **k: 1
     db.list_campaigns  = lambda *a, **k: []
     db.delete_campaign = lambda *a, **k: None
     db.rename_campaign = lambda *a, **k: None
     db.campaign_exists = lambda *a, **k: False
+    db.versao_de       = lambda data: (data or {}).get("_version")
+    db.CAMPO_VERSAO    = "_version"
+
+    # O dublê precisa expor a MESMA superfície do módulo real: memory captura
+    # esta exceção ao gravar, e um dublê sem ela quebra todo teste que salva.
+    class ConflitoDeGravacao(Exception):
+        def __init__(self, esperada=None, encontrada=None):
+            super().__init__(f"versão esperada {esperada}, encontrada {encontrada}")
+            self.esperada, self.encontrada = esperada, encontrada
+
+    db.ConflitoDeGravacao = ConflitoDeGravacao
     rpg.registrar_duble("database", db)
 
 
