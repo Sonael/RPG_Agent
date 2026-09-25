@@ -269,3 +269,53 @@ def test_campanha_importada_mantem_o_relogio_que_trouxe():
     vinda = server._payload_de_campanha("Vinda", {"campaign_type": "fantasia",
                                                   "relogio": {"dia": 12, "hora": 21}}, {})
     assert vinda["relogio"] == {"dia": 12, "hora": 21}
+
+
+# ---------------------------------------------------------------------------
+# O romance não pode ter tela de fantasia
+# ---------------------------------------------------------------------------
+# "no modo de romance ainda tem muitas coisas relacionadas ao modo de fantasia:
+# no menu tem como escolher a tela tática; na aba tramas tem o botão nova
+# missão." São duas coisas diferentes: uma tela de COMBATE num gênero sem
+# combate, e o VOCABULÁRIO da fantasia numa tela que já tinha outro nome.
+
+def test_cada_genero_tem_o_nome_da_coisa_no_singular():
+    """
+    A tela já trocava o TÍTULO por gênero ("As Tramas"), mas os botões
+    continuavam dizendo "Nova missão" — dentro de uma tela chamada Tramas.
+    O nome no singular é o que faltava para os rótulos.
+    """
+    esperado = {"fantasia": "missão", "romance": "trama",
+                "misterio": "caso", "scifi": "contrato"}
+    for genero, palavra in esperado.items():
+        cfg = agent.get_campaign_config(genero)
+        assert cfg["telas"].get("uma_missao") == palavra, genero
+
+
+def test_todo_genero_sabe_dizer_a_coisa_no_singular():
+    for genero in agent.CAMPAIGN_CONFIGS:
+        cfg = agent.get_campaign_config(genero)
+        assert cfg["telas"].get("uma_missao"), genero
+
+
+def test_a_tela_de_missoes_usa_o_nome_do_genero_nos_botoes():
+    from pathlib import Path
+    js = (Path(__file__).resolve().parents[1] / "static" / "js" / "missoes.js"
+          ).read_text(encoding="utf-8")
+    assert "uma_missao" in js, "a tela não lê o nome do gênero"
+    assert "Criar missão" not in js
+    assert "Criar ${uma()}" in js and "Nova ${uma()}" in js
+
+
+def test_o_modo_de_combate_so_aparece_onde_ha_regras():
+    """
+    "Tela tática" na engrenagem de uma campanha de romance era um botão que o
+    jogador não tinha como usar. A visibilidade é decidida no render, e não na
+    montagem: o painel é montado no início da sessão, antes de o gênero ter
+    chegado.
+    """
+    from pathlib import Path
+    js = (Path(__file__).resolve().parents[1] / "static" / "js" / "barra.js"
+          ).read_text(encoding="utf-8")
+    assert "settings-combate" in js
+    assert "q('settings-combate')?.classList.toggle('hidden', !ehDnd())" in js

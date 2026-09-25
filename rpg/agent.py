@@ -57,6 +57,7 @@ CAMPAIGN_CONFIGS = {
         "role_examples":  "guerreira, mago, ladino, curandeiro...",
         "flag_hint":      "Ex: portao_aberto=sim, dragao_derrotado=true",
         "telas": {"grupo": "Grupo", "missoes": "Missões", "titulo_missoes": "O Livro de Missões",
+                  "uma_missao": "missão",
                   "mapa": "Mapa", "titulo_mapa": "O Mapa",
                   "mundo": "Mundo"},
     },
@@ -67,6 +68,7 @@ CAMPAIGN_CONFIGS = {
         "role_examples":  "mercenária, caçador de bruxas, clérigo renegado, alquimista...",
         "flag_hint":      "Ex: pacto_selado=sim, aldeia_queimada=true",
         "telas": {"grupo": "Companhia", "missoes": "Missões", "titulo_missoes": "O Livro de Missões",
+                  "uma_missao": "missão",
                   "mapa": "Mapa", "titulo_mapa": "O Mapa",
                   "mundo": "Mundo"},
     },
@@ -77,6 +79,7 @@ CAMPAIGN_CONFIGS = {
         "role_examples":  "interesse romântico, melhor amigo, rival, mentor...",
         "flag_hint":      "Ex: primeiro_beijo=sim, segredo_revelado=nao",
         "telas": {"grupo": "Próximos", "missoes": "Tramas", "titulo_missoes": "As Tramas",
+                  "uma_missao": "trama",
                   "mapa": "Lugares", "titulo_mapa": "Os Lugares",
                   "tela_do_grupo": "relacoes"},
         # No romance não há "grupo": há você e as pessoas do seu círculo. As
@@ -107,6 +110,7 @@ CAMPAIGN_CONFIGS = {
         "role_examples":  "líder, cético, especialista, ferido...",
         "flag_hint":      "Ex: monstro_avistado=sim, luz_quebrada=true",
         "telas": {"grupo": "Sobreviventes", "missoes": "Objetivos", "titulo_missoes": "Os Objetivos",
+                  "uma_missao": "objetivo",
                   "mapa": "Mapa", "titulo_mapa": "O Mapa"},
     },
     "misterio": {
@@ -116,6 +120,7 @@ CAMPAIGN_CONFIGS = {
         "role_examples":  "detetive, informante, suspeito, testemunha...",
         "flag_hint":      "Ex: pista_encontrada=sim, suspeito_eliminado=carlos",
         "telas": {"grupo": "Aliados", "missoes": "Casos", "titulo_missoes": "Os Casos",
+                  "uma_missao": "caso",
                   "mapa": "Mapa", "titulo_mapa": "O Mapa"},
     },
     "scifi": {
@@ -125,6 +130,7 @@ CAMPAIGN_CONFIGS = {
         "role_examples":  "hacker, piloto, médico, mercenário...",
         "flag_hint":      "Ex: nave_hackeada=sim, corporacao_inimiga=arasaka",
         "telas": {"grupo": "Tripulação", "missoes": "Contratos", "titulo_missoes": "Os Contratos",
+                  "uma_missao": "contrato",
                   "mapa": "Mapa", "titulo_mapa": "O Mapa"},
     },
     "faroeste": {
@@ -134,6 +140,7 @@ CAMPAIGN_CONFIGS = {
         "role_examples":  "pistoleiro, xerife, buscador, curandeiro...",
         "flag_hint":      "Ex: recompensa_ativa=sim, xerife_corrupto=true",
         "telas": {"grupo": "Comparsas", "missoes": "Serviços", "titulo_missoes": "Os Serviços",
+                  "uma_missao": "serviço",
                   "mapa": "Mapa", "titulo_mapa": "O Mapa"},
     },
     "dnd": {

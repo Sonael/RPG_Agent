@@ -65,6 +65,41 @@ def _num(valor) -> int:
         return 0
 
 
+# ---------------------------------------------------------------------------
+# Custa mais quanto mais longe já se está
+# ---------------------------------------------------------------------------
+# Medido numa partida: um elogio e uma conversa sincera levaram Selene → Helena
+# de +30 a +45 e Helena → Selene de +5 a +20, no mesmo turno. Nesse ritmo,
+# "inseparáveis" (+60) chega em quatro cenas e +100 em sete — e o número que
+# devia contar anos de convivência vira um contador de gentilezas.
+#
+# O passo escrito pelo mestre continua sendo a INTENÇÃO ("isto foi grande, isto
+# foi pequeno"). O que muda é o preço: afastar-se do meio custa mais quanto
+# mais longe já se está. De 0, o passo vale inteiro; de +50, metade; de +90,
+# um décimo. Voltar em direção ao meio NÃO é freado — uma traição desfaz anos
+# numa cena, e é assim que tem de ser.
+#
+# O mínimo de 1 é para a relação nunca travar: mesmo em +95, um gesto ainda
+# move. Só que agora chegar a 100 é obra de campanha, não de tarde.
+
+def passo_efetivo(atual: int, delta: int) -> int:
+    """O quanto a relação anda de verdade, dado onde ela já está."""
+    try:
+        delta = int(delta)
+    except (TypeError, ValueError):
+        return 0
+    if delta == 0:
+        return 0
+    atual = _num(atual)
+    # Voltando para o meio (sinais opostos): sem freio.
+    if (delta > 0) != (atual >= 0):
+        return delta
+    # Conta inteira de propósito: `20 * (1 - 90/100)` dá 1,9999… em float, e
+    # o passo de +20 a partir de +90 virava 1 em vez de 2.
+    andado = abs(delta) * (100 - abs(atual)) // 100 or 1
+    return andado if delta > 0 else -andado
+
+
 def _texto(s) -> str:
     return " ".join(str(s or "").split())
 
@@ -122,10 +157,13 @@ def _escrever(de: str, para: str, valor=None, delta=None, motivo: str = "") -> s
     antes = _num(atual.get("valor"))
 
     if valor is not None:
+        # `definir` põe o número exato: é a tela de edição, e o jogador que
+        # digita 80 quer 80. O freio vale para o passo narrado, não para a
+        # mão de quem edita.
         novo = _num(valor)
     else:
         try:
-            novo = _num(antes + int(delta))
+            novo = _num(antes + passo_efetivo(antes, delta))
         except (TypeError, ValueError):
             return "Erro: a mudança precisa ser um número."
 

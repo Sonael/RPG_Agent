@@ -56,7 +56,7 @@
           <h1 class="lcl-title" id="msn-titulo">O Livro de Missões</h1>
           <div id="msn-abas" class="msn-abas" role="tablist"></div>
           <button id="msn-nova-btn" class="lcl-btn lcl-btn-sec msn-nova-btn" type="button"
-                  onclick="window.Missoes._nova()">Nova missão</button>
+                  onclick="window.Missoes._nova()">Nova missão</button><!-- o rótulo do gênero entra em abrir() -->
         </header>
         <div id="msn-lista" class="msn-lista"></div>
         <div class="lcl-rodape">
@@ -150,10 +150,17 @@
       </article>`;
   }
 
+  // O nome desta coisa no gênero da campanha: "missão" na fantasia, "trama"
+  // no romance, "caso" no mistério. A tela já trocava o TÍTULO, mas os botões
+  // e os rótulos continuavam falando de missão — no romance, uma tela chamada
+  // Tramas com o botão "Nova missão".
+  const uma = () => (window.nomeDaTela ? window.nomeDaTela('uma_missao', 'missão') : 'missão');
+  const Uma = () => { const n = uma(); return n.charAt(0).toUpperCase() + n.slice(1); };
+
   function formularioNova() {
     return `
       <article class="lcl-item msn-cartao msn-editando msn-nova">
-        <div class="lcl-item-cabeca"><span class="lcl-item-nome">Missão sua</span></div>
+        <div class="lcl-item-cabeca"><span class="lcl-item-nome">${Uma()} sua</span></div>
         ${campo('Título', 'msn-nv-titulo', '')}
         ${campo('Descrição', 'msn-nv-descricao', '', 'textarea')}
         ${campo('Objetivos (um por linha ou separados por ;)', 'msn-nv-objetivos', '', 'textarea')}
@@ -162,7 +169,7 @@
           ${campo('Encomendada por', 'msn-nv-quem', '')}
         </div>
         <div class="lcl-item-acoes">
-          <button class="lcl-btn lcl-btn-ir" type="button" onclick="window.Missoes._criar()">Criar missão</button>
+          <button class="lcl-btn lcl-btn-ir" type="button" onclick="window.Missoes._criar()">Criar ${uma()}</button>
           <button class="lcl-btn lcl-btn-sec" type="button" onclick="window.Missoes._cancelar()">Cancelar</button>
         </div>
       </article>`;
@@ -189,12 +196,12 @@
     const acoes = [];
     if (ativa && m.pronta_para_entregar && m.quem_deu) {
       acoes.push(`<button class="lcl-btn lcl-btn-ir"
-        title="Manda ao mestre: Quero falar com ${esc(m.quem_deu.nome)} sobre a missão."
+        title="Manda ao mestre: Quero falar com ${esc(m.quem_deu.nome)} sobre a ${uma()}."
         onclick="window.Missoes._entregar('${aspas(m.titulo)}','${aspas(m.quem_deu.nome)}')">Falar com ${esc(m.quem_deu.nome)}</button>`);
     }
     if (ativa) {
       acoes.push(`<button class="lcl-btn lcl-btn-sec msn-editar" type="button"
-        title="Editar esta missão" onclick="window.Missoes._editar('${aspas(m.titulo)}')">Editar</button>`);
+        title="Editar esta ${uma()}" onclick="window.Missoes._editar('${aspas(m.titulo)}')">Editar</button>`);
       const confirmando = _confirmandoAbandono === m.titulo;
       acoes.push(`<button class="lcl-btn lcl-btn-sec msn-abandonar${confirmando ? ' msn-confirmar' : ''}"
         onclick="window.Missoes._abandonar('${aspas(m.titulo)}')">${confirmando ? 'Confirmar abandono' : 'Abandonar'}</button>`);
@@ -246,6 +253,10 @@
   async function abrir(titulo) {
     ensureDom();
     q('msn-titulo').textContent = window.nomeDaTela('titulo_missoes', 'O Livro de Missões');
+    // A cada abertura, e não na montagem: a tela é montada uma vez só, e o
+    // gênero da campanha pode não ter chegado ainda naquele instante.
+    const botaoNova = q('msn-nova-btn');
+    if (botaoNova) botaoNova.textContent = `Nova ${uma()}`;
     _confirmandoAbandono = '';
     _editando = '';
     _criando = false;

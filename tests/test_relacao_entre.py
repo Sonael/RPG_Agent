@@ -81,11 +81,52 @@ def test_o_valor_acumula_e_guarda_o_porque(campanha):
     entre.ajustar("Helena", "Selene", -20, "o controle velado")
     entre.ajustar("Helena", "Selene", -15, "de novo, na frente de todos")
     r = entre.de_quem("Helena")[0]
-    assert r["valor"] == -35
+    # O segundo passo já não vale inteiro: de -20, afastar-se mais custa 20%
+    # a mais (ver entre.passo_efetivo). -20 + int(-15 × 0,8) = -32.
+    assert r["valor"] == -32
     assert r["rotulo"] == "atrito"
-    assert [h["delta"] for h in r["historico"]] == [-15, -20]
+    assert [h["delta"] for h in r["historico"]] == [-12, -20]
     assert "na frente de todos" in r["historico"][0]["motivo"]
     assert r["historico"][0]["capitulo"] == 2
+
+
+# ---------------------------------------------------------------------------
+# Custa mais quanto mais longe já se está
+# ---------------------------------------------------------------------------
+# Medido numa partida: um elogio e uma conversa sincera levaram Selene → Helena
+# de +30 a +45 e Helena → Selene de +5 a +20, no mesmo turno. Nesse ritmo,
+# "inseparáveis" (+60) chega em quatro cenas e +100 em sete. "Está muito fácil
+# subir as relações, qualquer coisinha já sobe."
+
+@pytest.mark.parametrize("atual, delta, esperado", [
+    (0,   20,  20),    # do meio, o passo vale inteiro
+    (50,  20,  10),    # na metade do caminho, metade
+    (90,  20,   2),    # quase no fim, quase nada
+    (-50, -20, -10),   # o mesmo do lado do ódio
+    (0,  -20, -20),
+    (95,  10,   1),    # nunca trava: sempre anda ao menos 1
+    (-95, -2,  -1),
+    (0,    0,   0),
+])
+def test_o_passo_custa_mais_quanto_mais_longe(atual, delta, esperado):
+    assert entre.passo_efetivo(atual, delta) == esperado
+
+
+@pytest.mark.parametrize("atual, delta", [(80, -20), (-80, 20), (45, -10)])
+def test_voltar_para_o_meio_nao_tem_freio(atual, delta):
+    """Uma traição desfaz anos numa cena — e é assim que tem de ser."""
+    assert entre.passo_efetivo(atual, delta) == delta
+
+
+def test_chegar_ao_topo_e_obra_de_campanha(campanha):
+    """
+    Antes, sete passos de +15 bastavam para cravar +100. Agora o mesmo
+    esforço encosta em "inseparáveis" e para ali.
+    """
+    for _ in range(7):
+        entre.ajustar("Helena", "Selene", 15, "mais uma gentileza")
+    valor = entre.valor_entre("Helena", "Selene")
+    assert 55 <= valor <= 75, valor
 
 
 def test_definir_poe_o_valor_exato(campanha):
@@ -204,6 +245,73 @@ def test_o_espelho_nao_gasta_o_teto_do_turno(campanha):
         "relação: Sonael → Helena +10 — achou graça"))
     assert entre.valor_entre("Selene", "Helena") == -10
     assert entre.valor_entre("Helena", "Sonael") == 10
+
+
+# ---------------------------------------------------------------------------
+# O mesmo par não muda de novo tão cedo
+# ---------------------------------------------------------------------------
+# Aconteceu numa partida: o jogador pediu OPÇÕES do que fazer. A resposta
+# resumiu a sessão ("a reaproximação sincera entre Helena e Selene") e fechou o
+# turno registrando a relação de novo, por um acontecimento de dois turnos
+# antes. Ao reabrir a campanha, o recap contou a mesma história e ela subiu uma
+# terceira vez.
+
+def test_o_resumo_nao_registra_de_novo_o_que_ja_aconteceu(campanha):
+    epilogo.processar(_bloco("relação: Helena → Selene +20 — a conversa sincera"))
+    memory.avancar_turno()
+
+    _, relatorio = epilogo.processar(
+        _bloco("relação: Helena → Selene +20 — a conversa sincera"))
+
+    assert entre.valor_entre("Helena", "Selene") == 20, "subiu duas vezes"
+    assert any("relacao" in r for r in relatorio["recusados"]), relatorio
+    assert not relatorio["feitos"]
+
+
+def test_a_recusa_diz_quantos_turnos_faltam(campanha):
+    epilogo.processar(_bloco("relação: Helena → Selene +20 — a conversa"))
+    memory.avancar_turno()
+    _, relatorio = epilogo.processar(_bloco("relação: Helena → Selene +20 — a conversa"))
+    texto = " ".join(relatorio["recusados"])
+    assert "2" in texto and "resumindo" in texto, texto
+
+
+def test_a_trava_vale_para_os_dois_sentidos(campanha):
+    """A relação é das duas pessoas: o espelho também fica em espera."""
+    epilogo.processar(_bloco("relação: Helena → Selene +20 — a conversa"))
+    memory.avancar_turno()
+    _, relatorio = epilogo.processar(_bloco("relação: Selene → Helena +20 — a conversa"))
+    assert not relatorio["feitos"], relatorio
+
+
+def test_passados_os_turnos_a_relacao_volta_a_mudar(campanha):
+    epilogo.processar(_bloco("relação: Helena → Selene +20 — a conversa"))
+    for _ in range(epilogo.TURNOS_ENTRE_MUDANCAS):
+        memory.avancar_turno()
+
+    _, relatorio = epilogo.processar(_bloco("relação: Helena → Selene +10 — outra cena"))
+
+    assert relatorio["feitos"], relatorio["recusados"]
+    assert entre.valor_entre("Helena", "Selene") > 20
+
+
+def test_a_ficha_continua_editando_livremente(campanha):
+    """A trava é do fechamento automático; a mão do jogador não espera."""
+    epilogo.processar(_bloco("relação: Helena → Selene +20 — a conversa"))
+    entre.definir("Helena", "Selene", 80, "corrigido pelo jogador")
+    assert entre.valor_entre("Helena", "Selene") == 80
+
+
+def test_a_trava_sobrevive_a_reabrir_a_campanha():
+    """
+    É justamente ao reabrir que o recap repete a cena. Se a marca não for
+    gravada, a trava não existe no turno em que ela mais importa.
+    """
+    assert "_relacao_turno" in memory._defaults()
+
+    import server
+    payload = server._payload_de_campanha("Teste", {}, {})
+    assert "_relacao_turno" in payload
 
 
 @pytest.mark.parametrize("seta", ["->", "→", "<->"])

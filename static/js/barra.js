@@ -442,12 +442,18 @@
     secao.className = 'settings-section';
     secao.innerHTML = `
       <div class="settings-section-title">Esta campanha</div>
-      <div class="settings-subtitulo">Modo de combate</div>
-      <div id="combat-mode-toggle" class="combat-mode-toggle">
-        <button type="button" data-mode="narrado" class="cm-opt active" onclick="setCombatMode('narrado')">Narrado pela IA</button>
-        <button type="button" data-mode="tela" class="cm-opt" onclick="setCombatMode('tela')">Tela tática</button>
+      <!-- Combate só existe onde há regras. No romance, "Tela tática" era um
+           botão que o jogador não tinha como usar. A visibilidade é decidida
+           no render, e não aqui: este painel é montado no início da sessão,
+           antes de a memória (e com ela o gênero) ter chegado. -->
+      <div id="settings-combate" class="hidden">
+        <div class="settings-subtitulo">Modo de combate</div>
+        <div id="combat-mode-toggle" class="combat-mode-toggle">
+          <button type="button" data-mode="narrado" class="cm-opt active" onclick="setCombatMode('narrado')">Narrado pela IA</button>
+          <button type="button" data-mode="tela" class="cm-opt" onclick="setCombatMode('tela')">Tela tática</button>
+        </div>
+        <div id="combat-mode-hint" class="settings-nota"></div>
       </div>
-      <div id="combat-mode-hint" class="settings-nota"></div>
       <div class="settings-subtitulo">Uso do modelo</div>
       <div class="quota-panel settings-quota">
         <div class="quota-linha"><div>Modelo: <span id="sb-model">—</span></div></div>
@@ -507,6 +513,7 @@
 
   function render(mem) {
     _mem = mem || {};
+    q('settings-combate')?.classList.toggle('hidden', !ehDnd());
     renderOnde();
     renderHerois();
     renderMissao();

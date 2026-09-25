@@ -1126,6 +1126,10 @@ def _payload_de_campanha(name: str, dados: dict, personagens: dict) -> dict:
         "bestiario":            _bestiario.importar(dados.get("bestiario")),
         "_turno":               dados.get("_turno", 0),
         "_upkeep":              dados.get("_upkeep", {}),
+        # A trava de "esta relação mudou há pouco" (epilogo). Vem junto para
+        # que a lista branca daqui continue espelhando memory._defaults() —
+        # é a divergência entre as duas que fez a onda 4 perder missões.
+        "_relacao_turno":       dados.get("_relacao_turno", {}),
     }
 
 

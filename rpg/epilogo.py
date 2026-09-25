@@ -92,6 +92,47 @@ _RELACAO_RE = re.compile(
 # Uma cena não vira ódio em amor: o passo de um turno tem teto.
 PASSO_MAXIMO = 30
 
+# ---------------------------------------------------------------------------
+# O mesmo par não muda de novo tão cedo
+# ---------------------------------------------------------------------------
+# Aconteceu numa partida: o jogador pediu ao mestre OPÇÕES do que fazer. A
+# resposta resumiu a sessão ("a reaproximação sincera entre Helena e Selene") e
+# fechou o turno registrando a relação de novo — por um acontecimento de dois
+# turnos antes. Ao reabrir a campanha, o recap contou a mesma história e ela
+# subiu uma terceira vez.
+#
+# A causa é a natureza do fechamento: o mestre anota o que a resposta DIZ, e
+# uma resposta que recapitula diz coisas antigas. Não há como distinguir isso
+# pelo texto com honestidade.
+#
+# A trava é por par: uma relação entre duas pessoas só torna a mudar depois de
+# alguns turnos. Resumo e recap caem nela; a cena seguinte de verdade, não —
+# um turno é uma troca inteira entre jogador e mestre, e três deles são uma
+# cena. Quem edita pela ficha não passa por aqui.
+TURNOS_ENTRE_MUDANCAS = 3
+
+
+def _mudou_ha_pouco(a: str, b: str) -> int:
+    """Quantos turnos faltam para este par poder mudar de novo (0 = pode)."""
+    marcas = memory.campaign.get("_relacao_turno") or {}
+    ultimo = marcas.get(f"{_norm(a)}|{_norm(b)}")
+    if ultimo is None:
+        return 0
+    faltam = TURNOS_ENTRE_MUDANCAS - (memory.turno_atual() - int(ultimo))
+    return max(0, faltam)
+
+
+def _marcar_mudanca(a: str, b: str) -> None:
+    marcas = memory.campaign.setdefault("_relacao_turno", {})
+    if not isinstance(marcas, dict):
+        marcas = {}
+        memory.campaign["_relacao_turno"] = marcas
+    marcas[f"{_norm(a)}|{_norm(b)}"] = memory.turno_atual()
+    # Sem teto, o dicionário cresceria com o número de pares da campanha.
+    if len(marcas) > 80:
+        for k in sorted(marcas, key=marcas.get)[:len(marcas) - 80]:
+            marcas.pop(k, None)
+
 # O nome do campo aceita acento: "relação:" é o que o mestre escreve, e
 # [a-z] deixava a linha inteira de fora sem dizer por quê.
 _LINHA_RE = re.compile(r"^\s*[-*•]?\s*([A-Za-zÀ-ÿ]+)\s*:\s*(.+?)\s*$")
@@ -334,6 +375,13 @@ def aplicar(campos: dict[str, list[str]], narracao: str) -> dict:
         if abs(delta) > PASSO_MAXIMO:
             recusa("relacao", f"{a} → {b}", f"passo maior que {PASSO_MAXIMO} num turno só")
             continue
+        faltam = _mudou_ha_pouco(a, b)
+        if faltam:
+            recusa("relacao", f"{a} → {b}",
+                   f"esta relação mudou há menos de {TURNOS_ENTRE_MUDANCAS} "
+                   f"turnos; ela volta a aceitar em {faltam}. Se você está "
+                   f"resumindo o que já aconteceu, não registre de novo")
+            continue
         linhas.append((a, b, delta, (m.group("motivo") or "").strip(" —–:-")))
 
     escritas = {(_norm(a), _norm(b)) for a, b, _, _ in linhas}
@@ -359,6 +407,8 @@ def aplicar(campos: dict[str, list[str]], narracao: str) -> dict:
             else:
                 feitos.append(f"ajustar_relacao({outro!r},afeto={delta:+d})")
                 avisos.append(resposta)
+                _marcar_mudanca(a, b)
+                _marcar_mudanca(b, a)
             continue
 
         # O espelho só entra quando o mestre NÃO escreveu a volta.
@@ -370,11 +420,13 @@ def aplicar(campos: dict[str, list[str]], narracao: str) -> dict:
                 recusa("relacao", f"{a} → {b}", resposta[6:].strip())
                 continue
             feitos.append(f"relacao({a!r}→{b!r},{delta:+d})")
+            _marcar_mudanca(a, b)
 
             if espelhar:
                 volta = _entre.ajustar(b, a, delta, motivo)
                 if not str(volta).startswith("Erro:"):
                     feitos.append(f"relacao({b!r}→{a!r},{delta:+d})")
+                    _marcar_mudanca(b, a)
 
             # A relação é a única coisa do fechamento que o jogador PROVOCA de
             # propósito ("fiz as duas se elogiarem"). Ela mudava em silêncio, e

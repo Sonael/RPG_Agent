@@ -223,6 +223,13 @@ def _defaults() -> dict:
         "_turno":               0,
         "_upkeep":              {},
         "_pendencias":          [],
+        # Em que turno cada par de pessoas teve a relação mudada pelo
+        # fechamento. É o que impede um resumo (ou o recap de quem reabre a
+        # campanha) de registrar de novo o que já aconteceu — ver
+        # epilogo.TURNOS_ENTRE_MUDANCAS. Precisa sobreviver ao save/load:
+        # sem isso, reabrir a campanha zera a trava justamente no turno em
+        # que ela mais importa.
+        "_relacao_turno":       {},
         # "narrado" = LLM narra turno a turno (padrão, comportamento atual).
         # "tela"    = combate resolvido na tela tática; LLM só emoldura.
         "combat_mode":          "narrado",

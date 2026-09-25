@@ -652,11 +652,34 @@ def test_descanso_a_vida_sobe_e_o_dado_se_esvazia(app_no_ar, abrir):
     try:
         pg.wait_for_selector("#rest-overlay:not(.hidden) .rst-card[data-nome='Helena']", timeout=8000)
         assert pg.locator("#rest-overlay .rst-brasas i").count() == 6
+        # As classes de animação são TRANSITÓRIAS: elas entram, o quadro
+        # roda e elas saem. Lê-las depois do fato é uma corrida — com a
+        # máquina carregada (a suíte roda os arquivos em paralelo), o teste
+        # chegava tarde e acusava uma animação que tinha acontecido. Quem
+        # não perde o instante é o observador, como no resto do arquivo.
+        pg.evaluate("""() => {
+          window.__vistas = new Set();
+          new MutationObserver(ms => ms.forEach(m => {
+            const alvo = m.target;
+            if (!alvo.classList) return;
+            if (alvo.classList.contains('rst-pips') && alvo.classList.contains('num-desceu'))
+              window.__vistas.add('pips-desceu');
+            if (alvo.dataset && /:vida$/.test(alvo.dataset.num || '')
+                && alvo.classList.contains('num-subiu'))
+              window.__vistas.add('vida-subiu');
+          })).observe(document, {attributes: true, attributeFilter: ['class'], subtree: true});
+        }""")
         pg.evaluate("() => window.Rest._dado('Helena')")
         pg.wait_for_selector(".rst-card[data-nome='Helena'] .rst-gastos:not(:empty)", timeout=8000)
         cartao = pg.locator(".rst-card[data-nome='Helena']")
-        assert "num-subiu" in cartao.locator("[data-num$=':vida']").get_attribute("class")
-        assert "num-desceu" in cartao.locator(".rst-pips").get_attribute("class")
+
+        def animou(marca, seletor, classe):
+            if pg.evaluate(f"() => window.__vistas.has('{marca}')"):
+                return True
+            return classe in (cartao.locator(seletor).get_attribute("class") or "")
+
+        assert animou("vida-subiu", "[data-num$=':vida']", "num-subiu")
+        assert animou("pips-desceu", ".rst-pips", "num-desceu")
         assert not erros, erros[:3]
     finally:
         voltar()
