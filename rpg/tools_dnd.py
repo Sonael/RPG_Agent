@@ -5449,6 +5449,107 @@ def _bonus_magico_da_arma(char: dict, weapon: str) -> int:
     return 0
 
 
+# ── O QUE A ARMA CARREGA ALÉM DO CORTE ────────────────────────────────────
+# A adaga besuntada de veneno e a espada que o ferreiro encantou eram, para o
+# motor, adaga e espada: a descrição era enfeite. Agora o que está ESCRITO no
+# item acontece — um dado extra do seu tipo e, se for o caso, uma condição
+# com teste de resistência.
+#
+# Por que ler da descrição em vez de criar uma ferramenta nova: a mesa do
+# mestre já tem mais de cem, e a lição medida neste projeto é que ferramenta
+# a mais é ferramenta esquecida. Ele já escreve a descrição — no add_item, na
+# loja, quando o ferreiro devolve a lâmina. Escrever passa a bastar.
+#
+# O TETO existe porque essa mesma facilidade é a porta de "espada +5d6": duas
+# faces de d8 no máximo, que é o rider de um item mágico de verdade
+# (Flame Tongue é 2d6).
+_RIDER_MAX_DADOS, _RIDER_MAX_FACES = 2, 8
+
+_RIDER_DANO = re.compile(
+    r"(\d)\s*d\s*(\d{1,2})\s*(?:de\s+)?(?:dano\s+)?(?:de\s+|d[eo]\s+)?"
+    r"(fogo|gelo|frio|[áa]cido|veneno|el[ée]trico|rel[âa]mpago|radiante|"
+    r"necr[óo]tico|ps[íi]quico|trovejante|for[çc]a|sagrado)",
+    re.IGNORECASE)
+_RIDER_CONDICAO = re.compile(
+    r"\b(?:fica|ficar|deixa|aplica|causa|torna|imp[õo]e)\w*\b[^.;]{0,40}?"
+    r"\b(envenenad\w+|ceg\w+|paralisad\w+|queimand\w+|amedrontad\w+|atordoad\w+|"
+    r"imobilizad\w+|surd\w+|ca[íi]d\w+|incapacitad\w+)\b",
+    re.IGNORECASE)
+_RIDER_CD = re.compile(
+    r"\bCD\s*(\d{1,2})\b[^.;]{0,25}?\b(CON|DES|FOR|SAB|INT|CAR|constitui\w*|destreza|"
+    r"for[çc]a|sabedoria|intelig\w*|carisma)\b"
+    r"|\b(CON|DES|FOR|SAB|INT|CAR|constitui\w*|destreza|for[çc]a|sabedoria|intelig\w*|"
+    r"carisma)\b[^.;]{0,25}?\bCD\s*(\d{1,2})\b",
+    re.IGNORECASE)
+_RIDER_ATRIBUTO = {
+    "con": "constituicao", "des": "destreza", "for": "forca",
+    "sab": "sabedoria", "int": "inteligencia", "car": "carisma",
+}
+_RIDER_CONDICAO_PT = {
+    "envenenad": "Envenenado", "ceg": "Cego", "paralisad": "Paralisado",
+    "queimand": "Queimando", "amedrontad": "Amedrontado", "atordoad": "Atordoado",
+    "imobilizad": "Imobilizado", "surd": "Surdo", "caid": "Caído",
+    "incapacitad": "Incapacitado",
+}
+
+
+def _rider_atributo(bruto: str) -> str:
+    n = _norm_txt(bruto)
+    if n in _RIDER_ATRIBUTO:
+        return _RIDER_ATRIBUTO[n]
+    for sigla, nome in _RIDER_ATRIBUTO.items():
+        if n.startswith(nome[:5]):
+            return nome
+    return ""
+
+
+def efeito_extra_da_arma(char: dict, weapon: str) -> dict | None:
+    """
+    O que a DESCRIÇÃO do item promete além do dano normal:
+
+        {"dados": (1, 6), "tipo": "poison", "condicao": "Envenenado",
+         "salvaguarda": "constituicao", "cd": 12, "nota": "…"}
+
+    None quando o item não promete nada — que é o caso da esmagadora maioria.
+    """
+    item = _item_do_inventario(char, weapon)
+    desc = (item or {}).get("descricao", "") or ""
+    if not desc.strip():
+        return None
+
+    efeito: dict = {}
+    nota = []
+
+    achado = _RIDER_DANO.search(desc)
+    if achado:
+        n, faces = int(achado.group(1)), int(achado.group(2))
+        if n > _RIDER_MAX_DADOS or faces > _RIDER_MAX_FACES:
+            nota.append(f"dano extra do item limitado a {_RIDER_MAX_DADOS}d{_RIDER_MAX_FACES}")
+            n, faces = min(n, _RIDER_MAX_DADOS), min(faces, _RIDER_MAX_FACES)
+        efeito["dados"] = (max(1, n), max(2, faces))
+        efeito["tipo"] = _norm_damage_type(achado.group(3)) or ""
+
+    achado = _RIDER_CONDICAO.search(desc)
+    if achado:
+        bruto = _norm_txt(achado.group(1))
+        for raiz, nome in _RIDER_CONDICAO_PT.items():
+            if bruto.startswith(raiz):
+                efeito["condicao"] = nome
+                break
+
+    achado = _RIDER_CD.search(desc)
+    if achado:
+        g = achado.groups()
+        cd, atributo = (g[0], g[1]) if g[0] else (g[3], g[2])
+        efeito["cd"] = int(cd)
+        efeito["salvaguarda"] = _rider_atributo(atributo or "")
+
+    if not efeito:
+        return None
+    efeito["nota"] = " · ".join(nota)
+    return efeito
+
+
 def _nota_de_posse(char: dict, weapon: str, matched_hab) -> str:
     """
     Aviso quando um personagem do GRUPO ataca com o que não tem. Não recusa:
@@ -5730,8 +5831,9 @@ def attack_roll(
     # ── Crítico Aprimorado / Superior (Campeão) ─────────────────────────────
     crit_min = _crit_threshold(attacker)
 
-    # ── A arma existe? Tem munição? É mágica? ───────────────────────────────
+    # ── A arma existe? Tem munição? É mágica? Carrega algo? ─────────────────
     _mag = _bonus_magico_da_arma(attacker, weapon)
+    _rider = efeito_extra_da_arma(attacker, weapon)
     _nota_arma = _nota_de_posse(attacker, weapon, matched_hab)
     _recusa_mun, _nota_mun = _gastar_municao(attacker, weapon)
     if _recusa_mun:
@@ -5832,6 +5934,23 @@ def attack_roll(
         if gd_total:
             _componentes.append((gd_total, gd_info[1] if gd_info else ""))
 
+        # O que a arma carrega: o veneno da lâmina, o fogo que o ferreiro
+        # pôs nela. Entra como componente PRÓPRIO, com o seu tipo — um alvo
+        # pode ser imune ao veneno e não ao corte do mesmo golpe. Dobra no
+        # crítico, como todo dado extra de arma.
+        _rider_rolls: list[int] = []
+        if _rider and _rider.get("dados"):
+            _rn, _rfaces = _rider["dados"]
+            _rider_rolls = [random.randint(1, _rfaces)
+                            for _ in range(_rn * (2 if critico else 1))]
+            _componentes.append((sum(_rider_rolls), _rider.get("tipo", "")))
+            result += (f"   {len(_rider_rolls)}d{_rfaces} de {weapon}: "
+                       f"[{' + '.join(str(r) for r in _rider_rolls)}] = "
+                       f"{sum(_rider_rolls)}"
+                       + (f" ({_rider['tipo']})" if _rider.get("tipo") else "") + "\n")
+            if _rider.get("nota"):
+                result += f"   ({_rider['nota']})\n"
+
         _res = _apply_damage(target, components=_componentes,
                              source_name=attacker["name"],
                              arma_magica=_bypasses_material_resistance(weapon))
@@ -5854,6 +5973,26 @@ def attack_roll(
             dmg=dmg, dmg_dice=detail, hp=hp_depois, hp_max=st["vida_max"],
             crit=bool(critico),
         )
+        # A condição que a arma promete ("o alvo fica Envenenado"). O teste de
+        # resistência é rolado aqui: reagir a um golpe não é escolha de
+        # ninguém, e é assim que o ácido arremessado já funcionava.
+        if _rider and _rider.get("condicao") and hp_depois > 0:
+            _cond = _rider["condicao"]
+            _save = _rider.get("salvaguarda") or "constituicao"
+            _cd_rider = int(_rider.get("cd") or 0) or (8 + prof + mod)
+            _passou, _linha_save = _rolar_salvaguarda(target, _save, _cd_rider)
+            result += f"\n   {target['name']}: {_linha_save}"
+            if _passou:
+                result += f" — resistiu, {_cond} não pega."
+            else:
+                _conds_alvo = st.setdefault("condicoes", [])
+                if not any(_norm_txt(c.get("nome", "") if isinstance(c, dict) else str(c))
+                           == _norm_txt(_cond) for c in _conds_alvo):
+                    _conds_alvo.append({"nome": _cond, "duracao": None})
+                result += f" — **{_cond}**!"
+                _log_combat_event("condition", attacker["name"], target["name"],
+                                  msg=f"{target['name']} ficou {_cond} por {weapon}")
+
         _was_asleep = (target.get("status", "") or "").lower() == "dormindo"
         if hp_depois == 0:
             result += _mark_at_zero_hp(target, attacker["name"])

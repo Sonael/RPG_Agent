@@ -724,6 +724,19 @@ ITENS — invente o SABOR, não a REGRA:
   list_custom_items() mostra tudo o que já foi inventado na campanha,
   separando sabor de regra.
 
+  A DESCRIÇÃO DA ARMA É MECÂNICA. O que estiver escrito nela acontece no
+  ataque, sem você chamar mais nada:
+    • "+1d6 de dano de fogo" → o dado sai junto, com o tipo dele (e um alvo
+      imune a fogo resiste a essa parte e não ao corte);
+    • "o alvo fica Envenenado (CD 12 CON)" → o motor rola a resistência do
+      alvo e aplica a condição em quem falhar;
+    • "+1", "+2" ou "+3" no NOME ou na descrição → entra no ataque e no dano.
+  É assim que a adaga besuntada de veneno e a lâmina que o ferreiro temperou
+  passam a valer de verdade: quando o item muda na história, reescreva a
+  descrição com add_item(dono, item, 0, "nova descrição") e pronto.
+  O teto é 2d8 de dano extra — acima disso o motor corta e avisa, porque essa
+  mesma facilidade é a porta de "espada +5d6".
+
 SAQUE E COMPRA — o peso faz o saque virar escolha:
   O saque (dos inimigos derrotados, de um baú, de um corpo) vai para o CHÃO
   com offer_loot("Espada Curta; Poção de Cura:2", gold=25, source="os
