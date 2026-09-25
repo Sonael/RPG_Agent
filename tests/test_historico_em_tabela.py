@@ -284,6 +284,40 @@ def test_a_contagem_vai_no_data_para_o_menu(banco):
     assert campanhas[0]["data"]["_n_historico"] == 5
 
 
+# ---------------------------------------------------------------------------
+# 1b. Com a tabela de pé, a coluna para de ser escrita
+# ---------------------------------------------------------------------------
+# Mandar as duas seria carregar a janela inteira — 180 KB na campanha real —
+# em TODA gravação, para guardar uma segunda cópia do que a tabela já guarda
+# inteiro. A coluna continua sendo LIDA como reserva.
+
+def test_com_a_tabela_a_coluna_nao_e_mais_escrita(banco):
+    campanhas, _ = banco
+    database.save_campaign("u1", "Teste", _campanha(_conversa(3)))
+    assert "historico" not in campanhas[0], (
+        "a janela inteira viajou junto de novo — é o peso que a tabela veio "
+        "tirar da gravação"
+    )
+
+
+def test_a_coluna_antiga_nao_e_apagada_pela_tabela(banco):
+    """
+    Ela envelhece, mas continua lá: é a reserva de quem abrir a campanha por
+    um caminho que não enxergue a tabela.
+    """
+    campanhas, _ = banco
+    campanhas.append({"user_id": "u1", "name": "Teste", "data": {"chapter": 1},
+                      "historico": [{"role": "user", "text": "de antes"}]})
+    database.save_campaign("u1", "Teste", _campanha(_conversa(3)))
+    assert campanhas[0]["historico"] == [{"role": "user", "text": "de antes"}]
+
+
+def test_sem_a_tabela_a_coluna_volta_a_receber(banco_sem_tabela):
+    campanhas, _ = banco_sem_tabela
+    database.save_campaign("u1", "Teste", _campanha(_conversa(3)))
+    assert len(campanhas[0]["historico"]) == 3
+
+
 def test_o_dict_de_quem_chamou_fica_intacto(banco):
     dados = _campanha(_conversa(2))
     database.save_campaign("u1", "Teste", dados)

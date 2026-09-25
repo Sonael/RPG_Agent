@@ -90,8 +90,12 @@ def _scoped_upsert(user_id: str, name: str, linha: dict):
 #     alter table campaigns add column if not exists historico jsonb
 #       default '[]'::jsonb;
 #
-# O PostgREST grava só as colunas que recebe, então uma gravação de turno
-# deixa de carregar a conversa inteira.
+# O que isso resolveu, com precisão: o `data` ficou pequeno, e a tela de
+# escolher campanha parou de baixar a conversa de TODAS as campanhas para
+# desenhar uma lista. O que NÃO resolveu: a gravação de um turno continuava
+# mandando a janela inteira, agora como coluna separada do mesmo upsert —
+# quase o mesmo peso na rede. Quem resolveu isso foi a tabela de mensagens
+# logo abaixo, e é por isso que a coluna para de ser escrita quando ela assume.
 #
 # TOLERA OS DOIS MUNDOS, de propósito: se a coluna não existir (ambiente onde
 # o SQL não rodou), a primeira tentativa falha, o módulo anota isso e volta ao
@@ -545,8 +549,16 @@ def save_campaign(user_id: str, name: str, data: dict,
     Salva (insert ou update) os dados de uma campanha. Devolve a versão
     gravada.
 
-    O histórico de conversa vai para a coluna própria; o resto, para `data`.
-    Quando a coluna não existe, grava tudo junto como antes.
+    ONDE A CONVERSA VAI, na ordem de preferência:
+      • tabela `historico_mensagens` (uma linha por mensagem, nada se perde);
+      • coluna `historico` (a janela inteira, regravada a cada turno);
+      • dentro do `data`, o formato antigo, quando não há nenhuma das duas.
+
+    As duas primeiras não se acumulam. Assim que a tabela assume, a coluna
+    PARA de ser escrita: mandar as duas seria carregar a janela inteira — os
+    180 KB medidos na campanha real — em toda gravação, para guardar uma
+    segunda cópia do que a tabela já guarda inteiro. Ela continua sendo LIDA
+    como reserva, e volta a ser escrita sozinha se a tabela falhar.
 
     `versao_esperada` liga a trava contra escrita perdida: a gravação só
     acontece se o banco ainda estiver nessa versão. Levanta
@@ -554,14 +566,14 @@ def save_campaign(user_id: str, name: str, data: dict,
     """
     global _tem_coluna_historico, _versao_condicional
 
-    usa_coluna = _tem_coluna_historico is not False
-    resto, historico = (_separar_historico(data) if usa_coluna
+    # A conversa sai do documento sempre que houver para onde mandá-la.
+    tem_onde = (_tem_coluna_historico is not False
+                or _tem_tabela_historico is not False)
+    resto, historico = (_separar_historico(data) if tem_onde
                         else (dict(data or {}), None))
 
-    # A conversa inteira vai para a tabela, uma linha por mensagem: é o que
-    # impede o corte das últimas 200 de apagar o começo da campanha. A coluna
-    # continua recebendo a janela, para o ambiente onde a tabela não existe e
-    # para quem abrir a campanha por outro caminho.
+    # A tabela primeiro: é ela que impede o corte das últimas 200 de apagar o
+    # começo da campanha.
     if historico is not None:
         gravadas = _gravar_mensagens(user_id, name, historico)
         if gravadas:
@@ -569,8 +581,14 @@ def save_campaign(user_id: str, name: str, data: dict,
 
     nova = int(versao_esperada or resto.get(CAMPO_VERSAO) or 0) + 1
     resto[CAMPO_VERSAO] = nova
-    linha = {"data": resto} if historico is None else {"data": resto,
-                                                       _COLUNA_HISTORICO: historico}
+    linha = {"data": resto}
+    # `_gravar_mensagens` acabou de descobrir se a tabela existe, então esta
+    # decisão é tomada com a informação do turno, não com a da semana passada.
+    manda_coluna = (historico is not None
+                    and _tem_tabela_historico is not True
+                    and _tem_coluna_historico is not False)
+    if manda_coluna:
+        linha[_COLUNA_HISTORICO] = historico
 
     def _gravar_sem_trava():
         _scoped_upsert(user_id, name, linha).execute()
@@ -600,7 +618,7 @@ def save_campaign(user_id: str, name: str, data: dict,
                     resultado = _gravar_sem_trava()
                 else:
                     raise ConflitoDeGravacao(versao_esperada, atual)
-        if usa_coluna:
+        if manda_coluna:
             _tem_coluna_historico = True
         return resultado
     except ConflitoDeGravacao:
