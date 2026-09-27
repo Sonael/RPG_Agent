@@ -12,7 +12,7 @@
   let _open      = false;   // overlay visível
   let _busy      = false;   // requisição em voo (trava de clique duplo)
   let _ending    = false;   // recap em andamento (evita disparo duplo)
-  let _mode      = 'narrado';
+  let _mode      = 'tela';   // ver memory.PADRAO_COMBATE
   let _autoTimer = null;
   let _autoGuard = 0;       // teto de segurança p/ turnos de IA encadeados
   let _pick      = null;    // {kind:'attack'|'ability', ability?}
@@ -485,7 +485,7 @@
 
   async function refresh(snap) {
     _last = snap;
-    _mode = snap.combat_mode || 'narrado';
+    _mode = snap.combat_mode || 'tela';
     updateModeUI();
     const pill = _pill();
 
@@ -970,8 +970,8 @@
       b.classList.toggle('active', b.dataset.mode === _mode));
     const hint = document.getElementById('combat-mode-hint');
     if (hint) hint.textContent = _mode === 'tela'
-      ? 'As lutas abrem a tela tática; a IA narra o resultado no fim.'
-      : 'A IA narra cada turno da luta no chat (padrão).';
+      ? 'As lutas abrem a tela tática; a IA narra o resultado no fim (padrão).'
+      : 'A IA narra cada turno da luta no chat.';
   }
 
   window.setCombatMode = async function (mode) {

@@ -220,7 +220,7 @@ class FerramentasDoTurno(BaseToolset):
 
         try:
             camp = memory.campaign
-            modo = (camp.get("combat_mode") or "narrado")
+            modo = (camp.get("combat_mode") or memory.PADRAO_COMBATE)
             usa_dnd = _campanha_usa_dnd(camp)
             romance = (camp.get("campaign_type") or "") == "romance"
             # "dnd" é a fantasia com regras de antes da separação.

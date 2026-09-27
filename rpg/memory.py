@@ -183,6 +183,17 @@ campaign = _CampaignProxy()
 # hora desde o primeiro turno; o mestre move daí com advance_time().
 RELOGIO_INICIAL = {"dia": 1, "hora": 8}
 
+# Como o combate é jogado quando ninguém escolheu: a TELA TÁTICA.
+#
+# Era "narrado" desde o começo, de quando a tela tática não existia. Hoje ela é
+# quem rola o dado, conta o dano, gasta munição, cobra alcance e move na zona —
+# e o modo narrado pede à IA que faça tudo isso de cabeça, que é justamente
+# onde ela erra. Quem preferir a narração continua a um clique na engrenagem.
+#
+# Um lugar só, de propósito: o padrão estava escrito em cinco arquivos
+# diferentes, e mudá-lo significava achar os cinco.
+PADRAO_COMBATE = "tela"
+
 
 def _defaults() -> dict:
     return {
@@ -230,9 +241,13 @@ def _defaults() -> dict:
         # sem isso, reabrir a campanha zera a trava justamente no turno em
         # que ela mais importa.
         "_relacao_turno":       {},
-        # "narrado" = LLM narra turno a turno (padrão, comportamento atual).
-        # "tela"    = combate resolvido na tela tática; LLM só emoldura.
-        "combat_mode":          "narrado",
+        # "tela"    = combate resolvido na tela tática; a IA só emoldura (padrão).
+        # "narrado" = a IA narra turno a turno no chat.
+        "combat_mode":          PADRAO_COMBATE,
+        # A troca do padrão já foi aplicada a esta campanha. Ver
+        # normalizar_campanha: sem a marca, uma campanha que o jogador pôs em
+        # "narrado" de propósito voltaria para a tela a cada carregamento.
+        "_padrao_combate_migrado": False,
         "combat_state": {
             "is_active":           False,
             "initiative_order":    [],
@@ -328,9 +343,22 @@ def _migrate_combat_state() -> None:
     for key, val in defaults.items():
         if key not in cs:
             cs[key] = val
-    # Campanhas antigas sem o modo de combate → padrão narrado.
+    # O modo de combate, e a troca do padrão para a tela tática.
+    #
+    # Mudar PADRAO_COMBATE sozinho não alcançaria nenhuma campanha que já
+    # existe: todas têm "narrado" GRAVADO, porque o padrão antigo era escrito
+    # no documento na criação. Elas ficariam narradas para sempre, e quem
+    # pediu a troca não veria diferença nenhuma no próprio jogo.
+    #
+    # A marca faz a virada acontecer UMA vez por campanha. Depois dela, a
+    # escolha é do jogador e fica: quem puser "narrado" na engrenagem continua
+    # narrado no carregamento seguinte.
     if "combat_mode" not in campaign:
-        campaign["combat_mode"] = "narrado"
+        campaign["combat_mode"] = PADRAO_COMBATE
+    elif (not campaign.get("_padrao_combate_migrado")
+            and campaign.get("combat_mode") == "narrado"):
+        campaign["combat_mode"] = PADRAO_COMBATE
+    campaign["_padrao_combate_migrado"] = True
 
 
 _SPELL_PLACEHOLDER = "Magia inicial da classe. Use learn_spell() para enriquecer com dados do Open5e."

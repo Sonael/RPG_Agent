@@ -110,10 +110,18 @@ def test_dnd_narrado_entrega_todas(dnd, conjunto):
     assert len(entregues(conjunto)) == FORA_DO_ROMANCE
 
 
-def test_campo_de_modo_ausente_nao_filtra_nada(dnd, conjunto):
-    """Campanha antiga, sem combat_mode: o padrão é o modo narrado."""
+def test_campo_de_modo_ausente_usa_o_padrao_do_jogo(dnd, conjunto):
+    """
+    Campanha sem combat_mode cai em memory.PADRAO_COMBATE, que hoje é a TELA
+    TÁTICA — e a tela retira da LLM as ferramentas de turno, senão o combate
+    acontece duas vezes. O padrão era "narrado" de quando a tela não existia.
+    """
+    from rpg import memory
+
+    assert memory.PADRAO_COMBATE == "tela"
     dnd.pop("combat_mode", None)
-    assert len(entregues(conjunto)) == FORA_DO_ROMANCE
+    assert len(entregues(conjunto)) == esperado("fantasia", tela=True)
+    assert not (nomes(entregues(conjunto)) & FERRAMENTAS_SO_DO_MODO_NARRADO)
 
 
 # ---------------------------------------------------------------------------

@@ -1385,13 +1385,15 @@ const _GUIDE_HTML = `
             <b>Esta campanha</b> → <b>Modo de combate</b>):
           </p>
           <ul>
+            <li><b>Tela tática</b> (padrão) — abre uma tela dedicada (o
+              "Pergaminho Épico") com cards de Vida/Mana e botões:
+              <b>Atacar, Habilidade, Item, Mover, Defender, Fugir</b> e
+              <b>Encerrar Turno</b>. Quem rola o dado, conta o dano, gasta a
+              munição e cobra o alcance é o motor. Os inimigos agem sozinhos.
+              No fim da luta, o Mestre narra a batalha inteira de uma vez.</li>
             <li><b>Narrado pela IA</b> — o Mestre descreve cada turno no
-              próprio chat, como o resto da história.</li>
-            <li><b>Tela tática</b> — abre uma tela dedicada (o "Pergaminho
-              Épico") com cards de Vida/Mana e botões: <b>Atacar, Habilidade,
-              Item, Mover, Defender, Fugir</b> e <b>Encerrar Turno</b>. Os
-              inimigos agem sozinhos. No fim da luta, o Mestre narra a batalha
-              inteira de uma vez.</li>
+              próprio chat, como o resto da história. As mesmas regras valem,
+              mas quem as aplica é ele, de cabeça.</li>
           </ul>
 
           <h4 class="guide-h4">Onde cada um está</h4>

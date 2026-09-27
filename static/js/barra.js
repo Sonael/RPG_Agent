@@ -449,8 +449,8 @@
       <div id="settings-combate" class="hidden">
         <div class="settings-subtitulo">Modo de combate</div>
         <div id="combat-mode-toggle" class="combat-mode-toggle">
-          <button type="button" data-mode="narrado" class="cm-opt active" onclick="setCombatMode('narrado')">Narrado pela IA</button>
-          <button type="button" data-mode="tela" class="cm-opt" onclick="setCombatMode('tela')">Tela tática</button>
+          <button type="button" data-mode="narrado" class="cm-opt" onclick="setCombatMode('narrado')">Narrado pela IA</button>
+          <button type="button" data-mode="tela" class="cm-opt active" onclick="setCombatMode('tela')">Tela tática</button>
         </div>
         <div id="combat-mode-hint" class="settings-nota"></div>
       </div>

@@ -559,7 +559,7 @@ memory.load_campaign() / memory.save_campaign()
   "name":                 str,
   "campaign_type":        "fantasia" | "dark_fantasy" | ...,   # gênero
   "dnd_mode":             bool,                             # regras
-  "combat_mode":          "narrado" | "tela",
+  "combat_mode":          "tela" | "narrado",   # default: "tela"
   "protagonist":          str,
   "characters":           {char_key: {...}},
   "locations":            {loc_key:  {...}},
@@ -1421,13 +1421,24 @@ e no combate**; derrotá-la ainda exige dano. Por isso `dormindo` entra em
 
 A escolha persiste por campanha (`combat_mode` em `memory.campaign`):
 
-- **`"narrado"`** (default), a IA narra cada turno no chat. Validador
-  pós-resposta detecta mecânica narrada sem ferramenta e corrige.
-- **`"tela"`**, abre a [tela tática](#tela-de-combate-tática-jrpg). A IA
-  monta a cena, chama `roll_initiative` e **para**. O combate inteiro é
-  resolvido por chamadas determinísticas a `/api/combat/*` (sem LLM no
-  meio). No fim, o servidor monta um log estruturado e a IA é chamada **uma
-  vez** para narrar a luta inteira + gerar saque.
+- **`"tela"`** (default — `memory.PADRAO_COMBATE`), abre a
+  [tela tática](#tela-de-combate-tática-jrpg). A IA monta a cena, chama
+  `roll_initiative` e **para**. O combate inteiro é resolvido por chamadas
+  determinísticas a `/api/combat/*` (sem LLM no meio). No fim, o servidor
+  monta um log estruturado e a IA é chamada **uma vez** para narrar a luta
+  inteira + gerar saque.
+- **`"narrado"`**, a IA narra cada turno no chat. Validador pós-resposta
+  detecta mecânica narrada sem ferramenta e corrige.
+
+O default era `"narrado"` desde antes de a tela tática existir. Hoje é ela
+quem rola o dado, conta o dano, gasta munição, cobra alcance e move na zona —
+e o modo narrado pede à IA que faça tudo isso de cabeça, que é onde ela erra.
+
+**A virada alcança campanha que já existe**, uma vez: toda campanha tinha
+`"narrado"` gravado no documento (o default antigo era escrito na criação), e
+mudar a constante sozinha não as tocaria. `normalizar_campanha` troca o valor
+e deixa a marca `_padrao_combate_migrado`; depois dela a escolha é do jogador
+e fica — quem puser `"narrado"` na engrenagem continua narrado.
 
 Toggle do modo: engrenagem → "Esta campanha" → "Narrado pela IA" / "Tela
 tática".

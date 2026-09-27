@@ -14289,7 +14289,7 @@ def combat_snapshot() -> dict:
             combatants.append(snap)
     current = order[idx] if order else ""
     return {
-        "combat_mode": camp.get("combat_mode", "narrado"),
+        "combat_mode": camp.get("combat_mode", memory.PADRAO_COMBATE),
         "is_active":   bool(cs.get("is_active")),
         "round":       int(cs.get("round", 1) or 1),
         "turn_index":  idx,

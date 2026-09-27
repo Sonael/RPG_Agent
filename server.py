@@ -1087,7 +1087,8 @@ def _payload_de_campanha(name: str, dados: dict, personagens: dict) -> dict:
         # Preferência de como o combate é jogado ("narrado" ou "tela"). Não
         # estava aqui: quem importava uma campanha do modo tela caía no
         # narrado sem entender por quê.
-        "combat_mode":          dados.get("combat_mode", "narrado"),
+        "combat_mode":          dados.get("combat_mode", memory.PADRAO_COMBATE),
+        "_padrao_combate_migrado": dados.get("_padrao_combate_migrado", True),
         "protagonist":          dados.get("protagonist", ""),
         "chapter":              dados.get("chapter", 1),
         "current_location":     dados.get("current_location", ""),
@@ -3602,7 +3603,7 @@ def combat_recap_route():
 @require_auth
 def combat_mode_route():
     if request.method == "GET":
-        return jsonify({"mode": memory.campaign.get("combat_mode", "narrado")})
+        return jsonify({"mode": memory.campaign.get("combat_mode", memory.PADRAO_COMBATE)})
     mode = ((request.json or {}).get("mode") or "").strip().lower()
     if mode not in ("narrado", "tela"):
         return jsonify({"ok": False, "error": "mode inválido"}), 400
