@@ -167,28 +167,39 @@ def versao_de(data: dict):
 #       created_at     timestamptz not null default now(),
 #       unique (user_id, campaign_name, ordem)
 #     );
-#     create index if not exists historico_mensagens_campanha
-#       on historico_mensagens (user_id, campaign_name, ordem desc);
 #     alter table historico_mensagens enable row level security;
 #
-# UM ÍNDICE SÓ, e é o composto. A primeira versão disto tinha também um GIN de
-# trigrama sobre `content`, para a busca. Medido no banco de verdade, com 327
-# mensagens:
+# NENHUM ÍNDICE A MAIS, e é de propósito: o da restrição `unique` já serve
+# tudo. Toda consulta daqui filtra por `user_id` e `campaign_name` e ordena
+# por `ordem desc` — que é exatamente esse índice, percorrido de trás para
+# frente, coisa que um btree faz sem custo.
 #
-#     dados .................   176 kB
-#     índice (composto) .....    80 kB
-#     índice (trigrama) .....  2176 kB   ← 76% de tudo
+# Conferido no banco, com os dois índices extras já removidos:
 #
-# O trigrama ficava 12 vezes maior que o texto que indexava, porque GIN tem
-# custo estrutural alto e prosa em português gera um vocabulário enorme de
-# trigramas. E ele nem era necessário: `historico_busca` filtra por campanha,
-# ordena por `ordem desc` e corta no limite — o planejador prefere o índice
-# composto, e o ILIKE roda sobre as poucas linhas daquela campanha.
+#     Index Scan Backward using historico_mensagens_user_id_campaign_name_ordem_key
+#       Index Cond: ((user_id = ...) AND (campaign_name = ...))
+#     Execution Time: 0.271 ms        (199 linhas, a janela inteira)
 #
-# Num plano gratuito de 500 MB, 2 MB de índice para 176 kB de conversa é o
-# tipo de coisa que come a cota sem ninguém perceber. Se um dia uma campanha
-# passar de dezenas de milhares de mensagens e a busca ficar lenta, ele volta
-# — com `explain analyze` na mão, não por precaução.
+# A primeira versão criava mais dois, por reflexo. Medido no banco de verdade,
+# com 327 mensagens:
+#
+#     dados ........................   176 kB
+#     índice do `unique` ...........    72 kB
+#     índice da chave primária .....    32 kB
+#     índice composto (redundante) .    80 kB   ← as MESMAS colunas do unique
+#     índice GIN de trigrama .......  2176 kB   ← 76% de tudo
+#
+# O trigrama ficava 12 vezes maior que o texto que indexava: GIN tem custo
+# estrutural alto e prosa em português gera um vocabulário enorme de trigramas.
+# O composto repetia coluna por coluna o índice do `unique`, mudando só o
+# sentido do `ordem` — que não separa nada.
+#
+# `historico_busca` não tem índice de texto nenhum: o filtro por campanha vem
+# primeiro, e o ILIKE só olha as linhas daquela campanha. Num plano gratuito
+# de 500 MB, 2 MB de índice para 176 kB de conversa come a cota sem ninguém
+# perceber. Se um dia uma campanha passar de dezenas de milhares de mensagens
+# e a busca ficar lenta, o trigrama volta — com `explain analyze` na mão, e
+# não por precaução.
 #
 # ENQUANTO O SQL NÃO RODAR, nada muda: a primeira tentativa falha, o módulo
 # anota isso e a conversa continua na coluna `historico`, como está hoje. É a
