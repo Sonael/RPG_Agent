@@ -26,6 +26,7 @@ from rpg import memory
 from rpg import database
 from rpg import eco
 from rpg import epilogo
+from rpg import chaves
 from rpg import medicao
 from rpg.auth import require_auth, register as auth_register, login as auth_login, refresh_session
 from rpg.agent import create_agent, get_campaign_config
@@ -1596,6 +1597,81 @@ def delete_campaign(name):
         return jsonify({"error": str(e)}), 500
 
 
+def _chaves_do_usuario(data: dict | None = None) -> tuple[str, str]:
+    """
+    As chaves de API deste usuário, na ordem: o que está guardado no servidor,
+    o que veio no corpo do pedido, e por fim as do ambiente.
+
+    O corpo continua sendo aceito por UM motivo: o navegador de quem ainda tem
+    o JS antigo em cache manda a chave por lá. Quando isso acontece, ela é
+    GRAVADA — a campanha migra sozinha e da próxima vez já vem do servidor.
+    Sem isso, todo mundo teria uma sessão quebrada entre o deploy e o F5.
+    """
+    guardadas = {}
+    try:
+        guardadas = chaves.ler(g.user_id)
+    except Exception as e:                                   # pragma: no cover
+        app.logger.warning("Não deu para ler as chaves guardadas: %s", e)
+
+    data = data or {}
+    do_corpo_google = (data.get("google_api_key") or "").strip()
+    do_corpo_ds     = (data.get("deepseek_api_key") or "").strip()
+
+    # Chegou pelo caminho antigo e não havia nada guardado: guarda agora.
+    migrar = {}
+    if do_corpo_google and not guardadas.get("google"):
+        migrar["google"] = do_corpo_google
+    if do_corpo_ds and not guardadas.get("deepseek"):
+        migrar["deepseek"] = do_corpo_ds
+    if migrar:
+        try:
+            chaves.salvar(g.user_id, **migrar)
+        except Exception as e:                               # pragma: no cover
+            app.logger.warning("Não deu para guardar a chave migrada: %s", e)
+
+    google = (guardadas.get("google") or do_corpo_google
+              or os.environ.get("GOOGLE_API_KEY", ""))
+    deepseek = (guardadas.get("deepseek") or do_corpo_ds
+                or os.environ.get("DEEPSEEK_API_KEY", ""))
+    return google, deepseek
+
+
+@app.route("/api/user/keys", methods=["GET"])
+@require_auth
+def ler_chaves_do_usuario():
+    """
+    O que a tela pode saber: se existe e os quatro últimos caracteres.
+    A chave inteira NUNCA volta ao navegador — é o ponto da mudança.
+    """
+    try:
+        return jsonify({"ok": True, "chaves": chaves.resumo(g.user_id)})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/user/keys", methods=["POST"])
+@require_auth
+def gravar_chaves_do_usuario():
+    """
+    Grava ou apaga. Só mexe no que vier: mandar `google` sozinho não encosta
+    na do DeepSeek, e mandar `google: ""` apaga a do Google.
+    """
+    data = request.get_json(silent=True) or {}
+    novas = {nome: data[nome] for nome in chaves.CAMPOS
+             if nome in data and isinstance(data[nome], str)}
+    if not novas:
+        return jsonify({"ok": False, "error": "nada a gravar"}), 400
+    try:
+        gravou = chaves.salvar(g.user_id, **novas)
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+    if not gravou:
+        return jsonify({"ok": False, "error": "sem_tabela",
+                        "detalhe": "A tabela usuario_chaves ainda não existe "
+                                   "no banco."}), 503
+    return jsonify({"ok": True, "chaves": chaves.resumo(g.user_id)})
+
+
 @app.route("/api/campaigns/<name>/historico", methods=["GET"])
 @require_auth
 def historico_da_campanha(name):
@@ -1733,8 +1809,8 @@ def gemini_models():
     if limited:
         return limited
 
-    data    = request.get_json(silent=True) or {}
-    api_key = data.get("google_api_key", "").strip() or os.environ.get("GOOGLE_API_KEY", "")
+    data = request.get_json(silent=True) or {}
+    api_key, _ = _chaves_do_usuario(data)
     if not api_key:
         return jsonify({"ok": False, "error": "sem_chave", "models": []})
 
@@ -1791,11 +1867,12 @@ def start_session():
     story_input   = data.get("story_input", "")
     genre         = data.get("genre", "")
 
-    # Chaves de API fornecidas pelo usuário (fallback para variáveis de ambiente)
-    user_google_key   = data.get("google_api_key", "").strip()
-    user_deepseek_key = data.get("deepseek_api_key", "").strip()
-    google_key        = user_google_key
-    deepseek_key      = user_deepseek_key
+    # As chaves do usuário vêm do SERVIDOR (rpg/chaves.py), onde elas moram
+    # presas à conta. O corpo do pedido ainda é aceito para quem tem o JS
+    # antigo em cache, e nesse caso a chave é guardada de passagem.
+    google_key, deepseek_key = _chaves_do_usuario(data)
+    user_google_key   = google_key
+    user_deepseek_key = deepseek_key
 
     # Vincula o contexto à campanha DESTE usuário (estado por sessão).
     memory.bind(user_id, campaign_name)
@@ -2762,8 +2839,7 @@ def generate_lore():
     user_prompt     = data.get("prompt", "").strip()
     model           = data.get("model", "").strip()
     campaign_type, is_dnd = memory.regras_e_genero(data.get("campaign_type"), data.get("dnd_mode"))
-    api_key         = data.get("google_api_key", "").strip()  or os.environ.get("GOOGLE_API_KEY", "")
-    ds_key          = data.get("deepseek_api_key", "").strip() or os.environ.get("DEEPSEEK_API_KEY", "")
+    api_key, ds_key = _chaves_do_usuario(data)
 
     if not user_prompt:
         return jsonify({"error": "Prompt vazio."}), 400

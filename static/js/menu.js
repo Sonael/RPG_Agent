@@ -319,8 +319,10 @@ async function loadGeminiModels() {
   const status = document.getElementById('apikeys-status');
   if (!sel) return;
 
-  const chave = (window.getApiKeys ? window.getApiKeys().google_api_key : '') || '';
-  if (!chave) {
+  // A chave mora no SERVIDOR: o navegador só sabe se ela existe. Perguntar
+  // "tenho a chave aqui?" deixou de ser possível, e é esse o ponto.
+  const temChave = !!(window._chavesDefinidas && window._chavesDefinidas.google);
+  if (!temChave) {
     // Sem chave não dá para consultar: fica a lista de reserva do HTML.
     if (status && !_modelosCarregados) {
       status.style.color   = 'var(--text-muted)';
@@ -333,7 +335,8 @@ async function loadGeminiModels() {
     const res  = await authFetch(`${API}/api/gemini/models`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ google_api_key: chave }),
+      // Sem corpo: o servidor pega a chave da conta de quem está logado.
+      body:    JSON.stringify({}),
     });
     const data = await res.json();
 
@@ -1728,7 +1731,6 @@ async function generateLore() {
     <line x1="16" y1="8" x2="2" y2="22"/><line x1="17.5" y1="15" x2="9" y2="15"/></svg>Gerando…</span>`;
   status.textContent = '';
   try {
-    const keys  = typeof window.getApiKeys === 'function' ? window.getApiKeys() : {};
     const model = document.getElementById('model-select')?.value || 'gemini-2.0-flash';
     const campaignType = wzGenero();
     const res = await authFetch(`${API}/api/campaigns/generate-lore`, {
@@ -1741,8 +1743,6 @@ async function generateLore() {
         dnd_mode:         wzIsDnd(),
         // Os campos do gênero que o wizard mostra, para a IA preencher.
         campos:           wzIsDnd() ? [] : (THEME_CHAR_FIELDS[campaignType]?.fields || []),
-        google_api_key:   keys.google_api_key   || '',
-        deepseek_api_key: keys.deepseek_api_key  || '',
       }),
     });
     const data = await res.json();
@@ -3626,9 +3626,7 @@ async function createCampaignFromWizard() {
       genre:         '',
     };
     btn.textContent = 'Iniciando...';
-    const keys = typeof window.getApiKeys === 'function' ? window.getApiKeys() : {};
-    if (keys.google_api_key)   sessionPayload.google_api_key   = keys.google_api_key;
-    if (keys.deepseek_api_key) sessionPayload.deepseek_api_key = keys.deepseek_api_key;
+    // A chave não viaja mais daqui: o servidor a lê da conta (rpg/chaves.py).
 
     const sesRes  = await authFetch(`${API}/api/session/start`, {
       method:  'POST',

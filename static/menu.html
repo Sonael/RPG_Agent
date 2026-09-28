@@ -108,7 +108,10 @@
             <h3>Credenciais de Acesso</h3>
             <p class="campo-ajuda">Insira as chaves API necessárias para processar a história:</p>
             <div class="field-group campo-abaixo">
-              <label style="font-size: 12px;">Google AI Studio:</label>
+              <label style="font-size: 12px;">Google AI Studio:
+                <button type="button" class="btn-apagar-chave"
+                        onclick="apagarChave('google')">apagar</button>
+              </label>
               <!-- O olho existe para conferir uma chave colada: sem ele, um
                    caractere a mais só aparece como erro genérico do modelo. -->
               <div class="campo-com-olho">
@@ -129,7 +132,10 @@
               </div>
             </div>
             <div class="field-group">
-              <label style="font-size: 12px;">DeepSeek API:</label>
+              <label style="font-size: 12px;">DeepSeek API:
+                <button type="button" class="btn-apagar-chave"
+                        onclick="apagarChave('deepseek')">apagar</button>
+              </label>
               <div class="campo-com-olho">
                 <input id="deepseek-api-key-input" type="password" placeholder="sk-..." oninput="onApiKeyChange()">
                 <button type="button" class="btn-olho" aria-controls="deepseek-api-key-input"
@@ -515,7 +521,7 @@
   </div>
 
   <script src="/static/js/utils.js?v=28"></script>
-  <script src="/static/js/menu.js?v=99"></script>
+  <script src="/static/js/menu.js?v=100"></script>
   <script>
     // Animação de volta para a capa quando carregado da cache
     window.addEventListener('pageshow', function(event) {
@@ -537,9 +543,57 @@
     const GOOGLE_KEY_STORAGE = 'rpg_google_api_key';
     const DEEPSEEK_KEY_STORAGE = 'rpg_deepseek_api_key';
 
-    function loadApiKeys() {
-      document.getElementById('google-api-key-input').value = localStorage.getItem(GOOGLE_KEY_STORAGE) || '';
-      document.getElementById('deepseek-api-key-input').value = localStorage.getItem(DEEPSEEK_KEY_STORAGE) || '';
+    // A chave mora no SERVIDOR, presa à conta (rpg/chaves.py). O navegador
+    // nunca a recebe de volta: daqui só se sabe SE existe e o fim dela.
+    window._chavesDefinidas = { google: false, deepseek: false };
+
+    function _pintarStatusDaChave(nome, info) {
+      const campo = document.getElementById(`${nome}-api-key-input`);
+      if (!campo) return;
+      campo.value = '';
+      campo.placeholder = info && info.definida
+        ? `Guardada na sua conta (final ${info.fim}) — cole outra para trocar`
+        : (nome === 'google' ? 'AIza...' : 'sk-...');
+    }
+
+    async function loadApiKeys() {
+      // Migração de quem ainda tem a chave no navegador: sobe uma vez para o
+      // servidor e some daqui. Sem isso, quem já tinha chave precisaria colar
+      // de novo — e ela continuaria no localStorage, que é o que queremos
+      // acabar.
+      const antigas = {};
+      try {
+        const g = localStorage.getItem(GOOGLE_KEY_STORAGE);
+        const d = localStorage.getItem(DEEPSEEK_KEY_STORAGE);
+        if (g) antigas.google = g;
+        if (d) antigas.deepseek = d;
+      } catch (_) {}
+      if (Object.keys(antigas).length) {
+        try {
+          const r = await authFetch(`${API}/api/user/keys`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(antigas),
+          });
+          // Só apaga daqui depois de o servidor confirmar que guardou.
+          if ((await r.json()).ok) {
+            localStorage.removeItem(GOOGLE_KEY_STORAGE);
+            localStorage.removeItem(DEEPSEEK_KEY_STORAGE);
+          }
+        } catch (_) {}
+      }
+
+      try {
+        const r = await authFetch(`${API}/api/user/keys`);
+        const d = await r.json();
+        if (!d.ok) return;
+        window._chavesDefinidas = {
+          google: !!(d.chaves.google && d.chaves.google.definida),
+          deepseek: !!(d.chaves.deepseek && d.chaves.deepseek.definida),
+        };
+        _pintarStatusDaChave('google', d.chaves.google);
+        _pintarStatusDaChave('deepseek', d.chaves.deepseek);
+      } catch (_) {}
     }
 
     // A lógica de revelar campo secreto vive em utils.js (alternarCampoSecreto),
@@ -547,42 +601,90 @@
 
     let _recarregarModelos = null;
 
+    let _gravandoChave = null;
+
     function onApiKeyChange() {
+      // O atraso evita uma gravação a cada tecla — só dispara quando a
+      // digitação para. Também serve para a lista de modelos, que antes era
+      // recarregada aqui.
+      clearTimeout(_gravandoChave);
+      _gravandoChave = setTimeout(salvarChavesNoServidor, 800);
+    }
+
+    async function salvarChavesNoServidor() {
       const gk = document.getElementById('google-api-key-input').value.trim();
       const dk = document.getElementById('deepseek-api-key-input').value.trim();
-      if (gk) localStorage.setItem(GOOGLE_KEY_STORAGE, gk); else localStorage.removeItem(GOOGLE_KEY_STORAGE);
-      if (dk) localStorage.setItem(DEEPSEEK_KEY_STORAGE, dk); else localStorage.removeItem(DEEPSEEK_KEY_STORAGE);
+      // Campo vazio quer dizer "não mexa": a chave guardada continua lá, e é
+      // por isso que ele nasce vazio mesmo com chave definida. Para APAGAR
+      // existe o botão, que manda a string vazia de propósito.
+      const novas = {};
+      if (gk) novas.google = gk;
+      if (dk) novas.deepseek = dk;
+      if (!Object.keys(novas).length) return;
 
-      // Colar a chave já atualiza a lista de modelos. O atraso evita uma
-      // consulta a cada tecla digitada — só dispara quando a digitação para.
-      if (typeof loadGeminiModels === 'function') {
-        clearTimeout(_recarregarModelos);
-        _recarregarModelos = setTimeout(loadGeminiModels, 800);
+      const status = document.getElementById('apikeys-status');
+      try {
+        const r = await authFetch(`${API}/api/user/keys`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(novas),
+        });
+        const d = await r.json();
+        if (!d.ok) {
+          if (status) {
+            status.style.color = 'var(--gold-dim)';
+            status.textContent = d.error === 'sem_tabela'
+              ? 'A chave não pôde ser guardada: falta criar a tabela no banco.'
+              : 'Não foi possível guardar a chave agora.';
+          }
+          return;
+        }
+        window._chavesDefinidas = {
+          google: !!(d.chaves.google && d.chaves.google.definida),
+          deepseek: !!(d.chaves.deepseek && d.chaves.deepseek.definida),
+        };
+        _pintarStatusDaChave('google', d.chaves.google);
+        _pintarStatusDaChave('deepseek', d.chaves.deepseek);
+        if (status) {
+          status.style.color = 'var(--text-muted)';
+          status.textContent = 'Chave guardada na sua conta.';
+        }
+        if (typeof loadGeminiModels === 'function') loadGeminiModels();
+      } catch (_) {
+        if (status) status.textContent = 'Não foi possível guardar a chave agora.';
       }
     }
 
-    window.getApiKeys = function () {
-      return {
-        google_api_key: localStorage.getItem(GOOGLE_KEY_STORAGE) || '',
-        deepseek_api_key: localStorage.getItem(DEEPSEEK_KEY_STORAGE) || '',
-      };
+    window.apagarChave = async function (nome) {
+      if (typeof showConfirm === 'function') {
+        const ok = await showConfirm('Apagar a chave',
+          'A chave sai da sua conta. Você pode colar outra depois.', 'danger', 'Apagar');
+        if (!ok) return;
+      }
+      try {
+        const r = await authFetch(`${API}/api/user/keys`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ [nome]: '' }),
+        });
+        const d = await r.json();
+        if (d.ok) {
+          window._chavesDefinidas[nome] = false;
+          _pintarStatusDaChave(nome, d.chaves[nome]);
+        }
+      } catch (_) {}
     };
 
-    const _originalFetch = window.fetch;
-    window.fetch = function (url, options = {}) {
-      if (typeof url === 'string' && url.includes('/api/session/start') && options.method === 'POST') {
-        try {
-          const keys = window.getApiKeys();
-          if (keys.google_api_key || keys.deepseek_api_key) {
-            const body = JSON.parse(options.body || '{}');
-            if (keys.google_api_key) body.google_api_key = keys.google_api_key;
-            if (keys.deepseek_api_key) body.deepseek_api_key = keys.deepseek_api_key;
-            options = { ...options, body: JSON.stringify(body) };
-          }
-        } catch (e) { }
-      }
-      return _originalFetch.call(this, url, options);
+    // A chave não passa mais pelo navegador. A função fica por compatibilidade
+    // com quem ainda a chama, devolvendo vazio: quem entrega a chave agora é o
+    // servidor, que a lê da conta de quem está logado.
+    window.getApiKeys = function () {
+      return { google_api_key: '', deepseek_api_key: '' };
     };
+
+    // Aqui existia um remendo que reescrevia TODO `window.fetch` para enfiar
+    // a chave no corpo de /api/session/start. Ele some junto com o motivo: a
+    // chave não sai mais do servidor, então não há nada para injetar.
 
     loadApiKeys();
 

@@ -667,6 +667,16 @@ select {
    O input continua ocupando 100% e mantendo a borda inferior do tema; o
    botão flutua por cima do canto direito, e o padding reserva o espaço
    para uma chave longa não passar por baixo dele. */
+/* "apagar" ao lado do rótulo da chave: a chave agora vive no servidor, e o
+   campo vazio quer dizer "não mexa" — tirar de vez precisa de um gesto
+   próprio, e não de apagar o texto de um campo que já nasce vazio. */
+.btn-apagar-chave {
+  float: right; background: none; border: none; cursor: pointer;
+  font-family: inherit; font-size: 11px; padding: 0;
+  color: var(--text-muted, #8a7a66); text-decoration: underline;
+}
+.btn-apagar-chave:hover { color: var(--inv-red, #8b2315); }
+
 .campo-com-olho { position: relative; }
 .campo-com-olho input { padding-right: 38px; }
 /* Chave revelada sai da fonte cursiva do tema e vai para monoespaçada: o

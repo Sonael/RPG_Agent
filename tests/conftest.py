@@ -75,7 +75,34 @@ def _stub_database() -> None:
     rpg.registrar_duble("database", db)
 
 
+def _stub_chaves() -> None:
+    """
+    `rpg.chaves` guarda a chave de API do jogador no Supabase. Nos testes não
+    há banco: sem o dublê, todo pedido que consulta a chave percorreria o
+    caminho até um cliente Postgrest que não existe e sairia por um `except`
+    com aviso no log — ruído que esconde falha de verdade.
+
+    O dublê responde "ninguém tem chave guardada", que é justamente o cenário
+    em que o caminho antigo (a chave vinda no corpo do pedido) tem de
+    continuar atendendo. Quem mede o módulo de verdade é
+    test_chave_no_servidor.py, que o carrega do arquivo com um Postgrest de
+    bancada.
+    """
+    import rpg
+    if getattr(rpg, "chaves", None) is not None:
+        return
+    mod = types.ModuleType("rpg.chaves")
+    mod.CAMPOS = {"google": "google_api_key", "deepseek": "deepseek_api_key"}
+    mod.ler    = lambda *a, **k: {"google": "", "deepseek": ""}
+    mod.salvar = lambda *a, **k: True
+    mod.apagar = lambda *a, **k: None
+    mod.resumo = lambda *a, **k: {
+        nome: {"definida": False, "fim": ""} for nome in mod.CAMPOS}
+    rpg.registrar_duble("chaves", mod)
+
+
 _stub_database()
+_stub_chaves()
 
 # Modo offline por padrão: nenhum teste sai para a rede sem pedir.
 os.environ.setdefault("RPG_SRD_OFFLINE", "1")

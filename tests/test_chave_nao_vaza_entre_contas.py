@@ -121,9 +121,28 @@ def _chaves(pg):
 # 1. Sair leva tudo o que é do usuário
 # ---------------------------------------------------------------------------
 
-def test_o_logout_apaga_a_chave_de_api(pagina):
+def test_a_chave_legada_nao_sobrevive_a_uma_visita_ao_menu(pagina):
+    """
+    A chave saiu do navegador de vez: agora ela vive presa à conta, no
+    servidor (rpg/chaves.py). Quem ainda tinha uma guardada aqui a vê subir na
+    primeira visita ao menu e sumir daqui — sem precisar colar de novo.
+
+    Este teste começa com o navegador "sujo" do jeito antigo e confere que,
+    depois de a página carregar, não sobrou chave nenhuma no localStorage.
+    """
     pg, erros = pagina
-    assert pg.evaluate("() => localStorage.getItem('rpg_google_api_key')")
+    pg.wait_for_function(
+        "() => !localStorage.getItem('rpg_google_api_key')", timeout=8000)
+
+    for chave in SEGREDOS:
+        assert pg.evaluate(f"() => localStorage.getItem('{chave}')") is None, chave
+    assert not erros, erros[:3]
+
+
+def test_o_logout_apaga_a_chave_de_api(pagina):
+    """A trava continua valendo para quem chegar com a chave de outro jeito."""
+    pg, erros = pagina
+    pg.evaluate("() => localStorage.setItem('rpg_google_api_key', 'AIza-de-algum-lugar')")
 
     pg.evaluate("() => clearTokens()")
 
@@ -170,21 +189,29 @@ def test_entrar_com_outra_conta_limpa_o_que_era_do_anterior(pagina):
     assert pg.evaluate("() => localStorage.getItem('rpg_user_id')") == "utilizador-2"
 
 
-def test_entrar_na_mesma_conta_nao_apaga_a_propria_chave(pagina):
-    """Quem volta para a própria conta não pode perder a chave que digitou."""
+def test_entrar_na_mesma_conta_nao_limpa_nada(pagina):
+    """
+    Voltar para a própria conta não pode custar as preferências guardadas —
+    e não custa mais a chave, que hoje vem do servidor de qualquer forma.
+    """
     pg, _ = pagina
+    pg.evaluate("() => localStorage.setItem('rpg_total_tokens', '4242')")
+    pg.evaluate("() => localStorage.setItem('rpg_user_id', 'utilizador-1')")
+
     pg.evaluate("() => entrarComoUsuario('utilizador-1')")
-    assert pg.evaluate("() => localStorage.getItem('rpg_google_api_key')") \
-        == DO_ANTERIOR["rpg_google_api_key"]
+
+    assert pg.evaluate("() => localStorage.getItem('rpg_total_tokens')") == "4242"
 
 
 def test_primeiro_login_do_aparelho_nao_apaga_nada(pagina):
     """Sem dono anterior registrado, não há o que limpar."""
     pg, _ = pagina
+    pg.evaluate("() => localStorage.setItem('rpg_total_tokens', '4242')")
     pg.evaluate("() => localStorage.removeItem('rpg_user_id')")
+
     pg.evaluate("() => entrarComoUsuario('utilizador-9')")
-    assert pg.evaluate("() => localStorage.getItem('rpg_google_api_key')") \
-        == DO_ANTERIOR["rpg_google_api_key"]
+
+    assert pg.evaluate("() => localStorage.getItem('rpg_total_tokens')") == "4242"
 
 
 # ---------------------------------------------------------------------------
