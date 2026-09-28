@@ -525,7 +525,7 @@
   </div>
 
   <script src="/static/js/utils.js?v=28"></script>
-  <script src="/static/js/menu.js?v=100"></script>
+  <script src="/static/js/menu.js?v=101"></script>
   <script>
     // Animação de volta para a capa quando carregado da cache
     window.addEventListener('pageshow', function(event) {
@@ -606,6 +606,16 @@
         _pintarStatusDaChave('google', d.chaves.google);
         _pintarStatusDaChave('deepseek', d.chaves.deepseek);
       } catch (_) {}
+
+      // A LISTA DE MODELOS SÓ PODE SER PEDIDA DEPOIS DAQUI.
+      //
+      // menu.js chama loadGeminiModels() no arranque, e ele pergunta
+      // "existe chave?" — pergunta que antes o localStorage respondia na
+      // hora. Agora a resposta vem do servidor, e quando o arranque pergunta
+      // ela ainda não chegou: a lista caía na de reserva com "Salve a chave
+      // do Google para carregar a lista de modelos atualizada", mesmo com a
+      // chave guardada. Aqui a resposta já existe.
+      if (typeof loadGeminiModels === 'function') loadGeminiModels();
     }
 
     // A lógica de revelar campo secreto vive em utils.js (alternarCampoSecreto),
