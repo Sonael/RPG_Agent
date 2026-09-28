@@ -158,7 +158,7 @@ def versao_de(data: dict):
 #
 #     create table if not exists historico_mensagens (
 #       id             bigserial primary key,
-#       user_id        text    not null,
+#       user_id        uuid    not null,
 #       campaign_name  text    not null,
 #       ordem          integer not null,
 #       role           text    not null,
@@ -168,6 +168,21 @@ def versao_de(data: dict):
 #       unique (user_id, campaign_name, ordem)
 #     );
 #     alter table historico_mensagens enable row level security;
+#
+# `user_id` é UUID, como em `campaigns`. A primeira versão o declarou `text`
+# sem conferir o tipo da tabela que já existia: o mesmo valor guardado de dois
+# jeitos. Nada quebrava — o código nunca cruza as duas tabelas, e cada uma era
+# coerente consigo mesma —, mas juntá-las numa consulta dava
+# "operator does not exist: text = uuid", e o texto custa ~37 bytes por linha
+# contra 16 do uuid.
+#
+# SEM CHAVE ESTRANGEIRA para campaigns(user_id, name), embora ela fosse o
+# natural aqui. `save_campaign` grava as MENSAGENS antes da linha da campanha
+# (ela precisa da contagem para pôr `_n_historico` no `data`), então uma FK
+# recusaria a primeira gravação de toda campanha nova. Trocar a ordem para
+# ganhar a FK é possível e seria melhor, mas é mudança de código, não de
+# esquema — fica para quando valer a pena. Quem apaga as mensagens da campanha
+# apagada é `delete_campaign`, chamando `_apagar_historico`.
 #
 # NENHUM ÍNDICE A MAIS, e é de propósito: o da restrição `unique` já serve
 # tudo. Toda consulta daqui filtra por `user_id` e `campaign_name` e ordena
