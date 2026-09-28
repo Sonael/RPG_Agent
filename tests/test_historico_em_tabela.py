@@ -345,6 +345,22 @@ def test_a_janela_tem_teto(banco, monkeypatch):
     assert janela[0]["text"] == "mensagem 15" and janela[-1]["text"] == "mensagem 24"
 
 
+def test_campanha_migrada_le_bem_com_a_coluna_vazia(banco):
+    """
+    O estado que sobra depois de limpar a coluna das campanhas migradas: a
+    tabela tem tudo, a coluna não tem nada. A leitura não pode confundir isso
+    com "campanha sem conversa".
+    """
+    campanhas, _ = banco
+    database.save_campaign("u1", "Teste", _campanha(_conversa(5)))
+    campanhas[0]["historico"] = []          # a limpeza, feita no banco
+
+    lida = database.get_campaign("u1", "Teste")
+
+    assert [m["text"] for m in lida["conversation_history"]] == \
+           [f"mensagem {i}" for i in range(5)]
+
+
 def test_campanha_sem_linha_na_tabela_cai_na_coluna(banco):
     """Campanha gravada antes da tabela existir continua abrindo."""
     campanhas, _ = banco
