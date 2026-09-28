@@ -156,6 +156,26 @@ def versao_de(data: dict):
 # continua sendo as últimas 200 (é isso que o mestre lê e a tela desenha), e o
 # que ficou para trás se alcança por página ou por busca.
 #
+# O QUE ISSO CUSTA EM ESPAÇO, medido no banco de verdade:
+#
+#     dentro do `data` (jsonb comprimido) .... ~0,75 kB por mensagem
+#     na tabela (uma linha por mensagem) ..... ~1,50 kB por mensagem
+#
+# O dobro, e a razão é o formato: dentro do documento a conversa é um jsonb
+# grande, que vai para o TOAST COMPRIMIDO — e prosa comprime bem. Como linha,
+# cada mensagem carrega o cabeçalho da tupla, repete `user_id` e
+# `campaign_name`, e um `content` abaixo de ~2 kB fica inline, sem compressão.
+#
+# É uma troca consciente: o dobro do espaço pelo histórico inteiro, a busca e
+# a paginação. Campanha antiga que nunca mais for jogada fica no formato
+# antigo e continua sendo a mais econômica — a migração acontece sozinha na
+# primeira gravação, e só para quem ainda está jogando.
+#
+# Se um dia o espaço apertar, o caminho é guardar em BLOCOS (dezenas de
+# mensagens por linha jsonb): devolve a compressão e corta o custo por linha,
+# ao preço de uma busca pior e de reescrever o último bloco a cada turno. Com
+# ~1 MB de banco num plano de 500 MB, essa complexidade ainda não se paga.
+#
 #     create table if not exists historico_mensagens (
 #       id             bigserial primary key,
 #       user_id        uuid    not null,
