@@ -169,15 +169,26 @@ def versao_de(data: dict):
 #     );
 #     create index if not exists historico_mensagens_campanha
 #       on historico_mensagens (user_id, campaign_name, ordem desc);
-#     create extension if not exists pg_trgm;
-#     create index if not exists historico_mensagens_busca
-#       on historico_mensagens using gin (content gin_trgm_ops);
 #     alter table historico_mensagens enable row level security;
 #
-# O índice de busca é de TRIGRAMA, e não de to_tsvector: `historico_busca`
-# procura com ILIKE '%termo%' — busca literal, que acha "cavalo" dentro de
-# "cavalos" e não depende de dicionário de idioma. Um índice de tsvector não
-# serve a esse operador e ficaria parado.
+# UM ÍNDICE SÓ, e é o composto. A primeira versão disto tinha também um GIN de
+# trigrama sobre `content`, para a busca. Medido no banco de verdade, com 327
+# mensagens:
+#
+#     dados .................   176 kB
+#     índice (composto) .....    80 kB
+#     índice (trigrama) .....  2176 kB   ← 76% de tudo
+#
+# O trigrama ficava 12 vezes maior que o texto que indexava, porque GIN tem
+# custo estrutural alto e prosa em português gera um vocabulário enorme de
+# trigramas. E ele nem era necessário: `historico_busca` filtra por campanha,
+# ordena por `ordem desc` e corta no limite — o planejador prefere o índice
+# composto, e o ILIKE roda sobre as poucas linhas daquela campanha.
+#
+# Num plano gratuito de 500 MB, 2 MB de índice para 176 kB de conversa é o
+# tipo de coisa que come a cota sem ninguém perceber. Se um dia uma campanha
+# passar de dezenas de milhares de mensagens e a busca ficar lenta, ele volta
+# — com `explain analyze` na mão, não por precaução.
 #
 # ENQUANTO O SQL NÃO RODAR, nada muda: a primeira tentativa falha, o módulo
 # anota isso e a conversa continua na coluna `historico`, como está hoje. É a
@@ -412,6 +423,10 @@ def historico_busca(user_id: str, name: str, termo: str,
     Mensagens desta campanha que contêm `termo`, da mais recente para a mais
     antiga. Busca literal (ilike): é o que responde "onde a gente deixou o
     cavalo" sem depender de dicionário de idioma no banco.
+
+    Sem índice de texto, de propósito (ver o cabeçalho da tabela): o filtro por
+    campanha vem primeiro, e o ILIKE só olha as linhas daquela campanha. Um GIN
+    de trigrama aqui custou 2176 kB para indexar 176 kB de conversa.
     """
     termo = (termo or "").strip()
     if len(termo) < 2:
