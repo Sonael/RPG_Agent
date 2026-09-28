@@ -301,3 +301,34 @@ def test_a_versao_do_menu_subiu():
     """Correção de credencial servida de cache não chega a ninguém."""
     html = (RAIZ / "static" / "menu.html").read_text(encoding="utf-8")
     assert "menu.js?v=99" not in html
+
+
+def test_a_versao_da_folha_de_estilo_subiu():
+    """
+    O mesmo esquecimento, do outro lado: a regra do botão "apagar" entrou no
+    style.css e a página continuou servindo a folha em cache — o botão saiu
+    com a aparência crua do navegador.
+    """
+    css = (RAIZ / "static" / "css" / "style.css").read_text(encoding="utf-8")
+    assert ".btn-apagar-chave" in css
+    for pagina in ("menu.html", "login.html", "game.html"):
+        html = (RAIZ / "static" / pagina).read_text(encoding="utf-8")
+        assert "style.css?v=106" not in html, pagina
+
+
+def test_o_menu_leva_a_onde_se_cria_a_chave():
+    """Sem o link, quem nunca gerou uma chave não tem por onde começar."""
+    html = (RAIZ / "static" / "menu.html").read_text(encoding="utf-8")
+    assert "aistudio.google.com/apikey" in html
+    assert "platform.deepseek.com/api_keys" in html
+    # Aba nova e sem carona no referrer.
+    assert html.count('rel="noopener noreferrer"') >= 2
+
+
+def test_o_apagar_so_aparece_quando_ha_o_que_apagar():
+    html = (RAIZ / "static" / "menu.html").read_text(encoding="utf-8")
+    # Nasce escondido...
+    assert 'id="apagar-google" class="btn-apagar-chave hidden"' in html
+    assert 'id="apagar-deepseek" class="btn-apagar-chave hidden"' in html
+    # ...e quem o mostra é o estado vindo do servidor.
+    assert "classList.toggle('hidden', !tem)" in html

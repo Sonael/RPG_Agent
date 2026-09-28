@@ -180,6 +180,43 @@ def test_a_preferencia_do_aparelho_sobrevive(pagina):
 # entrou direto" deixam o localStorage do anterior de pé — e era por aí que a
 # chave continuaria passando mesmo com o logout consertado.
 
+def test_sem_chave_guardada_o_apagar_nao_aparece(pagina):
+    """
+    O botão nasce escondido e só o estado vindo do servidor o acende. Na
+    bancada ninguém tem chave guardada, então ele fica escondido nos dois
+    campos — que é o que se via de errado na tela: um "apagar" oferecido para
+    a DeepSeek, que não tinha chave nenhuma.
+    """
+    pg, _ = pagina
+    pg.goto(pg.url.replace("/login.html", "/menu.html"), wait_until="networkidle")
+    for nome in ("google", "deepseek"):
+        escondido = pg.evaluate(
+            f"() => document.getElementById('apagar-{nome}')"
+            f"?.classList.contains('hidden')")
+        assert escondido is True, nome
+
+
+def test_o_botao_apagar_tem_estilo_proprio(pagina):
+    """
+    A regra estava no style.css, mas a página servia a folha em cache: o
+    botão saía com a aparência crua do navegador. O `?v=` é parte do conserto.
+    """
+    pg, _ = pagina
+    pg.goto(pg.url.replace("/login.html", "/menu.html"), wait_until="networkidle")
+    # Mostra o botão só para poder medi-lo (escondido não tem estilo computado
+    # que valha a pena conferir).
+    pg.evaluate("() => document.getElementById('apagar-google')"
+                ".classList.remove('hidden')")
+    estilo = pg.evaluate(
+        "() => { const e = document.getElementById('apagar-google');"
+        " const s = getComputedStyle(e);"
+        " return { borda: s.borderTopWidth, fundo: s.backgroundColor,"
+        "          sublinhado: s.textDecorationLine }; }")
+    assert estilo["borda"] == "0px", "o botão está com a borda padrão do navegador"
+    assert "rgba(0, 0, 0, 0)" in estilo["fundo"], estilo["fundo"]
+    assert "underline" in estilo["sublinhado"]
+
+
 def test_entrar_com_outra_conta_limpa_o_que_era_do_anterior(pagina):
     pg, _ = pagina
     pg.evaluate("() => entrarComoUsuario('utilizador-2')")

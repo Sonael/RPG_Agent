@@ -667,15 +667,20 @@ select {
    O input continua ocupando 100% e mantendo a borda inferior do tema; o
    botão flutua por cima do canto direito, e o padding reserva o espaço
    para uma chave longa não passar por baixo dele. */
-/* "apagar" ao lado do rótulo da chave: a chave agora vive no servidor, e o
-   campo vazio quer dizer "não mexa" — tirar de vez precisa de um gesto
-   próprio, e não de apagar o texto de um campo que já nasce vazio. */
-.btn-apagar-chave {
+/* Os dois ombros do rótulo da chave.
+   "criar chave" leva ao site onde ela é gerada — sem isso, quem nunca criou
+   uma não tem por onde começar. "apagar" existe porque a chave vive no
+   servidor e o campo vazio quer dizer "não mexa": tirar de vez precisa de um
+   gesto próprio, e só aparece quando há o que apagar. */
+.btn-apagar-chave,
+.link-criar-chave {
   float: right; background: none; border: none; cursor: pointer;
-  font-family: inherit; font-size: 11px; padding: 0;
+  font-family: inherit; font-size: 11px; line-height: 1.6; padding: 0;
+  margin-left: var(--esp-2, 8px);
   color: var(--text-muted, #8a7a66); text-decoration: underline;
 }
 .btn-apagar-chave:hover { color: var(--inv-red, #8b2315); }
+.link-criar-chave:hover { color: var(--gold, #b89947); }
 
 .campo-com-olho { position: relative; }
 .campo-com-olho input { padding-right: 38px; }

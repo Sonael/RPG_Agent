@@ -24,7 +24,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;600&family=Lora:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Playfair+Display:ital,wght@0,500;0,700;1,500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/css/style.css?v=106">
+  <link rel="stylesheet" href="/static/css/style.css?v=107">
   <!-- Chegou virando a página (utils.js, virarParaOutraPagina): a capa não
        abre de novo. Aqui no <head>, antes de a capa começar a animar. -->
   <script>
@@ -109,7 +109,9 @@
             <p class="campo-ajuda">Insira as chaves API necessárias para processar a história:</p>
             <div class="field-group campo-abaixo">
               <label style="font-size: 12px;">Google AI Studio:
-                <button type="button" class="btn-apagar-chave"
+                <a class="link-criar-chave" target="_blank" rel="noopener noreferrer"
+                   href="https://aistudio.google.com/apikey">criar chave</a>
+                <button type="button" id="apagar-google" class="btn-apagar-chave hidden"
                         onclick="apagarChave('google')">apagar</button>
               </label>
               <!-- O olho existe para conferir uma chave colada: sem ele, um
@@ -133,7 +135,9 @@
             </div>
             <div class="field-group">
               <label style="font-size: 12px;">DeepSeek API:
-                <button type="button" class="btn-apagar-chave"
+                <a class="link-criar-chave" target="_blank" rel="noopener noreferrer"
+                   href="https://platform.deepseek.com/api_keys">criar chave</a>
+                <button type="button" id="apagar-deepseek" class="btn-apagar-chave hidden"
                         onclick="apagarChave('deepseek')">apagar</button>
               </label>
               <div class="campo-com-olho">
@@ -550,10 +554,18 @@
     function _pintarStatusDaChave(nome, info) {
       const campo = document.getElementById(`${nome}-api-key-input`);
       if (!campo) return;
+      const tem = !!(info && info.definida);
       campo.value = '';
-      campo.placeholder = info && info.definida
-        ? `Guardada na sua conta (final ${info.fim}) — cole outra para trocar`
+      // Curto de propósito: o campo é estreito, e um texto longo some no meio
+      // ("…cole outra para troca"), que é pior do que não explicar nada.
+      campo.placeholder = tem
+        ? `Guardada (final ${info.fim})`
         : (nome === 'google' ? 'AIza...' : 'sk-...');
+      campo.title = tem
+        ? 'A chave está guardada na sua conta. Cole outra para trocar.'
+        : '';
+      // "apagar" só existe quando há o que apagar.
+      document.getElementById(`apagar-${nome}`)?.classList.toggle('hidden', !tem);
     }
 
     async function loadApiKeys() {
