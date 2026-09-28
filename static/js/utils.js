@@ -60,10 +60,65 @@ function setTokens(access, refresh) {
   if (refresh) localStorage.setItem('rpg_refresh_token', refresh);
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+//  O que é de QUEM está logado sai do navegador; o que é do APARELHO fica
+// ═══════════════════════════════════════════════════════════════════════
+//
+// O logout apagava só os dois tokens. Tudo o mais que o jogador tinha
+// guardado ficava para o próximo que entrasse no mesmo navegador — e o item
+// mais grave era a CHAVE DE API. Ela não só aparecia preenchida no campo do
+// menu: `getApiKeys` a injeta em /api/session/start, então a conta nova
+// gastava a cota (e a fatura) da conta anterior sem que ninguém percebesse.
+//
+// Também vazavam a contagem de uso, a cota do dia e as chaves
+// `rpg_telas::<campanha>::…`, que carregam o NOME das campanhas do outro no
+// próprio nome da chave.
+//
+// A lista é de EXCEÇÕES, e não de alvos, de propósito: tudo o que começa com
+// `rpg_` é tratado como dado de usuário e vai embora, menos o punhado de
+// preferências do aparelho listado aqui. Assim, quem acrescentar uma chave no
+// futuro e esquecer deste arquivo erra para o lado seguro — a chave é apagada
+// a mais, não vazada a menos.
+const CHAVES_DO_APARELHO = new Set([
+  'rpg_theme',
+  'rpg_animacoes',
+  'rpg_font_master',
+  'rpg_font_user',
+  'rpg_font_menu',
+  'rpg_barra_recolhida',
+]);
+
+function limparDadosDoUsuario() {
+  let chaves = [];
+  try {
+    chaves = Object.keys(localStorage);
+  } catch (_) {
+    return;            // navegador sem armazenamento: nada a limpar
+  }
+  chaves.forEach(k => {
+    if (CHAVES_DO_APARELHO.has(k)) return;
+    // `access_token` é o nome antigo, ainda lido em game.html.
+    if (!k.startsWith('rpg_') && k !== 'access_token') return;
+    try { localStorage.removeItem(k); } catch (_) {}
+  });
+}
+
 function clearTokens() {
-  localStorage.removeItem('rpg_access_token');
-  localStorage.removeItem('rpg_refresh_token');
-  localStorage.removeItem('rpg_token'); // Limpa o antigo por precaução
+  limparDadosDoUsuario();
+}
+
+// Chamado no login, ANTES de guardar os tokens novos.
+//
+// O logout é o caminho feliz, e não é o único: sessão que expira, aba
+// fechada, ou simplesmente outra pessoa abrindo o navegador e entrando
+// direto. Em qualquer um deles o localStorage do anterior continua lá. Por
+// isso a troca de usuário também limpa — é a rede que pega o que o logout
+// não pegou.
+function entrarComoUsuario(userId) {
+  let anterior = null;
+  try { anterior = localStorage.getItem('rpg_user_id'); } catch (_) {}
+  if (anterior && userId && anterior !== userId) limparDadosDoUsuario();
+  try { if (userId) localStorage.setItem('rpg_user_id', userId); } catch (_) {}
 }
 
 function requireAuth() {

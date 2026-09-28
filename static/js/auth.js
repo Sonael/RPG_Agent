@@ -53,6 +53,11 @@ async function submitAuth() {
       return;
     }
 
+    // Trocou de conta neste navegador? O que era do anterior sai antes de
+    // qualquer coisa nova entrar — inclusive a chave de API dele, que o
+    // logout nem sempre chega a apagar (sessão expirada, aba fechada).
+    if (typeof entrarComoUsuario === 'function') entrarComoUsuario(data.user_id);
+
     // Salvando os dois tokens na memória do navegador
     setTokens(data.access_token, data.refresh_token);
     window.location.href = '/menu.html';
