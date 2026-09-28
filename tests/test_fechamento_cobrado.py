@@ -276,6 +276,9 @@ def test_a_instrucao_diz_de_onde_sai_cada_campo(campanha):
     for campo in epilogo.CAMPOS:
         assert epilogo.ESCRITO.get(campo, campo) in salvar, campo
     # E a seção diz o que continua sendo ferramenta, para não sobrar dúvida.
+    # `add_character_knowledge` saiu desta lista: virou a linha "sabe:" do
+    # fechamento, depois de a medição mostrar o mestre tentando guardar fato
+    # sobre pessoa dentro de `fato:` e sendo recusado cinco vezes.
     for ferramenta in ("add_party_member", "update_story_summary",
-                       "set_character_location", "add_character_knowledge"):
+                       "set_character_location"):
         assert ferramenta in salvar, ferramenta

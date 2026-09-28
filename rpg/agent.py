@@ -171,10 +171,11 @@ o jogador: o sistema o recorta antes de mostrar a cena.
 
 [[registro]]
 local: <onde o grupo está AGORA, se mudou nesta cena>
-tempo: <quantas horas passaram — "2h — viagem pela trilha">
+tempo: <quanto tempo passou — "2h — viagem pela trilha", "30m — a conversa", "1h30 — a subida">
 lugar: <lugar novo que você acabou de descrever — "Ponte Quebrada (dentro de: Vale) — tábuas podres">
 gente: <pessoa nova que apareceu — "Aldric — ferreiro da vila">
-fato: <verdade nova do mundo — "ponte_atravessada=sim">
+sabe: <o que o grupo DESCOBRIU sobre alguém — "Nyx — tem cicatrizes de queimadura química">
+fato: <bandeira do mundo, sempre chave=valor — "ponte_atravessada=sim">
 relação: <o que mudou entre duas pessoas — "Helena → Selene +25 — se elogiaram depois da luta">
 cena: <o acontecimento desta cena, se houve — "Resgataram o herbologista na mina — a guilda passou a confiar neles">
 diário: <a página do diário, quando a cena mereceu uma — "A descida na mina — o ar ficou doce e errado, e a picareta parou de bater lá embaixo.">
@@ -201,6 +202,14 @@ COMO PREENCHER
   só quando a cena mereceu uma página. O diário é dele.
 • "capítulo:" só quando a história realmente virou de capítulo, e só para o
   número seguinte. O sistema recusa pulo.
+• "tempo:" aceita horas, minutos ou os dois ("2h", "30m", "1h30"). Minutos que
+  não fecham uma hora ficam guardados e se somam com os do próximo turno — não
+  escreva "0h" achando que meia hora não conta.
+• "fato:" é SÓ bandeira, sempre chave=valor: é o que o motor testa depois
+  ("portao_aberto=sim"). Verdade em prosa não cabe nele. Se for sobre uma
+  PESSOA, vai em "sabe:"; se for um acontecimento, vai em "cena:".
+• "sabe:" é o que o GRUPO descobriu sobre alguém, e aparece na ficha dessa
+  pessoa. Só o que foi revelado em cena — não o que você sabe e eles não.
 
 A LINHA DE RELAÇÃO
 • A relação é DAS DUAS pessoas: uma linha muda os dois lados. "Selene →
@@ -252,10 +261,10 @@ REGRAS DE MEMÓRIA — siga sempre, sem exceção
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 SALVAR — a maior parte já é o FECHAMENTO DO TURNO, no fim desta instrução.
-Estas nove coisas saem de lá, escrevendo uma linha, e você NÃO precisa chamar
+Estas dez coisas saem de lá, escrevendo uma linha, e você NÃO precisa chamar
 a ferramenta durante a cena:
 
-    local, tempo, lugar, gente, fato, relação, cena, diário, capítulo
+    local, tempo, lugar, gente, sabe, fato, relação, cena, diário, capítulo
 
 Chamar a ferramenta na hora continua certo quando você precisa do RESULTADO
 para continuar escrevendo — a ficha de alguém para consultar, o dado de um
@@ -266,7 +275,6 @@ O que o bloco NÃO faz, e continua com você:
 • Alguém entra de vez no grupo → add_party_member.
 • A cada 3–5 turnos → update_story_summary com o resumo atualizado.
 • Alguém muda de lugar → set_character_location(nome, local).
-• O grupo DESCOBRE algo sobre alguém → add_character_knowledge(nome, fato).
 
 MAPA — o jogador vê os locais numa ficha e navega por ela:
 • Lugar que fica DENTRO de outro (taverna na cidade, sala no castelo) →

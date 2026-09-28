@@ -74,11 +74,11 @@ def sem_bloco(texto: str) -> str:
     return _BLOCO_RE.sub("", texto or "").strip()
 
 CAMPOS = ("local", "tempo", "lugar", "gente", "fato", "relacao", "cena",
-          "capitulo", "diario")
+          "capitulo", "diario", "sabe")
 # Como o campo aparece ESCRITO no bloco: a leitura tira o acento, o prompt não.
 ESCRITO = {"relacao": "relação", "capitulo": "capítulo", "diario": "diário"}
 TETO = {"lugar": 3, "gente": 3, "fato": 2, "local": 1, "tempo": 1, "relacao": 2,
-        "cena": 1, "capitulo": 1, "diario": 1}
+        "cena": 1, "capitulo": 1, "diario": 1, "sabe": 2}
 
 # "Helena → Selene -20 — odiou o controle velado"
 # "Selene ↔ Sonael +30 — amigos de infância"
@@ -136,8 +136,28 @@ def _marcar_mudanca(a: str, b: str) -> None:
 # O nome do campo aceita acento: "relação:" é o que o mestre escreve, e
 # [a-z] deixava a linha inteira de fora sem dizer por quê.
 _LINHA_RE = re.compile(r"^\s*[-*•]?\s*([A-Za-zÀ-ÿ]+)\s*:\s*(.+?)\s*$")
-# "2h — viagem", "2 horas: viagem", "3h de caminhada"
-_TEMPO_RE = re.compile(r"^\s*(\d{1,2})\s*(?:h|hs|hora|horas)?\b\s*[—–:-]?\s*(.*)$", re.IGNORECASE)
+# "2h — viagem", "2 horas: viagem", "3h de caminhada", "1h30 — subida",
+# "30m — o debate diante do mural", "45 min de conversa"
+#
+# MINUTOS ENTRARAM DEPOIS, e por medição. Numa campanha de 34 turnos o mestre
+# escreveu "30m" duas vezes e levou "não dá para ler as horas" — enquanto o
+# jogador cobrava o relógio no chat SEIS vezes. O mestre estava tentando fazer
+# o tempo andar e o motor recusava; o relógio congelava; o jogador perguntava
+# que horas eram. Era o problema original do bloco, invertido.
+_TEMPO_RE = re.compile(
+    r"^\s*(?:(?P<h>\d{1,3})\s*(?:h|hs|horas?)(?:\s*(?P<hm>\d{1,2})\s*(?:m|min|minutos?)?)?"
+    r"|(?P<m>\d{1,3})\s*(?:m|min|minutos?)\b"
+    r"|(?P<so_numero>\d{1,3}))"
+    r"\s*[—–:-]?\s*(?P<motivo>.*)$", re.IGNORECASE)
+
+
+def _minutos_da_linha(m) -> int:
+    """Quantos minutos a linha pede, somando horas e minutos escritos juntos."""
+    if m.group("m") is not None:
+        return int(m.group("m"))
+    horas = m.group("h") or m.group("so_numero") or "0"
+    minutos = int(m.group("hm") or 0)
+    return int(horas) * 60 + minutos
 # "Ponte Quebrada (dentro de: Vale) — tábuas podres"
 _DENTRO_RE = re.compile(r"\((?:dentro\s+de|em)\s*:?\s*(.+?)\)", re.IGNORECASE)
 _FATO_RE = re.compile(r"^\s*([\w ]+?)\s*=\s*(.+?)\s*$")
@@ -212,7 +232,23 @@ def _tem_evidencia(nome: str, narracao: str) -> bool:
     # As palavras de peso primeiro: "Torre do Mago Sombrio" não se dá por
     # citada só porque a cena tinha um mago.
     grandes = [p for p in palavras if len(p) >= 5]
-    return any(re.search(rf"\b{re.escape(p)}", texto) for p in (grandes or palavras))
+    return any(re.search(rf"\b{re.escape(p)}", texto)
+               for p in (grandes or palavras))
+
+
+# AQUI EU TENTEI AFROUXAR E DESISTI, e o registro vale mais que a mudança.
+#
+# A medição trouxe quatro recusas que pareciam injustas —
+#     local='Salão da Guilda dos Aventureiros': não aparece na narração
+#     local='Floresta Sussurrante': não aparece na narração
+# — e eu escrevi uma regra de maioria para salvá-las. Ela não derrubou
+# injeção nenhuma: as narrações que MONTEI para o teste já passavam pela
+# regra de cima. Ou seja, eu não sabia o que as narrações REAIS tinham; só
+# sabia que não tinham o nome.
+#
+# Afrouxar a trava que impede inventar lugar sem um caso que falhe é trocar
+# a fechadura porque a chave sumiu. Quando a próxima medição trouxer a
+# narração junto da recusa, dá para decidir com dado em vez de palpite.
 
 
 def _quem_aparece(narracao: str, limite: int = 6) -> list[str]:
@@ -287,16 +323,26 @@ def aplicar(campos: dict[str, list[str]], narracao: str) -> dict:
         if not m:
             recusa("tempo", valor, "não dá para ler as horas")
             continue
-        horas = int(m.group(1))
+        minutos = _minutos_da_linha(m)
         # "0h — ajuste de laços" é o mestre dizendo que a cena não gastou
         # tempo. Isso não é erro: é a resposta certa para uma conversa de dois
         # minutos. Era recusado e entrava na conta de registro falhado.
-        if horas == 0:
+        if minutos <= 0:
             continue
-        if horas > 24:
+        if minutos > 24 * 60:
             recusa("tempo", valor, "mais de 24 horas num turno só")
             continue
-        motivo = m.group(2).strip() or "o tempo da cena"
+        motivo = (m.group("motivo") or "").strip() or "o tempo da cena"
+
+        # O relógio do mundo conta HORAS. Os minutos que sobram ficam guardados
+        # e viram hora quando se somam: duas cenas de 30m fazem o relógio andar
+        # uma vez, em vez de duas cenas jogadas fora.
+        relogio = memory.campaign.setdefault("relogio", {})
+        guardados = int(relogio.get("minutos", 0) or 0) + minutos
+        horas, relogio["minutos"] = divmod(guardados, 60)
+        if not horas:
+            feitos.append(f"minutos(+{minutos}, acumulado {relogio['minutos']}min)")
+            continue
         try:
             td.advance_time(horas, motivo)
             feitos.append(f"advance_time({horas}, {motivo!r})")
@@ -319,6 +365,7 @@ def aplicar(campos: dict[str, list[str]], narracao: str) -> dict:
         try:
             tl.save_location(nome, desc or "Descrito em cena.", dentro_de=dentro)
             feitos.append(f"save_location({nome!r})")
+            avisos.append(f"{nome} entrou no mapa.")
         except Exception as e:
             recusa("lugar", nome, f"falhou: {e}")
 
@@ -334,6 +381,7 @@ def aplicar(campos: dict[str, list[str]], narracao: str) -> dict:
             tl.save_character(nome, desc or "Apareceu em cena.",
                               local=memory.campaign.get("current_location", ""))
             feitos.append(f"save_character({nome!r})")
+            avisos.append(f"{nome} ganhou ficha.")
         except Exception as e:
             recusa("gente", nome, f"falhou: {e}")
 
@@ -454,6 +502,7 @@ def aplicar(campos: dict[str, list[str]], narracao: str) -> dict:
                           location=memory.campaign.get("current_location", ""),
                           consequence=consequencia)
             feitos.append(f"save_event({resumo[:40]!r})")
+            avisos.append(f"Na linha do tempo: {resumo}")
         except Exception as e:
             recusa("cena", resumo, f"falhou: {e}")
 
@@ -471,6 +520,7 @@ def aplicar(campos: dict[str, list[str]], narracao: str) -> dict:
         try:
             tl.add_diary_entry(titulo or conteudo[:50], conteudo)
             feitos.append(f"add_diary_entry({(titulo or conteudo)[:40]!r})")
+            avisos.append(f"Nova página no diário: {titulo or conteudo[:50]}")
         except Exception as e:
             recusa("diario", titulo, f"falhou: {e}")
 
@@ -492,14 +542,45 @@ def aplicar(campos: dict[str, list[str]], narracao: str) -> dict:
         try:
             tl.update_world_state(chapter=novo)
             feitos.append(f"update_world_state(chapter={novo})")
+            avisos.append(f"Começou o capítulo {novo}.")
         except Exception as e:
             recusa("capitulo", valor, f"falhou: {e}")
 
     # ---- fato do mundo ----------------------------------------------------
+    # ---- o que o grupo DESCOBRIU sobre alguém ------------------------------
+    # Medido: 5 das 15 recusas de um mês eram `fato:` escrito em prosa, e três
+    # delas eram fatos sobre uma PESSOA ("Nyx possui cicatrizes de queimadura
+    # química", "Nyx quer interceptar o contrabando"). O mestre tinha razão em
+    # querer guardá-las e não tinha onde: `fato:` só aceita bandeira, e
+    # add_character_knowledge era uma das ferramentas que ele precisava
+    # lembrar sozinho — e esquecia.
+    for valor in campos.get("sabe", [])[:TETO["sabe"]]:
+        nome, fato = _partes(valor)
+        if not fato:
+            recusa("sabe", valor, "escreva 'Nome — o que o grupo descobriu'")
+            continue
+        if not _tem_evidencia(nome, narracao):
+            recusa("sabe", nome, "não aparece na narração")
+            continue
+        try:
+            resposta = tl.add_character_knowledge(nome, fato)
+            if str(resposta).lower().startswith(("erro", "personagem")):
+                recusa("sabe", nome, str(resposta))
+                continue
+            feitos.append(f"add_character_knowledge({nome!r})")
+            avisos.append(f"O grupo agora sabe: {nome} — {fato}")
+        except Exception as e:
+            recusa("sabe", nome, f"falhou: {e}")
+
     for valor in campos.get("fato", [])[:TETO["fato"]]:
         m = _FATO_RE.match(valor)
         if not m:
-            recusa("fato", valor, "use chave=valor")
+            # A recusa diz PARA ONDE ir. Medido: o mestre repetiu a mesma
+            # prosa em cinco turnos, porque nada nunca lhe disse que o campo
+            # não era esse — e porque a recusa não voltava para ele.
+            recusa("fato", valor,
+                   "este campo é só bandeira (chave=valor). Fato sobre uma "
+                   "PESSOA vai em 'sabe:'; acontecimento vai em 'cena:'")
             continue
         chave = "_".join(_norm(m.group(1)).split())
         try:

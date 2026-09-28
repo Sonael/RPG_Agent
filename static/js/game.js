@@ -847,10 +847,14 @@ function _appendDiceResultLog(toolName, content) {
     short_rest:       { badge: 'Descanso Curto',                color: 'var(--green)' },
     long_rest:        { badge: 'Descanso Longo',                color: 'var(--green)' },
     advance_turn:     { badge: 'Turno Avançado',                color: 'var(--ink-sys)' },
-    // Não é ferramenta do mestre: é o fechamento do turno dizendo o que mudou
-    // entre duas pessoas. Entra aqui porque, para o jogador, é a mesma coisa
+    // Não é ferramenta do mestre: é o fechamento do turno dizendo o que ele
+    // acabou de registrar. Entra aqui porque, para o jogador, é a mesma coisa
     // que a linha de atitude — algo que ele provocou e quer ver acontecer.
     relacao:          { badge: 'Relação',                       color: '#7b5ea7' },
+    // Ficha nova, lugar no mapa, página de diário, virada de capítulo. Antes
+    // só a relação avisava, e o jogador via a Nyx entrar na campanha sem nada
+    // aparecer no chat.
+    fechamento:       { badge: 'Registrado',                    color: '#7b5ea7' },
   };
   const cfg = labels[toolName] || { badge: 'Sistema', color: 'var(--text-muted)' };
 

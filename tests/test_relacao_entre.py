@@ -387,8 +387,23 @@ def test_quando_os_lados_diferem_o_aviso_mostra_a_direcao(campanha):
     assert " e " not in relatorio["avisos"][0].split(":")[0]
 
 
-def test_turno_sem_relacao_nao_avisa_nada(campanha):
+def test_o_lugar_novo_tambem_avisa(campanha):
+    """
+    Antes só a relação avisava, com o argumento de que o resto "aparece
+    sozinho na barra e no mapa". Não aparecia: o jogador viu uma personagem
+    entrar na campanha e nada acontecer no chat. Agora o que CRIA alguma
+    coisa que ele pode ir olhar avisa.
+    """
     _, relatorio = epilogo.processar(_bloco("lugar: Residência de Selene — sala clara"))
+    assert relatorio["avisos"] == ["Residência de Selene entrou no mapa."]
+
+
+def test_o_que_a_barra_ja_mostra_continua_calado(campanha):
+    """Local e tempo a barra mostra o tempo todo; `fato:` é bandeira de motor."""
+    _, relatorio = epilogo.processar(_bloco(
+        "tempo: 2h — a conversa se estendeu",
+        "fato: porta_trancada=sim"))
+    assert relatorio["feitos"], relatorio["recusados"]
     assert relatorio["avisos"] == []
 
 
@@ -409,9 +424,11 @@ def test_o_servidor_manda_o_aviso_para_a_tela():
     import server
     fonte = inspect.getsource(server.chat)
     assert "registro.get(\"avisos\")" in fonte
-    assert "'tool_name': \"relacao\"" in fonte or '"tool_name": "relacao"' in fonte
+    # O cartão deixou de ser só de relação: hoje ele traz tudo o que o
+    # fechamento registrou e o jogador pode ir olhar.
+    assert '"tool_name": "fechamento"' in fonte
     # Depois da cena: o cartão confirma o que acabou de ser narrado.
-    assert fonte.index("'type': 'text'") < fonte.index('"tool_name": "relacao"')
+    assert fonte.index("'type': 'text'") < fonte.index('"tool_name": "fechamento"')
 
 
 def test_o_prompt_ensina_a_linha():

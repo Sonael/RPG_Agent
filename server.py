@@ -2580,10 +2580,18 @@ def chat():
                     # jeito a cada turno.
                     if registrar:
                         memory.avancar_turno()
-                        memory.campaign["_pendencias"] = [
-                            v["message"] for v in violations
-                            if v["rule"] in ("unsaved_character", "unknown_location") + SO_PARA_O_MESTRE
-                        ][:6]
+                        # As RECUSAS do fechamento entram aqui também, e essa
+                        # é a parte que faltava: o mestre escreveu a mesma
+                        # prosa em `fato:` durante CINCO turnos porque nada
+                        # nunca lhe disse que o campo não era aquele. A recusa
+                        # ia para o log e para a medição, e morria ali.
+                        memory.campaign["_pendencias"] = (
+                            [f"O fechamento do turno anterior recusou: {r}"
+                             for r in (registro.get("recusados") or [])[:3]]
+                            + [v["message"] for v in violations
+                               if v["rule"] in ("unsaved_character", "unknown_location")
+                               + SO_PARA_O_MESTRE]
+                        )[:6]
                         # O fechamento do turno só conserta o esquecimento se
                         # ele VIER. Na primeira medição real ele veio em 3 de
                         # 6 respostas, então a conta de quantas vezes seguidas
@@ -2596,15 +2604,22 @@ def chat():
 
                     yield f"data: {json.dumps({'type': 'text', 'content': response_text})}\n\n"
 
-                    # O que o fechamento do turno mudou entre duas pessoas vai
-                    # para o chat, DEPOIS da cena. O jogador provoca isso de
-                    # propósito ("fiz as duas se elogiarem") e não via nada
-                    # acontecer — enquanto a mudança de atitude sempre avisou.
-                    # O resto do fechamento (lugar, gente, hora) aparece
-                    # sozinho na barra e no mapa, e não vira cartão.
+                    # O que o fechamento do turno registrou vai para o chat,
+                    # DEPOIS da cena, num cartão só.
+                    #
+                    # Antes só a relação avisava, com o argumento de que o
+                    # resto "aparece sozinho na barra e no mapa". Não aparece:
+                    # o jogador viu a Nyx entrar na campanha e nada acontecer
+                    # no chat. O que CRIA alguma coisa que ele pode ir olhar
+                    # — ficha, lugar no mapa, acontecimento na linha do tempo,
+                    # página de diário, capítulo novo — avisa.
+                    #
+                    # Continuam calados local, tempo e fato: o primeiro e o
+                    # segundo a barra já mostra o tempo todo, e o terceiro é
+                    # bandeira de motor, que não é assunto do jogador.
                     if registro.get("avisos"):
                         pacote = json.dumps({"type": "tool_result",
-                                             "tool_name": "relacao",
+                                             "tool_name": "fechamento",
                                              "content": "\n".join(registro["avisos"])})
                         yield f"data: {pacote}\n\n"
 
