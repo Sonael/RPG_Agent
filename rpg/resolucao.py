@@ -208,6 +208,76 @@ ACOES_DE_CLASSE: dict[str, dict] = {
         "slot": "acao", "alvo": "inimigo",
         "texto": "Ação: o alvo faz salvaguarda de SAB (CD 8 + prof. + CAR); se falhar, fica Amedrontado até o fim do seu próximo turno.",
     },
+    # ── Subclasses e nível alto (rpg/subclasses.py) ─────────────────────────
+    "maestria de feitico": {"slot": "livre", "alvo": "si", "modos_dinamicos": True,
+                            "texto": "Escolha a magia de 1º e a de 2º círculo que saem sem mana no círculo delas."},
+    "assinatura de feitico": {"slot": "livre", "alvo": "si", "modos_dinamicos": True,
+                              "texto": "Escolha duas magias de 3º círculo; cada uma sai sem mana uma vez por descanso curto."},
+    "metamagia": {"slot": "livre", "alvo": "si", "modos_dinamicos": True, "uso": "pontos de feiticaria",
+                  "uso_manual": True,
+                  "texto": "Arma uma Metamagia para a próxima magia deste turno (Acelerada, Gêmea, Cuidadosa, "
+                           "Intensificada, Potencializada, Sutil...), paga com pontos de feitiçaria quando a magia sai."},
+    "mestre sobrenatural": {"slot": "acao", "alvo": "si",
+                            "texto": "Ação: o pacto devolve um espaço de 5º círculo (mana). Uma vez por descanso longo."},
+    "disparo magico": {"slot": "bonus", "alvo": "inimigo",
+                       "texto": "Ação bônus, depois de conjurar uma magia neste turno: um ataque com a arma."},
+    "avatar sagrado": {"slot": "acao", "alvo": "nenhum",
+                       "texto": "Ação: você e os aliados da sua zona resistem a todo dano até o fim do combate. "
+                                "Uma vez por descanso longo."},
+    "tornado de folhas": {"slot": "acao", "alvo": "inimigo", "uso": "canalizar divindade",
+                          "texto": "Ação: SAB ou o alvo fica Amedrontado até o fim do combate."},
+    "anjo vingador": {"slot": "acao", "alvo": "nenhum",
+                      "texto": "Ação: asas (mais uma zona por turno), +CAR de dano, e os inimigos da zona fazem SAB "
+                               "ou ficam Amedrontados. Uma vez por descanso longo."},
+    "ler pensamentos": {"slot": "acao", "alvo": "inimigo", "uso": "canalizar divindade",
+                        "texto": "Ação: SAB; se falhar, você lê os pensamentos dele por um minuto (o Mestre diz o que "
+                                 "ele pensa)."},
+    "coroa da luz": {"slot": "acao", "alvo": "si",
+                     "texto": "Ação: até o fim do combate, inimigos fazem com desvantagem as salvaguardas contra "
+                              "magias de fogo e radiantes do grupo."},
+    "encantar animais e plantas": {"slot": "acao", "alvo": "nenhum", "uso": "canalizar divindade",
+                                   "texto": "Ação: animais e plantas inimigos perto fazem SAB ou ficam Enfeitiçados."},
+    "bencao do trapaceiro": {"slot": "acao", "alvo": "aliado",
+                             "texto": "Ação: um aliado tem vantagem em Furtividade por uma hora."},
+    "invocar duplicacao": {"slot": "acao", "alvo": "si", "uso": "canalizar divindade",
+                           "texto": "Ação: uma cópia ilusória confunde os inimigos — vantagem nos seus ataques "
+                                    "enquanto durar a concentração."},
+    "palma vibrante": {"slot": "livre", "alvo": "si", "modos_dinamicos": True, "uso": "ki",
+                       "uso_manual": True,
+                       "texto": "Vibrar: o próximo golpe que acertar planta a vibração (1 ki). Detonar (ação): CON; "
+                                "falha cai a 0 PV, sucesso leva 10d10 necrótico."},
+    "salto sombrio": {"slot": "bonus", "alvo": "si", "modos_dinamicos": True,
+                      "texto": "Ação bônus, nas sombras (Escuridão ou Névoa): teleporta até duas zonas e ganha "
+                               "vantagem no próximo ataque corpo a corpo."},
+    "manto sombrio": {"slot": "acao", "alvo": "si",
+                      "texto": "Ação, nas sombras: fica Invisível até atacar ou conjurar."},
+    "conjuracao elemental": {"slot": "acao", "alvo": "inimigo", "modos_dinamicos": True, "uso": "ki",
+                             "custo_uso": 2,
+                             "texto": "Ação, 2 ki: Varredura de Fogo (3d6 de fogo na zona) ou Punho do Ar Desatado "
+                                      "(3d10 e empurrão)."},
+    "terceiro olho": {"slot": "acao", "alvo": "si",
+                      "texto": "Ação: você vê o invisível até o fim do combate. Uma vez por descanso curto."},
+    "conjuracao veloz": {"slot": "livre", "alvo": "si",
+                         "texto": "A próxima magia de conjuração deste turno sai como ação bônus. Uma vez por descanso curto."},
+    "teletransporte pequeno": {"slot": "bonus", "alvo": "si", "modos_dinamicos": True,
+                               "texto": "Ação bônus: teleporta para a zona vizinha, uma vez por turno."},
+    "asas draconicas": {"slot": "bonus", "alvo": "si",
+                        "texto": "Ação bônus: asas — mais uma zona de movimento por turno até o fim do combate."},
+    "presenca draconica": {"slot": "acao", "alvo": "nenhum", "modos_dinamicos": True,
+                           "uso": "pontos de feiticaria", "uso_manual": True,
+                           "texto": "Ação, 3 pontos de feitiçaria, concentração: inimigos da zona fazem SAB ou ficam "
+                                    "Amedrontados (ou Enfeitiçados)."},
+    "esculpir o caos": {"slot": "livre", "alvo": "si", "uso": "pontos de feiticaria", "uso_manual": True,
+                        "texto": "2 pontos de feitiçaria: o motor rola o Surto de Magia Selvagem (d100) e o Mestre "
+                                 "aplica o efeito."},
+    "presenca feerica": {"slot": "acao", "alvo": "nenhum", "modos_dinamicos": True,
+                         "texto": "Ação: inimigos da zona fazem SAB ou ficam Enfeitiçados (ou Amedrontados) até o fim do "
+                                  "seu próximo turno. Uma vez por descanso curto."},
+    "apenas para mim": {"slot": "acao", "alvo": "inimigo",
+                        "texto": "Ação: um humanoide faz SAB ou fica Em Transe (não age; SAB no fim de cada turno). "
+                                 "Uma vez por descanso curto."},
+    "mestrado do grande antigo": {"slot": "acao", "alvo": "inimigo",
+                                  "texto": "Ação: SAB ou o alvo ataca um aliado dele. Uma vez por descanso longo."},
     "manobras de combate": {
         "slot": "livre", "alvo": "si", "modos_dinamicos": True, "uso": "dados de superioridade",
         "gasta_no_acerto": True,
@@ -269,6 +339,18 @@ APELIDOS_DE_ACAO = {
     "intimidating presence": "presenca intimidadora",
     "frenzy": "frenesi",
     "combat superiority": "manobras de combate",
+    "spell mastery": "maestria de feitico", "signature spells": "assinatura de feitico",
+    "metamagic": "metamagia", "eldritch master": "mestre sobrenatural", "war magic": "disparo magico",
+    "eldritch strike": "disparo magico", "holy nimbus": "avatar sagrado", "avenging angel": "anjo vingador",
+    "read thoughts": "ler pensamentos", "corona of light": "coroa da luz",
+    "charm animals and plants": "encantar animais e plantas", "blessing of the trickster": "bencao do trapaceiro",
+    "invoke duplicity": "invocar duplicacao", "quivering palm": "palma vibrante",
+    "palma vibrante tremula": "palma vibrante", "shadow step": "salto sombrio", "cloak of shadows": "manto sombrio",
+    "disciple of the elements": "conjuracao elemental", "the third eye": "terceiro olho",
+    "minor conjuration": "conjuracao veloz", "benign transposition": "teletransporte pequeno",
+    "dragon wings": "asas draconicas", "draconic presence": "presenca draconica",
+    "controlled chaos": "esculpir o caos", "fey presence": "presenca feerica",
+    "dark delirium": "apenas para mim", "create thrall": "mestrado do grande antigo",
     "superioridade em combate": "manobras de combate",
     "maneuvers": "manobras de combate",
 }
@@ -725,6 +807,19 @@ PASSIVAS_NO_MOTOR = {
     "improved divine smite": "o motor soma 1d8 radiante a todo acerto com arma corpo a corpo",
     "uso de forma selvagem adicional": "a Forma Selvagem passa a ter 3 usos por descanso",
     "forma selvagem do combate": "a Forma Selvagem vira ação bônus e aceita feras de ND 1 já no 2º nível",
+    "inspiracao bardica aprimorada": "o motor já rola o dado de Inspiração maior conforme o nível",
+    "inspiracao superior aprimorada": "ao rolar iniciativa, o motor devolve todos os usos de Inspiração de Bardo",
+    "visao aprofundada": "o motor guarda 3 dados de Lampejos de Adivinhação por descanso longo",
+    "lampejos aprimorados": "o motor guarda 4 dados de Lampejos de Adivinhação por descanso longo",
+    "atleta notavel": "o motor dá vantagem nos seus testes de Atletismo",
+    "bencao do trapaceiro aprimorada": "o motor cobra a Bênção do Trapaceiro como ação bônus",
+    "magias lunares": "na Forma Selvagem, o motor deixa conjurar Curar Ferimentos, como ação bônus",
+    "restauracao de feiticaria": "no descanso curto, o motor devolve 4 pontos de feitiçaria",
+    "inimigo do inimigo": "uma vez por turno, o motor soma os +2 do Inimigo Favorecido contra qualquer criatura",
+    "surto de magia selvagem": "a cada magia de 1º círculo ou mais, o motor rola o d20; no 1, rola o d100 do "
+                               "Surto e o Mestre aplica o efeito",
+    "encontrar familiar aprimorado": "o motor oferece diabrete, pseudodragão, quasit e sprite no Convocar "
+                                     "Familiar, e o familiar ataca",
     "dado de superioridade": "o motor gasta os dados nas Manobras de Combate (d8; d10 no 10º, d12 no 18º; "
                              "4 por descanso curto, 5 no 7º, 6 no 15º)",
     "superiority dice": "o motor gasta os dados nas Manobras de Combate",
@@ -808,6 +903,10 @@ def como_resolve(hab: dict, char: dict | None = None) -> dict:
         if chave == "manobras de combate":
             from rpg import superioridade
             saida["modos_alvo"] = {m: superioridade.alvo_do_modo(m) for m in lista}
+        else:
+            from rpg import subclasses
+            if any(k[0] == chave for k in subclasses.ALVO_DO_MODO):
+                saida["modos_alvo"] = {m: subclasses.ALVO_DO_MODO.get((chave, m), "") for m in lista}
         return saida
 
     # "Mente Vazia" é a característica do monge e também o nome em português
@@ -860,6 +959,11 @@ def como_resolve(hab: dict, char: dict | None = None) -> dict:
                                       .replace("na zona", "na área").replace("da zona", "da área"))
             if ef.get("transformar"):
                 modos = _modos_da_polimorfia(bool(ef.get("verdadeira")))
+            if m["nome_srd"] == "Find Familiar" and char:
+                from rpg import criaturas
+                if criaturas._corrente(char):
+                    modos.update({"diabrete:1": "Diabrete", "pseudodragao:1": "Pseudodragão",
+                                  "quasit:1": "Quasit", "sprite:1": "Sprite"})
             if ef.get("identificar") and char:
                 modos = {i["nome"]: i["nome"] for i in (char.get("inventario") or [])
                          if isinstance(i, dict) and i.get("nome") and not i.get("identificado")}
@@ -1020,6 +1124,11 @@ def validar(char: dict, hab: dict, alvo: str, modo: str) -> str:
             from rpg import tools_dnd as td
             if (td.usos_restantes(char, "Forma Selvagem") or 0) <= 0:
                 return "Aviso: a Forma Selvagem está gasta. Volta no descanso curto. Nada foi gasto."
+        from rpg import subclasses
+        if chave in subclasses.EXECUTORES:
+            recusa = subclasses.validar(chave, char, alvo, modo)
+            if recusa:
+                return recusa
         if chave == "manobras de combate" and alvo_do_modo(hab, char, modo) in ("inimigo", "aliado") \
                 and not _char(alvo):
             return f"Aviso: escolha o alvo da manobra. Nada foi gasto."
@@ -1069,7 +1178,12 @@ def validar(char: dict, hab: dict, alvo: str, modo: str) -> str:
     if ef:
         nome_pt = m.get("nome") or hab.get("nome", "")
         a = _char(alvo)
-        if ef.get("modos") and modo not in ef["modos"]:
+        _modos_ok = dict(ef.get("modos") or {})
+        if m.get("nome_srd") == "Find Familiar":
+            from rpg import criaturas
+            if criaturas._corrente(char):
+                _modos_ok.update({"diabrete:1": "", "pseudodragao:1": "", "quasit:1": "", "sprite:1": ""})
+        if ef.get("modos") and modo not in _modos_ok:
             return (f"Aviso: {nome_pt} pede uma escolha: " + "; ".join(ef["modos"].values())
                     + ". Nada foi gasto.")
         if ef.get("estabilizar"):
@@ -2303,7 +2417,9 @@ def modos_de(chave: str, char: dict | None) -> dict:
         return {m: MODOS_DE_MOVIMENTO.get(m, m) for m in acao.get("modos") or []}
     if not char:
         return {}
-    from rpg import superioridade
+    from rpg import subclasses, superioridade
+    if chave in subclasses.MODOS:
+        return subclasses.MODOS[chave](char)
     return {"destruicao divina": _modos_da_destruicao, "forma selvagem": _modos_da_forma,
             "fonte de magia": _modos_da_fonte, "manobras de combate": superioridade.modos}[chave](char)
 
@@ -2314,7 +2430,8 @@ def alvo_do_modo(hab: dict, char: dict | None, modo: str) -> str:
     if chave == "manobras de combate" and modo:
         from rpg import superioridade
         return superioridade.alvo_do_modo(modo)
-    return ""
+    from rpg import subclasses
+    return subclasses.ALVO_DO_MODO.get((chave, modo), "")
 
 
 def slot_do_modo(hab: dict, char: dict | None, modo: str) -> str:
@@ -2325,7 +2442,12 @@ def slot_do_modo(hab: dict, char: dict | None, modo: str) -> str:
     if chave == "manobras de combate" and modo:
         from rpg import superioridade
         return superioridade.slot_do_modo(modo)
-    return ""
+    from rpg import subclasses
+    if chave == "bencao do trapaceiro" and char:
+        from rpg import tools_dnd as td
+        if td._tem_habilidade(char, "bencao do trapaceiro aprimorada"):
+            return "bonus"
+    return subclasses.SLOT_DO_MODO.get((chave, modo), "")
 
 
 def _manobras_de_combate(char, hab, alvo, modo):
@@ -2333,7 +2455,21 @@ def _manobras_de_combate(char, hab, alvo, modo):
     return superioridade.usar(char, modo, alvo)
 
 
+def _da_subclasse(chave):
+    def _executar(char, hab, alvo, modo):
+        from rpg import subclasses
+        return subclasses.EXECUTORES[chave](char, hab, alvo, modo)
+    return _executar
+
+
 _ACOES = {
+    **{k: _da_subclasse(k) for k in (
+        "maestria de feitico", "assinatura de feitico", "metamagia", "mestre sobrenatural", "disparo magico",
+        "avatar sagrado", "tornado de folhas", "anjo vingador", "ler pensamentos", "coroa da luz",
+        "encantar animais e plantas", "bencao do trapaceiro", "invocar duplicacao", "palma vibrante",
+        "salto sombrio", "manto sombrio", "conjuracao elemental", "terceiro olho", "conjuracao veloz",
+        "teletransporte pequeno", "asas draconicas", "presenca draconica", "esculpir o caos",
+        "presenca feerica", "apenas para mim", "mestrado do grande antigo")},
     "manobras de combate": _manobras_de_combate,
     "destruicao divina": _destruicao_divina,
     "arma sagrada": _arma_sagrada,

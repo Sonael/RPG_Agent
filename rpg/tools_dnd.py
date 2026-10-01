@@ -2474,6 +2474,10 @@ def _rolar_salvaguarda(alvo: dict, atributo: str, cd: int,
     if atributo == "destreza" and conds & {"contido", "imobilizado"}:
         desvantagem = True
     notas_extra = []
+    from rpg import reacoes as _reacoes_s
+    mod, _nota_proj = _reacoes_s.bonus_projetado(alvo, atributo, mod)
+    if _nota_proj:
+        notas_extra.append(_nota_proj)
     for e in _efeitos(s):
         if _norm_txt(atributo) in {_norm_txt(x) for x in e.get("vantagem_save_atributos") or []}:
             vantagem = True
@@ -2504,6 +2508,9 @@ def _rolar_salvaguarda(alvo: dict, atributo: str, cd: int,
         linha += f" ({'; '.join(notas_extra)})"
     if passou:
         return passou, linha
+    _passou_l, _linha_l = _reacoes_s.lampejo_na_salvaguarda(alvo, mod, cd)
+    if _passou_l:
+        return True, f"{linha}; {_linha_l}"
     # Indomável (guerreiro) e Alma do Diamante (monge, 1 ki): refaz a
     # salvaguarda que falhou. O motor usa sozinho, se o jogador não desligou.
     if (_tem_habilidade(alvo, "indomavel", "indomitable") and reacao_automatica(alvo, "indomavel")
@@ -2823,6 +2830,15 @@ _USOS_POR_DESCANSO = {
     "eu ilusorio":         ("curto", lambda n, s: 1),
     # Mestre de Batalha: 4 dados por descanso curto, 5 no 7º, 6 no 15º.
     "dados de superioridade": ("curto", lambda n, s: 6 if n >= 15 else (5 if n >= 7 else 4)),
+    "mestre sobrenatural": ("longo", lambda n, s: 1),
+    "avatar sagrado":      ("longo", lambda n, s: 1),
+    "anjo vingador":       ("longo", lambda n, s: 1),
+    "terceiro olho":       ("curto", lambda n, s: 1),
+    "conjuracao veloz":    ("curto", lambda n, s: 1),
+    "presenca feerica":    ("curto", lambda n, s: 1),
+    "apenas para mim":     ("curto", lambda n, s: 1),
+    "mestrado do grande antigo": ("longo", lambda n, s: 1),
+    "refugio feerico":     ("curto", lambda n, s: max(2, int(s.get("proficiencia", 2) or 2))),
 }
 
 
@@ -3196,6 +3212,7 @@ CONDITION_EFFECTS: dict[str, dict] = {
     "no labirinto": {"no_actions": True, "no_movement": True, "untargetable": True},
     "forma gasosa": {"no_actions": True},
     "levitando":   {"no_movement": True, "fora_do_corpo_a_corpo": True},
+    "em transe":   {"no_actions": True},
     # Raio do Enfraquecimento: metade do dano com armas de FOR.
     "enfraquecido": {"metade_dano_for": True},
     "transformado":{},
@@ -6783,6 +6800,12 @@ def attack_roll(
         if target_type and any(t.rstrip("s") in target_type for t in favored):
             favored_bonus = 2
             style_note = (style_note + " · " if style_note else "") + "Inimigo Favorecido → +2 dano"
+    if not favored_bonus and _tem_habilidade(attacker, "inimigo do inimigo"):
+        _tk_ii = (memory.campaign.get("combat_state") or {}).get("turn_token")
+        if sa.get("_inimigo_token") != _tk_ii:
+            sa["_inimigo_token"] = _tk_ii
+            favored_bonus = 2
+            style_note = (style_note + " · " if style_note else "") + "Inimigo do Inimigo → +2 dano"
 
     # ── Golpe Divino (Domínio de Clérigo / Paladino) ────────────────────────
     # +1d8 (2d8 a partir do nv. 14) de dano elemental UMA vez por turno, ao
@@ -6842,6 +6865,10 @@ def attack_roll(
     # Uso único (Guiar Ataque, o Raio Guia que marcou o alvo) acaba neste golpe.
     for _sh_e, _e in _mods["gastar"]:
         _gastar_efeito(_sh_e, _e)
+    # Manto Sombrio: a invisibilidade das sombras acaba ao atacar.
+    if any(isinstance(c, dict) and c.get("some_ao_atacar") for c in sa.get("condicoes") or []):
+        sa["condicoes"] = [c for c in sa.get("condicoes") or [] if not (isinstance(c, dict) and c.get("some_ao_atacar"))]
+        cond_notes.append(f"{attacker['name']} sai das sombras ao atacar")
     # Escondido: atacar revela quem estava escondido.
     _conds_atk = sa.get("condicoes") or []
     if any(_norm_txt(c.get("nome", "") if isinstance(c, dict) else str(c)) == "escondido"
@@ -6849,6 +6876,11 @@ def attack_roll(
         sa["condicoes"] = [c for c in _conds_atk
                            if _norm_txt(c.get("nome", "") if isinstance(c, dict) else str(c)) != "escondido"]
         cond_notes.append(f"{attacker['name']} sai do esconderijo ao atacar")
+    _novo_d20, _linha_lamp = _reacoes.lampejo_no_ataque(attacker, target, d20, attack_total, target_ca)
+    if _linha_lamp:
+        attack_total += _novo_d20 - d20
+        d20 = _novo_d20
+        cond_notes.append(_linha_lamp)
     critico       = force_crit or (d20 >= crit_min)
     falha_critica = (not force_crit) and (d20 == 1)
     # Golpe de Sorte: o ataque que errou vira acerto.
@@ -7137,6 +7169,8 @@ def attack_roll(
                           ca=target_ca)
 
     _marcar_que_atacou(attacker)
+    for _l in _reacoes.depois_do_ataque(attacker, target, _acerta, is_ranged, weapon):
+        result += f"\n   {_l}"
 
     if end_turn:
         result += _auto_advance_turn(attacker_name)
@@ -7216,6 +7250,7 @@ def use_ability(
     _skip_turn_check: bool = False,
     modo: str = "",
     _ritual: bool = False,
+    _sem_custo: bool = False,
 ) -> str:
     """
     Usa uma habilidade do personagem: verifica mana, desconta o custo,
@@ -7317,7 +7352,8 @@ def use_ability(
             if _globo:
                 return (f"Erro: o {_globo} protege {_alvo_am}: magia de até 5º círculo vinda de fora não "
                         f"o afeta. Nada foi gasto.")
-        _cala = _zona_silenciada(char["name"])
+        from rpg import subclasses as _sub_s
+        _cala = "" if _sub_s.metamagia_armada(char, "sutil") else _zona_silenciada(char["name"])
         if _cala and "V" in [c.strip() for c in str(_m_zona.get("componentes") or "").split(",")]:
             return (f"Erro: {char['name']} está no {_cala}: {hab['nome']} tem componente verbal e não "
                     f"sai sem som. Saia da zona ou use outra coisa. Nada foi gasto.")
@@ -7370,6 +7406,16 @@ def use_ability(
         if _circulo > _base_c:
             custo = SPELL_MANA_COST[_circulo]
 
+    from rpg import subclasses as _sub
+    _nota_graca = ""
+    if _sem_custo:
+        custo = 0
+    elif custo and _resolucao._magia_srd(hab):
+        _gratis = _sub.custo_de_graca(char, hab, _circulo)
+        if _gratis:
+            custo = 0
+            _nota_graca = f"\n   {_gratis}: sem mana."
+
     # ── RECARGA 5–6 ────────────────────────────────────────────────────────
     # O poder de recarga gasto não pode ser usado de novo até o d6 devolvê-lo
     # no início do turno (_rolar_recargas). Antes, só o braço da IA de NPC
@@ -7420,7 +7466,9 @@ def use_ability(
     # Na forma de fera o druida não conjura (SRD: Forma Selvagem).
     from rpg import criaturas as _criaturas
     _fera = _criaturas.em_forma_selvagem(char)
-    if _fera and _resolucao._magia_srd(hab):
+    if (_fera and _resolucao._magia_srd(hab)
+            and not (_tem_habilidade(char, "magias lunares")
+                     and (_resolucao._magia_srd(hab) or {}).get("nome_srd") == "Cure Wounds")):
         return (f"Erro: {char['name']} está na forma de {_fera['forma']} e não conjura magias. "
                 f"Volte à forma normal primeiro (Forma Selvagem → voltar). Nada foi gasto.")
 
@@ -7464,7 +7512,17 @@ def use_ability(
     # ── Contramágica de quem está do outro lado ────────────────────────────
     # A mana já foi: a magia anulada gasta o espaço (SRD).
     from rpg import reacoes as _reacoes
-    _contra = _reacoes.contramagica(char, hab) if _como["tipo"] != "acao_de_classe" else ""
+    _nota_meta = _nota_graca
+    if _resolucao._magia_srd(hab) and any(isinstance(c, dict) and c.get("some_ao_atacar")
+                                          for c in s.get("condicoes") or []):
+        s["condicoes"] = [c for c in s.get("condicoes") or [] if not (isinstance(c, dict) and c.get("some_ao_atacar"))]
+        _nota_meta += f"\n   {char['name']} sai das sombras ao conjurar."
+    if _resolucao._magia_srd(hab) and _sub.metamagia_armada(char, "sutil") and not _sem_custo:
+        _sub.consumir_metamagia(char, "sutil")
+        _nota_meta += "\n   Magia Sutil (1 ponto): sem som nem gesto — ninguém percebe a conjuração."
+        _contra = ""
+    else:
+        _contra = _reacoes.contramagica(char, hab) if _como["tipo"] != "acao_de_classe" else ""
     if _contra and not _contra.startswith("("):
         result = (f"{char['name']} conjura {hab['nome']}"
                   + (f" em {target_name}" if target_name else "") + "!\n"
@@ -7478,7 +7536,27 @@ def use_ability(
             result += _auto_advance_turn(char_name)
         memory.save_campaign()
         return result
-    _nota_contra = f"\n   {_contra}" if _contra else ""
+    _nota_contra = (f"\n   {_contra}" if _contra else "") + _nota_meta
+    if _resolucao._magia_srd(hab) and not _sem_custo:
+        for _tipo_m in ("distante", "estendida"):
+            if _sub.consumir_metamagia(char, _tipo_m):
+                _nota_contra += f"\n   {_sub.METAMAGIAS[_tipo_m][0]} (1 ponto): {_sub.METAMAGIAS[_tipo_m][2]}."
+        _nota_contra += _sub.surto(char, hab)
+        _cs_c = memory.campaign.get("combat_state") or {}
+        _ord_c = _cs_c.get("initiative_order") or []
+        _i_c = _cs_c.get("current_turn_index", 0)
+        if (_cs_c.get("is_active") and isinstance(_i_c, int) and 0 <= _i_c < len(_ord_c)
+                and memory.char_key(_ord_c[_i_c]) == memory.char_key(char["name"])):
+            _resolucao._eco()["conjurou"] = True
+    # Intensificada e Cuidadosa valem para as salvaguardas desta magia.
+    _desv_primeira = bool(_resolucao._magia_srd(hab) and salvaguarda_da_habilidade(hab) and not _sem_custo
+                          and _sub.consumir_metamagia(char, "intensificada"))
+    if _desv_primeira:
+        _nota_contra += "\n   Magia Intensificada (3 pontos): o primeiro alvo faz a salvaguarda com desvantagem."
+    _cuidadosa = bool(_resolucao._magia_srd(hab) and area_da_habilidade(hab) and not _sem_custo
+                      and _sub.consumir_metamagia(char, "cuidadosa"))
+    if _cuidadosa:
+        _nota_contra += "\n   Magia Cuidadosa (1 ponto): os aliados na área passam na salvaguarda."
 
     # ── Efeito, ação de classe e narrativa: caminho próprio ────────────────
     # (rpg/resolucao.py). Nenhum deles rola o "dado" da ficha como dano ou
@@ -7531,6 +7609,15 @@ def use_ability(
             _attr_cura = _atributo_de_conjuracao(s) or "sabedoria"
             bonus += max(0, _modifier(int(s.get(_attr_cura, 10) or 10)))
         rolls      = [random.randint(1, sides) for _ in range(n_dice)]
+        if (_efeito == "dano" and not _sem_custo and _resolucao._magia_srd(hab)
+                and _sub.consumir_metamagia(char, "potencializada")):
+            _quantos = max(1, _modifier(int(s.get("carisma", 10) or 10)))
+            _baixos = sorted(range(len(rolls)), key=lambda i: rolls[i])[:_quantos]
+            _antes_p = list(rolls)
+            for _i_p in _baixos:
+                if rolls[_i_p] <= sides // 2:
+                    rolls[_i_p] = random.randint(1, sides)
+            _nota_contra += (f"\n   Magia Potencializada (1 ponto): dados {_antes_p} → {rolls}.")
         total_dano = sum(rolls) + bonus
     else:
         n_dice, sides, bonus = 0, 0, 0
@@ -7683,8 +7770,14 @@ def use_ability(
             if _globo_a:
                 result += f"\n   {_alvo['name']}: dentro do {_globo_a} — a magia não o alcança."
                 continue
-            if _save_area:
-                _passou, _linha_save = _rolar_salvaguarda(_alvo, _save_area, _cd_area)
+            if _save_area and _cuidadosa and memory.luta_com_o_grupo(_alvo) == memory.luta_com_o_grupo(char):
+                _passou, _linha_save = True, "Magia Cuidadosa: passa"
+                _dano_nele = total_dano // 2 if _metade_se_passar(hab) else 0
+                _linha_save = f" ({_linha_save} — {'metade' if _dano_nele else 'nada'})"
+            elif _save_area:
+                _passou, _linha_save = _rolar_salvaguarda(_alvo, _save_area, _cd_area,
+                                                          desvantagem=_desv_primeira or _sub.coroa_contra(_alvo, hab))
+                _desv_primeira = False
                 if _passou:
                     _dano_nele = total_dano // 2
                 _linha_save = (f" ({_linha_save} — "
@@ -7753,7 +7846,9 @@ def use_ability(
                 else:
                     _passou, _linha = _rolar_salvaguarda(
                         target, _save_auto, _cd,
+                        desvantagem=_desv_primeira or _sub.coroa_contra(target, hab),
                         contra=(ctrl_effect or {}).get("condition", ""))
+                    _desv_primeira = False
                     result += f"\n   {target['name']}: {_linha}"
                     if ctrl_effect is not None:
                         if _passou:
@@ -11445,6 +11540,12 @@ def short_rest(char_name: str, hit_dice: int = -1) -> str:
     # hora do descanso curto que os devolve no SRD, e sem isto o contador que
     # o motor passou a cobrar seria uma via de mão única.
     _usos_voltaram = restaurar_usos(char, "curto")
+    (char.get("sheet") or {}).pop("assinatura_usada", None)
+    if _tem_habilidade(char, "restauracao de feiticaria"):
+        _s_rf = char["sheet"]
+        _pts = int(usos_restantes(char, "Fonte de Magia") or 0)
+        _s_rf.setdefault("usos", {})["pontos de feiticaria"] = min(
+            int(usos_maximos(char, "Fonte de Magia") or 0), _pts + 4)
     memory.save_campaign()
 
     linhas = [f"{char['name']} faz um descanso curto (1 hora — agora {_hora_legivel()})."]
@@ -11579,6 +11680,8 @@ def long_rest(char_name: str) -> str:
     # O longo devolve TUDO: quem dorme a noite inteira também teve a hora do
     # descanso curto.
     restaurar_usos(char, "longo")
+    s.pop("assinatura_usada", None)
+    s.pop("lampejos", None)          # novos dados de Lampejos de Adivinhação
     dados_antes, dados_max = _reserva_de_dados(s)
     s["hit_dice_remaining"] = dados_antes + _dados_devolvidos_no_longo(s)
     s["death_saves_sucessos"] = 0
@@ -12155,6 +12258,12 @@ def roll_initiative(characters_names: str, allies: str = "") -> str:
 
     results      = []
     auto_created = []
+
+    # Inspiração Superior Aprimorada: rolar iniciativa devolve a Inspiração.
+    for _nm_is in names:
+        _ch_is = memory.campaign["characters"].get(memory.char_key(_nm_is))
+        if _ch_is and _tem_habilidade(_ch_is, "inspiracao superior aprimorada"):
+            ((_ch_is.get("sheet") or {}).get("usos") or {}).pop("inspiracao de bardo", None)
 
     for name in names:
         char, criado = _combatente_para_a_luta(name)
@@ -13237,6 +13346,8 @@ def conjurar_fora_de_combate(ator: str, habilidade: str, alvo: str = "", modo: s
     recusou = msg.startswith(("Erro:", "Aviso:")) or "não conhece" in msg.split("\n")[0]
     if recusou:
         return {"ok": False, "message": msg}
+    from rpg import subclasses as _sub_f
+    msg += _sub_f.lancar_gemea(ator, habilidade, modo)
     # O tempo de conjuração: uma hora (Convocar Familiar) passa no relógio;
     # o ritual soma dez minutos, que o relógio de horas não registra.
     from rpg import resolucao as _res
@@ -15891,10 +16002,16 @@ def _efeitos_no_teste(char: dict, atributo: str, pericia: str = "") -> tuple[int
         if _norm_txt(atributo) in {_norm_txt(x) for x in e.get("vantagem_teste_atributos") or []}:
             vantagem = True
             notas.append(f"{e.get('nome', 'efeito')}: vantagem")
+        if pericia and _norm_txt(pericia) in {_norm_txt(x) for x in e.get("vantagem_pericias") or []}:
+            vantagem = True
+            notas.append(f"{e.get('nome', 'efeito')}: vantagem")
         extra = (e.get("bonus_pericia") or {}).get(_norm_txt(pericia)) if pericia else None
         if extra:
             bonus += int(extra)
             notas.append(f"{e.get('nome', 'efeito')}: {int(extra):+d}")
+    if _norm_txt(pericia) == "atletismo" and _tem_habilidade(char, "atleta notavel"):
+        vantagem = True
+        notas.append("Atleta Notável: vantagem")
     return bonus, vantagem, notas
 
 
@@ -16671,6 +16788,10 @@ def combat_action(action: str, actor: str = "", target: str = "",
                 _ov = _res_slot.slot_do_modo(hab_pre, ch_pre, (weapon or "").strip())
                 if _ov:
                     slot = None if _ov == "livre" else _ov
+            from rpg import subclasses as _sub_c
+            _rapida = _sub_c.conjuracao_rapida(ch_pre, hab_pre) if (slot == "acao" and hab_pre) else ""
+            if _rapida:
+                slot = "bonus"
             if slot:
                 err = _use_slot(eco, slot)
                 if err:
@@ -16685,6 +16806,9 @@ def combat_action(action: str, actor: str = "", target: str = "",
                 if slot:
                     eco[slot + "_usada"] = False
                 return {"ok": False, "message": msg, "snapshot": combat_snapshot()}
+            if _rapida:
+                msg += _sub_c.consumir_rapida(ch_pre, _rapida)
+            msg += _sub_c.lancar_gemea(actor, ability, (weapon or "").strip())
             if surto:
                 eco["acao_usada"] = False
                 eco["surto_usado"] = True

@@ -76,6 +76,19 @@ FICHAS: dict[str, dict] = {
     "aranha": {"nome": "Aranha", "nd": "0", "tipo": "beast", "ca": 12, "pv": 1,
                "atr": (2, 14, 8, 1, 10, 2), "nao_ataca": True, "ataques": [{"nome": "mordida", "dado": "1d1", "tipo": "piercing"}]},
 
+    # ── Pacto da Corrente (Encontrar Familiar Aprimorado) ───────────────
+    "diabrete": {"nome": "Diabrete", "nd": "1", "tipo": "fiend", "ca": 13, "pv": 10,
+                 "atr": (6, 17, 13, 11, 12, 14), "voa": True,
+                 "ataques": [{"nome": "ferrão", "dado": "1d4", "tipo": "piercing"}],
+                 "resistencias": ["cold"], "imunidades": ["fire", "poison"]},
+    "pseudodragao": {"nome": "Pseudodragão", "nd": "1/4", "tipo": "dragon", "ca": 13, "pv": 7,
+                     "atr": (6, 15, 13, 10, 12, 10), "voa": True,
+                     "ataques": [{"nome": "mordida", "dado": "1d4", "tipo": "piercing"}]},
+    "quasit": {"nome": "Quasit", "nd": "1", "tipo": "fiend", "ca": 13, "pv": 7,
+               "atr": (5, 17, 10, 7, 10, 10),
+               "ataques": [{"nome": "garras", "dado": "1d4", "tipo": "slashing"}],
+               "resistencias": ["cold", "fire", "lightning"], "imunidades": ["poison"]},
+
     # ── Montarias (Encontrar Montaria) ──────────────────────────────────
     "cavalo de guerra": {"nome": "Cavalo de Guerra", "nd": "1/2", "tipo": "celestial", "ca": 11, "pv": 19,
                          "atr": (18, 12, 13, 6, 12, 7),
@@ -332,6 +345,12 @@ def _invocadas() -> list[dict]:
             if isinstance(c, dict) and isinstance(c.get("invocacao"), dict)]
 
 
+def _corrente(conjurador: dict) -> bool:
+    """Pacto da Corrente: o familiar do bruxo ataca."""
+    from rpg import tools_dnd as td
+    return td._tem_habilidade(conjurador, "encontrar familiar aprimorado", "pact of the chain")
+
+
 def invocar(conjurador: dict, chave: str, quantos: int, magia: str, *,
             concentracao: bool, persistente: bool, ate_hora: int | None = None,
             acompanha: bool | None = None, hostil_ao_perder: bool = False) -> list[str]:
@@ -343,7 +362,7 @@ def invocar(conjurador: dict, chave: str, quantos: int, magia: str, *,
     for i in range(quantos):
         nome = f"{f['nome']} de {dono}" + (f" {i + 1}" if quantos > 1 else "")
         sheet = montar_sheet(chave)
-        if f.get("nao_ataca"):
+        if f.get("nao_ataca") and not _corrente(conjurador):
             sheet["nao_ataca"] = True
         memory.campaign["characters"][memory.char_key(nome)] = {
             "name": nome, "description": f"{f['nome']} invocado por {dono} ({magia}).",

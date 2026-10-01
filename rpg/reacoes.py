@@ -78,6 +78,30 @@ REACOES: dict[str, dict] = {
     # Estilo de Combate Proteção: com escudo, desvantagem no ataque contra o aliado ao lado.
     "protecao": {"nome": "Proteção (estilo)", "estilo": "Proteção",
                  "texto": "Reação, com escudo: o primeiro ataque contra um aliado na sua zona em cada rodada tem desvantagem."},
+    # Subclasses (rpg/subclasses.py).
+    "golpe magico": {"nome": "Golpe Mágico", "nomes": ("golpe magico",),
+                     "texto": "Reação: depois de acertar com arma, o motor conjura o seu melhor truque de dano no alvo."},
+    "marca da vinganca": {"nome": "Marca da Vingança", "nomes": ("marca da vinganca", "soul of vengeance"),
+                          "texto": "Reação: quando um inimigo ataca um aliado na sua zona, o motor ataca o inimigo."},
+    "oportunista": {"nome": "Oportunista", "nomes": ("oportunista", "opportunist"),
+                    "texto": "Reação: quando um aliado acerta um inimigo na sua zona, o motor ataca esse inimigo."},
+    "recuperacao bestial": {"nome": "Recuperação Bestial", "nomes": ("recuperacao bestial",),
+                            "texto": "Reação: o dano destinado à sua fera ou invocação vem para você."},
+    "mudanca imediata": {"nome": "Mudança Imediata", "nomes": ("mudanca imediata",),
+                         "texto": "Reação: ao levar um golpe na forma normal, o motor gasta a Forma Selvagem e vira a "
+                                  "fera de mais vida antes do dano."},
+    "resistencia magica projetada": {"nome": "Resistência Mágica Projetada",
+                                     "nomes": ("resistencia magica projetada",),
+                                     "texto": "Reação: um aliado perto faz a salvaguarda com o seu bônus, quando o seu é maior."},
+    "refugio feerico": {"nome": "Refúgio Feérico", "nomes": ("refugio feerico", "misty escape"),
+                        "texto": "Reação: ao ser ferido, o motor o leva para a zona vizinha e o deixa Invisível até o "
+                                 "seu próximo turno."},
+    "vinganca do grande antigo": {"nome": "Vingança do Grande Antigo", "nomes": ("vinganca do grande antigo",),
+                                  "texto": "Reação: quando alguém ataca você, ele leva 1 + CAR de dano psíquico."},
+    "lampejos": {"nome": "Lampejos de Adivinhação", "nomes": ("lampejos de adivinhacao", "portent"),
+                 "texto": "O motor guarda os d20 do descanso longo e troca o dado de um ataque inimigo que "
+                          "acertaria um aliado (o menor) ou de um ataque ou salvaguarda do grupo que falharia "
+                          "(o maior), quando a troca vira o resultado."},
     # Não são reações, mas reagem sozinhos e podem ser desligados na mesma lista.
     "indomavel": {"nome": "Indomável", "nomes": ("indomavel", "indomitable"), "recurso": True,
                   "texto": ""},
@@ -177,7 +201,7 @@ def _pode_reagir(char: dict, chave: str) -> dict | None:
         return None
     if not td.reacao_automatica(char, chave):
         return None
-    if not td._reaction_available(char):
+    if chave != "lampejos" and not td._reaction_available(char):
         return None
     return habilidade_da_reacao(char, chave)
 
@@ -270,6 +294,30 @@ def reduzir_dano(atacante: dict, alvo: dict, componentes: list, a_distancia: boo
     total = sum(max(0, int(v or 0)) for v, _ in componentes)
     if total <= 0:
         return componentes, []
+    # Recuperação Bestial: o dono da fera (ou invocação) leva o golpe por ela.
+    inv = alvo.get("invocacao") if isinstance(alvo.get("invocacao"), dict) else None
+    dono = memory.campaign["characters"].get(inv.get("por", "")) if inv else None
+    if dono and _pode_reagir(dono, "recuperacao bestial"):
+        res = td._apply_damage(dono, total, componentes[0][1] if componentes else "",
+                               source_name=atacante.get("name", ""))
+        msg = (f"{dono['name']} se põe na frente de {alvo['name']} (Recuperação Bestial) e leva {res['dano']} "
+               f"({res['hp_antes']} → {res['hp_depois']}).")
+        _registrar(dono, "Recuperação Bestial", atacante.get("name", ""), msg)
+        if res["hp_depois"] == 0 and res["hp_antes"] > 0:
+            msg += td._mark_at_zero_hp(dono, atacante.get("name", ""))
+        return [(0, t) for _, t in componentes], [msg]
+    # Mudança Imediata: o druida vira fera antes do golpe.
+    if (not (alvo.get("sheet") or {}).get("_forma_selvagem") and _pode_reagir(alvo, "mudanca imediata")
+            and (td.usos_restantes(alvo, "Forma Selvagem") or 0) > 0):
+        from rpg import criaturas, resolucao
+        formas = criaturas.formas_permitidas(int(alvo["sheet"].get("nivel", 1) or 1),
+                                             resolucao._circulo_da_lua(alvo))
+        if formas:
+            melhor = max(formas, key=lambda k: criaturas.FICHAS[k]["pv"])
+            td._gastar_uso(alvo, "Forma Selvagem")
+            linha = criaturas.transformar(alvo, melhor)
+            _registrar(alvo, "Mudança Imediata", atacante.get("name", ""), linha)
+            return componentes, [f"Mudança Imediata: {linha}"]
     hab = _pode_reagir(alvo, "defletir projeteis") if (a_distancia and com_arma) else None
     if hab:
         s = alvo["sheet"]
@@ -317,6 +365,16 @@ def depois_do_dano(atacante: dict, alvo: dict, dano: int) -> list[str]:
     if int((atacante.get("sheet") or {}).get("vida_atual", 0) or 0) <= 0:
         return []
     linhas = []
+    if _pode_reagir(alvo, "refugio feerico") and (td.usos_restantes(alvo, "Refúgio Feérico") or 0) > 0:
+        td._gastar_uso(alvo, "Refúgio Feérico")
+        destino = resolucao._empurrar_para_longe(alvo, atacante) if td._zonas_ativas() else ""
+        resolucao._tirar_condicoes(alvo, ("invisivel",))
+        alvo["sheet"].setdefault("condicoes", []).append(
+            {"nome": "Invisível", "duracao": None, "ate_turno_de": memory.char_key(alvo["name"])})
+        msg = (f"{alvo['name']} some num lampejo feérico (Refúgio Feérico)"
+               + (f" e reaparece em {destino}" if destino else "") + ", Invisível até o próximo turno.")
+        _registrar(alvo, "Refúgio Feérico", atacante.get("name", ""), msg)
+        return [msg]
     hab = _pode_reagir(alvo, "repreensao infernal")
     if hab and _pagar_mana(alvo, hab):
         cd = resolucao._cd(alvo)
@@ -347,6 +405,146 @@ def depois_do_dano(atacante: dict, alvo: dict, dano: int) -> list[str]:
                              reacao="Retaliação")
         linhas.append(f"{alvo['name']} usa Retaliação:\n" + golpe)
     return linhas
+
+
+def _atacar_de_reacao(quem: dict, alvo: dict, rotulo: str) -> str:
+    from rpg import tools_dnd as td
+    td._consume_reaction(quem)
+    arma = ((quem["sheet"].get("equipamentos") or {}).get("arma_principal")
+            or td._melee_weapon_of(quem) or "ataque desarmado")
+    golpe = td.attack_roll(quem["name"], alvo["name"], arma, 6, end_turn=False, _skip_turn_check=True)
+    td._log_combat_event("reaction", quem["name"], alvo["name"], msg=f"{quem['name']} usa {rotulo}", reacao=rotulo)
+    return f"{quem['name']} usa {rotulo}:\n" + golpe.replace(td._BONUS_ACTION_HINT, "")
+
+
+def depois_do_ataque(atacante: dict, alvo: dict, acertou: bool, a_distancia: bool, arma: str) -> list[str]:
+    """Golpe Mágico, Marca da Vingança, Oportunista, Vingança do Grande Antigo."""
+    from rpg import resolucao, tools_dnd as td
+    linhas = []
+    vivo = lambda c: int((c.get("sheet") or {}).get("vida_atual", 0) or 0) > 0  # noqa: E731
+    lado_atk = memory.luta_com_o_grupo(atacante)
+    if lado_atk == memory.luta_com_o_grupo(alvo):
+        return []
+    # Vingança do Grande Antigo: quem ataca o bruxo leva psíquico.
+    if vivo(alvo) and vivo(atacante) and _pode_reagir(alvo, "vinganca do grande antigo"):
+        dano = 1 + max(0, td._modifier(int(alvo["sheet"].get("carisma", 10) or 10)))
+        res = td._apply_damage(atacante, dano, "psychic", source_name=alvo["name"])
+        msg = (f"Vingança do Grande Antigo: {atacante['name']} leva {res['dano']} de dano psíquico "
+               f"({res['hp_antes']} → {res['hp_depois']}).")
+        _registrar(alvo, "Vingança do Grande Antigo", atacante.get("name", ""), msg)
+        linhas.append(msg)
+    # Golpe Mágico: quem acertou conjura o truque no mesmo alvo.
+    if acertou and vivo(alvo) and _pode_reagir(atacante, "golpe magico"):
+        truques = []
+        for h in atacante.get("habilidades") or []:
+            m = resolucao._magia_srd(h) if isinstance(h, dict) else None
+            if m and int(m.get("nivel", 0) or 0) == 0 and m.get("efeito") == "dano":
+                truques.append((td._media_da_formula(td.dado_efetivo(h, atacante)), h))
+        if truques:
+            _, h = max(truques, key=lambda x: x[0])
+            td._consume_reaction(atacante)
+            saida = td.use_ability(atacante["name"], h["nome"], alvo["name"], end_turn=False,
+                                   _skip_turn_check=True, _sem_custo=True)
+            linhas.append(f"{atacante['name']} usa Golpe Mágico:\n" + saida.replace(td._BONUS_ACTION_HINT, ""))
+    cs = memory.campaign.get("combat_state") or {}
+    for nm in list(cs.get("initiative_order") or []):
+        c = memory.campaign["characters"].get(memory.char_key(nm))
+        if not c or c is atacante or c is alvo or not vivo(c):
+            continue
+        # Marca da Vingança: inimigo atacou um aliado na zona do paladino.
+        if (memory.luta_com_o_grupo(c) == memory.luta_com_o_grupo(alvo) and vivo(atacante)
+                and not td._distancia(c["name"], alvo["name"]) and not td._distancia(c["name"], atacante["name"])
+                and _pode_reagir(c, "marca da vinganca")):
+            linhas.append(_atacar_de_reacao(c, atacante, "Marca da Vingança"))
+        # Oportunista: um aliado acertou o inimigo na zona do monge.
+        elif (acertou and memory.luta_com_o_grupo(c) == lado_atk and vivo(alvo)
+              and not td._distancia(c["name"], alvo["name"]) and _pode_reagir(c, "oportunista")):
+            linhas.append(_atacar_de_reacao(c, alvo, "Oportunista"))
+    return linhas
+
+
+# ── Lampejos de Adivinhação ─────────────────────────────────────────────────
+
+def _lampejos(char: dict) -> list[int]:
+    """Os d20 guardados (rolados no descanso longo; na primeira vez, agora)."""
+    from rpg import tools_dnd as td
+    s = char.setdefault("sheet", {})
+    if "lampejos" not in s:
+        n = 4 if td._tem_habilidade(char, "lampejos aprimorados") else (
+            3 if td._tem_habilidade(char, "visao aprofundada") else 2)
+        s["lampejos"] = [random.randint(1, 20) for _ in range(n)]
+    return s["lampejos"]
+
+
+def _adivinho_do_lado(quem: dict) -> dict | None:
+    for c in (memory.campaign.get("characters") or {}).values():
+        if (isinstance(c, dict) and c.get("sheet") and memory.luta_com_o_grupo(c) == memory.luta_com_o_grupo(quem)
+                and memory.is_party_member(c) and _pode_reagir(c, "lampejos") and _lampejos(c)):
+            return c
+    return None
+
+
+def lampejo_no_ataque(atacante: dict, alvo: dict, d20: int, total: int, ca: int) -> tuple[int, str]:
+    """(novo d20, linha) quando um Lampejo vira o ataque; (d20, '') quando não."""
+    acerta = d20 != 1 and (d20 == 20 or total >= ca)
+    adivinho = _adivinho_do_lado(alvo) if acerta else _adivinho_do_lado(atacante)
+    if not adivinho or memory.luta_com_o_grupo(atacante) == memory.luta_com_o_grupo(alvo):
+        return d20, ""
+    guardados = _lampejos(adivinho)
+    resto = total - d20
+    if acerta and not memory.luta_com_o_grupo(atacante):
+        v = min(guardados)
+        if v == 20 or v + resto >= ca:
+            return d20, ""
+    elif not acerta and memory.luta_com_o_grupo(atacante):
+        v = max(guardados)
+        if v == 1 or (v != 20 and v + resto < ca):
+            return d20, ""
+    else:
+        return d20, ""
+    guardados.remove(v)
+    return v, f"{adivinho['name']} usa um Lampejo de Adivinhação: o d20 de {atacante['name']} vira {v}."
+
+
+def lampejo_na_salvaguarda(alvo: dict, mod: int, cd: int) -> tuple[bool, str]:
+    """A salvaguarda do grupo que falhou passa com o maior Lampejo, se ele basta."""
+    if not memory.luta_com_o_grupo(alvo):
+        return False, ""
+    adivinho = _adivinho_do_lado(alvo)
+    if not adivinho:
+        return False, ""
+    guardados = _lampejos(adivinho)
+    v = max(guardados)
+    if v + mod < cd:
+        return False, ""
+    guardados.remove(v)
+    return True, f"{adivinho['name']} usa um Lampejo de Adivinhação: o d20 vira {v} ({v}{mod:+d} = {v + mod} vs CD {cd})"
+
+
+def bonus_projetado(alvo: dict, atributo: str, mod: int) -> tuple[int, str]:
+    """Resistência Mágica Projetada: o aliado perto empresta o bônus de salvaguarda, se for maior."""
+    from rpg import tools_dnd as td
+    cs = memory.campaign.get("combat_state") or {}
+    if not cs.get("is_active") or not memory.luta_com_o_grupo(alvo):
+        return mod, ""
+    for c in (memory.campaign.get("characters") or {}).values():
+        if not isinstance(c, dict) or c is alvo or not c.get("sheet"):
+            continue
+        if memory.luta_com_o_grupo(c) != memory.luta_com_o_grupo(alvo):
+            continue
+        d = td._distancia(c.get("name", ""), alvo.get("name", ""))
+        if d is not None and d > 1:
+            continue
+        if not _pode_reagir(c, "resistencia magica projetada"):
+            continue
+        s = c["sheet"]
+        dele = td._modifier(int(s.get(atributo, 10) or 10))
+        if atributo in td.CLASS_DATA.get((s.get("classe") or "").lower(), {}).get("saves", []):
+            dele += int(s.get("proficiencia", 2) or 2)
+        if dele > mod:
+            td._consume_reaction(c)
+            return dele, f"Resistência Mágica Projetada de {c['name']}: usa {dele:+d}"
+    return mod, ""
 
 
 def ao_errar(atacante: dict, alvo: dict, a_distancia: bool) -> list[str]:
