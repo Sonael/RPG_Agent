@@ -126,11 +126,18 @@ def get_character(name: str) -> str:
 
     base = (
         f"[{data['name']}]\n"
-        f"Descrição: {data['description']}\n"
-        f"Traços: {data['traits']}\n"
-        f"Status: {data['status']}\n"
-        f"Notas: {data['notes']}"
+        f"Descrição: {data.get('description', '')}\n"
+        f"Traços: {data.get('traits', '')}\n"
+        f"Status: {data.get('status', '')}\n"
+        f"Notas: {data.get('notes', '')}"
     )
+    # Enfeitiçado ou dominado: o mestre precisa saber ao narrar a cena — é o
+    # que faz o guarda enfeitiçado tratar o clérigo como amigo.
+    from rpg import encantos
+    encantos.expirar()
+    _enc = encantos.nota(data)
+    if _enc:
+        base += f"\nENCANTO: {_enc}"
 
     sheet = data.get("sheet")
     if not sheet:
@@ -1389,6 +1396,9 @@ def get_scene_context(extra_characters: str = "", extra_locations: str = "") -> 
     """
     c    = memory.campaign
     parts = []
+    # Encanto vencido acaba antes de a cena ser contada ao mestre.
+    from rpg import encantos as _encantos_cena
+    _fim_enc = _encantos_cena.expirar()
 
     # Estado do mundo
     parts.append(
@@ -1408,6 +1418,9 @@ def get_scene_context(extra_characters: str = "", extra_locations: str = "") -> 
     else:
         parts.append("Tempo: Dia 1, 08h (manhã) — o relógio ainda não andou nesta campanha; "
                      "use advance_time() quando a história consumir tempo")
+
+    if _fim_enc:
+        parts.append("Encanto que acabou agora (narre a reação): " + " ".join(_fim_enc))
 
     # Resumo (só as primeiras 3 linhas para economizar tokens)
     summary = c.get("story_summary", "")
@@ -1478,6 +1491,12 @@ def get_scene_context(extra_characters: str = "", extra_locations: str = "") -> 
                 linha = _entre.para_o_mestre(ch.get("name", ""))
                 if linha:
                     lines.append("  " + linha)
+            # Enfeitiçado: o mestre narra o guarda tratando o clérigo como
+            # amigo — e sabe até quando (rpg/encantos.py).
+            from rpg import encantos as _encantos
+            _enc = _encantos.nota(ch)
+            if _enc:
+                lines.append("  ENCANTO: " + _enc)
         titulo = (
             "Personagens conhecidos (a campanha INTEIRA — ainda não há grupo "
             "nem local para filtrar; quem está na cena quem decide é você)"

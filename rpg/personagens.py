@@ -110,6 +110,12 @@ def _efeitos_da_atitude(valor: int) -> list[str]:
             f"{pct:+d}% no preço da loja dele"]
 
 
+def _encanto(ch: dict) -> str:
+    from rpg import encantos
+    encantos.expirar()
+    return encantos.nota(ch)
+
+
 def _mundo_da_pessoa(ch: dict) -> dict:
     from rpg import faccoes, lacos
     if (memory.campaign.get("campaign_type") or "") not in faccoes.GENEROS:
@@ -184,6 +190,8 @@ def ficha(nome: str) -> dict:
         "descricao": ch.get("description", "") or "",
         "tracos": ch.get("traits", "") or "",
         "conhecido": [f for f in (ch.get("conhecido") or []) if isinstance(f, str) and f.strip()],
+        # Enfeitiçado por quem e até quando (rpg/encantos.py).
+        "encanto": _encanto(ch),
         "local": {"nome": locais.nome_canonico(local), "alcance": alcance} if local else None,
         # Relação só faz sentido para quem não é do grupo.
         "relacao": relacao,

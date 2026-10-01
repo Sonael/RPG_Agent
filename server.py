@@ -3587,6 +3587,30 @@ def grimoire_action_route():
     ))
 
 
+@app.route("/api/magia/alvos", methods=["GET"])
+@require_auth
+def magia_alvos_route():
+    """Quem pode ser alvo de uma magia conjurada fora do combate."""
+    from rpg import tools_dnd
+    return jsonify(tools_dnd.alvos_fora_de_combate((request.args.get("actor") or "").strip()))
+
+
+@app.route("/api/magia/conjurar", methods=["POST"])
+@require_auth
+def magia_conjurar_route():
+    """
+    Conjurar fora do combate pela tela. Antes o único caminho era o chat, e o
+    Mestre podia narrar a magia sem chamar a ferramenta: nem a mana era gasta.
+    """
+    from rpg import tools_dnd
+    d = request.json or {}
+    return jsonify(tools_dnd.conjurar_fora_de_combate(
+        (d.get("actor") or "").strip(),
+        (d.get("ability") or "").strip(),
+        (d.get("target") or "").strip(),
+    ))
+
+
 @app.route("/api/map/state", methods=["GET"])
 @require_auth
 def map_state_route():

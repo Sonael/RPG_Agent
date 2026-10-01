@@ -403,8 +403,13 @@
     q('psn-sabe-titulo').textContent = window.frase('sabe', 'O que o grupo sabe');
     // Pelo nome: "com ele" supunha o gênero de todo personagem.
     q('psn-cenas-titulo').textContent = `Últimas cenas com ${_last.nome}`;
-    q('psn-relacao').innerHTML = _last.relacao
-      ? relacaoDoRomance(_last.relacao, gestos(_last)) : relacao(_last.atitude);
+    // Enfeitiçado: a atitude amistosa que aparece logo abaixo é do encanto,
+    // e acaba com ele.
+    const encanto = _last.encanto
+      ? `<div class="psn-encanto" role="note">${esc(_last.encanto)}</div>` : '';
+    q('psn-relacao').innerHTML = encanto + (_last.relacao
+      ? relacaoDoRomance(_last.relacao, gestos(_last)) : relacao(_last.atitude));
+    if (_last.encanto) q('psn-relacao-bloco').classList.remove('hidden');
     q('psn-entre-titulo').textContent = `Como ${_last.nome} se dá com os outros`;
     q('psn-entre').innerHTML = entre(_last);
     const sabe = _last.conhecido || [];

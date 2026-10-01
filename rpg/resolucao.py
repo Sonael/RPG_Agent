@@ -225,6 +225,41 @@ RIDERS_DE_MAGIA: dict[str, dict] = {
 }
 
 
+# O que cada condição faz no motor, em uma linha (o cartão mostra). Condição
+# que não está aqui não tem regra: a magia que só a aplica é narrativa.
+TEXTO_DA_CONDICAO = {
+    "paralisado": "não age, ataques contra ele têm vantagem e crítico de perto",
+    "atordoado": "não age e ataques contra ele têm vantagem",
+    "incapacitado": "não age",
+    "inconsciente": "não age, ataques contra ele têm vantagem e crítico de perto",
+    "petrificado": "não age e ataques contra ele têm vantagem",
+    "caído": "ataca com desvantagem e ataques de perto contra ele têm vantagem",
+    "cego": "ataca com desvantagem e ataques contra ele têm vantagem",
+    "amedrontado": "ataca com desvantagem",
+    "envenenado": "ataca com desvantagem",
+    "contido": "não sai da zona, ataca com desvantagem e ataques contra ele têm vantagem",
+    "imobilizado": "não sai da zona, ataca com desvantagem e ataques contra ele têm vantagem",
+    "agarrado": "não sai da zona",
+    "aprisionado": "não sai da zona",
+    "lentidão": "ataca com desvantagem",
+    "banido": "some da luta: não age e ninguém o alcança",
+    "confuso": "o d10 decide o turno: não faz nada, vaga ou ataca quem estiver perto",
+    "amaldiçoado": "ataca com desvantagem quem o amaldiçoou",
+}
+
+# Aplicam "Enfeitiçado" no compêndio, mas o efeito é uma ordem, um transe ou
+# uma calma que só o Mestre sabe narrar. O motor rola o teste; o Mestre narra.
+NARRATIVAS_COM_TESTE = {"Suggestion", "Mass Suggestion", "Enthrall", "Calm Emotions",
+                        "Compulsion", "Geas", "Polymorph", "True Polymorph",
+                        "Gust of Wind", "Divine Word"}
+
+
+def _condicao_da_magia(hab: dict, m: dict) -> str:
+    from rpg import tools_dnd as td
+    ctrl = td._get_control_effect(hab)
+    return norm((ctrl or {}).get("condition") or m.get("condicao") or "")
+
+
 def _magia_srd(hab: dict) -> dict | None:
     from rpg import compendio
     for chave in (hab.get("nome_srd"), hab.get("nome")):
@@ -339,6 +374,20 @@ def como_resolve(hab: dict, char: dict | None = None) -> dict:
 
     m = _magia_srd(hab)
     if m:
+        from rpg import encantos
+        if encantos.do_encanto(m["nome_srd"]):
+            cfg = encantos.do_encanto(m["nome_srd"])
+            if cfg["tipo"] == "dominado":
+                texto = ("O motor aplica: salvaguarda de SAB; se falhar, fica Dominado enquanto "
+                         "durar a concentração — não ataca o seu lado e obedece às suas ordens "
+                         "(o Mestre narra). Funciona fora do combate.")
+            else:
+                texto = (f"O motor aplica: salvaguarda de SAB (com vantagem se ele está lutando "
+                         f"contra vocês); se falhar, fica Enfeitiçado por {cfg['horas']}h — não "
+                         f"ataca você, trata você como amigo, e quebra se o grupo o ferir. "
+                         f"Funciona fora do combate.")
+            saida.update(tipo="efeito", texto=texto)
+            return saida
         chave_ef, ef = efeito_de_magia(hab)
         if ef:
             saida.update(tipo="efeito", texto="O motor aplica: " + ef["texto"]
@@ -350,9 +399,17 @@ def como_resolve(hab: dict, char: dict | None = None) -> dict:
             if rider:
                 saida["texto"] = "Além do dano: " + rider["texto"] + "."
             return saida
-        if efeito == "condicao" and (m.get("condicao") or td._get_control_effect(hab)):
+        cond = _condicao_da_magia(hab, m)
+        textos = {norm(k): (k, v) for k, v in TEXTO_DA_CONDICAO.items()}
+        if (efeito == "condicao" and m["nome_srd"] not in NARRATIVAS_COM_TESTE
+                and cond in textos):
+            nome_cond, texto_cond = textos[cond]
+            saida["texto"] = (f"O motor aplica: {nome_cond.capitalize()} — {texto_cond}"
+                              + (", enquanto durar a concentração" if m.get("concentracao") else "")
+                              + ".")
             return saida
-        saida.update(tipo="narrativa", texto=_TEXTO_NARRATIVA)
+        saida.update(tipo="narrativa", texto=_TEXTO_NARRATIVA
+                     + (" O motor rola a salvaguarda do alvo." if m.get("salvaguarda") else ""))
         return saida
 
     # Característica de classe ou habilidade feita pelo mestre.
@@ -481,6 +538,18 @@ def validar(char: dict, hab: dict, alvo: str, modo: str) -> str:
             if int(st.get("vida_atual", 0) or 0) >= int(st.get("vida_max", 0) or 0):
                 return f"Aviso: {alvo} já está com a vida cheia. Nada foi gasto."
         return ""
+    m = _magia_srd(hab) or {}
+    from rpg import encantos
+    if encantos.do_encanto(m.get("nome_srd", "")):
+        if not _char(alvo):
+            if (alvo or "").strip():
+                return f"Aviso: {alvo} não está entre os personagens da história. Nada foi gasto."
+            return f"Aviso: escolha quem {m.get('nome', hab.get('nome'))} vai enfeitiçar. Nada foi gasto."
+        if not encantos.tipo_combina(_char(alvo), m["nome_srd"]):
+            return (f"Aviso: {m.get('nome')} não afeta {alvo}: "
+                    f"{'só humanoides' if m['nome_srd'] == 'Charm Person' else 'só bestas'}. "
+                    f"Nada foi gasto.")
+        return ""
     _, ef = efeito_de_magia(hab)
     if ef and ef["alvos"] in ("marca", "inimigos", "area") and not _char(alvo):
         return f"Aviso: escolha o alvo de {hab['nome']}. Nada foi gasto."
@@ -494,12 +563,37 @@ def executar(char: dict, hab: dict, alvo: str, modo: str) -> str:
     info = como_resolve(hab, char)
     if info["tipo"] == "acao_de_classe":
         return _ACOES[info["chave"]](char, hab, alvo, modo)
+    m = _magia_srd(hab) or {}
     if info["tipo"] == "efeito":
+        from rpg import encantos
+        if encantos.do_encanto(m.get("nome_srd", "")):
+            return encantos.conjurar(char, hab, alvo, m["nome_srd"], m.get("nome") or hab.get("nome", ""))
         return aplicar_magia(char, hab, alvo)
     if info["tipo"] == "narrativa":
-        return (f"\n   Sem regra no motor para {hab.get('nome', '')}: o Mestre narra o efeito."
-                f"\n   (Mestre: decida o efeito pela descrição e pelo que o jogador pediu.)")
+        teste = _teste_da_narrativa(char, m, alvo)
+        return (f"\n   Sem regra no motor para {hab.get('nome', '')}: o Mestre narra o efeito.{teste}"
+                f"\n   (Mestre: decida o efeito pela descrição, pelo resultado do teste e pelo "
+                f"que o jogador pediu.)")
     return ""
+
+
+def _teste_da_narrativa(char: dict, m: dict, alvo_nome: str) -> str:
+    """
+    Sugestão, Missão, Acalmar Emoções: o efeito é do Mestre, mas o teste não
+    precisa ser — o motor rola a salvaguarda e o Mestre narra a partir dela.
+    """
+    from rpg import tools_dnd as td
+    alvo = _char(alvo_nome)
+    if not m.get("salvaguarda") or not alvo:
+        return ""
+    cd = _cd(char)
+    if alvo.get("sheet"):
+        passou, linha = td._rolar_salvaguarda(alvo, m["salvaguarda"], cd)
+    else:
+        d20 = random.randint(1, 20)
+        passou, linha = d20 >= cd, f"salvaguarda: {d20}+0 = {d20} vs CD {cd}"
+    return (f"\n   {alvo.get('name')}: {linha} — "
+            + ("passou: a magia não pega." if passou else "falhou: o efeito vale."))
 
 
 # ── Magias de efeito ─────────────────────────────────────────────────────────

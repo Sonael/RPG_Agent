@@ -206,10 +206,78 @@
         <div class="grm-conhecidas-titulo">${n == 0 ? 'Truques' : `${n}º círculo`}</div>
         ${grupos[n].map(m => `
           <div class="grm-conhecida" data-nome="${esc(m.nome)}" title="${esc(m.descricao)}">
-            <span class="grm-conhecida-nome">${esc(m.nome)}</span>
+            <span class="grm-conhecida-nome">${esc(m.nome_exibido || m.nome)}</span>
             <span class="grm-conhecida-custo">${m.custo_mana ? `${m.custo_mana} mana` : ''}${m.dado ? ` · ${esc(m.dado)}` : ''}</span>
+            ${_last.em_combate ? '' : `<button class="grm-conjurar-btn" type="button"
+                title="${esc(m.resolucao_texto || 'Conjurar agora, fora do combate')}"
+                onclick="window.Grimoire._conjurar('${esc(m.nome).replace(/'/g, "\\'")}')">Conjurar</button>`}
           </div>`).join('')}
       </div>`).join('');
+  }
+
+  // ---- Conjurar fora do combate ----------------------------------------
+  // Antes a magia fora da luta só existia se o Mestre lembrasse de chamar a
+  // ferramenta: o Enfeitiçar Pessoa no guarda podia não gastar mana nem
+  // deixar o guarda enfeitiçado. Aqui o motor resolve e o Mestre narra.
+  async function conjurar(nome) {
+    if (_busy) return;
+    const p = _last.personagem || {};
+    const m = (p.conhecidas || []).find(x => x.nome === nome);
+    if (!p.nome || !m) return;
+    if (m.alvo_modo === 'si') { lancar(p.nome, m, p.nome); return; }
+    let alvos = { aqui: [], outros: [] };
+    try { alvos = await api(`/api/magia/alvos?actor=${encodeURIComponent(p.nome)}`); } catch (_) { /* segue sem lista */ }
+    const el = [...document.querySelectorAll('#grimoire-overlay .grm-conhecida')].find(e => e.dataset.nome === nome);
+    if (!el) return;
+    document.querySelectorAll('#grimoire-overlay .grm-conjurar-painel').forEach(x => x.remove());
+    const botao = (n) => `<button class="grm-alvo" type="button"
+        onclick="window.Grimoire._lancar('${esc(nome).replace(/'/g, "\\'")}','${esc(n).replace(/'/g, "\\'")}')">${esc(n)}${
+        n === p.nome ? ' (em si)' : ''}</button>`;
+    const painel = document.createElement('div');
+    painel.className = 'grm-conjurar-painel';
+    painel.innerHTML = `
+      <div class="grm-conjurar-como">${esc(m.resolucao_texto || m.resumo || '')}</div>
+      <div class="grm-conjurar-titulo">Em quem?</div>
+      <div class="grm-alvos">${(alvos.aqui || []).map(botao).join('') || '<span class="grm-vazio-lado">Ninguém registrado aqui.</span>'}</div>
+      ${(alvos.outros || []).length ? `<details class="grm-alvos-outros"><summary>Outras pessoas da história</summary>
+        <div class="grm-alvos">${alvos.outros.map(botao).join('')}</div></details>` : ''}
+      <div class="grm-alvos-rodape">
+        <button class="grm-alvo grm-alvo-nenhum" type="button"
+                onclick="window.Grimoire._lancar('${esc(nome).replace(/'/g, "\\'")}','')">Sem alvo</button>
+        <button class="grm-alvo grm-alvo-cancelar" type="button"
+                onclick="this.closest('.grm-conjurar-painel').remove()">Cancelar</button>
+      </div>`;
+    el.after(painel);
+  }
+
+  async function lancar(ator, m, alvo) {
+    if (_busy) return;
+    _busy = true;
+    mensagem('Conjurando…', true);
+    let res = null;
+    try {
+      res = await api('/api/magia/conjurar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ actor: ator, ability: m.nome, target: alvo || '' }),
+      });
+    } catch (_) { res = null; }
+    _busy = false;
+    if (!res || !res.ok) {
+      mensagem(String((res && res.message) || 'Falha de conexão.').split('\n')[0].replace(/\*\*/g, ''), false);
+      return;
+    }
+    fechar();
+    // O resultado do motor no chat, como a rolagem; a cena, o Mestre narra.
+    if (typeof window.appendSystem === 'function') {
+      const linhas = String(res.message || '').replace(/\*\*/g, '').split('\n').filter(l => l.trim());
+      window.appendSystem(`<div class="sys-card grm-resultado"><div class="sys-card-badge">${esc(m.nome_exibido || m.nome)}</div>`
+        + `<div class="sys-card-body">${linhas.map(esc).join('<br>')}</div></div>`);
+    }
+    if (typeof window.refreshMemory === 'function') window.refreshMemory();
+    try {
+      if (typeof window.sendToAgent === 'function') await window.sendToAgent(res.para_o_mestre, true, 'tela');
+    } catch (_) { /* o efeito já está registrado */ }
   }
 
   // A magia recém-aprendida e até quando ela brilha (aprender, abaixo).
@@ -427,6 +495,12 @@
     _close: fechar,
     _concluir: concluir,
     _aprender: aprender,
+    _conjurar: conjurar,
+    _lancar: (nome, alvo) => {
+      const p = (_last || {}).personagem || {};
+      const m = (p.conhecidas || []).find(x => x.nome === nome);
+      if (m) lancar(p.nome, m, alvo);
+    },
     _trocar: (n) => { _quem = n; _nivel = null; recarregar(); },
     _filtro: (n) => { _nivel = n; recarregar(); },
     // A busca espera o jogador parar de digitar: cada tecla seria uma ida ao SRD.

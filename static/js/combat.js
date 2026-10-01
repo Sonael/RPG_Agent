@@ -226,9 +226,11 @@
     const turnos = c.condicoes_turnos || {};
     const conds  = (c.condicoes || []).map(x => {
         const n = turnos[x];
+        // Enfeitiçado/Dominado: por quem e até quando (rpg/encantos.py).
+        const enc = /^(enfeiti|dominad)/i.test(x) && c.encanto ? ` title="${esc(c.encanto)}"` : '';
         return n
           ? `<span class="cbt-cond" title="${esc(x)}: ${n} turno${n === 1 ? '' : 's'} restante${n === 1 ? '' : 's'}">${esc(x)} <small>${n}t</small></span>`
-          : `<span class="cbt-cond">${esc(x)}</span>`;
+          : `<span class="cbt-cond"${enc}>${esc(x)}</span>`;
       }).join('')
       + (c.efeitos || []).map(x => `<span class="cbt-cond cbt-efeito" title="Efeito de item até o fim do combate">${esc(x)}</span>`).join('');
     const meta   = `${esc(c.classe || '')}${c.nivel ? ' Nv.' + c.nivel : ''}`.trim();
@@ -238,6 +240,7 @@
     const detalhes = [
       meta ? `<span class="cbt-meta">${meta}</span>` : '',
       c.concentracao ? `<div class="cbt-conc" title="Sofrer dano exige teste de Constituição para manter">Concentrado em ${esc(c.concentracao)}</div>` : '',
+      c.encanto ? `<div class="cbt-conc cbt-encanto">${esc(c.encanto)}</div>` : '',
       defs ? `<div class="cbt-defs">${defs}</div>` : '',
     ].join('');
     return `<div data-nome="${esc(c.name)}" role="button" tabindex="0" aria-expanded="${aberto}" class="cbt-card ${comOGrupo(c) ? 'cbt-aliado' : 'cbt-inimigo'} ${
@@ -453,6 +456,17 @@
     }
 
     titleEl.textContent = `O que fará ${cur.name}?`;
+
+    // Paralisado, Atordoado, Banido: não age — a tela diz por quê e só
+    // oferece encerrar o turno (o motor recusaria qualquer outra coisa).
+    if (cur.impedido) {
+      titleEl.textContent = `${cur.name} está ${cur.impedido}`;
+      promptEl.innerHTML = `<span class="cbt-enemy-msg">${esc(cur.name)} não pode agir neste turno.</span>`;
+      btnEl.innerHTML = `<button class="cbt-btn cbt-primary" style="--cbt-span:4" ${_busy ? 'disabled' : ''} `
+        + `onclick="window.Combat._act({action:'end_turn',actor:'${jsNome(cur.name)}'})">Encerrar Turno</button>`;
+      acompanharAlturaDaBarra();
+      return;
+    }
 
     // Economia 5e do turno atual: Ação, Ação Bônus e Reação.
     // Antes eram dois "○" minúsculos sem legenda, governando o turno inteiro.

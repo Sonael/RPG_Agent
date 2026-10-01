@@ -300,9 +300,25 @@ def _fim_do_turno(nome: str, token: int) -> list[str]:
     # (Zombaria Viciosa) acabam aqui.
     _expirar_efeitos(memory.char_key(nome or ""), "fim")
     s = ch.get("sheet") or {}
+    _limpar_condicoes(ch)
     conds = s.get("condicoes")
     if not isinstance(conds, list) or not conds:
         return []
+    # Imobilizar Pessoa, Confusão, Medo: o alvo repete a salvaguarda no fim
+    # do turno dele e se livra ao passar.
+    livres = []
+    for c in list(conds):
+        sv = c.get("salvaguarda_fim") if isinstance(c, dict) else None
+        if not sv:
+            continue
+        passou, linha_sv = _rolar_salvaguarda(ch, sv.get("atributo", "sabedoria"), int(sv.get("cd", 10)))
+        if passou:
+            conds.remove(c)
+            msg = f"{ch.get('name', nome)} se livra de {c.get('nome', 'condição')} ({linha_sv})"
+            _log_combat_event("condition_end", "", ch.get("name", nome), msg=msg, condicao=c.get("nome", ""))
+            livres.append(msg)
+    if not conds:
+        return livres
     ficam, acabaram = [], []
     for c in conds:
         if _turnos_restantes(c) <= 0:
@@ -320,9 +336,9 @@ def _fim_do_turno(nome: str, token: int) -> list[str]:
         else:
             ficam.append(c)
     if not acabaram:
-        return []
+        return livres
     s["condicoes"] = ficam
-    linhas = []
+    linhas = list(livres)
     for cond in acabaram:
         linha = f"{cond} de {ch.get('name', nome)} acabou"
         _log_combat_event("condition_end", "", ch.get("name", nome), msg=linha, condicao=cond)
@@ -2391,7 +2407,8 @@ def salvaguarda_da_habilidade(hab: dict) -> str:
     return _SAVE_PT.get(bruto, bruto)
 
 
-def _rolar_salvaguarda(alvo: dict, atributo: str, cd: int) -> tuple[bool, str]:
+def _rolar_salvaguarda(alvo: dict, atributo: str, cd: int,
+                       vantagem: bool = False, desvantagem: bool = False) -> tuple[bool, str]:
     """
     O alvo resiste? Mesma conta da salvaguarda de item arremessado, para
     qualquer atributo: d20 + modificador (+ proficiência quando a classe tem
@@ -2408,7 +2425,14 @@ def _rolar_salvaguarda(alvo: dict, atributo: str, cd: int) -> tuple[bool, str]:
     classe = (s.get("classe") or "").lower()
     if atributo in CLASS_DATA.get(classe, {}).get("saves", []):
         mod += int(s.get("proficiencia", 2) or 2)
+    # Contido: desvantagem nas salvaguardas de DES.
+    if atributo == "destreza" and conds & {"contido", "imobilizado"}:
+        desvantagem = True
     d20 = random.randint(1, 20)
+    if vantagem and not desvantagem:
+        d20 = max(d20, random.randint(1, 20))
+    elif desvantagem and not vantagem:
+        d20 = min(d20, random.randint(1, 20))
     # Bênção, Perdição, Resistência: o dado do efeito entra na conta.
     extra, nota = _bonus_de_salvaguarda(alvo)
     total = d20 + mod + extra
@@ -2979,33 +3003,56 @@ CONDITION_PT_TO_EN: dict[str, str] = {
 }
 
 
+#   no_actions   → não age no turno (o turno passa sozinho)
+#   no_movement  → não sai da zona
+#   untargetable → ninguém o alcança (Banimento)
+#
+# Até aqui o turno do inimigo não olhava condição nenhuma: o orc Paralisado
+# pelo Imobilizar Pessoa atacava, só com desvantagem; o Atordoado e o
+# Inconsciente (Padrão Hipnótico) também. E metade das condições que as magias
+# aplicam não tinha linha nenhuma nesta tabela — "contido" (Teia, Constrição),
+# "aprisionado" (Prisão de Força), "banido" — e não faziam nada.
 CONDITION_EFFECTS: dict[str, dict] = {
     "cego":        {"attack_disadvantage": True, "defense_disadvantage": True},
     "envenenado":  {"attack_disadvantage": True, "check_disadvantage": True},
     "amedrontado": {"attack_disadvantage": True},
     "caído":       {"attack_disadvantage": True, "defense_disadvantage": True},
-    "paralisado":  {"attack_disadvantage": True, "auto_crit": True},
-    "atordoado":   {"attack_disadvantage": True, "defense_disadvantage": True},
+    # Ataques contra o paralisado têm vantagem (faltava) e ele não age.
+    "paralisado":  {"attack_disadvantage": True, "defense_disadvantage": True, "auto_crit": True,
+                    "no_actions": True, "no_movement": True},
+    "atordoado":   {"attack_disadvantage": True, "defense_disadvantage": True,
+                    "no_actions": True, "no_movement": True},
     "invisível":   {"attack_advantage": True},
     # Ação Ardilosa (Esconder): o primeiro ataque sai com vantagem e revela
     # quem estava escondido (attack_roll tira a condição).
     "escondido":   {"attack_advantage": True},
+    # Enfeitiçado e dominado: o efeito é QUEM ele não ataca (rpg/encantos.py).
     "enfeitiçado": {},
-    "agarrado":    {},
-    "incapacitado":{"attack_disadvantage": True},
-    "petrificado": {"attack_disadvantage": True, "defense_disadvantage": True, "auto_crit": True},
+    "dominado":    {},
+    "agarrado":    {"no_movement": True},
+    "incapacitado":{"attack_disadvantage": True, "no_actions": True},
+    "petrificado": {"attack_disadvantage": True, "defense_disadvantage": True, "auto_crit": True,
+                    "no_actions": True, "no_movement": True},
     "surdo":       {},
     "assustado":   {"attack_disadvantage": True, "check_disadvantage": True},
     "exausto":     {"attack_disadvantage": True, "check_disadvantage": True},
     # Inconsciente (Sleep, 0 HP): não age; ataques contra ele têm vantagem e
     # acertos corpo-a-corpo a até 1,5m são CRÍTICOS automáticos (regra 5e).
-    "inconsciente":{"attack_disadvantage": True, "defense_disadvantage": True, "auto_crit": True},
-    "imobilizado": {"attack_disadvantage": True, "defense_disadvantage": True},
+    "inconsciente":{"attack_disadvantage": True, "defense_disadvantage": True, "auto_crit": True,
+                    "no_actions": True, "no_movement": True},
+    "imobilizado": {"attack_disadvantage": True, "defense_disadvantage": True, "no_movement": True},
+    # "contido" é o nome do SRD em português (Teia, Constrição); o motor só
+    # conhecia "imobilizado".
+    "contido":     {"attack_disadvantage": True, "defense_disadvantage": True, "no_movement": True},
+    "aprisionado": {"no_movement": True},
     "lentidão":    {"attack_disadvantage": True},
     "silenciado":  {},
+    # Rogar Maldição: desvantagem nos ataques contra quem amaldiçoou (attack_roll).
+    "amaldiçoado": {},
+    # Confusão: o turno é sorteado (ver _turno_confuso).
     "confuso":     {},
-    "dominado":    {},
-    "banido":      {},
+    # Banimento: some da luta enquanto durar a concentração.
+    "banido":      {"no_actions": True, "untargetable": True},
     "transformado":{},
 }
 
@@ -3338,6 +3385,12 @@ def _requires_concentration(hab: dict) -> bool:
         return False
     if hab.get("concentracao") is not None:
         return bool(hab["concentracao"])
+    # Magia do SRD: o compêndio sabe. Pelo texto, Imobilizar Pessoa com
+    # descrição curta na ficha não concentrava — e a paralisia, presa à
+    # concentração, caía na mesma hora.
+    srd = _srd(hab)
+    if srd is not None:
+        return bool(srd.get("concentracao"))
     texto = _norm_txt(f"{hab.get('descricao', '')} {hab.get('nome', '')}")
     return "concentracao" in texto or "concentration" in texto
 
@@ -3477,6 +3530,14 @@ def _apply_damage(target: dict, amount: int = 0, damage_type: str = "",
     hp_antes = int(sheet.get("vida_atual", 0) or 0)
     sheet["vida_atual"] = max(0, hp_antes - dano)
     hp_depois = sheet["vida_atual"]
+
+    # O enfeitiçado ferido por quem o enfeitiçou (ou pelo lado dele): o
+    # encanto quebra. É a regra do Enfeitiçar Pessoa.
+    if dano > 0 and source_name:
+        from rpg import encantos
+        quebrou = encantos.ferido_por(target, source_name)
+        if quebrou:
+            notas.append(quebrou)
 
     # Concentração: só testa se realmente perdeu PV reais.
     if dano > 0 and sheet.get("concentracao"):
@@ -4226,6 +4287,13 @@ def _provoke_opportunity_attacks(leaving_name: str, motivo: str = "fugir") -> st
             continue
         if not _reaction_available(oponente):
             continue
+        # Quem não age (Paralisado, Atordoado) não reage; o enfeitiçado não
+        # dá bote em quem o enfeitiçou.
+        if _impedido_de_agir(oponente):
+            continue
+        from rpg import encantos
+        if encantos.pode_atacar(oponente, saindo):
+            continue
         # Só dá bote quem está em contato — a zona é o "alcance" aqui.
         if zona_saida and _zona_de(nome) != zona_saida:
             continue
@@ -4271,15 +4339,103 @@ def _hp_bar(current: int, maximum: int, width: int = 10) -> str:
     return "▓" * filled + "░" * (width - filled)
 
 
+def _condicao_vale(c, char: dict) -> bool:
+    """
+    A condição ainda vale? A de magia de concentração (Imobilizar Pessoa)
+    cai com a concentração de quem conjurou; a de prazo (`ate_hora`), com o
+    relógio; a de encanto, com o encanto (rpg/encantos.py). Antes toda
+    condição de magia ficava na ficha para sempre — o orc continuava
+    "Paralisado" depois da luta.
+    """
+    if not isinstance(c, dict):
+        return True
+    if c.get("ate_hora") is not None and _agora_em_horas() >= int(c["ate_hora"]):
+        return False
+    if c.get("concentracao_de"):
+        conj = memory.campaign.get("characters", {}).get(c["concentracao_de"]) or {}
+        atual = ((conj.get("sheet") or {}).get("concentracao") or {})
+        if _norm_txt(atual.get("magia", "")) != _norm_txt(c.get("magia", "")):
+            return False
+    if c.get("encanto"):
+        from rpg import encantos
+        return encantos.ativo(char) is not None
+    return True
+
+
+def _limpar_condicoes(char: dict) -> None:
+    s = (char or {}).get("sheet") or {}
+    conds = s.get("condicoes")
+    if not isinstance(conds, list) or not conds:
+        return
+    ficam = [c for c in conds if _condicao_vale(c, char)]
+    if len(ficam) != len(conds):
+        s["condicoes"] = ficam
+
+
 def _get_conditions(char: dict) -> list[dict]:
     """Retorna a lista de condições ativas do personagem."""
+    _limpar_condicoes(char)
     return (char.get("sheet") or {}).get("condicoes") or []
+
+
+def _condicao_com(char: dict, chave: str) -> str:
+    """O nome da primeira condição ativa com o efeito `chave`, ou ''."""
+    for c in _get_conditions(char):
+        nome = (c.get("nome", "") if isinstance(c, dict) else str(c)).lower()
+        if CONDITION_EFFECTS.get(nome, {}).get(chave):
+            return c.get("nome", "") if isinstance(c, dict) else str(c)
+    return ""
+
+
+def _impedido_de_agir(char: dict) -> str:
+    """Paralisado, Atordoado, Incapacitado, Banido…: não age. '' quando age."""
+    return _condicao_com(char, "no_actions")
+
+
+# Magias cujo alvo repete a salvaguarda no FIM de cada turno dele e se livra
+# ao passar (SRD). Sem isto, Imobilizar Pessoa prendia até a luta acabar.
+_REPETE_SALVAGUARDA = {"Hold Person", "Hold Monster", "Tasha's Hideous Laughter",
+                       "Hideous Laughter", "Confusion", "Blindness/Deafness", "Slow",
+                       "Fear", "Phantasmal Killer", "Flesh to Stone", "Eyebite"}
+# Duram um turno só.
+_UM_TURNO = {"Command"}
+
+
+def _condicao_de_magia(conjurador: dict, hab: dict, cond: str, s_conj: dict) -> dict:
+    """A condição que a magia deixa, com o que a faz acabar."""
+    from rpg import resolucao
+    m = resolucao._magia_srd(hab) or {}
+    c = {"nome": cond.capitalize(), "duracao": None, "por": conjurador.get("name", ""),
+         "magia": hab.get("nome", "")}
+    if m.get("nome_srd") in _UM_TURNO:
+        c["duracao"] = 1
+    if m.get("concentracao") or _requires_concentration(hab):
+        c["concentracao_de"] = memory.char_key(conjurador.get("name", ""))
+    if m.get("nome_srd") in _REPETE_SALVAGUARDA and m.get("salvaguarda"):
+        conj = _conjuracao(s_conj) or {}
+        c["salvaguarda_fim"] = {"atributo": m["salvaguarda"],
+                                "cd": int(conj.get("cd") or (8 + int(s_conj.get("proficiencia", 2) or 2)))}
+    return c
+
+
+def _como_a_condicao_acaba(c: dict) -> str:
+    partes = []
+    if c.get("concentracao_de"):
+        partes.append("acaba se a concentração cair")
+    if c.get("salvaguarda_fim"):
+        sv = c["salvaguarda_fim"]
+        partes.append(f"o alvo repete a salvaguarda de "
+                      f"{_ATRIBUTO_SIGLA.get(sv['atributo'], sv['atributo'][:3].upper())} "
+                      f"(CD {sv['cd']}) no fim de cada turno dele")
+    if c.get("duracao") == 1:
+        partes.append("dura um turno")
+    return ("Como acaba: " + "; ".join(partes) + ".") if partes else ""
 
 
 def _has_condition_effect(char: dict, effect_key: str) -> bool:
     """Verifica se alguma condição ativa possui o efeito mecânico indicado."""
     for cond in _get_conditions(char):
-        name = cond.get("nome", "").lower()
+        name = (cond.get("nome", "") if isinstance(cond, dict) else str(cond)).lower()
         effects = CONDITION_EFFECTS.get(name, {})
         if effects.get(effect_key):
             return True
@@ -5709,6 +5865,18 @@ def social_check(
     dc_efetiva = max(1, dc + ajuste_atitude)
 
     d20          = max(1, min(20, int(player_roll)))
+    # Quem enfeitiçou tem vantagem nos testes sociais com o enfeitiçado: o
+    # jogador rolou um d20, o motor rola o segundo e fica com o maior.
+    nota_encanto = ""
+    if target_name:
+        from rpg import encantos
+        _alvo_enc = memory.campaign["characters"].get(memory.char_key(target_name))
+        _e = encantos.ativo(_alvo_enc) if _alvo_enc else None
+        if _e and memory.char_key(_e.get("por_nome", "")) == memory.char_key(char["name"]):
+            segundo = random.randint(1, 20)
+            nota_encanto = (f"   Vantagem: {target_name} está enfeitiçado por {char['name']} "
+                            f"(segundo d20 = {segundo}).\n")
+            d20 = max(d20, segundo)
     total        = d20 + total_mod
     sign         = "+" if total_mod >= 0 else ""
 
@@ -5727,6 +5895,7 @@ def social_check(
 
     result = (
         f"Teste de {skill_cap}{prof_tag} — CD {dc_efetiva}{nota_atitude}\n"
+        f"{nota_encanto}"
         f"   {char['name']}{target_str}: d20={d20} {sign}{total_mod}(mod) = **{total}**\n"
     )
     if critico:
@@ -6111,6 +6280,16 @@ def attack_roll(
         if _viol:
             return _viol
 
+    # O enfeitiçado não ataca quem o enfeitiçou; o banido não é alcançado.
+    # Antes o orc enfeitiçado pelo clérigo o atacou no turno seguinte.
+    from rpg import encantos
+    _motivo_encanto = encantos.pode_atacar(attacker, target)
+    if _motivo_encanto:
+        return f"Erro: {_motivo_encanto}"
+    _fora = _condicao_com(target, "untargetable")
+    if _fora:
+        return f"Erro: {target['name']} está {_fora} e ninguém o alcança agora."
+
     # ALCANCE: quando o campo tem zonas, corpo-a-corpo exige a mesma zona e
     # tiro longo (ou com inimigo colado) sai com desvantagem. Vem antes de
     # qualquer dado — recusar depois de rolar já teria mudado o estado.
@@ -6206,6 +6385,13 @@ def attack_roll(
                         if CONDITION_EFFECTS.get(c["nome"].lower(), {}).get("defense_disadvantage")]
         advantage = True
         cond_notes.append(f"{target['name']} está {', '.join(active_conds)} → atacante ganha vantagem")
+
+    # Rogar Maldição: desvantagem nos ataques contra quem amaldiçoou.
+    if any(_norm_txt(c.get("nome", "")) == "amaldicoado"
+           and _norm_txt(c.get("por", "")) == _norm_txt(target.get("name", ""))
+           for c in _get_conditions(attacker) if isinstance(c, dict)):
+        disadvantage = True
+        cond_notes.append(f"{attacker['name']} está amaldiçoado por {target['name']} → desvantagem")
 
     # Alvo paralisado / petrificado → crítico automático (melee implícito)
     force_crit = _has_condition_effect(target, "auto_crit")
@@ -7067,8 +7253,11 @@ def use_ability(
                 cond  = ctrl_effect["condition"]
                 conds = st.setdefault("condicoes", [])
                 if not any(c["nome"].lower() == cond.lower() for c in conds):
-                    conds.append({"nome": cond.capitalize(), "duracao": None})
+                    conds.append(_condicao_de_magia(char, hab, cond, s))
                 result += f"\n   {target['name']}: {cond.upper()}! (sem dano)"
+                _como_acaba = _como_a_condicao_acaba(conds[-1])
+                if _como_acaba:
+                    result += f"\n   {_como_acaba}"
 
             else:
                 # Dano direto — passa pelo pipeline de tipo/resistência.
@@ -10348,11 +10537,16 @@ def advance_time(hours: int, reason: str = "") -> str:
     # Para a cobrança do relógio parado (agent._pendencias_block) e o aviso de
     # narração que fez o tempo passar sem ele (validator).
     memory.marcar_upkeep("relogio")
+    # Enfeitiçar Pessoa dura uma hora: passada a hora, o encanto acaba (e o
+    # alvo sabe o que fizeram com ele). O mestre recebe a linha para narrar.
+    from rpg import encantos
+    acabaram = encantos.expirar()
     memory.save_campaign()
 
     motivo = f" — {reason}" if reason else ""
     virou  = "\n   O dia virou." if total >= 24 else ""
-    return f"{antes} → **{_hora_legivel()}**{motivo}{virou}"
+    fim_encanto = "".join(f"\n   {l}" for l in acabaram)
+    return f"{antes} → **{_hora_legivel()}**{motivo}{virou}{fim_encanto}"
 
 
 def get_world_time() -> str:
@@ -11548,10 +11742,14 @@ def end_combat() -> str:
             _sh["efeitos"] = [e for e in _efeitos(_sh) if e.get("ate") != "fim_do_combate"]
         if _sh.get("condicoes"):
             # Duração em turnos só existe dentro do combate; as chamas também.
+            # Condição de magia (Imobilizar Pessoa, Cegueira, Lentidão: um
+            # minuto) também acaba com a luta — só o encanto, que dura horas,
+            # continua (rpg/encantos.py).
             _sh["condicoes"] = [c for c in _sh["condicoes"]
                                 if not (isinstance(c, dict)
                                         and ((c.get("nome") or "").lower() == "queimando"
-                                             or _turnos_restantes(c) > 0))]
+                                             or _turnos_restantes(c) > 0
+                                             or (c.get("magia") and not c.get("encanto"))))]
     memory.save_campaign()
     return "Combate encerrado. Iniciativa e rastreador de turnos limpos."
 
@@ -12300,12 +12498,20 @@ def grimoire_snapshot(char_name: str = "", query: str = "",
     s = alvo["sheet"]
     vagas = _vagas_de_magia(alvo)
     nivel_max = _nivel_maximo_de_magia(s)
-    conhecidas = sorted(
-        ({"nome": h.get("nome", ""), "nivel": _nivel_da_magia(h),
-          "custo_mana": int(h.get("custo_mana", 0) or 0), "dado": h.get("dado", ""),
-          "descricao": h.get("descricao", "")}
-         for h in _magias_da_ficha(alvo)),
-        key=lambda m: (m["nivel"], m["nome"].lower()))
+    # Para conjurar fora do combate pela tela: o que acontece ao usar e quem
+    # a magia mira (rpg/resolucao.py), como no cartão do combate.
+    from rpg import habilidade as _habilidade
+
+    def _conhecida(h: dict) -> dict:
+        r = _habilidade.resolver(h, alvo)
+        return {"nome": h.get("nome", ""), "nome_exibido": r["nome"], "nivel": _nivel_da_magia(h),
+                "custo_mana": int(h.get("custo_mana", 0) or 0), "dado": h.get("dado", ""),
+                "descricao": h.get("descricao", ""), "resumo": r["resumo"],
+                "resolucao": r["resolucao"], "resolucao_texto": r["resolucao_texto"],
+                "alvo_modo": r["alvo_modo"] or ("si" if r["alvos"] == "si" else "")}
+
+    conhecidas = sorted((_conhecida(h) for h in _magias_da_ficha(alvo)),
+                        key=lambda m: (m["nivel"], m["nome"].lower()))
 
     # Por que a lista pode vir vazia. A tela dizia "A lista da classe não
     # respondeu" para qualquer lista vazia — inclusive a de um patrulheiro de
@@ -12357,8 +12563,57 @@ def grimoire_snapshot(char_name: str = "", query: str = "",
         },
         "catalogo": catalogo,
         "catalogo_motivo": motivo,
+        # Em combate, conjurar é pela tela de combate (que cobra a economia).
+        "em_combate": bool((memory.campaign.get("combat_state") or {}).get("is_active")),
     })
     return base
+
+
+def alvos_fora_de_combate(ator: str) -> dict:
+    """
+    Quem pode ser alvo de uma magia conjurada fora do combate: quem está aqui
+    (o grupo e quem tem o local atual como paradeiro) primeiro; os demais
+    vivos depois — o paradeiro gravado nem sempre acompanha a história, e o
+    guarda do portão pode não ter local nenhum.
+    """
+    from rpg import locais
+    aqui, outros = [], []
+    for ch in (memory.campaign.get("characters") or {}).values():
+        if not isinstance(ch, dict) or not ch.get("name"):
+            continue
+        if (ch.get("status") or "").lower() in ("morto", "fugiu"):
+            continue
+        local = ch.get("local") or ""
+        perto = memory.is_party_member(ch) or (local and locais.alcance(local) == "aqui")
+        (aqui if perto else outros).append(ch["name"])
+    return {"aqui": sorted(aqui, key=str.lower), "outros": sorted(outros, key=str.lower)}
+
+
+def conjurar_fora_de_combate(ator: str, habilidade: str, alvo: str = "") -> dict:
+    """
+    Conjura uma magia FORA do combate pela tela (Grimório): o motor gasta a
+    mana, rola o que é dele rolar (salvaguarda, cura, o encanto) e devolve o
+    texto para o Mestre narrar a cena.
+
+    Antes o único caminho era escrever no chat e torcer: o Mestre podia narrar
+    sem chamar a ferramenta, e aí nem a mana era gasta, nem o encanto existia.
+    """
+    cs = memory.campaign.get("combat_state") or {}
+    if cs.get("is_active"):
+        return {"ok": False, "message": ("Aviso: há um combate em andamento — conjure pela "
+                                         "tela de combate, que cobra a ação do turno.")}
+    msg = use_ability(ator, habilidade, alvo, end_turn=False)
+    recusou = msg.startswith(("Erro:", "Aviso:")) or "não conhece" in msg.split("\n")[0]
+    if recusou:
+        return {"ok": False, "message": msg}
+    memory.save_campaign()
+    em = f" em {alvo}" if alvo and memory.char_key(alvo) != memory.char_key(ator) else ""
+    para_o_mestre = (f"[MAGIA FORA DE COMBATE, resolvida na tela] {ator} conjurou "
+                     f"{habilidade}{em}. O motor já gastou a mana e resolveu o que é regra:\n"
+                     f"{msg}\n"
+                     f"Narre o efeito na cena e a reação de quem estiver lá, de acordo com "
+                     f"o resultado acima. Não chame use_ability de novo.")
+    return {"ok": True, "message": msg, "para_o_mestre": para_o_mestre}
 
 
 def _primeiro_nivel_com_magia(classe: str) -> int | None:
@@ -13667,6 +13922,54 @@ def execute_npc_turn(npc_name: str = "") -> str:
     return saida
 
 
+def _turno_confuso(npc: dict, npc_name: str) -> str:
+    """
+    Confusão (SRD), um d10 no começo do turno:
+      1     anda para uma zona vizinha qualquer e não age;
+      2–6   não faz nada;
+      7–8   ataca uma criatura qualquer ao alcance — aliada inclusive;
+      9–10  age normalmente ('' — o turno segue o caminho de sempre).
+    """
+    d10 = random.randint(1, 10)
+    if d10 >= 9:
+        return ""
+    if d10 == 1:
+        zonas, aqui = _zonas(), _zona_de(npc_name)
+        if aqui in zonas:
+            i = zonas.index(aqui)
+            vizinhas = [zonas[j] for j in (i - 1, i + 1) if 0 <= j < len(zonas)]
+            if vizinhas:
+                destino = random.choice(vizinhas)
+                movido = move_combatant(npc_name, destino)
+                linha = f"{npc_name} está Confuso (d10={d10}): vaga sem rumo.\n{movido}"
+                _log_combat_event("pass", npc_name, "", msg=f"{npc_name} vaga confuso")
+                return linha + _auto_advance_turn(npc_name)
+        msg = f"{npc_name} está Confuso (d10={d10}): cambaleia sem rumo e não age."
+    elif d10 <= 6:
+        msg = f"{npc_name} está Confuso (d10={d10}): não faz nada neste turno."
+    else:
+        cs = memory.campaign.get("combat_state") or {}
+        arma = _melee_weapon_of(npc)
+        perto = []
+        for nm in cs.get("initiative_order") or []:
+            ch = memory.campaign["characters"].get(memory.char_key(nm))
+            if (not ch or ch is npc
+                    or (ch.get("status") or "").lower() in OUT_OF_COMBAT_STATUSES
+                    or int((ch.get("sheet") or {}).get("vida_atual", 0) or 0) <= 0):
+                continue
+            if _checar_alcance(npc_name, ch.get("name", nm), arma)[0]:
+                continue
+            perto.append(ch.get("name", nm))
+        if perto:
+            alvo = random.choice(perto)
+            golpe = attack_roll(npc_name, alvo, arma, 6, end_turn=True, _skip_turn_check=True)
+            return f"{npc_name} está Confuso (d10={d10}): ataca quem estiver perto — {alvo}.\n{golpe}"
+        msg = f"{npc_name} está Confuso (d10={d10}): não há ninguém ao alcance para atacar."
+    _log_combat_event("pass", npc_name, "", msg=msg)
+    memory.save_campaign()
+    return msg + _auto_advance_turn(npc_name)
+
+
 def _executar_turno_npc(npc_name: str = "") -> str:
     cs = memory.campaign.get("combat_state", {})
     if not cs.get("is_active"):
@@ -13702,6 +14005,23 @@ def _executar_turno_npc(npc_name: str = "") -> str:
             f"Aviso: {npc_name} é um personagem do grupo — use attack_roll() "
             f"conforme instrução do jogador."
         )
+
+    # Paralisado, Atordoado, Incapacitado, Banido: não age. Antes o orc
+    # Paralisado pelo Imobilizar Pessoa atacava normalmente, só com desvantagem.
+    from rpg import encantos
+    encantos.expirar()
+    preso = _impedido_de_agir(npc)
+    if preso:
+        _log_combat_event("pass", npc_name, "", msg=f"{npc_name} está {preso} e não age")
+        memory.save_campaign()
+        return f"{npc_name} está **{preso}** e não age neste turno." + _auto_advance_turn(npc_name)
+
+    # Confusão: o d10 decide o turno (SRD).
+    if any(_norm_txt(c.get("nome", "") if isinstance(c, dict) else str(c)) == "confuso"
+           for c in _get_conditions(npc)):
+        confuso = _turno_confuso(npc, npc_name)
+        if confuso:
+            return confuso
 
     strategy = cs.get("npc_strategies", {}).get(npc_name.lower(), "agressivo")
     npc_sheet = npc.get("sheet", {}) or {}
@@ -13749,6 +14069,9 @@ def _executar_turno_npc(npc_name: str = "") -> str:
         p_sheet = p_char.get("sheet", {}) or {}
         if p_sheet.get("vida_atual", 0) <= 0:
             continue
+        # Enfeitiçado não mira quem o enfeitiçou; ninguém alcança o banido.
+        if encantos.pode_atacar(npc, p_char) or _condicao_com(p_char, "untargetable"):
+            continue
         targets.append({
             "name":   p_char.get("name", ""),
             "hp":     p_sheet.get("vida_atual", 0),
@@ -13756,6 +14079,14 @@ def _executar_turno_npc(npc_name: str = "") -> str:
         })
 
     if not targets:
+        e_enc = encantos.ativo(npc)
+        if e_enc:
+            _log_combat_event("pass", npc_name, "",
+                              msg=f"{npc_name} está enfeitiçado por {e_enc['por_nome']} e não ataca")
+            memory.save_campaign()
+            return (f"{npc_name} está {'Dominado' if e_enc['tipo'] == 'dominado' else 'Enfeitiçado'} "
+                    f"por {e_enc['por_nome']} e não ataca ninguém do lado dele."
+                    + _auto_advance_turn(npc_name))
         return f"{npc_name} não encontra alvos válidos. Verifique se o combate deve encerrar com end_combat()."
 
     # Golpes do turno. O Ataque Múltiplo do urso-coruja é "um com o bico e um
@@ -14930,6 +15261,7 @@ def _combatant_snapshot(name: str) -> dict | None:
     ch = memory.campaign["characters"].get(memory.char_key(name))
     if not ch:
         return None
+    _limpar_condicoes(ch)
     s = ch.get("sheet") or {}
     conds = []
     _seen_cond = set()
@@ -15062,6 +15394,10 @@ def _combatant_snapshot(name: str) -> dict | None:
                              if _turnos_restantes(c) > 0},
         # Efeitos de item que duram o combate (resistência, antitoxina).
         "efeitos":    [e.get("nome", "") for e in _efeitos(s)],
+        # Paralisado, Atordoado, Banido…: a tela mostra por que ele não age.
+        "impedido":   _impedido_de_agir(ch),
+        # Enfeitiçado por quem, até quando (rpg/encantos.py).
+        "encanto":    _encanto_nota(ch),
         "habilidades": habs,
         "passivas":   passivas,
         "inventario": itens,
@@ -15069,8 +15405,15 @@ def _combatant_snapshot(name: str) -> dict | None:
     }
 
 
+def _encanto_nota(ch: dict) -> str:
+    from rpg import encantos
+    return encantos.nota(ch)
+
+
 def combat_snapshot() -> dict:
     """Estado completo do combate para a tela tática (JSON-serializável)."""
+    from rpg import encantos
+    encantos.expirar()
     camp = memory.campaign
     cs   = camp.get("combat_state", {}) or {}
     order = list(cs.get("initiative_order", []) or [])
@@ -15193,6 +15536,13 @@ def combat_action(action: str, actor: str = "", target: str = "",
         v = _combat_turn_violation(actor)
         if v:
             return {"ok": False, "message": v, "snapshot": combat_snapshot()}
+        # Paralisado, Atordoado, Banido: o personagem do jogador também não age.
+        ch_ator = memory.campaign["characters"].get(memory.char_key(actor)) or {}
+        preso = _impedido_de_agir(ch_ator) if ch_ator else ""
+        if preso and a not in ("pass", "end_turn"):
+            return {"ok": False,
+                    "message": f"Erro: {actor} está {preso} e não pode agir neste turno. Encerre o turno.",
+                    "snapshot": combat_snapshot()}
         eco = cs.setdefault("turn_economy",
                             {"acao_usada": False, "bonus_usada": False})
         force_end = False  # se True ao final, encerra o turno (flee/pass)
@@ -15472,6 +15822,12 @@ def combat_action(action: str, actor: str = "", target: str = "",
             destino = (target or item or "").strip()
             if not destino:
                 return {"ok": False, "message": "Movimento exige a zona de destino.",
+                        "snapshot": combat_snapshot()}
+            # Agarrado, Contido (Teia), Aprisionado: não sai da zona.
+            preso_mv = _condicao_com(ch_ator, "no_movement") if ch_ator else ""
+            if preso_mv:
+                return {"ok": False,
+                        "message": f"Erro: {actor} está {preso_mv} e não sai da zona.",
                         "snapshot": combat_snapshot()}
             # Zonas de movimento do turno: a de sempre, mais as da Disparada
             # de bônus (Ação Ardilosa, Passo do Vento). A Disparada de Ação

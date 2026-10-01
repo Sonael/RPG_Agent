@@ -337,3 +337,68 @@ def test_mobile_concluir_fica_na_tela(navegador):
     caixa = pg.locator("#grm-concluir").bounding_box()
     altura = pg.evaluate("window.innerHeight")
     assert caixa and caixa["y"] + caixa["height"] <= altura, f"Concluir fora da tela: {caixa}"
+
+
+# ---- conjurar fora do combate ----------------------------------------------
+# Antes, a magia fora da luta dependia de o Mestre lembrar de chamar a
+# ferramenta. O botão Conjurar leva ao motor (mana, salvaguarda, encanto) e
+# entrega ao Mestre só a narração.
+
+def _com_encanto(cap):
+    estado = copy.deepcopy(cap.GRIMORIO)
+    estado["characters"]["helena"]["habilidades"].append(
+        cap._magia_de_captura("Enfeitiçar Pessoa", 1, "Encantamento",
+                              "Um humanoide a seu alcance fica amistoso por uma hora."))
+    estado["characters"]["guarda do portão"] = {
+        "name": "Guarda do Portão", "status": "vivo",
+        "description": "guarda entediado do portão leste", "traits": "", "notes": ""}
+    return estado
+
+
+def test_conjurar_pede_o_alvo_gasta_a_mana_e_avisa_o_mestre(navegador):
+    import capturar_telas as cap
+    pg, erros = navegador(_com_encanto(cap))
+    mana_antes = _estado(pg)["personagem"]["mana_atual"]
+
+    linha = ".grm-conhecida[data-nome='Enfeitiçar Pessoa']"
+    _clicar(pg, f"{linha} .grm-conjurar-btn", 900)
+    painel = pg.inner_text(".grm-conjurar-painel")
+    assert "Em quem?" in painel
+    # O cartão diz como o motor resolve: é encanto, não "motor rola dano".
+    assert "Enfeitiçado" in painel
+
+    pg.click(".grm-conjurar-painel summary") if pg.locator(
+        ".grm-conjurar-painel summary").count() else None
+    _clicar(pg, ".grm-conjurar-painel .grm-alvo:has-text('Guarda do Portão')", 1500)
+
+    # O Grimório fecha, o resultado do motor vai ao chat e o Mestre é avisado.
+    assert pg.evaluate("() => document.getElementById('grimoire-overlay').classList.contains('hidden')")
+    assert "Guarda do Portão" in pg.inner_text("#chat-history")
+    enviado = pg.evaluate("() => window.__enviado")
+    assert enviado and "MAGIA FORA DE COMBATE" in enviado[-1]
+    assert "Guarda do Portão" in enviado[-1]
+    assert _estado(pg)["personagem"]["mana_atual"] == mana_antes - 2
+    assert not erros, f"erros no console: {erros[:3]}"
+
+
+def test_cancelar_nao_conjura(navegador):
+    import capturar_telas as cap
+    pg, _ = navegador(_com_encanto(cap))
+    mana_antes = _estado(pg)["personagem"]["mana_atual"]
+    _clicar(pg, ".grm-conhecida[data-nome='Enfeitiçar Pessoa'] .grm-conjurar-btn", 900)
+    _clicar(pg, ".grm-conjurar-painel .grm-alvo-cancelar", 300)
+    assert pg.locator(".grm-conjurar-painel").count() == 0
+    assert _estado(pg)["personagem"]["mana_atual"] == mana_antes
+    assert pg.evaluate("() => window.__enviado") == []
+
+
+def test_em_combate_o_botao_conjurar_some(navegador):
+    """Em combate a magia custa a ação do turno: quem cobra é a tela de combate."""
+    import capturar_telas as cap
+    estado = _fundir(_com_encanto(cap), {"combat_state": {
+        "is_active": True, "round_number": 1, "current_turn_index": 0,
+        "initiative_order": ["Helena", "Guarda do Portão"]}})
+    pg, _ = navegador(estado, esperar=None)
+    pg.evaluate("window.Grimoire._abrir('Helena')")
+    pg.wait_for_selector(".grm-conhecida", timeout=10000)
+    assert pg.locator(".grm-conjurar-btn").count() == 0
