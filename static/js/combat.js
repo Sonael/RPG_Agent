@@ -447,6 +447,20 @@
       return;
     }
 
+    // O turno do inimigo parou: uma reação em "perguntar" espera o jogador.
+    const pend = snap.reacao_pendente;
+    if (pend) {
+      titleEl.textContent = `Reação de ${pend.quem}`;
+      promptEl.innerHTML = `<span class="cbt-reacao-pergunta" role="alert">${esc(pend.texto)}</span>`;
+      btnEl.innerHTML =
+        `<button class="cbt-btn cbt-primary" style="--cbt-span:2" ${_busy ? 'disabled' : ''} `
+        + `onclick="window.Combat._act({action:'reagir',weapon:'sim'})">Usar ${esc(pend.nome || '')}</button>`
+        + `<button class="cbt-btn" style="--cbt-span:2" ${_busy ? 'disabled' : ''} `
+        + `onclick="window.Combat._act({action:'reagir',weapon:'nao'})">Não usar</button>`;
+      acompanharAlturaDaBarra();
+      return;
+    }
+
     if (!snap.current_is_party) {
       const aliado = lado(cur) === 'aliado';
       titleEl.textContent = aliado ? 'Turno do Aliado' : 'Turno do Inimigo';
@@ -459,6 +473,12 @@
     }
 
     titleEl.textContent = `O que fará ${cur.name}?`;
+    // Invocação do grupo (Conjurar Animais, o familiar): o turno é do jogador,
+    // com um atalho para o motor jogar por ela só esta vez.
+    const botaoAuto = cur.controlada
+      ? `<button class="cbt-btn" ${_busy ? 'disabled' : ''} title="O motor escolhe o alvo e ataca por ${esc(cur.name)}, só neste turno" `
+        + `onclick="window.Combat._act({action:'auto',actor:'${jsNome(cur.name)}'})">Motor joga</button>`
+      : '';
 
     // Paralisado, Atordoado, Banido: não age — a tela diz por quê e só
     // oferece encerrar o turno (o motor recusaria qualquer outra coisa).
@@ -536,6 +556,7 @@
     botoes.push(
       `<button class="cbt-btn" ${acaoDis} onclick="window.Combat._manobras()" title="Defender, Ajudar, Esconder-se, Agarrar, Empurrar, Preparar, Fugir">Manobras</button>`,
       `<button class="cbt-btn" ${dis} onclick="window.Combat._free()">Ação Livre</button>`);
+    if (botaoAuto) botoes.push(botaoAuto);
     // No celular a grade tem 4 colunas: o "Encerrar Turno" ocupa o que sobra
     // da última fileira, e nunca menos de duas colunas — numa só o rótulo
     // quebrava em duas linhas.
@@ -547,27 +568,42 @@
     acompanharAlturaDaBarra();
   }
 
-  // Reações que o motor usa sozinho no turno do inimigo (Escudo Arcano,
-  // Esquiva Sobrenatural, Indomável...). O turno do inimigo não para para
-  // perguntar; aqui o jogador desliga a que não quer que o motor use.
+  // Reações no turno do inimigo (Escudo Arcano, Esquiva Sobrenatural,
+  // Indomável...). Cada uma tem três modos, num toque cada: o motor usa
+  // sozinho quando faz diferença ("automática"), o turno do inimigo para e
+  // pergunta ("pergunta"), ou nunca ("desligada").
+  const MODO_DA_REACAO = { auto: 'automática', perguntar: 'pergunta', desligada: 'desligada' };
+  function modoDe(r) { return r.modo || (r.ligada ? 'auto' : 'desligada'); }
+  function proximoModo(r) {
+    const m = modoDe(r);
+    if (m === 'auto') return r.pode_perguntar ? 'perguntar' : 'desligada';
+    return m === 'perguntar' ? 'desligada' : 'auto';
+  }
   function linhaDeReacoes(cur) {
     const lista = (cur && cur.reacoes) || [];
     if (!lista.length) return '';
-    return `<div class="cbt-reacoes" role="group" aria-label="Reações automáticas">`
-      + `<span class="cbt-reacoes-titulo" title="O motor usa sozinho no turno do inimigo, quando faz diferença">Reações automáticas:</span>`
-      + lista.map(r => `<button type="button" class="cbt-reacao-chip ${r.ligada ? 'ligada' : 'desligada'}" `
-        + `aria-pressed="${r.ligada ? 'true' : 'false'}" ${_busy ? 'disabled' : ''} `
-        + `onclick="window.Combat._reacao('${jsNome(cur.name)}','${jsNome(r.chave)}',${!r.ligada})">`
-        + `${esc(r.nome)}<small>${r.ligada ? 'ligada' : 'desligada'}</small></button>`).join('')
+    return `<div class="cbt-reacoes" role="group" aria-label="Reações">`
+      + `<span class="cbt-reacoes-titulo" title="No turno do inimigo: automática (o motor usa quando faz diferença), pergunta (o turno para e você decide) ou desligada">Reações:</span>`
+      + lista.map(r => {
+          const m = modoDe(r);
+          const classe = m === 'auto' ? 'ligada' : (m === 'perguntar' ? 'pergunta' : 'desligada');
+          return `<button type="button" class="cbt-reacao-chip ${classe}" `
+            + `aria-pressed="${m !== 'desligada' ? 'true' : 'false'}" ${_busy ? 'disabled' : ''} `
+            + `onclick="window.Combat._reacao('${jsNome(cur.name)}','${jsNome(r.chave)}','${proximoModo(r)}')">`
+            + `${esc(r.nome)}<small>${MODO_DA_REACAO[m]}</small></button>`;
+        }).join('')
       + `</div>`;
   }
 
-  async function _reacao(ator, chave, ligada) {
+  async function _reacao(ator, chave, modo) {
     if (_busy) return;
+    // Compatível com quem chama com booleano (ligada / desligada).
+    if (modo === true) modo = 'auto';
+    if (modo === false) modo = 'desligada';
     try {
       const res = await api('/api/combat/reacao', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ actor: ator, reacao: chave, ligada }),
+        body: JSON.stringify({ actor: ator, reacao: chave, ligada: modo !== 'desligada', modo }),
       });
       if (res && res.message && window.showToast) window.showToast(res.message);
       if (res && res.snapshot) await refresh(res.snapshot);
@@ -611,6 +647,17 @@
   // decide se pode é o motor.
   const MIRA_ALIADO = ['Cura', 'Reforço'];
 
+  // Quantos alvos a habilidade deixa escolher: por círculo (Imobilizar
+  // Pessoa: 2 no 3º; Mísseis Mágicos: um alvo por dardo) ou, sem zonas, pelo
+  // tamanho da área (Bola de Fogo: 4).
+  function maxAlvos(h, modo) {
+    if (!h) return 1;
+    const por = h.alvos_por_modo || {};
+    const chaves = Object.keys(por);
+    if (chaves.length) return Number(por[modo] || por[chaves[0]] || 1);
+    return Number(h.max_alvos || 1);
+  }
+
   function showTargets(kind, opts) {
     const snap = _last;
     if (!snap) return;
@@ -648,11 +695,18 @@
           + `${esc(m.texto.split(':')[0])}<small>${esc(m.texto.split(':').slice(1).join(':'))}</small></button>`).join('')
         + `</div>`
       : '';
+    // Vários alvos: cada toque marca ou desmarca, e o botão confirma.
+    const maxN = kind === 'ability' ? maxAlvos(h, _pick.modo || (circulos[0] ? circulos[0].id : '')) : 1;
+    _pick.max = maxN;
+    _pick.sel = (_pick.sel || []).filter(n => live.some(c => c.name === n)).slice(0, maxN);
+    const sel = maxN > 1 ? _pick.sel : [];
     const html =
-      `<div class="cbt-tgt-title">${titulo}</div>`
+      `<div class="cbt-tgt-title">${titulo}${maxN > 1 ? ` <small>· até ${maxN} alvos</small>` : ''}</div>`
       + (h && h.resumo ? `<div class="cbt-tgt-resumo">${esc(h.resumo)}</div>` : '')
       + chips
-      + `<div class="cbt-tgt-dica">Toque no combatente ou escolha abaixo.</div>`
+      + `<div class="cbt-tgt-dica">${maxN > 1
+          ? `Toque para marcar até ${maxN} alvos e confirme.`
+          : 'Toque no combatente ou escolha abaixo.'}</div>`
       + `<div class="cbt-picker-btns">`
       + live.map(c => {
           const estado = alcance[c.name];
@@ -664,16 +718,34 @@
             ? ` title="${esc(c.name)} está em ${esc(c.zona || 'outra zona')}: corpo-a-corpo só na mesma zona. Mova-se ou use uma arma à distância."`
             : '';
           const quem = c.name === (cur && cur.name) ? ' (em si)' : '';
-          return `<button class="cbt-btn ${comOGrupo(c) ? 'cbt-alvo-aliado' : 'cbt-alvo-inimigo'}${fora ? ' cbt-fora' : ''}" ${fora ? 'disabled' : ''}${dica} `
+          const marcado = sel.includes(c.name);
+          return `<button class="cbt-btn ${comOGrupo(c) ? 'cbt-alvo-aliado' : 'cbt-alvo-inimigo'}${fora ? ' cbt-fora' : ''}${marcado ? ' cbt-selecionado' : ''}" ${fora ? 'disabled' : ''}${dica} `
+            + (maxN > 1 ? `aria-pressed="${marcado ? 'true' : 'false'}" ` : '')
             + `onclick="window.Combat._target('${jsNome(c.name)}')">${esc(c.name)}${quem}`
             + ` <small>${c.hp}/${c.hp_max}</small>${nota}</button>`;
         }).join('')
       + (_pick.permiteNenhum
           ? `<button class="cbt-btn" onclick="window.Combat._target('')">O primeiro que chegar</button>` : '')
+      + (maxN > 1
+          ? `<button class="cbt-btn cbt-primary" ${sel.length ? '' : 'disabled'} onclick="window.Combat._confirmarAlvos()">`
+            + `Confirmar (${sel.length}/${maxN})</button>` : '')
       + BOTAO_CANCELAR
       + `</div>`;
     abrirSeletor(html, false);
     marcarLinhas(estados, {});
+  }
+
+  function _confirmarAlvos() {
+    if (_busy || !_pick || !(_pick.sel || []).length) return;
+    const cur = (_last.combatants || []).find(c => c.is_current);
+    if (!cur) return;
+    const nomes = _pick.sel.join(', ');
+    const h = _pick.hab || { nome: _pick.ability };
+    if (_pick.mode === 'area' || _pick.mode === 'area_self')
+      conferirArea(cur, h, nomes, _pick.modo || '');
+    else
+      act({ action: 'ability', actor: cur.name, ability: _pick.ability, target: nomes,
+            weapon: _pick.modo || '' });
   }
 
   // No mobile o painel de ação é uma barra fixa que rola por dentro: se o
@@ -738,7 +810,7 @@
       if (_open) {
         if (pill) pill.classList.add('hidden');
         render(snap);
-        if (!snap.current_is_party && !_busy) {
+        if (!snap.current_is_party && !snap.reacao_pendente && !_busy) {
           clearTimeout(_autoTimer);
           if (_autoGuard++ < 80) {
             _autoTimer = setTimeout(() => act({ action: 'enemy' }), 650);
@@ -1218,6 +1290,11 @@
   function _circulo(id) {
     if (!_pick) return;
     _pick.modo = id;
+    // O círculo muda quantos alvos cabem: redesenha com a marcação que cabe.
+    if (_pick.kind === 'ability' && _pick.hab && Object.keys(_pick.hab.alvos_por_modo || {}).length) {
+      showTargets('ability', Object.assign({}, _pick));
+      return;
+    }
     document.querySelectorAll('#cbt-targets .cbt-circulo').forEach(b =>
       b.classList.toggle('ativo', b.dataset.modo === id));
   }
@@ -1271,6 +1348,11 @@
     }
     // Pool e área-que-nasce-no-conjurador não escolhem alvo: o motor sabe
     // onde a magia cai (a zona de quem conjura, ou os inimigos do pool).
+    // Sem zonas, a área que nasce no conjurador também escolhe quem pega.
+    if (mode === 'area_self' && maxAlvos(h, w) > 1) {
+      showTargets('ability', { ability: name, hab: h, mode, modo: w });
+      return;
+    }
     if (mode === 'pool' || mode === 'area_self') {
       conferirArea(cur, h, '', w);
       return;
@@ -1284,6 +1366,14 @@
     if (_busy || !_pick) return;
     const cur = (_last.combatants || []).find(c => c.is_current);
     if (!cur) return;
+    if (_pick.kind === 'ability' && (_pick.max || 1) > 1 && name) {
+      const sel = (_pick.sel || []).slice();
+      const i = sel.indexOf(name);
+      if (i >= 0) sel.splice(i, 1);
+      else if (sel.length < _pick.max) sel.push(name);
+      showTargets('ability', Object.assign({}, _pick, { sel }));
+      return;
+    }
     if (_pick.kind === 'manobra')
       act({ action: _pick.acao, actor: cur.name, target: name, weapon: _pick.modo || '' });
     else if (_pick.kind === 'attack')
@@ -1533,7 +1623,7 @@
   // ---- API pública -------------------------------------------------
   window.Combat = {
     sync,
-    _sel, _selHab, _usarHab, _modo, _circulo, _info, _reacao, _manobras, _manobra, _selWeapon, _selItem, _target, _mover, _cancel, _free,
+    _sel, _selHab, _usarHab, _modo, _circulo, _info, _reacao, _manobras, _manobra, _selWeapon, _selItem, _target, _confirmarAlvos, _mover, _cancel, _free,
     _confirmarArea,
     _livreEnviar, _livreFechar,
     _act: act,

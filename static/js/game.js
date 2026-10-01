@@ -32,7 +32,7 @@ const STATE_TOOLS = new Set([
   'roll_death_save', 'equip_item', 'unequip_item', 'set_stat',
   'modify_currency', 'grant_xp',
   // Faltavam: mudam turno/HP/status mas não atualizavam a barra/sidebar
-  'execute_npc_turn', 'spawn_monster', 'recruit_character',
+  'execute_npc_turn', 'responder_reacao', 'spawn_monster', 'recruit_character',
   'resolve_saving_throw',
   // offer_rest abre a tela de descanso; use_hit_die mexe na vida e na reserva.
   'offer_rest', 'use_hit_die',
@@ -385,6 +385,7 @@ const TOOL_LABEL = {
   // Combate
   roll_initiative: 'rolando iniciativa', next_turn: 'passando a vez',
   end_combat: 'encerrando o combate', execute_npc_turn: 'jogando pelo NPC',
+  responder_reacao: 'decidindo a reação',
   spawn_monster: 'trazendo criatura', suggest_encounter: 'medindo o desafio',
   set_npc_strategy: 'definindo a tática', set_combat_side: 'definindo o lado',
   set_battlefield: 'montando o campo', describe_battlefield: 'olhando o campo',

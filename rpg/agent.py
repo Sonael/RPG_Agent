@@ -1028,6 +1028,13 @@ Para definir estratégia de um NPC (opcional; padrão = agressivo):
   → set_npc_strategy("Goblin Chefe", "covarde")
   Estratégias: agressivo, tático, covarde, aleatório, suporte.
 
+• INVOCAÇÃO DO GRUPO (lobos do Conjurar Animais, o elemental, o familiar):
+  a vez dela é do JOGADOR. execute_npc_turn() recusa; pergunte o que ela faz e
+  use attack_roll / use_ability com ela (ou end_turn).
+• REAÇÃO QUE PERGUNTA: se execute_npc_turn() devolver "REAÇÃO — <nome>
+  decide", o turno do inimigo parou. Pergunte ao jogador e chame
+  responder_reacao(usar=True ou False); o turno continua com os mesmos dados.
+
 • VITÓRIA (inimigos derrotados) → end_combat() e DEPOIS grant_xp() para CADA
   membro do grupo (aliados recrutados incluídos). Não pule o XP da vitória —
   numa vitória, o servidor detecta a ausência de grant_xp() como violação.

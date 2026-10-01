@@ -964,6 +964,8 @@ def como_resolve(hab: dict, char: dict | None = None) -> dict:
                 if criaturas._corrente(char):
                     modos.update({"diabrete:1": "Diabrete", "pseudodragao:1": "Pseudodragão",
                                   "quasit:1": "Quasit", "sprite:1": "Sprite"})
+            if ef.get("invocar") and char:
+                modos.update(modos_de_invocacao_no_circulo(hab, m, ef, char))
             if ef.get("identificar") and char:
                 modos = {i["nome"]: i["nome"] for i in (char.get("inventario") or [])
                          if isinstance(i, dict) and i.get("nome") and not i.get("identificado")}
@@ -996,6 +998,9 @@ def como_resolve(hab: dict, char: dict | None = None) -> dict:
             saida["texto"] = (f"O motor aplica: {nome_cond.capitalize()} — {texto_cond}"
                               + (", enquanto durar a concentração" if m.get("concentracao") else "")
                               + ".")
+            if m.get("alvos_por_espaco"):
+                modos = circulos_da_magia(hab, char)
+                saida.update(modos=list(modos), modos_texto=modos)
             return saida
         saida.update(tipo="narrativa", texto=_TEXTO_NARRATIVA
                      + (" O motor rola a salvaguarda do alvo." if m.get("salvaguarda") else ""))
@@ -1183,6 +1188,8 @@ def validar(char: dict, hab: dict, alvo: str, modo: str) -> str:
             from rpg import criaturas
             if criaturas._corrente(char):
                 _modos_ok.update({"diabrete:1": "", "pseudodragao:1": "", "quasit:1": "", "sprite:1": ""})
+        if ef.get("invocar"):
+            _modos_ok.update(modos_de_invocacao_no_circulo(hab, m, ef, char))
         if ef.get("modos") and modo not in _modos_ok:
             return (f"Aviso: {nome_pt} pede uma escolha: " + "; ".join(ef["modos"].values())
                     + ". Nada foi gasto.")
@@ -1322,7 +1329,7 @@ def aplicar_magia(char: dict, hab: dict, alvo_nome: str, modo: str = "") -> str:
     m = _magia_srd(hab) or {}
     nome_pt = m.get("nome") or hab.get("nome", "")
     base = int(m.get("nivel", 1) or 1)
-    circ = int(modo[1:]) if (modo or "").startswith("c") and modo[1:].isdigit() else base
+    circ = circulo_do_modo(hab, modo) or base
     extra_circ = max(0, circ - base)
     if ef.get("alvos") in ("aliados", "inimigos") and extra_circ and m.get("alvos_por_espaco"):
         ef = dict(ef, max=int(ef.get("max", 1)) + extra_circ)
@@ -1775,7 +1782,7 @@ def _nd_de(ch: dict) -> float:
 def _invocar(char: dict, hab: dict, ef: dict, modo: str, nome_pt: str) -> str:
     from rpg import criaturas, tools_dnd as td
     cfg = ef["invocar"]
-    chave, _, n = (modo or "").partition(":")
+    chave, _, n = (modo or "").split("@")[0].partition(":")
     quantos = int(n or 1)
     if cfg.get("um_so"):
         criaturas.dispensar_de(memory.char_key(char.get("name", "")), hab.get("nome", ""), "substituído")
@@ -1787,7 +1794,8 @@ def _invocar(char: dict, hab: dict, ef: dict, modo: str, nome_pt: str) -> str:
                               hostil_ao_perder=bool(cfg.get("hostil_ao_perder")))
     na_luta = (memory.campaign.get("combat_state") or {}).get("is_active")
     return (f"\n   {nome_pt}: " + ", ".join(nomes) + (" entram na luta ao lado de " + char["name"]
-                                                    + " (o motor conduz o turno delas)." if na_luta and len(nomes) > 1
+                                                    + " (o turno delas é seu, na ordem de iniciativa)."
+                                                    if na_luta and len(nomes) > 1
                                                     else (" entra na luta ao lado de " + char["name"] + "."
                                                           if na_luta else f" acompanha {char['name']}."))
             + (f" Some em {cfg['horas']} hora{'s' if int(cfg['horas']) > 1 else ''}."
@@ -1881,7 +1889,8 @@ def _escala(m: dict) -> bool:
     return bool(m.get("escala_espaco") or m.get("alvos_por_espaco")
                 or _ESCALA_RE.search(m.get("nivel_superior_en") or "")
                 or m.get("nome_srd") in ("Aid", "False Life", "Magic Weapon", "Branding Smite",
-                                         "Spiritual Weapon", "Dispel Magic"))
+                                         "Spiritual Weapon", "Dispel Magic")
+                or m.get("nome_srd") in ESCALA_DE_INVOCACAO)
 
 
 def circulos_da_magia(hab: dict, char: dict | None) -> dict:
@@ -1906,14 +1915,127 @@ def circulos_da_magia(hab: dict, char: dict | None) -> dict:
         if c > base and custo > mana:
             break
         dado = dado_no_circulo(hab, formula, c) if formula else ""
+        n_proj = projeteis(hab, c)
+        if n_proj and dado:
+            rotulo = PROJETEIS[(_magia_srd(hab) or {}).get("nome_srd", "")]["rotulo"]
+            dado = f"{n_proj} {rotulo}s de {dado}"
+        elif (m.get("alvos_por_espaco") and not formula and c > base):
+            dado = f"{alvos_no_circulo(hab, c)} alvos"
         saida[f"c{c}"] = f"{c}º círculo: {custo} mana" + (f" · {dado}" if dado else "")
     return saida if len(saida) > 1 else {}
 
 
 def circulo_do_modo(hab: dict, modo: str) -> int:
-    if (modo or "").startswith("c") and modo[1:].isdigit():
+    modo = modo or ""
+    if "@" in modo:                       # invocação num círculo acima: "lobo:16@c5"
+        modo = modo.rsplit("@", 1)[1]
+    if modo.startswith("c") and modo[1:].isdigit():
         return int(modo[1:])
     return 0
+
+
+# ── Mais criaturas (ou mais fortes) num círculo acima (SRD, "At Higher Levels") ──
+#   vezes    círculo → multiplicador do número de criaturas (Conjurar Animais)
+#   objetos  dois objetos miúdos a mais por círculo (Animar Objetos)
+#   mais_um  uma criatura a mais por círculo (Criar Mortos-Vivos)
+#   extras   círculo → modos que só existem dali para cima (ND maior)
+ESCALA_DE_INVOCACAO = {
+    "Conjure Animals": {"vezes": {5: 2, 7: 3, 9: 4}},
+    "Conjure Minor Elementals": {"vezes": {6: 2, 8: 3}},
+    "Conjure Woodland Beings": {"vezes": {6: 2, 8: 3}},
+    "Animate Objects": {"objetos": True},
+    "Create Undead": {"mais_um": True},
+    "Conjure Elemental": {"extras": {6: {"perseguidor invisivel:1": "Perseguidor Invisível (ND 6)"}}},
+}
+
+
+def modos_de_invocacao_no_circulo(hab: dict, m: dict, ef: dict, char: dict | None) -> dict:
+    """
+    Os modos de invocação conjurada num círculo acima do da magia, com o
+    círculo no id ("lobo:16@c5"). Só os círculos que a mana alcança, e só
+    onde o número (ou a criatura) muda.
+    """
+    from rpg import tools_dnd as td
+    regra = ESCALA_DE_INVOCACAO.get((m or {}).get("nome_srd", ""))
+    if not regra or not char:
+        return {}
+    base = int(m.get("nivel", 0) or 0)
+    circulos = sorted(int(k[1:]) for k in circulos_da_magia(hab, char))
+    saida = {}
+    for c in circulos:
+        if c <= base:
+            continue
+        custo = td.SPELL_MANA_COST[c]
+        k = c - base
+        for id_m, txt in (ef.get("modos") or {}).items():
+            chave, _, n = id_m.partition(":")
+            n = int(n or 1)
+            if regra.get("vezes"):
+                if c not in regra["vezes"]:
+                    continue
+                novo = n * regra["vezes"][c]
+            elif regra.get("objetos"):
+                novo = n * (10 + 2 * k) // 10
+            elif regra.get("mais_um"):
+                novo = n + k
+            else:
+                continue
+            if novo != n:
+                saida[f"{chave}:{novo}@c{c}"] = f"{txt.split(' (')[0]} → {novo} ({c}º círculo, {custo} mana)"
+        for minimo, extras in (regra.get("extras") or {}).items():
+            if c == minimo:
+                saida.update({f"{i}@c{c}": f"{t} ({c}º círculo, {custo} mana)" for i, t in extras.items()})
+    return saida
+
+
+# ── Projéteis: um dado por dardo ou raio, cada um num alvo à escolha ──────────
+#   base: quantos no círculo da magia; ataque: cada raio rola acerto
+PROJETEIS = {
+    "Magic Missile": {"base": 3, "rotulo": "dardo", "ataque": False},
+    "Scorching Ray": {"base": 3, "rotulo": "raio", "ataque": True},
+}
+
+
+def projeteis(hab: dict, circulo: int = 0) -> int:
+    """Quantos dardos (Mísseis Mágicos) ou raios (Raio Ardente) a magia solta neste círculo; 0 se não é dessas."""
+    m = _magia_srd(hab) or {}
+    cfg = PROJETEIS.get(m.get("nome_srd", ""))
+    if not cfg:
+        return 0
+    base = int(m.get("nivel", 1) or 1)
+    return cfg["base"] + max(0, (circulo or base) - base)
+
+
+def alvos_no_circulo(hab: dict, circulo: int = 0) -> int:
+    """
+    Quantas criaturas a magia de alvo pega neste círculo (Imobilizar Pessoa:
+    uma no 2º, duas no 3º...). Os projéteis podem ir cada um num alvo.
+    """
+    n = projeteis(hab, circulo)
+    if n:
+        return n
+    m = _magia_srd(hab) or {}
+    base = int(m.get("nivel", 1) or 1)
+    um = max(1, int(m.get("alvo_max", 1) or 1))
+    c = circulo or base
+    if c <= base:
+        return um
+    tabela = m.get("alvos_por_espaco") or {}
+    return int(tabela.get(str(c)) or (um + c - base))
+
+
+def alvos_por_modo(hab: dict, char: dict | None) -> dict:
+    """modo (círculo) → quantos alvos, para a tela escolher vários. {} quando é um só sempre."""
+    m = _magia_srd(hab) or {}
+    if not m or not (m.get("alvos_por_espaco") or projeteis(hab)):
+        return {}
+    from rpg import tools_dnd as td
+    if not projeteis(hab) and (td._get_control_effect(hab) or {}).get("pool", True):
+        return {}
+    base = int(m.get("nivel", 1) or 1)
+    ids = list(circulos_da_magia(hab, char)) or [f"c{base}"]
+    saida = {i: alvos_no_circulo(hab, int(i[1:])) for i in ids}
+    return saida if any(v > 1 for v in saida.values()) else {}
 
 
 def aplicar_rider(char: dict, hab: dict, alvo: dict) -> str:

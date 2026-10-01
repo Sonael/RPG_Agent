@@ -121,6 +121,13 @@ FICHAS: dict[str, dict] = {
                           "resistencias": ["acid"],
                           "resistencias_nao_magicas": ["bludgeoning", "piercing", "slashing"],
                           "imunidades": ["poison"]},
+    # Conjurar Elemental no 6º círculo ou acima (ND 6).
+    "perseguidor invisivel": {"nome": "Perseguidor Invisível", "nd": "6", "tipo": "elemental", "ca": 14,
+                              "pv": 104, "atr": (16, 19, 14, 10, 15, 11), "multiataque": 2, "voa": True,
+                              "invisivel": True,
+                              "ataques": [{"nome": "pancada", "dado": "2d6", "tipo": "bludgeoning"}],
+                              "resistencias_nao_magicas": ["bludgeoning", "piercing", "slashing"],
+                              "imunidades": ["poison"]},
 
     # ── Conjurar Elementais Menores ─────────────────────────────────────
     "mefita de vapor": {"nome": "Mefita de Vapor", "nd": "1/4", "tipo": "elemental", "ca": 10, "pv": 21,
@@ -245,7 +252,8 @@ def montar_sheet(chave: str) -> dict:
                             if f.get("resistencias_nao_magicas") else [])),
         "imunidades": [{"tipos": [t]} for t in f.get("imunidades", [])],
         "vulnerabilidades": [{"tipos": [t]} for t in f.get("vulnerabilidades", [])],
-        "vida_temp": 0, "concentracao": None, "condicoes": [],
+        "vida_temp": 0, "concentracao": None,
+        "condicoes": [{"nome": "Invisível", "duracao": None}] if f.get("invisivel") else [],
         "death_saves_sucessos": 0, "death_saves_falhas": 0, "cr": f["nd"],
     }
 
@@ -330,14 +338,28 @@ def voltar(char: dict, motivo: str = "") -> str:
 # ===========================================================================
 # INVOCAÇÕES
 # ===========================================================================
-# A criatura invocada entra na história como personagem do lado "aliado": o
-# motor conduz o turno dela, como o de qualquer aliado (memory.lado_no_combate).
+# A criatura invocada entra na história como personagem do lado "aliado". O
+# turno dela é do JOGADOR quando quem invocou é do grupo: as feras do Conjurar
+# Animais obedecem às ordens de quem as chamou, e o motor jogava por elas como
+# se fossem aliados quaisquer. Na tela, o turno da invocação tem a barra de
+# ação inteira (os ataques dela, Manobras, Encerrar) e um botão para deixar o
+# motor jogar aquela vez.
 # `invocacao` guarda de onde ela veio e o que a faz sumir:
 #   por          chave de quem invocou
 #   magia        o nome da magia na ficha
 #   concentracao some quando quem invocou perde a concentração nesta magia
 #   persistente  fica depois do combate (familiar, montaria, mortos animados)
 #   ate_hora     some quando o relógio do mundo chega lá (Animar Mortos: 24 h)
+
+def controlada_pelo_jogador(c: dict | None) -> bool:
+    """A invocação de alguém do grupo, que ainda obedece: o jogador decide o turno dela."""
+    from rpg import memory
+    inv = (c or {}).get("invocacao")
+    if not isinstance(inv, dict) or (c.get("lado") or "") == "inimigo":
+        return False
+    dono = (memory.campaign.get("characters") or {}).get(inv.get("por", ""))
+    return bool(dono and memory.is_party_member(dono))
+
 
 def _invocadas() -> list[dict]:
     from rpg import memory

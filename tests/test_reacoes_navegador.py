@@ -1,10 +1,11 @@
 """
 test_reacoes_navegador.py
 
-As reações (Escudo Arcano, Indomável...) o motor usa sozinho no turno do
-inimigo. A tela de combate mostra quais o personagem tem e deixa desligar:
-aqui se prova que a linha aparece, que o toque desliga no motor e que o botão
-mostra o estado novo.
+As reações (Escudo Arcano, Indomável...) acontecem no turno do inimigo. A
+tela de combate mostra quais o personagem tem e, num toque cada, troca o
+modo: automática (o motor usa) → pergunta (o turno para e o jogador decide) →
+desligada. O Indomável é recurso: só liga e desliga. Aqui se prova que a
+linha aparece, que o toque muda o modo no motor e que o botão mostra o novo.
 
 Depende do Playwright, que não está em requirements-dev.txt. Sem ele o arquivo
 é pulado:
@@ -76,7 +77,7 @@ def _estado_no_motor(pg):
     return pg.evaluate("""async () => {
       const s = await (await authFetch((window.API || '') + '/api/combat/state')).json();
       const c = s.combatants.find(x => x.name === 'Stelar');
-      return Object.fromEntries((c.reacoes || []).map(r => [r.chave, r.ligada]));
+      return Object.fromEntries((c.reacoes || []).map(r => [r.chave, r.modo]));
     }""")
 
 
@@ -88,11 +89,23 @@ def test_linha_de_reacoes_aparece_ligada(pagina):
     assert not erros, erros[:3]
 
 
-def test_tocar_desliga_no_motor_e_na_tela(pagina):
+def test_tocar_troca_o_modo_no_motor_e_na_tela(pagina):
     pg, _ = pagina
-    pg.click(".cbt-reacao-chip:has-text('Escudo Arcano')")
+    chip = ".cbt-reacao-chip:has-text('Escudo Arcano')"
+    pg.click(chip)
+    pg.wait_for_selector(".cbt-reacao-chip.pergunta:has-text('Escudo Arcano')", timeout=5000)
+    assert "pergunta" in pg.inner_text(chip)
+    assert _estado_no_motor(pg)["escudo arcano"] == "perguntar"
+    pg.click(chip)
     pg.wait_for_selector(".cbt-reacao-chip.desligada:has-text('Escudo Arcano')", timeout=5000)
-    assert _estado_no_motor(pg)["escudo arcano"] is False
-    pg.click(".cbt-reacao-chip:has-text('Escudo Arcano')")
+    assert _estado_no_motor(pg)["escudo arcano"] == "desligada"
+    pg.click(chip)
     pg.wait_for_selector(".cbt-reacao-chip.ligada:has-text('Escudo Arcano')", timeout=5000)
-    assert _estado_no_motor(pg)["escudo arcano"] is True
+    assert _estado_no_motor(pg)["escudo arcano"] == "auto"
+
+
+def test_recurso_nao_tem_o_modo_pergunta(pagina):
+    pg, _ = pagina
+    pg.click(".cbt-reacao-chip:has-text('Indomável')")
+    pg.wait_for_selector(".cbt-reacao-chip.desligada:has-text('Indomável')", timeout=5000)
+    assert _estado_no_motor(pg)["indomavel"] == "desligada"

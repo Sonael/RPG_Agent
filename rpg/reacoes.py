@@ -12,10 +12,21 @@ Arcano e Contramágica apareciam na lista como "o Mestre decide", e a Esquiva
 Sobrenatural do ladino nunca reduziu um ponto de dano.
 
 Pausar o turno do inimigo a cada golpe para perguntar "quer usar o Escudo?"
-travaria a luta numa fila de perguntas. Aqui o motor usa a reação sozinho, no
-momento em que ela faz diferença — o Escudo só quando os +5 transformam o
-acerto em erro, a Contramágica só contra magia de inimigo ao alcance — e o
-jogador desliga na tela a que não quiser que o motor use.
+travaria a luta numa fila de perguntas. Por padrão o motor usa a reação
+sozinho, no momento em que ela faz diferença — o Escudo só quando os +5
+transformam o acerto em erro, a Contramágica só contra magia de inimigo ao
+alcance. Cada reação tem três modos na tela: "auto" (o motor usa), "perguntar"
+e "desligada".
+
+PERGUNTAR
+─────────
+No modo "perguntar", quando a reação faria diferença, o turno do inimigo para
+e o jogador decide. O motor não tem como suspender uma função no meio, então
+faz o seguinte: guarda a campanha e o estado do sorteio antes do turno; quando
+chega a pergunta, desfaz tudo e grava a pergunta pendente; com a resposta, roda
+o turno de novo do mesmo ponto, com o mesmo sorteio — os mesmos dados caem, a
+mesma pergunta chega, e agora ela tem resposta. Uma segunda pergunta no mesmo
+turno funciona igual, com as duas respostas.
 
 Cada reação gasta a reação da rodada (e a mana ou o uso, quando tem).
 """
@@ -111,6 +122,59 @@ REACOES: dict[str, dict] = {
 
 _POR_SRD = {cfg["srd"]: chave for chave, cfg in REACOES.items() if cfg.get("srd")}
 
+# Reações que podem perguntar: as que são escolha de verdade. Os Lampejos e os
+# recursos que refazem salvaguarda continuam no liga/desliga.
+PODEM_PERGUNTAR = frozenset(k for k, cfg in REACOES.items() if not cfg.get("recurso") and k != "lampejos")
+
+
+class PerguntaDeReacao(BaseException):
+    """
+    O turno do inimigo para aqui: o jogador decide a reação. BaseException de
+    propósito — um `except Exception` no caminho não pode engolir a pausa.
+    """
+    def __init__(self, quem: str, chave: str, texto: str):
+        super().__init__(texto)
+        self.quem, self.chave, self.texto = quem, chave, texto
+
+
+# Durante o turno do inimigo (tools_dnd._turno_com_perguntas): as respostas já
+# dadas, em ordem. None fora dele — aí a reação em "perguntar" age como "auto".
+_respostas: list | None = None
+_indice = 0
+
+
+def modo_da_reacao(char: dict, chave: str) -> str:
+    """'auto' | 'perguntar' | 'desligada'."""
+    s = (char or {}).get("sheet") or {}
+    if _norm(chave) in {_norm(x) for x in s.get("reacoes_desligadas") or []}:
+        return "desligada"
+    if _norm(chave) in {_norm(x) for x in s.get("reacoes_perguntar") or []}:
+        return "perguntar"
+    return "auto"
+
+
+def alguem_pergunta() -> bool:
+    """Algum personagem do grupo tem reação em 'perguntar'? Sem isso, o turno corre sem guardar nada."""
+    return any(isinstance(c, dict) and ((c.get("sheet") or {}).get("reacoes_perguntar"))
+               and memory.is_party_member(c)
+               for c in (memory.campaign.get("characters") or {}).values())
+
+
+def _confirmar(char: dict, chave: str, texto: str) -> bool:
+    """
+    O jogador quer esta reação agora? Sempre sim no modo "auto" e fora do
+    turno do inimigo. No "perguntar", a resposta já dada ou a pausa.
+    """
+    global _indice
+    if (_respostas is None or not memory.is_party_member(char)
+            or modo_da_reacao(char, chave) != "perguntar"):
+        return True
+    if _indice < len(_respostas):
+        resposta = _respostas[_indice]
+        _indice += 1
+        return bool(resposta)
+    raise PerguntaDeReacao(char.get("name", ""), chave, texto)
+
 
 def _norm(s: str) -> str:
     from rpg import resolucao
@@ -158,30 +222,47 @@ def habilidade_da_reacao(char: dict, chave: str) -> dict | None:
 
 
 def disponiveis(char: dict) -> list[dict]:
-    """As reações (e recursos que reagem) da ficha, com o estado ligado/desligado."""
+    """As reações (e recursos que reagem) da ficha, com o modo (auto, perguntar, desligada)."""
     from rpg import tools_dnd as td
     saida = []
     for chave, cfg in REACOES.items():
         if habilidade_da_reacao(char, chave):
             saida.append({"chave": chave, "nome": cfg["nome"],
-                          "ligada": td.reacao_automatica(char, chave)})
+                          "ligada": td.reacao_automatica(char, chave),
+                          "modo": modo_da_reacao(char, chave),
+                          "pode_perguntar": chave in PODEM_PERGUNTAR})
     return saida
 
 
-def alternar(nome: str, chave: str, ligada: bool) -> str:
+def alternar(nome: str, chave: str, ligada: bool, modo: str = "") -> str:
+    """
+    Muda o modo da reação. `modo` ("auto", "perguntar", "desligada") manda;
+    sem ele, `ligada` escolhe entre "auto" e "desligada" (a tela antiga).
+    """
     ch = memory.campaign.get("characters", {}).get(memory.char_key(nome or ""))
     if not ch:
         return f"Erro: '{nome}' não encontrado."
     if chave not in REACOES:
         return f"Erro: reação desconhecida: {chave}."
+    modo = (modo or ("auto" if ligada else "desligada")).strip().lower()
+    if modo not in ("auto", "perguntar", "desligada"):
+        return f"Erro: modo desconhecido: {modo}. Use auto, perguntar ou desligada."
+    if modo == "perguntar" and chave not in PODEM_PERGUNTAR:
+        return f"Erro: {REACOES[chave]['nome']} não pergunta: só liga ou desliga."
     s = ch.setdefault("sheet", {})
-    lista = [x for x in (s.get("reacoes_desligadas") or []) if _norm(x) != _norm(chave)]
-    if not ligada:
-        lista.append(chave)
-    s["reacoes_desligadas"] = lista
+    desligadas = [x for x in (s.get("reacoes_desligadas") or []) if _norm(x) != _norm(chave)]
+    perguntar = [x for x in (s.get("reacoes_perguntar") or []) if _norm(x) != _norm(chave)]
+    if modo == "desligada":
+        desligadas.append(chave)
+    elif modo == "perguntar":
+        perguntar.append(chave)
+    s["reacoes_desligadas"] = desligadas
+    s["reacoes_perguntar"] = perguntar
     memory.save_campaign()
     return (f"{REACOES[chave]['nome']} de {ch['name']}: "
-            + ("o motor usa sozinho." if ligada else "desligada — o motor não usa."))
+            + {"auto": "o motor usa sozinho.",
+               "perguntar": "o turno do inimigo para e pergunta quando ela faria diferença.",
+               "desligada": "desligada — o motor não usa."}[modo])
 
 
 # ---------------------------------------------------------------------------
@@ -247,12 +328,18 @@ def antes_do_ataque(atacante: dict, alvo: dict, ja_tem_desvantagem: bool) -> tup
         d = td._distancia(guarda.get("name", ""), alvo.get("name", ""))
         if d not in (None, 0) or not _pode_reagir(guarda, "protecao"):
             continue
+        if not _confirmar(guarda, "protecao", f"{atacante['name']} vai atacar {alvo['name']}. {guarda['name']} "
+                                              f"ergue o escudo (Proteção) e impõe desvantagem?"):
+            continue
         msg = (f"{guarda['name']} ergue o escudo (Proteção): o ataque de {atacante['name']} contra "
                f"{alvo['name']} tem desvantagem.")
         _registrar(guarda, "Proteção", atacante.get("name", ""), msg)
         return True, [msg]
     hab = _pode_reagir(alvo, "bandeira de aviso")
     if not hab or (td.usos_restantes(alvo, "Bandeira de Aviso") or 0) <= 0:
+        return False, []
+    if not _confirmar(alvo, "bandeira de aviso", f"{atacante['name']} vai atacar {alvo['name']}. Usar Bandeira "
+                                                 f"de Aviso (desvantagem no ataque, gasta um uso)?"):
         return False, []
     td._gastar_uso(alvo, "Bandeira de Aviso")
     msg = f"{alvo['name']} usa Bandeira de Aviso: o ataque de {atacante['name']} tem desvantagem."
@@ -269,7 +356,12 @@ def ao_ser_atingido(atacante: dict, alvo: dict, total: int, ca: int, critico: bo
     if memory.luta_com_o_grupo(atacante) == memory.luta_com_o_grupo(alvo):
         return False, []
     hab = _pode_reagir(alvo, "escudo arcano")
-    if hab and not critico and total < ca + 5 and _pagar_mana(alvo, hab):
+    if (hab and not critico and total < ca + 5
+            and int(alvo["sheet"].get("mana_atual", 0) or 0) >= _custo_de_mana(hab)
+            and _confirmar(alvo, "escudo arcano",
+                           f"{atacante['name']} acerta {alvo['name']} ({total} contra CA {ca}). Conjurar Escudo "
+                           f"Arcano ({_custo_de_mana(hab)} mana)? Com +5 de CA ({ca + 5}) o ataque erra.")
+            and _pagar_mana(alvo, hab)):
         td.dar_efeito_de_combate(alvo, {"nome": "Escudo Arcano", "ca": 5,
                                         "ate_turno_de": memory.char_key(alvo.get("name", ""))})
         msg = (f"{alvo['name']} conjura Escudo Arcano ({_custo_de_mana(hab)} mana): CA {ca} → {ca + 5} "
@@ -277,7 +369,9 @@ def ao_ser_atingido(atacante: dict, alvo: dict, total: int, ca: int, critico: bo
         _registrar(alvo, "Escudo Arcano", atacante.get("name", ""), msg)
         return True, [msg]
     hab = _pode_reagir(alvo, "eu ilusorio")
-    if hab and (td.usos_restantes(alvo, "Eu Ilusório") or 0) > 0:
+    if (hab and (td.usos_restantes(alvo, "Eu Ilusório") or 0) > 0
+            and _confirmar(alvo, "eu ilusorio", f"{atacante['name']} acerta {alvo['name']}. Usar Eu Ilusório "
+                                                f"(o ataque erra; uma vez por descanso curto)?")):
         td._gastar_uso(alvo, "Eu Ilusório")
         msg = f"{alvo['name']} usa Eu Ilusório: uma cópia ilusória recebe o golpe e o ataque erra."
         _registrar(alvo, "Eu Ilusório", atacante.get("name", ""), msg)
@@ -297,7 +391,9 @@ def reduzir_dano(atacante: dict, alvo: dict, componentes: list, a_distancia: boo
     # Recuperação Bestial: o dono da fera (ou invocação) leva o golpe por ela.
     inv = alvo.get("invocacao") if isinstance(alvo.get("invocacao"), dict) else None
     dono = memory.campaign["characters"].get(inv.get("por", "")) if inv else None
-    if dono and _pode_reagir(dono, "recuperacao bestial"):
+    if (dono and _pode_reagir(dono, "recuperacao bestial")
+            and _confirmar(dono, "recuperacao bestial", f"{atacante['name']} acerta {alvo['name']} ({total} de "
+                                                         f"dano). {dono['name']} leva o golpe no lugar dela?")):
         res = td._apply_damage(dono, total, componentes[0][1] if componentes else "",
                                source_name=atacante.get("name", ""))
         msg = (f"{dono['name']} se põe na frente de {alvo['name']} (Recuperação Bestial) e leva {res['dano']} "
@@ -312,14 +408,18 @@ def reduzir_dano(atacante: dict, alvo: dict, componentes: list, a_distancia: boo
         from rpg import criaturas, resolucao
         formas = criaturas.formas_permitidas(int(alvo["sheet"].get("nivel", 1) or 1),
                                              resolucao._circulo_da_lua(alvo))
-        if formas:
-            melhor = max(formas, key=lambda k: criaturas.FICHAS[k]["pv"])
+        melhor = max(formas, key=lambda k: criaturas.FICHAS[k]["pv"]) if formas else ""
+        if formas and _confirmar(alvo, "mudanca imediata",
+                                 f"{atacante['name']} acerta {alvo['name']} ({total} de dano). Virar "
+                                 f"{criaturas.FICHAS[melhor]['nome']} antes do dano (Mudança Imediata, gasta "
+                                 f"uma Forma Selvagem)?"):
             td._gastar_uso(alvo, "Forma Selvagem")
             linha = criaturas.transformar(alvo, melhor)
             _registrar(alvo, "Mudança Imediata", atacante.get("name", ""), linha)
             return componentes, [f"Mudança Imediata: {linha}"]
     hab = _pode_reagir(alvo, "defletir projeteis") if (a_distancia and com_arma) else None
-    if hab:
+    if hab and _confirmar(alvo, "defletir projeteis", f"{atacante['name']} acerta {alvo['name']} à distância "
+                                                      f"({total} de dano). Usar Defletir Projéteis?"):
         s = alvo["sheet"]
         d10 = random.randint(1, 10)
         reducao = d10 + td._modifier(int(s.get("destreza", 10) or 10)) + int(s.get("nivel", 1) or 1)
@@ -334,7 +434,9 @@ def reduzir_dano(atacante: dict, alvo: dict, componentes: list, a_distancia: boo
         return novos, [msg]
     if not a_distancia and _pode_reagir(alvo, "aparar"):
         from rpg import superioridade
-        if superioridade.restantes(alvo) > 0:
+        if superioridade.restantes(alvo) > 0 and _confirmar(
+                alvo, "aparar", f"{atacante['name']} acerta {alvo['name']} ({total} de dano). Aparar (gasta um "
+                                f"dado de superioridade)?"):
             superioridade.gastar(alvo)
             d = random.randint(1, superioridade.dado(alvo))
             reducao = d + td._modifier(int(alvo["sheet"].get("destreza", 10) or 10))
@@ -348,7 +450,8 @@ def reduzir_dano(atacante: dict, alvo: dict, componentes: list, a_distancia: boo
             _registrar(alvo, "Aparar", atacante.get("name", ""), msg)
             return novos, [msg]
     hab = _pode_reagir(alvo, "esquiva sobrenatural")
-    if hab:
+    if hab and _confirmar(alvo, "esquiva sobrenatural", f"{atacante['name']} acerta {alvo['name']} ({total} de "
+                                                        f"dano). Usar Esquiva Sobrenatural (metade do dano)?"):
         novos = [(int(v or 0) // 2, t) for v, t in componentes]
         msg = (f"{alvo['name']} usa Esquiva Sobrenatural: o dano cai pela metade "
                f"({total} → {sum(v for v, _ in novos)}).")
@@ -365,7 +468,9 @@ def depois_do_dano(atacante: dict, alvo: dict, dano: int) -> list[str]:
     if int((atacante.get("sheet") or {}).get("vida_atual", 0) or 0) <= 0:
         return []
     linhas = []
-    if _pode_reagir(alvo, "refugio feerico") and (td.usos_restantes(alvo, "Refúgio Feérico") or 0) > 0:
+    if (_pode_reagir(alvo, "refugio feerico") and (td.usos_restantes(alvo, "Refúgio Feérico") or 0) > 0
+            and _confirmar(alvo, "refugio feerico", f"{atacante['name']} feriu {alvo['name']} ({dano}). Usar "
+                                                    f"Refúgio Feérico (some e fica Invisível)?")):
         td._gastar_uso(alvo, "Refúgio Feérico")
         destino = resolucao._empurrar_para_longe(alvo, atacante) if td._zonas_ativas() else ""
         resolucao._tirar_condicoes(alvo, ("invisivel",))
@@ -376,7 +481,11 @@ def depois_do_dano(atacante: dict, alvo: dict, dano: int) -> list[str]:
         _registrar(alvo, "Refúgio Feérico", atacante.get("name", ""), msg)
         return [msg]
     hab = _pode_reagir(alvo, "repreensao infernal")
-    if hab and _pagar_mana(alvo, hab):
+    if (hab and int(alvo["sheet"].get("mana_atual", 0) or 0) >= _custo_de_mana(hab)
+            and _confirmar(alvo, "repreensao infernal",
+                           f"{atacante['name']} feriu {alvo['name']} ({dano}). Conjurar Repreensão Infernal "
+                           f"({_custo_de_mana(hab)} mana, 2d10 de fogo)?")
+            and _pagar_mana(alvo, hab)):
         cd = resolucao._cd(alvo)
         rolls = [random.randint(1, 10) for _ in range(2)]
         dano_fogo = sum(rolls)
@@ -393,7 +502,9 @@ def depois_do_dano(atacante: dict, alvo: dict, dano: int) -> list[str]:
             linhas.append(td._mark_at_zero_hp(atacante, alvo["name"]).strip())
         return linhas
     hab = _pode_reagir(alvo, "retaliacao")
-    if hab and not td._distancia(alvo.get("name", ""), atacante.get("name", "")):
+    if (hab and not td._distancia(alvo.get("name", ""), atacante.get("name", ""))
+            and _confirmar(alvo, "retaliacao", f"{atacante['name']} feriu {alvo['name']} ({dano}). "
+                                               f"Atacar de volta (Retaliação)?")):
         td._consume_reaction(alvo)
         arma = ((alvo["sheet"].get("equipamentos") or {}).get("arma_principal")
                 or td._melee_weapon_of(alvo) or "ataque desarmado")
@@ -426,7 +537,9 @@ def depois_do_ataque(atacante: dict, alvo: dict, acertou: bool, a_distancia: boo
     if lado_atk == memory.luta_com_o_grupo(alvo):
         return []
     # Vingança do Grande Antigo: quem ataca o bruxo leva psíquico.
-    if vivo(alvo) and vivo(atacante) and _pode_reagir(alvo, "vinganca do grande antigo"):
+    if (vivo(alvo) and vivo(atacante) and _pode_reagir(alvo, "vinganca do grande antigo")
+            and _confirmar(alvo, "vinganca do grande antigo",
+                           f"{atacante['name']} atacou {alvo['name']}. Usar Vingança do Grande Antigo?")):
         dano = 1 + max(0, td._modifier(int(alvo["sheet"].get("carisma", 10) or 10)))
         res = td._apply_damage(atacante, dano, "psychic", source_name=alvo["name"])
         msg = (f"Vingança do Grande Antigo: {atacante['name']} leva {res['dano']} de dano psíquico "
@@ -454,11 +567,15 @@ def depois_do_ataque(atacante: dict, alvo: dict, acertou: bool, a_distancia: boo
         # Marca da Vingança: inimigo atacou um aliado na zona do paladino.
         if (memory.luta_com_o_grupo(c) == memory.luta_com_o_grupo(alvo) and vivo(atacante)
                 and not td._distancia(c["name"], alvo["name"]) and not td._distancia(c["name"], atacante["name"])
-                and _pode_reagir(c, "marca da vinganca")):
+                and _pode_reagir(c, "marca da vinganca")
+                and _confirmar(c, "marca da vinganca", f"{atacante['name']} atacou {alvo['name']}. {c['name']} "
+                                                       f"ataca {atacante['name']} (Marca da Vingança)?")):
             linhas.append(_atacar_de_reacao(c, atacante, "Marca da Vingança"))
         # Oportunista: um aliado acertou o inimigo na zona do monge.
         elif (acertou and memory.luta_com_o_grupo(c) == lado_atk and vivo(alvo)
-              and not td._distancia(c["name"], alvo["name"]) and _pode_reagir(c, "oportunista")):
+              and not td._distancia(c["name"], alvo["name"]) and _pode_reagir(c, "oportunista")
+              and _confirmar(c, "oportunista", f"{atacante['name']} acertou {alvo['name']}. {c['name']} ataca "
+                                               f"{alvo['name']} (Oportunista)?")):
             linhas.append(_atacar_de_reacao(c, alvo, "Oportunista"))
     return linhas
 
@@ -541,7 +658,9 @@ def bonus_projetado(alvo: dict, atributo: str, mod: int) -> tuple[int, str]:
         dele = td._modifier(int(s.get(atributo, 10) or 10))
         if atributo in td.CLASS_DATA.get((s.get("classe") or "").lower(), {}).get("saves", []):
             dele += int(s.get("proficiencia", 2) or 2)
-        if dele > mod:
+        if dele > mod and _confirmar(c, "resistencia magica projetada",
+                                     f"{alvo['name']} faz salvaguarda de {atributo} ({mod:+d}). {c['name']} "
+                                     f"empresta o bônus dele ({dele:+d})?"):
             td._consume_reaction(c)
             return dele, f"Resistência Mágica Projetada de {c['name']}: usa {dele:+d}"
     return mod, ""
@@ -557,6 +676,9 @@ def ao_errar(atacante: dict, alvo: dict, a_distancia: bool) -> list[str]:
     if not _pode_reagir(alvo, "contra ataque") or superioridade.restantes(alvo) <= 0:
         return []
     if td._distancia(alvo.get("name", ""), atacante.get("name", "")):
+        return []
+    if not _confirmar(alvo, "contra ataque", f"{atacante['name']} errou {alvo['name']}. Contra-Atacar (gasta um "
+                                             f"dado de superioridade)?"):
         return []
     superioridade.gastar(alvo)
     td._consume_reaction(alvo)
@@ -598,9 +720,16 @@ def contramagica(conjurador: dict, hab: dict) -> str:
         if dist is not None and dist > 2:
             continue
         cm = _pode_reagir(ch, "contramagica")
-        if not cm or not _pagar_mana(ch, cm):
-            continue
         nivel = int(m.get("nivel", 0) or 0)
+        if not cm or int(ch["sheet"].get("mana_atual", 0) or 0) < _custo_de_mana(cm):
+            continue
+        if not _confirmar(ch, "contramagica",
+                          f"{conjurador['name']} conjura {m.get('nome', hab.get('nome'))} ({nivel}º círculo). "
+                          f"{ch['name']} conjura Contramágica ({_custo_de_mana(cm)} mana)?"
+                          + ("" if nivel <= 3 else f" Acima do 3º círculo é um teste contra CD {10 + nivel}.")):
+            continue
+        if not _pagar_mana(ch, cm):
+            continue
         if nivel <= 3:
             msg = (f"{ch['name']} conjura Contramágica ({_custo_de_mana(cm)} mana): "
                    f"{m.get('nome', hab.get('nome'))} de {conjurador['name']} é anulada.")

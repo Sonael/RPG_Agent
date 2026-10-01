@@ -2703,8 +2703,10 @@ def _alvos_em_area(char_name: str, hab: dict, target_name: str) -> tuple[str, li
                    defeito que queimou aliados numa partida: uma magia que só
                    fere criaturas HOSTIS era tratada como indiscriminada.
     """
-    if not area_da_habilidade(hab) or not _zonas_ativas():
+    if not area_da_habilidade(hab):
         return "", []
+    if not _zonas_ativas():
+        return "", _alvos_sem_zonas(char_name, hab, target_name)
     so_adversarios = alvos_da_habilidade(hab) in ("hostis", "escolha")
     if origem_da_area(hab) == "self":
         zona = _zona_de(char_name)
@@ -2740,6 +2742,52 @@ def _alvos_em_area(char_name: str, hab: dict, target_name: str) -> tuple[str, li
     return (zona, pegos) if pegos else ("", [])
 
 
+def max_alvos_da_area(hab: dict) -> int:
+    """
+    Sem zonas, quantas criaturas a área pega, pela tabela do Guia do Mestre
+    ("Targets in Areas of Effect"): esfera, cilindro e cubo, tamanho ÷ 5 pés;
+    cone, ÷ 10; linha, ÷ 30. A Bola de Fogo (6 m de raio = 20 pés) pega 4.
+    """
+    import math
+    area = area_da_habilidade(hab)
+    achado = re.match(r"(\w+) de ([\d,\.]+) m", area or "")
+    if not achado:
+        return 1
+    forma = _norm_txt(achado.group(1))
+    pes = float(achado.group(2).replace(",", ".")) * 10 / 3
+    divisor = 10 if forma == "cone" else (30 if forma == "linha" else 5)
+    return max(1, math.ceil(pes / divisor - 1e-9))
+
+
+def _alvos_sem_zonas(char_name: str, hab: dict, target_name: str) -> list[dict]:
+    """
+    Combate sem zonas: a área pega as criaturas que a tela escolheu (nomes
+    por vírgula), até o tamanho dela. Antes pegava só a primeira, e a Bola de
+    Fogo virava magia de um alvo. Um nome só segue o caminho de alvo único.
+    """
+    nomes = [n.strip() for n in (target_name or "").split(",") if n.strip()]
+    if len(nomes) < 2:
+        return []
+    eu = memory.char_key(char_name)
+    chars = memory.campaign.get("characters", {})
+    conjurador = chars.get(eu) or {}
+    so_adversarios = alvos_da_habilidade(hab) in ("hostis", "escolha")
+    pegos = []
+    for nome in nomes:
+        alvo = chars.get(memory.char_key(nome))
+        if not alvo or not alvo.get("sheet") or alvo in pegos or memory.char_key(nome) == eu:
+            continue
+        if (alvo.get("status", "vivo") or "").lower() in OUT_OF_COMBAT_STATUSES:
+            continue
+        if int((alvo.get("sheet") or {}).get("vida_atual", 0) or 0) <= 0:
+            continue
+        if (so_adversarios and conjurador
+                and memory.luta_com_o_grupo(alvo) == memory.luta_com_o_grupo(conjurador)):
+            continue
+        pegos.append(alvo)
+    return pegos[:max_alvos_da_area(hab)]
+
+
 def prever_area(char_name: str, ability_name: str, target_name: str = "") -> dict:
     """
     Quem a habilidade VAI atingir, antes de ela acontecer — para a tela pedir
@@ -2768,6 +2816,8 @@ def prever_area(char_name: str, ability_name: str, target_name: str = "") -> dic
         "ok": True,
         "area": area,
         "zona": zona,
+        # Sem zonas: quantas criaturas a tela deixa escolher.
+        "max_alvos": max_alvos_da_area(hab) if area and not _zonas_ativas() else None,
         "alvos": alvos,
         "atingidos": atingidos,
         "aliados_atingidos": [a["nome"] for a in atingidos if a["aliado"]],
@@ -6589,6 +6639,10 @@ def attack_roll(
         if _viol:
             return _viol
 
+    if (attacker.get("sheet") or {}).get("nao_ataca"):
+        return (f"Erro: {attacker_name} é um familiar e não ataca (SRD). Use Ajudar (Manobras): o "
+                f"próximo ataque do grupo contra o alvo tem vantagem.")
+
     # O enfeitiçado não ataca quem o enfeitiçou; o banido não é alcançado.
     # Antes o orc enfeitiçado pelo clérigo o atacou no turno seguinte.
     from rpg import encantos
@@ -7601,6 +7655,13 @@ def use_ability(
     _formula = dado_efetivo(hab, char)
     if _circulo:
         _formula = _resolucao.dado_no_circulo(hab, _formula, _circulo)
+    # Mísseis Mágicos e Raio Ardente: um dado por dardo (ou raio), cada um no
+    # alvo escolhido. O motor rolava um dado só, num alvo só: o 1d4+1 de um
+    # dardo, e conjurar no 3º círculo gastava 5 de mana pelo mesmo dardo.
+    _n_proj = _resolucao.projeteis(hab, _circulo) if (_efeito == "dano" and target_name) else 0
+    _formula_proj = ""
+    if _n_proj and _formula:
+        _formula_proj, _formula = _formula, ""
     if _formula:
         n_dice, sides, bonus = _parse_dice(_formula)
         # Curar Ferimentos, Palavra Curativa: o SRD soma o modificador de
@@ -7665,8 +7726,24 @@ def use_ability(
     # habilidade segue pelo caminho de alvo único — que é como ela se
     # comportava antes de existir área nenhuma.
     _zona_area, _alvos_area = ("", [])
-    if _efeito == "dano" and ctrl_effect is None:
+    if _efeito == "dano" and ctrl_effect is None and not _n_proj:
         _zona_area, _alvos_area = _alvos_em_area(char_name, hab, target_name)
+
+    # Imobilizar Pessoa no 3º círculo pega duas pessoas, no 4º três: a tela
+    # manda os nomes separados por vírgula. O motor cobrava o círculo e
+    # paralisava um só.
+    _alvos_ctrl: list[dict] = []
+    _nomes_ctrl = [n.strip() for n in (target_name or "").split(",") if n.strip()]
+    _cap_ctrl = 1
+    if ctrl_effect is not None and not ctrl_effect["pool"] and len(_nomes_ctrl) > 1:
+        _cap_ctrl = _resolucao.alvos_no_circulo(hab, _circulo)
+        if _cap_ctrl > 1:
+            for _n_c in _nomes_ctrl:
+                _ch_c = memory.campaign["characters"].get(memory.char_key(_n_c))
+                if (_ch_c and _ch_c.get("sheet") and _ch_c not in _alvos_ctrl
+                        and (_ch_c.get("status") or "").lower() not in OUT_OF_COMBAT_STATUSES):
+                    _alvos_ctrl.append(_ch_c)
+            _alvos_ctrl = _alvos_ctrl[:_cap_ctrl] if len(_alvos_ctrl) > 1 else []
 
     # ══════════════════════════════════════════════════════════════════════════
     # POOL SPELLS (Sleep, Color Spray, …)
@@ -7741,6 +7818,93 @@ def use_ability(
             result += "\n   Nenhum alvo foi afetado — todos têm HP alto demais."
 
     # ══════════════════════════════════════════════════════════════════════════
+    # PROJÉTEIS (Mísseis Mágicos, Raio Ardente)
+    # Cada dardo é um dado e um alvo. A tela manda os nomes por vírgula; um
+    # nome repetido recebe mais de um dardo, e nomes a menos que dardos
+    # repartem em rodízio. O dardo nunca erra; o raio rola acerto, um a um.
+    # ══════════════════════════════════════════════════════════════════════════
+    elif _n_proj:
+        _cfg_p = _resolucao.PROJETEIS[(_resolucao._magia_srd(hab) or {}).get("nome_srd", "")]
+        _nomes_p = [n.strip() for n in target_name.split(",") if n.strip()]
+        _alvos_p = []
+        for _n_p in _nomes_p:
+            _ch_p = memory.campaign["characters"].get(memory.char_key(_n_p))
+            if _ch_p and _ch_p.get("sheet"):
+                _alvos_p.append(_ch_p)
+        _tipo_p = (_norm_damage_type(hab.get("tipo_dano", "") or "")
+                   or _norm_damage_type((_resolucao._magia_srd(hab) or {}).get("tipo_dano", "") or "")
+                   or _damage_type_from_text(hab.get("descricao", "")))
+        _nd_p, _faces_p, _bonus_p = _parse_dice(_formula_proj)
+        result += f"\n   {_n_proj} {_cfg_p['rotulo']}s de {_formula_proj}"
+        rolls = []
+        for _i_p in range(_n_proj if _alvos_p else 0):
+            _a_p = _alvos_p[_i_p % len(_alvos_p)]
+            _st_p = _a_p["sheet"]
+            _rot = f"{_cfg_p['rotulo'].capitalize()} {_i_p + 1} → {_a_p['name']}"
+            if int(_st_p.get("vida_atual", 0) or 0) <= 0:
+                result += f"\n   {_rot}: já está caído."
+                continue
+            _dobra = 1
+            if _cfg_p["ataque"]:
+                _ok_p, _crit_p, _linha_p = _rolar_ataque_magico(char, _a_p, hab)
+                result += f"\n   {_rot}:" + _linha_p.replace("\n   ", " ", 1)
+                if not _ok_p:
+                    continue
+                _dobra = 2 if _crit_p else 1
+            elif any(_norm_txt(e.get("nome", "")) == "escudo arcano" for e in _efeitos(_st_p)):
+                result += f"\n   {_rot}: o Escudo Arcano de {_a_p['name']} absorve o dardo."
+                continue
+            _r_p = [random.randint(1, _faces_p) for _ in range(_nd_p * _dobra)]
+            rolls += _r_p
+            _dano_p = max(0, sum(_r_p) + _bonus_p)
+            total_dano += _dano_p
+            _res_p = _apply_damage(_a_p, _dano_p, _tipo_p, source_name=char["name"], arma_magica=True)
+            result += (f"\n   {_rot}: [{' + '.join(map(str, _r_p))}]"
+                       + (f" + {_bonus_p}" if _bonus_p else "") + f" = {_dano_p}"
+                       + _fmt_notas(_res_p["notas"]).replace("\n", " ")
+                       + f" ({_res_p['hp_antes']} → {_st_p['vida_atual']}/{_st_p['vida_max']})")
+            if _st_p["vida_atual"] == 0 and _res_p["hp_antes"] > 0:
+                result += _mark_at_zero_hp(_a_p, char["name"])
+        if not _alvos_p:
+            result += f"\n   Nenhum alvo válido em '{target_name}'."
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # CONDIÇÃO EM VÁRIOS ALVOS (Imobilizar Pessoa no 3º círculo ou acima)
+    # A salvaguarda de cada alvo é rolada aqui, inclusive a de personagem do
+    # jogador — como na área, uma bandeja por alvo travaria o turno.
+    # ══════════════════════════════════════════════════════════════════════════
+    elif _alvos_ctrl:
+        _cond_m = ctrl_effect["condition"]
+        _save_m = salvaguarda_da_habilidade(hab)
+        _conj_m = _conjuracao(s) or {}
+        _cd_m = int(saving_throw_dc or _conj_m.get("cd") or (8 + int(s.get("proficiencia", 2) or 2)))
+        result += (f"\n   {len(_alvos_ctrl)} alvos"
+                   + (f" (no máximo {_cap_ctrl} neste círculo)" if len(_nomes_ctrl) > _cap_ctrl else ""))
+        for _a_m in _alvos_ctrl:
+            _globo_m = _protegido_pelo_globo(char["name"], _a_m.get("name", ""),
+                                             _circulo or int((_resolucao._magia_srd(hab) or {}).get("nivel", 0) or 0))
+            if _globo_m:
+                result += f"\n   {_a_m['name']}: dentro do {_globo_m} — a magia não o alcança."
+                continue
+            if _imune_a_condicao(_a_m, _cond_m):
+                result += f"\n   {_a_m['name']} é imune a {_cond_m.capitalize()}."
+                continue
+            if _save_m:
+                _passou_m, _linha_m = _rolar_salvaguarda(
+                    _a_m, _save_m, _cd_m, desvantagem=_desv_primeira or _sub.coroa_contra(_a_m, hab),
+                    contra=_cond_m)
+                _desv_primeira = False
+                if _passou_m:
+                    result += f"\n   {_a_m['name']}: {_linha_m} — resistiu, {_cond_m} não pega."
+                    continue
+                result += f"\n   {_a_m['name']}: {_linha_m}"
+            _conds_m = _a_m["sheet"].setdefault("condicoes", [])
+            if not any((c.get("nome", "") if isinstance(c, dict) else str(c)).lower() == _cond_m.lower()
+                       for c in _conds_m):
+                _conds_m.append(_condicao_de_magia(char, hab, _cond_m, s))
+            result += f"\n   {_a_m['name']}: {_cond_m.upper()}! (sem dano)"
+
+    # ══════════════════════════════════════════════════════════════════════════
     # DANO EM ÁREA (Bola de Fogo, Mãos Flamejantes, Sopro do Dragão…)
     # Um dado só para a área inteira, como manda o SRD, e uma salvaguarda por
     # criatura. Quem passa leva metade.
@@ -7759,8 +7923,10 @@ def use_ability(
                        or (8 + int(s.get("proficiencia", 2) or 2)))
         _tipo_area = (_norm_damage_type(hab.get("tipo_dano", "") or "")
                       or _damage_type_from_text(hab.get("descricao", "")))
-        result += (f"\n   Área: {area_da_habilidade(hab)} em **{_zona_area}** "
-                   f"— {len(_alvos_area)} "
+        result += (f"\n   Área: {area_da_habilidade(hab)} "
+                   + (f"em **{_zona_area}** " if _zona_area
+                      else f"(sem zonas: até {max_alvos_da_area(hab)} criaturas escolhidas) ")
+                   + f"— {len(_alvos_area)} "
                    f"{'criatura' if len(_alvos_area) == 1 else 'criaturas'}")
         for _alvo in _alvos_area:
             _dano_nele = total_dano
@@ -7964,7 +8130,9 @@ def use_ability(
     # Para pool spells (Sleep, Color Spray) o dado representa um POOL de HP,
     # NÃO dano. Mostra explicitamente quem foi afetado para não parecer dano.
     _abil_dice = ""
-    if hab.get("dado"):
+    if _n_proj:
+        _abil_dice = f" • {_n_proj} {_cfg_p['rotulo']}s = {total_dano}"
+    elif hab.get("dado"):
         _abil_dice = (f" • {n_dice}d{sides}: [{detail}]{bonus_str} "
                       f"= {total_dano}")
     if ctrl_effect is not None and ctrl_effect.get("pool"):
@@ -11193,10 +11361,53 @@ def _agora_em_horas() -> int:
     return int(r.get("dia", 1) or 1) * 24 + hora_do_relogio(r)
 
 
+def _minuto_do_relogio(r: dict) -> int:
+    try:
+        return int((r or {}).get("minuto", 0) or 0) % 60
+    except (TypeError, ValueError):
+        return 0
+
+
 def _hora_legivel() -> str:
     r = _relogio()
     h = hora_do_relogio(r)
-    return f"Dia {int(r.get('dia', 1) or 1)}, {h:02d}h ({_periodo(h)})"
+    mi = _minuto_do_relogio(r)
+    return f"Dia {int(r.get('dia', 1) or 1)}, {h:02d}h{f'{mi:02d}' if mi else ''} ({_periodo(h)})"
+
+
+def avancar_minutos(minutos: int, reason: str = "") -> str:
+    """
+    O tempo curto: o ritual de dez minutos, a conjuração de um minuto. O
+    relógio do mundo contava só horas, e por isso o ritual "somava dez
+    minutos" só no texto. Os minutos se acumulam; a cada 60, passa uma hora
+    de verdade (com tudo o que advance_time faz).
+    """
+    try:
+        m = int(minutos)
+    except (TypeError, ValueError):
+        return ""
+    if m <= 0:
+        return ""
+    r = _relogio()
+    antes = _hora_legivel()
+    total = _minuto_do_relogio(r) + m
+    r["minuto"] = total % 60
+    if total // 60:
+        r["_antes_minutos"] = antes      # advance_time mostra o início com os minutos
+        return advance_time(total // 60, reason)
+    memory.save_campaign()
+    motivo = f" — {reason}" if reason else ""
+    return f"{antes} → **{_hora_legivel()}**{motivo}"
+
+
+def minutos_de_conjuracao(tempo: str) -> int:
+    """'1 minuto' → 1; '10 minutos' → 10; '1 hora' → 60; ação, reação: 0."""
+    t = _norm_txt(tempo or "")
+    achado = re.search(r"(\d+)\s*(minuto|hora)", t)
+    if not achado:
+        return 0
+    n = int(achado.group(1))
+    return n * 60 if achado.group(2) == "hora" else n
 
 
 def advance_time(hours: int, reason: str = "") -> str:
@@ -11222,6 +11433,8 @@ def advance_time(hours: int, reason: str = "") -> str:
 
     r     = _relogio()
     antes = _hora_legivel()
+    if r.get("_antes_minutos"):
+        antes = r.pop("_antes_minutos")
     total = hora_do_relogio(r) + h
     r["dia"]  = int(r.get("dia", 1) or 1) + total // 24
     r["hora"] = total % 24
@@ -13348,18 +13561,20 @@ def conjurar_fora_de_combate(ator: str, habilidade: str, alvo: str = "", modo: s
         return {"ok": False, "message": msg}
     from rpg import subclasses as _sub_f
     msg += _sub_f.lancar_gemea(ator, habilidade, modo)
-    # O tempo de conjuração: uma hora (Convocar Familiar) passa no relógio;
-    # o ritual soma dez minutos, que o relógio de horas não registra.
+    # O tempo de conjuração passa no relógio: uma hora (Convocar Familiar),
+    # um minuto (Conjurar Elemental, Identificar), e o ritual soma dez.
     from rpg import resolucao as _res
     _m = _res._magia_srd({"nome": habilidade}) or {}
     _ch_c = memory.campaign["characters"].get(memory.char_key(ator)) or {}
     _hab_c = next((h for h in _ch_c.get("habilidades") or []
                    if isinstance(h, dict) and _norm_txt(h.get("nome", "")) == _norm_txt(habilidade)), None)
     _m = _res._magia_srd(_hab_c or {"nome": habilidade}) or _m
-    if "hora" in _norm_txt(_m.get("tempo_de_conjuracao", "")):
-        msg += "\n   " + advance_time(1, f"conjurar {habilidade}").split("\n")[0]
+    _minutos = minutos_de_conjuracao(_m.get("tempo_de_conjuracao", "")) + (10 if ritual else 0)
     if ritual:
         msg += "\n   Como ritual: sem mana, e dez minutos a mais de conjuração."
+    if _minutos:
+        msg += "\n   " + avancar_minutos(_minutos, f"conjurar {habilidade}"
+                                         + (" como ritual" if ritual else "")).split("\n")[0]
     memory.save_campaign()
     em = f" em {alvo}" if alvo and memory.char_key(alvo) != memory.char_key(ator) else ""
     para_o_mestre = (f"[MAGIA FORA DE COMBATE, resolvida na tela] {ator} conjurou "
@@ -14769,7 +14984,7 @@ def _npc_aproximar(npc_name: str, alvo: str) -> tuple[str, bool]:
     return texto, (dist == 1 and de_pe and _zona_de(npc_name) == zb)
 
 
-def execute_npc_turn(npc_name: str = "") -> str:
+def execute_npc_turn(npc_name: str = "", _forcar: bool = False) -> str:
     """
     Executa o turno do NPC atual (ou do NPC especificado) de forma totalmente
     determinística: escolhe alvo com base na estratégia configurada e chama
@@ -14783,8 +14998,22 @@ def execute_npc_turn(npc_name: str = "") -> str:
         npc_name: Nome do NPC (opcional — se omitido, usa o NPC do turno atual).
     """
     cs = memory.campaign.get("combat_state", {}) or {}
+    _pend = cs.get("reacao_pendente")
+    if _pend:
+        return (f"Aviso: o turno de {_pend.get('npc')} está parado esperando o jogador decidir: "
+                f"{_pend.get('texto')} Pergunte e chame responder_reacao(usar=True ou False).")
+    from rpg import reacoes as _rea
+    if _rea._respostas is None and _rea.alguem_pergunta():
+        return _turno_com_perguntas(npc_name, _forcar, [], None)
     token = cs.get("turn_token", 0)
     vez   = _combat_current_actor()
+    from rpg import criaturas as _cri_t
+    _ch_vez = memory.campaign["characters"].get(memory.char_key(vez)) if vez else None
+    if _ch_vez and _cri_t.controlada_pelo_jogador(_ch_vez) and not _forcar:
+        _dono = (memory.campaign["characters"].get(_ch_vez["invocacao"].get("por", "")) or {}).get("name", "")
+        return (f"Aviso: {vez} é invocação de {_dono}: o turno é do jogador. Pergunte o que {vez} faz e "
+                f"use attack_roll / use_ability com ela (ou end_turn). Se o jogador pedir, "
+                f"combat_action('auto') deixa o motor jogar esta vez.")
     saida = _executar_turno_npc(npc_name)
 
     # O turno de um NPC SEMPRE termina. Se algo sobrou recusado (um alvo que
@@ -14796,10 +15025,71 @@ def execute_npc_turn(npc_name: str = "") -> str:
                  and _combat_current_actor() == vez)
     if ainda_ele:
         ch = memory.campaign["characters"].get(memory.char_key(vez)) or {}
-        if ch and not memory.is_party_member(ch):
+        if ch and not memory.is_party_member(ch) and (_forcar or not _cri_t.controlada_pelo_jogador(ch)):
             _log_combat_event("pass", vez, "", msg=f"{vez} não conseguiu agir e passou a vez")
             saida += f"\n{vez} não consegue agir e passa a vez." + _auto_advance_turn(vez)
     return saida
+
+
+def _turno_com_perguntas(npc_name: str, forcar: bool, respostas: list, rng) -> str:
+    """
+    O turno do inimigo que pode parar para o jogador decidir uma reação
+    (rpg/reacoes.py, modo "perguntar"). Guarda a campanha e o sorteio; se a
+    pergunta chega, desfaz o turno inteiro e grava a pergunta pendente. A
+    resposta (responder_reacao) roda o turno de novo com o mesmo sorteio — os
+    mesmos dados, até a mesma pergunta, que agora tem resposta.
+    """
+    import copy
+    from rpg import reacoes as _rea
+    vez = _combat_current_actor()
+    copia = copy.deepcopy(memory.campaign.copy())
+    if rng is None:
+        rng = random.getstate()
+    else:
+        random.setstate(rng)
+    _rea._respostas, _rea._indice = list(respostas), 0
+    try:
+        return execute_npc_turn(npc_name, _forcar=forcar)
+    except _rea.PerguntaDeReacao as p:
+        memory.campaign.clear()
+        memory.campaign.update(copia)
+        cs = memory.campaign.get("combat_state") or {}
+        cs["reacao_pendente"] = {"npc": vez, "quem": p.quem, "chave": p.chave, "texto": p.texto,
+                                 "nome": _rea.REACOES.get(p.chave, {}).get("nome", p.chave),
+                                 "respostas": list(respostas), "forcar": bool(forcar),
+                                 "rng": [rng[0], list(rng[1]), rng[2]]}
+        memory.save_campaign()
+        return (f"**REAÇÃO — {p.quem} decide**\n   {p.texto}\n"
+                f"   O turno de {vez} está parado. Pergunte ao jogador e chame "
+                f"responder_reacao(usar=True ou False).")
+    finally:
+        _rea._respostas, _rea._indice = None, 0
+
+
+def responder_reacao(usar: bool) -> str:
+    """
+    Responde à reação que parou o turno do inimigo (modo "perguntar" da tela de
+    combate): o motor usa ou não a reação e o turno do inimigo continua com os
+    mesmos dados.
+
+    Args:
+        usar: True para usar a reação (Escudo Arcano, Esquiva Sobrenatural,
+              Contramágica...), False para deixar passar.
+    """
+    cs = memory.campaign.get("combat_state") or {}
+    pend = cs.get("reacao_pendente")
+    if not pend:
+        return "Aviso: nenhuma reação esperando decisão."
+    cs.pop("reacao_pendente", None)
+    if (not cs.get("is_active")
+            or memory.char_key(_combat_current_actor()) != memory.char_key(pend.get("npc", ""))):
+        memory.save_campaign()
+        return "Aviso: o turno mudou e a pergunta caducou. Nada foi feito."
+    estado = pend.get("rng") or []
+    rng = (estado[0], tuple(estado[1]), estado[2]) if len(estado) == 3 else None
+    respostas = list(pend.get("respostas") or []) + [bool(usar)]
+    decisao = (f"{pend.get('quem')}: {'usa' if usar else 'não usa'} {pend.get('nome', pend.get('chave'))}.\n")
+    return decisao + _turno_com_perguntas(pend.get("npc", ""), bool(pend.get("forcar")), respostas, rng)
 
 
 def _turno_confuso(npc: dict, npc_name: str) -> str:
@@ -16292,6 +16582,9 @@ def _numero_de_ataques(char: dict) -> int:
         n = max(n, 4 if nivel >= 20 else 3 if nivel >= 11 else 2 if nivel >= 5 else 1)
     elif classe in ("barbaro", "paladino", "patrulheiro", "monge") and nivel >= 5:
         n = max(n, 2)
+    # O Multiataque do bloco: o urso da Forma Selvagem, o elemental invocado.
+    if s.get("_forma_selvagem") or isinstance((char or {}).get("invocacao"), dict):
+        n = max(n, int(s.get("multiattack", 1) or 1))
     return n
 
 
@@ -16356,9 +16649,9 @@ def _combatant_weapons(ch: dict) -> list[dict]:
     s = ch.get("sheet") or {}
     eq = s.get("equipamentos", {}) or {}
     out, seen = [], set()
-    # Na Forma Selvagem, só os ataques da fera.
-    if s.get("_forma_selvagem"):
-        return [{"nome": a.get("nome", ""), "origem": s["_forma_selvagem"].get("forma", "fera")}
+    # Na Forma Selvagem, só os ataques da fera; a invocação, os dela.
+    if s.get("_forma_selvagem") or (isinstance(ch.get("invocacao"), dict) and s.get("ataques")):
+        return [{"nome": a.get("nome", ""), "origem": (s.get("_forma_selvagem") or {}).get("forma", "fera")}
                 for a in (s.get("ataques") or []) if isinstance(a, dict) and a.get("nome")]
 
     def _add(nm, origem):
@@ -16418,7 +16711,7 @@ def _combatant_snapshot(name: str) -> dict | None:
     # campo cru da ficha: Infligir Ferimentos aparecia sem dado e rolava 3d10,
     # a descrição só existia ao passar o mouse, e a mesma Chama Sagrada vinha
     # duas vezes.
-    from rpg import habilidade as _habilidade
+    from rpg import habilidade as _habilidade, resolucao as _resolucao_snap
     for h in _habilidade.sem_duplicatas(ch.get("habilidades") or []):
         r = _habilidade.resolver(h, ch)
         entry = {
@@ -16451,6 +16744,10 @@ def _combatant_snapshot(name: str) -> dict | None:
             # Modo de alvo: "self" | "pool" | "single". A UI usa para decidir
             # se mostra o picker ou despacha direto (self/pool não pedem alvo).
             "target_mode": _ability_target_mode(h.get("nome", ""), h),
+            # Vários alvos: por círculo (Imobilizar Pessoa, Mísseis Mágicos) e,
+            # sem zonas, pelo tamanho da área (Bola de Fogo: 4).
+            "alvos_por_modo": _resolucao_snap.alvos_por_modo(h, ch),
+            "max_alvos": (max_alvos_da_area(h) if r["area"] and not _zonas_ativas() else 1),
             # Usos por descanso (Surto de Ação, Fúria…). None quando a
             # habilidade é livre — a tela não desenha contador nesse caso.
             "usos":     usos_restantes(ch, h.get("nome", "")),
@@ -16499,6 +16796,10 @@ def _combatant_snapshot(name: str) -> dict | None:
         "name":       ch.get("name", name),
         "status":     (ch.get("status", "vivo") or "vivo"),
         "is_party":   bool(memory.is_party_member(ch)),
+        # Invocação que o jogador comanda: a tela dá a barra de ação a ela.
+        "invocacao_de": ((memory.campaign["characters"].get((ch.get("invocacao") or {}).get("por", "")) or {})
+                         .get("name", "") if isinstance(ch.get("invocacao"), dict) else ""),
+        "controlada": __import__("rpg.criaturas", fromlist=["x"]).controlada_pelo_jogador(ch),
         # "grupo" | "aliado" | "inimigo": a tela pinta o aliado do seu lado,
         # mas quem o joga é o motor (is_party continua sendo só o grupo).
         "lado":       memory.lado_no_combate(ch),
@@ -16580,7 +16881,8 @@ def combat_snapshot() -> dict:
         "current_is_party": bool(
             memory.is_party_member(
                 memory.campaign["characters"].get(memory.char_key(current), {})
-            )
+            ) or criaturas.controlada_pelo_jogador(
+                memory.campaign["characters"].get(memory.char_key(current), {}))
         ) if current else False,
         "order":       order,
         # Campo de batalha: lista vazia = combate sem posicionamento.
@@ -16588,6 +16890,10 @@ def combat_snapshot() -> dict:
         "zona_desc":   dict(cs.get("zona_desc") or {}),
         "zonas_efeito": {z: [e.get("nome", "") for e in _efeitos_de_zona(z)] for z in _zonas()},
         "combatants":  combatants,
+        # O turno do inimigo parado numa reação em "perguntar" (rpg/reacoes.py).
+        "reacao_pendente": ({k: (cs.get("reacao_pendente") or {}).get(k, "")
+                             for k in ("npc", "quem", "chave", "nome", "texto")}
+                            if cs.get("reacao_pendente") else None),
         "log":         list(cs.get("log", []) or [])[-60:],
         "result":      cs.get("result"),   # painel de fim (None até acabar)
         "turn_economy": dict(cs.get("turn_economy") or
@@ -16608,7 +16914,8 @@ def _alcance_do_turno(nome: str) -> dict:
         return {}
     chars = memory.campaign.get("characters", {})
     ch = chars.get(memory.char_key(nome))
-    if not ch or not memory.is_party_member(ch):
+    from rpg import criaturas as _cri_a
+    if not ch or not (memory.is_party_member(ch) or _cri_a.controlada_pelo_jogador(ch)):
         return {}
     cs = memory.campaign.get("combat_state") or {}
     outros = []
@@ -16660,6 +16967,21 @@ def combat_action(action: str, actor: str = "", target: str = "",
     # Caminhos que NÃO usam a economia do jogador (o motor cuida do avanço):
     if a == "enemy":
         msg = execute_npc_turn()
+
+    elif a == "reagir":
+        # A reação em "perguntar": Usar / Não usar (weapon = "sim" | "nao").
+        msg = responder_reacao(_norm_txt(weapon or "") in ("sim", "usar", "true", "1"))
+        if msg.startswith("Aviso:"):
+            return {"ok": False, "message": msg, "snapshot": combat_snapshot()}
+
+    elif a == "auto":
+        # A invocação do jogador, jogada pelo motor só desta vez.
+        from rpg import criaturas as _cri_auto
+        _vez_a = memory.campaign["characters"].get(memory.char_key(_combat_current_actor())) or {}
+        if not _cri_auto.controlada_pelo_jogador(_vez_a):
+            return {"ok": False, "message": "Erro: o motor só joga por uma invocação do grupo, na vez dela.",
+                    "snapshot": combat_snapshot()}
+        msg = execute_npc_turn(_forcar=True)
 
     elif a == "death_save":
         if not actor:
@@ -17265,6 +17587,7 @@ DND_TOOLS = [
     # NPC strategy system
     set_npc_strategy,
     execute_npc_turn,
+    responder_reacao,
     # Onda 3 — posicionamento por zonas
     set_battlefield,
     set_combat_side,

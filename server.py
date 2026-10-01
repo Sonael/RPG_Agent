@@ -3413,7 +3413,7 @@ def combat_reacao_route():
     from rpg import reacoes, tools_dnd
     d = request.json or {}
     msg = reacoes.alternar((d.get("actor") or "").strip(), (d.get("reacao") or "").strip(),
-                           bool(d.get("ligada")))
+                           bool(d.get("ligada")), (d.get("modo") or "").strip())
     return jsonify({"ok": not msg.startswith("Erro:"), "message": msg,
                     "snapshot": tools_dnd.combat_snapshot()})
 
