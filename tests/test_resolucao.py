@@ -323,7 +323,7 @@ def test_raio_guia_marca_o_alvo(luta, monkeypatch):
 def test_chama_sagrada_nao_fere_quem_passa(luta, monkeypatch):
     _dar("Kaelen", _hab("Sacred Flame"))
     _vez("Kaelen")
-    monkeypatch.setattr(td, "_rolar_salvaguarda", lambda a, attr, cd: (True, "salvaguarda de DES: passou"))
+    monkeypatch.setattr(td, "_rolar_salvaguarda", lambda a, attr, cd, **k: (True, "salvaguarda de DES: passou"))
     saida = td.use_ability("Kaelen", "Sacred Flame", "Orc", end_turn=False)
     assert _vida("Orc") == 60, saida
     assert "nenhum dano" in saida

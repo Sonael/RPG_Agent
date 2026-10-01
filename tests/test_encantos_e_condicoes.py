@@ -32,7 +32,7 @@ def _falha(monkeypatch):
     """Toda salvaguarda falha (e registra se pediram vantagem)."""
     pedidos = []
 
-    def falhar(alvo, atributo, cd, vantagem=False, desvantagem=False):
+    def falhar(alvo, atributo, cd, vantagem=False, desvantagem=False, contra=""):
         pedidos.append({"alvo": alvo.get("name"), "vantagem": vantagem})
         return False, f"salvaguarda de {atributo[:3].upper()}: 1 vs CD {cd}"
     monkeypatch.setattr(td, "_rolar_salvaguarda", falhar)

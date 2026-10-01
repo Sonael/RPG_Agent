@@ -129,6 +129,86 @@ ACOES_DE_CLASSE: dict[str, dict] = {
         "slot": "acao", "alvo": "aliado", "pool": True,
         "texto": "Toque: cura o que falta na vida do alvo, tirando da reserva de 5 × nível de paladino (volta no descanso longo).",
     },
+    # ── Paladino ────────────────────────────────────────────────────────────
+    "destruicao divina": {
+        "slot": "livre", "alvo": "si", "modos_dinamicos": True,
+        "texto": "Sem gastar ação: o próximo acerto corpo a corpo neste turno soma 2d8 radiante "
+                 "(+1d8 por círculo acima do 1º, até 5d8; +1d8 contra morto-vivo ou infernal). "
+                 "A mana do círculo só é gasta se acertar.",
+    },
+    "arma sagrada": {
+        "slot": "acao", "alvo": "si", "uso": "canalizar divindade",
+        "texto": "Ação: até o fim do combate, soma o seu modificador de CAR (mínimo +1) aos ataques com arma.",
+    },
+    "voto de inimizade": {
+        "slot": "bonus", "alvo": "inimigo", "uso": "canalizar divindade",
+        "texto": "Ação bônus: vantagem em todos os seus ataques contra o alvo até o fim do combate.",
+    },
+    "toque purificador": {
+        "slot": "acao", "alvo": "aliado",
+        "texto": "Ação: encerra uma magia sobre você ou um aliado (encanto, condição ou efeito de magia inimiga). Usos = mod. de CAR por descanso longo.",
+    },
+    # ── Monge ───────────────────────────────────────────────────────────────
+    "artes marciais": {
+        "slot": "bonus", "alvo": "inimigo", "exige_ataque": True,
+        "texto": "O motor usa DES (se for melhor) e o dado de artes marciais nos golpes desarmados e armas de monge. "
+                 "Ação bônus, depois de usar a ação Atacar: um golpe desarmado.",
+    },
+    "ataque atordoante": {
+        "slot": "livre", "alvo": "si", "uso": "ki", "gasta_no_acerto": True,
+        "texto": "Sem gastar ação: no próximo acerto corpo a corpo neste turno, gasta 1 ponto de ki e o alvo faz "
+                 "salvaguarda de CON (CD de ki); se falhar, fica Atordoado até o fim do seu próximo turno.",
+    },
+    "mente tranquila": {
+        "slot": "acao", "alvo": "si",
+        "texto": "Ação: encerra Amedrontado e Enfeitiçado em você.",
+    },
+    "corpo vazio": {
+        "slot": "acao", "alvo": "si", "uso": "ki", "custo_uso": 4,
+        "texto": "Ação, 4 pontos de ki: fica Invisível e com resistência a todo dano, exceto força, até o fim do combate.",
+    },
+    "corpo curativo": {
+        "slot": "acao", "alvo": "si",
+        "texto": "Ação: recupera 3 × nível de monge em vida. Uma vez por descanso longo.",
+    },
+    # ── Ladino, patrulheiro ────────────────────────────────────────────────
+    "golpe de sorte": {
+        "slot": "livre", "alvo": "si",
+        "texto": "Sem gastar ação: o próximo ataque que errar neste turno vira acerto. Uma vez por descanso curto.",
+    },
+    "desaparecer": {
+        "slot": "bonus", "alvo": "nenhum",
+        "texto": "Ação bônus: esconder-se (Furtividade contra a Percepção dos inimigos; escondido, o próximo ataque tem vantagem).",
+    },
+    # ── Clérigo, bardo, druida, feiticeiro, bárbaro ───────────────────────
+    "intervencao divina": {
+        "slot": "acao", "alvo": "nenhum",
+        "texto": "Ação: o motor rola d100; se sair até o seu nível de clérigo, a divindade intervém e o Mestre narra como. "
+                 "Uma vez por descanso longo.",
+    },
+    "contra encanto": {
+        "slot": "acao", "alvo": "nenhum",
+        "texto": "Ação: você e os aliados na sua zona têm vantagem nas salvaguardas contra Amedrontado e Enfeitiçado até o fim do seu próximo turno.",
+    },
+    "forma selvagem": {
+        "slot": "acao", "alvo": "si", "modos_dinamicos": True, "uso_manual": True,
+        "texto": "Vira uma fera: a ficha passa a ter a vida, a CA, FOR/DES/CON e os ataques dela. Quando a vida da fera "
+                 "chega a 0, você volta e o dano que sobrou passa para você. Não conjura magias na forma de fera.",
+    },
+    "fonte de magia": {
+        "slot": "bonus", "alvo": "si", "modos_dinamicos": True, "uso_manual": True,
+        "uso": "pontos de feiticaria",
+        "texto": "Ação bônus: troca pontos de feitiçaria por mana (1 por 1) ou mana por pontos (2 de mana dão 1 ponto, "
+                 "3 dão 2, 5 dão 3, 6 dão 4, 7 dão 5).",
+    },
+    "presenca intimidadora": {
+        "slot": "acao", "alvo": "inimigo",
+        "texto": "Ação: o alvo faz salvaguarda de SAB (CD 8 + prof. + CAR); se falhar, fica Amedrontado até o fim do seu próximo turno.",
+    },
+    "frenesi": {
+        "slot": "bonus", "alvo": "inimigo",
+        "texto": "Durante a Fúria, ação bônus: um ataque corpo a corpo. Ao fim do combate, ganha 1 nível de exaustão.",
+    },
 }
 
 APELIDOS_DE_ACAO = {
@@ -144,11 +224,40 @@ APELIDOS_DE_ACAO = {
     "rage": "furia",
     "reckless attack": "ataque imprudente",
     "movimento imprudente": "ataque imprudente",
+    # Os nomes que o jogo grava nas fichas (CLASS_FEATURE_DESCS) caíam como
+    # narrativa, embora o motor tenha a regra sob outro nome.
+    "ataque descuidado": "ataque imprudente",
+    "imposicao de maos": "cura pelas maos",
+    "inspiracao bardica": "inspiracao de bardo",
+    "repelir mortos vivos": "expulsar mortos vivos",
     "bardic inspiration": "inspiracao de bardo",
     "flurry of blows": "rajada de golpes",
     "patient defense": "defesa paciente",
     "step of the wind": "passo do vento",
     "lay on hands": "cura pelas maos",
+    "divine smite": "destruicao divina",
+    "combate divino": "destruicao divina",
+    "punicao divina": "destruicao divina",
+    "smite divino": "destruicao divina",
+    "sacred weapon": "arma sagrada",
+    "vow of enmity": "voto de inimizade",
+    "cleansing touch": "toque purificador",
+    "martial arts": "artes marciais",
+    "stunning strike": "ataque atordoante",
+    "atordoamento": "ataque atordoante",
+    "stillness of mind": "mente tranquila",
+    "empty body": "corpo vazio",
+    "wholeness of body": "corpo curativo",
+    "stroke of luck": "golpe de sorte",
+    "vanish": "desaparecer",
+    "divine intervention": "intervencao divina",
+    "intervencao divina inicial": "intervencao divina",
+    "countercharm": "contra encanto",
+    "contraencanto": "contra encanto",
+    "wild shape": "forma selvagem",
+    "font of magic": "fonte de magia",
+    "intimidating presence": "presenca intimidadora",
+    "frenzy": "frenesi",
 }
 
 
@@ -303,6 +412,22 @@ PASSIVAS_NO_MOTOR = {
     "ataque extra adicional": "o motor libera mais ataques na mesma ação Atacar",
     "defesa sem armadura": "o motor calcula a CA sem armadura",
     "unarmored defense": "o motor calcula a CA sem armadura",
+    "ki": "pontos de ki = nível de monge; o motor gasta nas ações de ki (Rajada de Golpes, Defesa Paciente, "
+          "Passo do Vento, Ataque Atordoante, Corpo Vazio) e devolve no descanso curto",
+    "indomavel": "quando você falha numa salvaguarda, o motor rola de novo sozinho e fica com o novo resultado "
+                 "(1 uso por descanso longo; 2 no 13º, 3 no 17º)",
+    "indomitable": "quando você falha numa salvaguarda, o motor rola de novo sozinho e fica com o novo resultado "
+                   "(1 uso por descanso longo; 2 no 13º, 3 no 17º)",
+    "alma do diamante": "proficiência em todas as salvaguardas; quando você falha numa, o motor gasta 1 ponto de ki "
+                        "e rola de novo",
+    "diamond soul": "proficiência em todas as salvaguardas; quando você falha numa, o motor gasta 1 ponto de ki "
+                    "e rola de novo",
+    "mente vazia": "o motor não deixa você ficar Amedrontado nem Enfeitiçado",
+    "golpe divino aprimorado": "o motor soma 1d8 radiante a todo acerto com arma corpo a corpo",
+    "improved divine smite": "o motor soma 1d8 radiante a todo acerto com arma corpo a corpo",
+    "uso de forma selvagem adicional": "a Forma Selvagem passa a ter 3 usos por descanso",
+    "forma selvagem do combate": "a Forma Selvagem vira ação bônus e aceita feras de ND 1 já no 2º nível",
+    "combat wild shape": "a Forma Selvagem vira ação bônus e aceita feras de ND 1 já no 2º nível",
 }
 
 # Ativas que o motor já resolvia por caminho próprio (não passam por aqui).
@@ -368,9 +493,25 @@ def como_resolve(hab: dict, char: dict | None = None) -> dict:
 
     chave, acao = acao_de_classe(nome, classe)
     if acao:
-        saida.update(tipo="acao_de_classe", texto=acao["texto"], slot=acao["slot"],
-                     alvo=acao["alvo"], modos=list(acao.get("modos") or []), chave=chave)
+        modos = modos_de(chave, char)
+        # Destruição Divina do paladino de nível baixo só tem o 1º círculo:
+        # perguntar "qual círculo?" com uma opção só seria um clique à toa.
+        lista = list(modos) if (len(modos) > 1 or chave in ("forma selvagem", "fonte de magia")) else []
+        slot = acao["slot"]
+        if chave == "forma selvagem" and char and _circulo_da_lua(char):
+            slot = "bonus"
+        saida.update(tipo="acao_de_classe", texto=acao["texto"], slot=slot,
+                     alvo=acao["alvo"], modos=lista, modos_texto=modos, chave=chave)
         return saida
+
+    # "Mente Vazia" é a característica do monge e também o nome em português
+    # de Mind Blank. Sem custo de mana e sem marca de magia do SRD, é a
+    # característica.
+    if not int(hab.get("custo_mana", 0) or 0) and not hab.get("nome_srd"):
+        for parte in _partes_do_nome(nome):
+            if parte in PASSIVAS_NO_MOTOR:
+                saida.update(tipo="passiva", texto="Passiva: " + PASSIVAS_NO_MOTOR[parte] + ".")
+                return saida
 
     m = _magia_srd(hab)
     if m:
@@ -517,6 +658,28 @@ def validar(char: dict, hab: dict, alvo: str, modo: str) -> str:
         if acao.get("modos") and modo not in acao["modos"]:
             return (f"Aviso: {hab['nome']} pede uma escolha: "
                     + ", ".join(acao["modos"]) + ". Nada foi gasto.")
+        if acao.get("modos_dinamicos"):
+            modos = modos_de(chave, char)
+            if modo not in modos and not (chave == "destruicao divina" and not modo):
+                if not modos:
+                    return f"Aviso: {hab['nome']} não tem o que fazer agora. Nada foi gasto."
+                return (f"Aviso: {hab['nome']} pede uma escolha: "
+                        + "; ".join(modos.values()) + ". Nada foi gasto.")
+        if chave == "destruicao divina":
+            from rpg import tools_dnd as td
+            custo = td.SPELL_MANA_COST[int(modo or 1)]
+            mana = int((char.get("sheet") or {}).get("mana_atual", 0) or 0)
+            if mana < custo:
+                return (f"Aviso: Destruição Divina no {int(modo or 1)}º círculo precisa de {custo} "
+                        f"mana; {char['name']} tem {mana}. Nada foi gasto.")
+        if chave == "forma selvagem" and modo != "voltar":
+            from rpg import tools_dnd as td
+            if (td.usos_restantes(char, "Forma Selvagem") or 0) <= 0:
+                return "Aviso: a Forma Selvagem está gasta. Volta no descanso curto. Nada foi gasto."
+        if chave == "frenesi":
+            from rpg import tools_dnd as td
+            if not any(e.get("nome") == "Fúria" for e in td._efeitos_de(char)):
+                return "Aviso: o Frenesi só vale durante a Fúria. Entre em Fúria primeiro. Nada foi gasto."
         if acao.get("exige_ataque") and not _eco().get("atacou"):
             return (f"Aviso: {hab['nome']} só vale depois de usar a ação Atacar neste "
                     f"turno. Ataque primeiro. Nada foi gasto.")
@@ -788,7 +951,10 @@ def _expulsar(char, hab, alvo, modo, tipos, rotulo):
     for c in _combatentes_vivos():
         if _mesmo_lado(char, c) or not _e_do_tipo(c, tipos) or not _perto(char, c, 1):
             continue
-        passou, linha = td._rolar_salvaguarda(c, "sabedoria", cd)
+        if td._imune_a_condicao(c, "Amedrontado"):
+            linhas.append(f"{c['name']}: imune a Amedrontado")
+            continue
+        passou, linha = td._rolar_salvaguarda(c, "sabedoria", cd, contra="amedrontado")
         if passou:
             linhas.append(f"{c['name']}: {linha} — resiste")
             continue
@@ -892,7 +1058,309 @@ def _cura_pelas_maos(char, hab, alvo, modo):
             f"{st.get('vida_max')}). Reserva: {reserva - cura}.")
 
 
+# ── Ações de classe do lote 1 ────────────────────────────────────────────────
+
+def _nivel(char: dict) -> int:
+    return int(((char.get("sheet") or {}).get("nivel", 1)) or 1)
+
+
+def _token() -> int:
+    return int((memory.campaign.get("combat_state") or {}).get("turn_token", 0) or 0)
+
+
+def _chave_de(char: dict) -> str:
+    return memory.char_key(char.get("name", ""))
+
+
+def _prof(char: dict) -> int:
+    return int(((char.get("sheet") or {}).get("proficiencia", 2)) or 2)
+
+
+def circulo_max_de_paladino(nivel: int) -> int:
+    return 5 if nivel >= 17 else 4 if nivel >= 13 else 3 if nivel >= 9 else 2 if nivel >= 5 else 1
+
+
+def _modos_da_destruicao(char: dict) -> dict:
+    from rpg import tools_dnd as td
+    saida = {}
+    for c in range(1, circulo_max_de_paladino(_nivel(char)) + 1):
+        saida[str(c)] = (f"{c}º círculo: +{min(5, c + 1)}d8 radiante no próximo acerto "
+                         f"({td.SPELL_MANA_COST[c]} mana, só se acertar)")
+    return saida
+
+
+def _destruicao_divina(char, hab, alvo, modo):
+    from rpg import tools_dnd as td
+    c = int(modo or 1)
+    dados = min(5, c + 1)
+    custo = td.SPELL_MANA_COST[c]
+    td.dar_efeito_de_combate(char, {
+        "nome": "Destruição Divina", "golpe_dado": f"{dados}d8", "golpe_tipo": "radiant",
+        "golpe_mana": custo, "golpe_contra_profanos": "1d8", "golpe_so_corpo": True,
+        "ate_fim_turno_de": _chave_de(char)})
+    return (f"\n   Destruição Divina pronta ({c}º círculo): o próximo acerto corpo a corpo neste "
+            f"turno soma {dados}d8 radiante (+1d8 contra morto-vivo ou infernal) e gasta {custo} "
+            f"mana. Se não acertar neste turno, nada é gasto.")
+
+
+def _cd_de_ki(char: dict) -> int:
+    return 8 + _prof(char) + _mod(char, "sabedoria")
+
+
+def _ataque_atordoante(char, hab, alvo, modo):
+    from rpg import tools_dnd as td
+    td.dar_efeito_de_combate(char, {
+        "nome": "Ataque Atordoante", "golpe_ki": 1, "golpe_so_corpo": True,
+        "golpe_condicao": {"nome": "Atordoado", "salvaguarda": "constituicao", "cd": _cd_de_ki(char),
+                           "ate_fim_do_proximo_turno_de": _chave_de(char)},
+        "ate_fim_turno_de": _chave_de(char)})
+    return (f"\n   Ataque Atordoante pronto: no próximo acerto corpo a corpo neste turno, 1 ponto "
+            f"de ki e salvaguarda de CON (CD {_cd_de_ki(char)}) do alvo; se falhar, fica Atordoado "
+            f"até o fim do seu próximo turno.")
+
+
+def _artes_marciais(char, hab, alvo, modo):
+    from rpg import tools_dnd as td
+    attr = "destreza" if _mod(char, "destreza") >= _mod(char, "forca") else "forca"
+    return "\n" + td.attack_roll(char["name"], alvo, "ataque desarmado",
+                                 _dado_de_artes_marciais(char), attack_attribute=attr,
+                                 end_turn=False, _skip_turn_check=True)
+
+
+def _tirar_condicoes(char: dict, nomes) -> list[str]:
+    st = char.setdefault("sheet", {})
+    alvo = {norm(n) for n in nomes}
+    tiradas, ficam = [], []
+    for c in st.get("condicoes") or []:
+        nm = c.get("nome", "") if isinstance(c, dict) else str(c)
+        (tiradas if norm(nm) in alvo else ficam).append(c)
+    st["condicoes"] = ficam
+    return [c.get("nome", "") if isinstance(c, dict) else str(c) for c in tiradas]
+
+
+def _mente_tranquila(char, hab, alvo, modo):
+    from rpg import encantos
+    tiradas = _tirar_condicoes(char, ("amedrontado", "enfeiticado"))
+    linha = encantos.quebrar(char, "Mente Tranquila") if encantos.ativo(char) else ""
+    if not tiradas and not linha:
+        return f"\n   Mente Tranquila: {char['name']} não estava Amedrontado nem Enfeitiçado."
+    return (f"\n   Mente Tranquila: {char['name']} se livra de "
+            f"{', '.join(tiradas) or 'Enfeitiçado'}." + (f"\n   {linha}" if linha else ""))
+
+
+_TODOS_OS_DANOS_MENOS_FORCA = ["acid", "bludgeoning", "cold", "fire", "lightning", "necrotic",
+                               "piercing", "poison", "psychic", "radiant", "slashing", "thunder"]
+
+
+def _corpo_vazio(char, hab, alvo, modo):
+    from rpg import tools_dnd as td
+    conds = char.setdefault("sheet", {}).setdefault("condicoes", [])
+    if not any(norm(c.get("nome", "") if isinstance(c, dict) else c) == "invisivel" for c in conds):
+        conds.append({"nome": "Invisível", "duracao": None, "magia": "Corpo Vazio"})
+    td.dar_efeito_de_combate(char, {"nome": "Corpo Vazio", "resistencias": list(_TODOS_OS_DANOS_MENOS_FORCA)})
+    return (f"\n   Corpo Vazio: {char['name']} fica Invisível e com resistência a todo dano, "
+            f"exceto força, até o fim do combate.")
+
+
+def _corpo_curativo(char, hab, alvo, modo):
+    st = char["sheet"]
+    antes = int(st.get("vida_atual", 0) or 0)
+    st["vida_atual"] = min(int(st.get("vida_max", 0) or 0), antes + 3 * _nivel(char))
+    return f"\n   Corpo Curativo: {char['name']} {antes} → {st['vida_atual']}/{st.get('vida_max')}."
+
+
+def _golpe_de_sorte(char, hab, alvo, modo):
+    from rpg import tools_dnd as td
+    td.dar_efeito_de_combate(char, {"nome": "Golpe de Sorte", "acerto_garantido": True,
+                                    "ate_fim_turno_de": _chave_de(char)})
+    return "\n   Golpe de Sorte: o próximo ataque que errar neste turno vira acerto."
+
+
+def _desaparecer(char, hab, alvo, modo):
+    return _acao_de_movimento(char, "esconder", "Desaparecer")
+
+
+def _intervencao_divina(char, hab, alvo, modo):
+    nivel = _nivel(char)
+    d100 = random.randint(1, 100)
+    if nivel >= 20 or d100 <= nivel:
+        return (f"\n   Intervenção Divina: d100 = {d100} (precisa de até {nivel}"
+                f"{'; no 20º nível é automática' if nivel >= 20 else ''}) — A DIVINDADE INTERVÉM."
+                f"\n   (Mestre: narre a intervenção conforme o pedido do clérigo e a natureza da divindade.)")
+    return (f"\n   Intervenção Divina: d100 = {d100} (precisa de até {nivel}) — o pedido não foi atendido."
+            f"\n   (Mestre: a divindade não responde desta vez.)")
+
+
+def _contra_encanto(char, hab, alvo, modo):
+    from rpg import tools_dnd as td
+    afetados = [c for c in _combatentes_vivos() if _mesmo_lado(char, c) and _perto(char, c)]
+    if char not in afetados:
+        afetados.append(char)
+    for c in afetados:
+        td.dar_efeito_de_combate(c, {"nome": "Contra-Encanto",
+                                     "vantagem_save_contra": ["amedrontado", "enfeiticado"],
+                                     "ate_fim_turno_de": _chave_de(char), "desde_token": _token()})
+    return (f"\n   Contra-Encanto: vantagem contra Amedrontado e Enfeitiçado até o fim do próximo "
+            f"turno de {char['name']} para " + ", ".join(c["name"] for c in afetados) + ".")
+
+
+def _arma_sagrada(char, hab, alvo, modo):
+    from rpg import tools_dnd as td
+    bonus = max(1, _mod(char, "carisma"))
+    td.dar_efeito_de_combate(char, {"nome": "Arma Sagrada", "atk_bonus": bonus})
+    return f"\n   Arma Sagrada: +{bonus} nos ataques com arma até o fim do combate."
+
+
+def _voto_de_inimizade(char, hab, alvo, modo):
+    from rpg import tools_dnd as td
+    td.dar_efeito_de_combate(char, {"nome": "Voto de Inimizade", "vantagem_ataque": True,
+                                    "contra": memory.char_key(alvo)})
+    return f"\n   Voto de Inimizade: vantagem em todos os ataques de {char['name']} contra {alvo}."
+
+
+def _toque_purificador(char, hab, alvo, modo):
+    from rpg import encantos, tools_dnd as td
+    a = _char(alvo) or char
+    if encantos.ativo(a):
+        return f"\n   Toque Purificador: {encantos.quebrar(a, 'Toque Purificador')}"
+    st = a.setdefault("sheet", {})
+    for c in list(st.get("condicoes") or []):
+        if isinstance(c, dict) and c.get("magia"):
+            st["condicoes"].remove(c)
+            return f"\n   Toque Purificador: {a['name']} se livra de {c.get('nome')} ({c.get('magia')})."
+    for e in td._efeitos(st):
+        origem = _char(e.get("origem", ""))
+        if e.get("magia") and origem and not _mesmo_lado(a, origem):
+            st["efeitos"] = [x for x in st.get("efeitos") or [] if x is not e]
+            return f"\n   Toque Purificador: {a['name']} se livra de {e.get('nome')}."
+    return f"\n   Toque Purificador: nenhuma magia sobre {a['name']} para encerrar."
+
+
+def _presenca_intimidadora(char, hab, alvo, modo):
+    from rpg import tools_dnd as td
+    a = _char(alvo)
+    cd = 8 + _prof(char) + _mod(char, "carisma")
+    if td._imune_a_condicao(a, "Amedrontado"):
+        return f"\n   Presença Intimidadora: {a['name']} é imune a Amedrontado."
+    passou, linha = td._rolar_salvaguarda(a, "sabedoria", cd, contra="amedrontado")
+    if passou:
+        return f"\n   Presença Intimidadora: {a['name']}: {linha} — resiste."
+    _tirar_condicoes(a, ("amedrontado",))
+    a["sheet"].setdefault("condicoes", []).append(
+        {"nome": "Amedrontado", "duracao": None, "por": char["name"],
+         "ate_fim_turno_de": _chave_de(char), "desde_token": _token()})
+    return (f"\n   Presença Intimidadora: {a['name']}: {linha} — AMEDRONTADO até o fim do próximo "
+            f"turno de {char['name']}.")
+
+
+def _frenesi(char, hab, alvo, modo):
+    from rpg import tools_dnd as td
+    char["sheet"]["_frenesi"] = True
+    return "\n" + td.attack_roll(char["name"], alvo, _arma_de(char), 6,
+                                 end_turn=False, _skip_turn_check=True)
+
+
+# Forma Selvagem ------------------------------------------------------------
+
+def _circulo_da_lua(char: dict) -> bool:
+    from rpg import tools_dnd as td
+    s = char.get("sheet") or {}
+    sub = norm(" ".join(str(s.get(k) or "") for k in ("subclasse", "circulo", "arquetipo")))
+    return ("lua" in sub or "moon" in sub
+            or td._tem_habilidade(char, "forma selvagem do combate", "combat wild shape"))
+
+
+def _modos_da_forma(char: dict) -> dict:
+    from rpg import criaturas
+    saida = {}
+    if criaturas.em_forma_selvagem(char):
+        saida["voltar"] = "Voltar à forma normal: ação bônus, sem gastar uso"
+    for chave in criaturas.formas_permitidas(_nivel(char), _circulo_da_lua(char)):
+        f = criaturas.FICHAS[chave]
+        saida[chave] = f"{f['nome']}: ND {f['nd']}, {f['pv']} PV, CA {f['ca']}"
+    return saida
+
+
+def _forma_selvagem(char, hab, alvo, modo):
+    from rpg import criaturas, tools_dnd as td
+    if modo == "voltar":
+        return "\n   " + (criaturas.voltar(char) or f"{char['name']} já está na forma normal.")
+    td._gastar_uso(char, "Forma Selvagem")
+    return "\n   " + criaturas.transformar(char, modo)
+
+
+# Fonte de Magia ------------------------------------------------------------
+# A mana do jogo é a variante de pontos de magia do SRD: criar um espaço de
+# 1º círculo custa 2 pontos de feitiçaria, e conjurar no 1º custa 2 de mana. A
+# troca de pontos por mana é 1 por 1; a de mana por pontos segue a tabela do
+# círculo (o espaço de 1º círculo vale 1 ponto, o de 2º vale 2...).
+_MANA_EM_PONTOS = {2: 1, 3: 2, 5: 3, 6: 4, 7: 5}
+
+
+def _modos_da_fonte(char: dict) -> dict:
+    from rpg import tools_dnd as td
+    s = char.get("sheet") or {}
+    pontos = int(td.usos_restantes(char, "Fonte de Magia") or 0)
+    maximo = int(td.usos_maximos(char, "Fonte de Magia") or 0)
+    mana, mana_max = int(s.get("mana_atual", 0) or 0), int(s.get("mana_max", 0) or 0)
+    saida = {}
+    for m in (2, 3, 5, 6, 7):
+        if pontos >= m and mana + m <= mana_max:
+            saida[f"mana:{m}"] = f"Criar {m} de mana: gasta {m} pontos de feitiçaria"
+    for m, p in _MANA_EM_PONTOS.items():
+        if mana >= m and pontos + p <= maximo:
+            saida[f"pontos:{m}"] = f"Recuperar {p} {'ponto' if p == 1 else 'pontos'}: gasta {m} de mana"
+    return saida
+
+
+def _fonte_de_magia(char, hab, alvo, modo):
+    from rpg import tools_dnd as td
+    s = char["sheet"]
+    tipo, _, n = (modo or "").partition(":")
+    n = int(n or 0)
+    pontos = int(td.usos_restantes(char, "Fonte de Magia") or 0)
+    usos = s.setdefault("usos", {})
+    if tipo == "mana":
+        usos["pontos de feiticaria"] = pontos - n
+        s["mana_atual"] = int(s.get("mana_atual", 0) or 0) + n
+        return (f"\n   Fonte de Magia: {n} pontos viram {n} de mana. Mana {s['mana_atual']}/{s.get('mana_max')}, "
+                f"pontos {pontos - n}.")
+    p = _MANA_EM_PONTOS[n]
+    usos["pontos de feiticaria"] = pontos + p
+    s["mana_atual"] = int(s.get("mana_atual", 0) or 0) - n
+    return (f"\n   Fonte de Magia: {n} de mana viram {p} {'ponto' if p == 1 else 'pontos'}. "
+            f"Mana {s['mana_atual']}/{s.get('mana_max')}, pontos {pontos + p}.")
+
+
+def modos_de(chave: str, char: dict | None) -> dict:
+    """id → texto dos modos de uma ação de classe, para esta ficha."""
+    acao = ACOES_DE_CLASSE.get(chave) or {}
+    if not acao.get("modos_dinamicos"):
+        return {m: MODOS_DE_MOVIMENTO.get(m, m) for m in acao.get("modos") or []}
+    if not char:
+        return {}
+    return {"destruicao divina": _modos_da_destruicao, "forma selvagem": _modos_da_forma,
+            "fonte de magia": _modos_da_fonte}[chave](char)
+
+
 _ACOES = {
+    "destruicao divina": _destruicao_divina,
+    "arma sagrada": _arma_sagrada,
+    "voto de inimizade": _voto_de_inimizade,
+    "toque purificador": _toque_purificador,
+    "artes marciais": _artes_marciais,
+    "ataque atordoante": _ataque_atordoante,
+    "mente tranquila": _mente_tranquila,
+    "corpo vazio": _corpo_vazio,
+    "corpo curativo": _corpo_curativo,
+    "golpe de sorte": _golpe_de_sorte,
+    "desaparecer": _desaparecer,
+    "intervencao divina": _intervencao_divina,
+    "contra encanto": _contra_encanto,
+    "forma selvagem": _forma_selvagem,
+    "fonte de magia": _fonte_de_magia,
+    "presenca intimidadora": _presenca_intimidadora,
+    "frenesi": _frenesi,
     "acao ardilosa": _acao_ardilosa,
     "passo do vento": _passo_do_vento,
     "sacerdote de guerra": _sacerdote_de_guerra,

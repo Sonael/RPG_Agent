@@ -253,13 +253,16 @@ def conjurar(conjurador: dict, hab: dict, alvo_nome: str, magia_srd: str, nome_p
     if not tipo_combina(alvo, magia_srd):
         return (f"\n   {nome_pt} não afeta {alvo.get('name')}: "
                 f"{'só humanoides' if magia_srd == 'Charm Person' else 'só bestas'}.")
+    if td._imune_a_condicao(alvo, "Enfeitiçado"):
+        return f"\n   {alvo.get('name')} é imune a Enfeitiçado."
     cd = resolucao._cd(conjurador)
     cs = memory.campaign.get("combat_state") or {}
     na_luta = {memory.char_key(n) for n in (cs.get("initiative_order") or [])} if cs.get("is_active") else set()
     lutando = (memory.char_key(alvo.get("name", "")) in na_luta
                and memory.luta_com_o_grupo(alvo) != memory.luta_com_o_grupo(conjurador))
     if alvo.get("sheet"):
-        passou, linha = td._rolar_salvaguarda(alvo, "sabedoria", cd, vantagem=lutando)
+        passou, linha = td._rolar_salvaguarda(alvo, "sabedoria", cd, vantagem=lutando,
+                                             contra="enfeiticado")
     else:
         d20 = random.randint(1, 20)
         if lutando:
