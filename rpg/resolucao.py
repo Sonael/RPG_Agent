@@ -428,6 +428,133 @@ EFEITOS_DE_MAGIA: dict[str, dict] = {
                           "texto": "um elemental de ND 5 obedece a você enquanto durar a concentração (até "
                                    "1 hora) e entra na próxima luta ao seu lado; se a concentração cair, "
                                    "ele não some: vira inimigo do grupo"},
+    # ── Segunda leva: magias de combate que faltavam ────────────────────────
+    "Dispel Magic": {"alvos": "aliado", "dissipar": True,
+                     "texto": "encerra as magias sobre uma criatura (efeitos, condições, encanto, transformação); "
+                              "até o círculo usado, sem teste; acima, teste de conjuração contra 10 + círculo. "
+                              "Criatura invocada some"},
+    "Death Ward": {"alvos": "aliado", "efeito": {"protecao_morte": True}, "horas": 8,
+                   "texto": "a primeira vez que a vida do aliado chegaria a 0, fica em 1 (e a magia acaba)"},
+    "Protection from Energy": {"alvos": "aliado",
+                               "modos": {"acid": "Ácido", "cold": "Frio", "fire": "Fogo",
+                                         "lightning": "Elétrico", "thunder": "Trovejante"},
+                               "efeito_por_modo": {t: {"resistencias": [t]} for t in
+                                                   ("acid", "cold", "fire", "lightning", "thunder")},
+                               "texto": "resistência ao tipo de dano escolhido"},
+    "Freedom of Movement": {"alvos": "aliado", "horas": 1,
+                            "tira": ["paralisado", "contido", "imobilizado", "agarrado"],
+                            "efeito": {"imune_condicoes": ["paralisado", "contido", "imobilizado", "agarrado"]},
+                            "texto": "o aliado não fica Paralisado, Contido nem Agarrado (e sai disso agora)"},
+    "Dimension Door": {"alvos": "si", "teleporte": True, "teleporte_longe": True,
+                       "texto": "teleporta você para qualquer zona, sem ataque de oportunidade"},
+    "Power Word Kill": {"alvos": "inimigo", "palavra_matar": True,
+                        "texto": "quem tem 100 de vida ou menos morre; acima disso, nada"},
+    "Irresistible Dance": {"alvos": "inimigo",
+                           "condicao_direta": {"nome": "Dançando", "salvaguarda_fim": "sabedoria",
+                                               "imune_se": "Enfeitiçado"},
+                           "texto": "o alvo dança: não sai do lugar, ataca e esquiva com desvantagem (ataques "
+                                    "contra ele têm vantagem); repete SAB no fim de cada turno"},
+    "Resilient Sphere": {"alvos": "aliado", "save_se_inimigo": "destreza",
+                         "condicao_direta": {"nome": "Na Esfera"},
+                         "texto": "uma esfera de força envolve a criatura: nada entra nem sai (ninguém a alcança, "
+                                  "ela não age). Inimigo faz DES"},
+    "Maze": {"alvos": "inimigo",
+             "condicao_direta": {"nome": "No Labirinto", "salvaguarda_fim": "inteligencia", "cd_fixa": 20},
+             "texto": "o alvo some num labirinto: não age e ninguém o alcança; INT CD 20 no fim de cada turno "
+                      "para sair"},
+    "Raise Dead": {"alvos": "aliado", "reviver": True, "prazo_horas": 240, "vida": "1",
+                   "fora_de_combate": "1 hora",
+                   "texto": "traz de volta, com 1 PV, quem morreu há até 10 dias; gasta um diamante"},
+    "Resurrection": {"alvos": "aliado", "reviver": True, "prazo_horas": None, "vida": "max",
+                     "fora_de_combate": "1 hora",
+                     "texto": "traz de volta, com a vida cheia, quem morreu (não de velhice); gasta um diamante"},
+    "True Resurrection": {"alvos": "aliado", "reviver": True, "prazo_horas": None, "vida": "max",
+                          "fora_de_combate": "1 hora",
+                          "texto": "traz de volta, com a vida cheia, quem morreu; gasta um diamante"},
+    "Fire Shield": {"alvos": "si",
+                    "modos": {"quente": "Quente: resistência a frio; quem o acertar corpo a corpo leva 2d8 de fogo",
+                              "frio": "Frio: resistência a fogo; quem o acertar corpo a corpo leva 2d8 de frio"},
+                    "efeito_por_modo": {"quente": {"resistencias": ["cold"], "escudo_de_fogo": "fire"},
+                                        "frio": {"resistencias": ["fire"], "escudo_de_fogo": "cold"}},
+                    "texto": "chamas quentes ou frias: resistência a frio ou a fogo, e quem acertar você corpo "
+                             "a corpo leva 2d8"},
+    "Gaseous Form": {"alvos": "aliado", "condicao_direta": {"nome": "Forma Gasosa"},
+                     "efeito": {"resistencias": ["bludgeoning", "piercing", "slashing"]},
+                     "texto": "vira névoa: resistência a corte, perfuração e concussão, mas não ataca nem conjura"},
+    "Levitate": {"alvos": "aliado", "save_se_inimigo": "constituicao",
+                 "condicao_direta": {"nome": "Levitando"},
+                 "texto": "a criatura flutua: não sai do lugar, e ninguém a alcança corpo a corpo (nem ela "
+                          "alcança). Inimigo faz CON"},
+    "Gust of Wind": {"alvos": "inimigo", "lufada": True,
+                     "texto": "quem está na zona do alvo faz FOR; quem falha é empurrado para longe de você"},
+    "Divine Word": {"alvos": "nenhum", "palavra_divina": True,
+                    "texto": "inimigos perto fazem CAR; quem falha sofre pela vida que tem: até 50, Surdo; até 40, "
+                             "também Cego; até 30, também Atordoado; até 20, morre. Celestiais, elementais, fadas e "
+                             "infernais que falham são banidos"},
+    "Telekinesis": {"alvos": "inimigo", "telecinese": True,
+                    "modos": {"segurar": "Segurar: o alvo fica Contido até o fim do seu próximo turno",
+                              "afastar": "Afastar: o alvo vai para a zona vizinha e fica Contido"},
+                    "texto": "disputa do seu atributo de conjuração contra a FOR do alvo; nos turnos seguintes, "
+                             "usar de novo não gasta mana"},
+    "Holy Aura": {"alvos": "aliados", "max": 8,
+                  "efeito": {"vantagem_save_atributos": ["forca", "destreza", "constituicao", "inteligencia", "sabedoria", "carisma"], "desvantagem_contra_mim": True},
+                  "texto": "você e até 7 aliados: vantagem em todas as salvaguardas, e ataques contra vocês têm "
+                           "desvantagem"},
+    "Foresight": {"alvos": "aliado", "horas": 8, "fora_de_combate": "1 minuto",
+                  "efeito": {"vantagem_ataque": True, "vantagem_save_atributos": ["forca", "destreza", "constituicao", "inteligencia", "sabedoria", "carisma"],
+                             "desvantagem_contra_mim": True},
+                  "texto": "por 8 horas: vantagem em ataques e salvaguardas, e ataques contra o alvo têm desvantagem"},
+    "Globe of Invulnerability": {"alvos": "nenhum", "zona": "globo", "zona_do_conjurador": True,
+                                 "texto": "magias de até 5º círculo conjuradas de fora não afetam quem está na sua "
+                                          "zona (sem zonas, você)"},
+    "Antimagic Field": {"alvos": "nenhum", "zona": "antimagia", "zona_do_conjurador": True,
+                        "texto": "na sua zona (sem zonas, em você), que o acompanha, nenhuma magia é conjurada nem "
+                                 "atinge quem está lá"},
+    "Conjure Minor Elementals": {"alvos": "si", "fora_de_combate": "1 minuto",
+                                 "invocar": {"concentracao": True, "persistente": False, "acompanha": True,
+                                             "horas": 1},
+                                 "modos": {"gargula:1": "1 gárgula (ND 2)",
+                                           "mefita de magma:4": "4 mefitas de magma (ND 1/2)",
+                                           "mefita de vapor:8": "8 mefitas de vapor (ND 1/4)"},
+                                 "texto": "elementais menores obedecem a você enquanto durar a concentração e entram "
+                                          "na próxima luta ao seu lado"},
+    "Conjure Woodland Beings": {"alvos": "si", "invocar": {"concentracao": True, "persistente": False},
+                                "modos": {"driade:2": "2 dríades (ND 1)", "satiro:4": "4 sátiros (ND 1/2)",
+                                          "sprite:8": "8 sprites (ND 1/4)"},
+                                "texto": "seres feéricos lutam ao seu lado enquanto durar a concentração"},
+    "Conjure Fey": {"alvos": "si", "fora_de_combate": "1 minuto",
+                    "invocar": {"concentracao": True, "persistente": False, "acompanha": True,
+                                "hostil_ao_perder": True, "horas": 1},
+                    "modos": {"mamute:1": "Espírito em forma de mamute (ND 6)",
+                              "urso polar:1": "Espírito em forma de urso-polar (ND 2)",
+                              "escorpiao gigante:1": "Espírito em forma de escorpião gigante (ND 3)"},
+                    "texto": "um espírito feérico obedece a você enquanto durar a concentração; se ela cair, ele "
+                             "vira inimigo"},
+    "Conjure Celestial": {"alvos": "si", "fora_de_combate": "1 minuto",
+                          "invocar": {"concentracao": True, "persistente": False, "acompanha": True, "horas": 1},
+                          "modos": {"couatl:1": "Couatl (ND 4)"},
+                          "texto": "um celestial obedece a você enquanto durar a concentração e entra na próxima "
+                                   "luta ao seu lado"},
+    "Giant Insect": {"alvos": "si", "invocar": {"concentracao": True, "persistente": False},
+                     "modos": {"centopeia gigante:10": "10 centopeias gigantes", "aranha gigante:3": "3 aranhas gigantes",
+                               "vespa gigante:5": "5 vespas gigantes", "escorpiao gigante:1": "1 escorpião gigante"},
+                     "texto": "insetos gigantes lutam ao seu lado enquanto durar a concentração"},
+    "Animate Objects": {"alvos": "si", "invocar": {"concentracao": True, "persistente": False},
+                        "modos": {"objeto miudo:10": "10 objetos miúdos", "objeto pequeno:10": "10 objetos pequenos",
+                                  "objeto medio:5": "5 objetos médios", "objeto grande:2": "2 objetos grandes",
+                                  "objeto enorme:1": "1 objeto enorme"},
+                        "texto": "objetos ganham vida e lutam ao seu lado enquanto durar a concentração"},
+    "Create Undead": {"alvos": "si", "fora_de_combate": "1 minuto",
+                      "invocar": {"concentracao": False, "persistente": True, "horas": 24},
+                      "modos": {"carnical:3": "3 carniçais"},
+                      "texto": "três carniçais obedecem a você por 24 horas (precisa de cadáveres, à noite)"},
+    "Planar Ally": {"alvos": "si", "fora_de_combate": "10 minutos",
+                    "invocar": {"concentracao": False, "persistente": True, "horas": 24},
+                    "modos": {"couatl:1": "Um couatl (celestial)", "elemental do fogo:1": "Um elemental do fogo",
+                              "elemental da terra:1": "Um elemental da terra",
+                              "elemental do ar:1": "Um elemental do ar", "elemental da agua:1": "Um elemental da água"},
+                    "texto": "uma criatura enviada pela sua divindade serve por um dia (o pagamento, o Mestre "
+                             "negocia)"},
     # ── Lote 5: invocações ──────────────────────────────────────────────────
     "Spiritual Weapon": {"alvos": "inimigo", "arma_espiritual": True,
                          "texto": "uma arma espectral ataca agora (ataque mágico corpo a corpo, 1d8 + seu "
@@ -500,8 +627,7 @@ TEXTO_DA_CONDICAO = {
 # Aplicam "Enfeitiçado" no compêndio, mas o efeito é uma ordem, um transe ou
 # uma calma que só o Mestre sabe narrar. O motor rola o teste; o Mestre narra.
 NARRATIVAS_COM_TESTE = {"Suggestion", "Mass Suggestion", "Enthrall", "Calm Emotions",
-                        "Compulsion", "Geas",
-                        "Gust of Wind", "Divine Word"}
+                        "Compulsion", "Geas"}
 
 
 def _condicao_da_magia(hab: dict, m: dict) -> str:
@@ -693,7 +819,7 @@ def como_resolve(hab: dict, char: dict | None = None) -> dict:
             saida.update(tipo="efeito", texto="O motor aplica: " + ef["texto"]
                          + (", enquanto durar a concentração" if m.get("concentracao") else "") + ".")
             modos = dict(ef.get("modos") or {})
-            if ef.get("zona"):
+            if ef.get("zona") and not ef.get("zona_do_conjurador"):
                 from rpg import tools_dnd as td
                 modos = {z: f"{z}: a área cobre esta zona" for z in td._zonas()} if td._zonas_ativas() else {}
                 if not td._zonas_ativas() and (memory.campaign.get("combat_state") or {}).get("is_active"):
@@ -706,7 +832,10 @@ def como_resolve(hab: dict, char: dict | None = None) -> dict:
             if ef.get("teleporte") and char:
                 from rpg import tools_dnd as td
                 if td._zonas_ativas():
-                    modos = {z: f"{z}: zona vizinha" for z in _zonas_vizinhas(char)}
+                    if ef.get("teleporte_longe"):
+                        modos = {z: f"{z}" for z in td._zonas() if z != td._zona_de(char["name"])}
+                    else:
+                        modos = {z: f"{z}: zona vizinha" for z in _zonas_vizinhas(char)}
             if not modos and not (ef.get("arma_espiritual") and char and reuso_gratis(char, hab)):
                 modos = circulos_da_magia(hab, char)
             saida.update(modos=list(modos), modos_texto=modos)
@@ -918,13 +1047,14 @@ def validar(char: dict, hab: dict, alvo: str, modo: str) -> str:
             if not a or (a.get("status") or "").lower() != "morto":
                 return f"Aviso: {nome_pt} só vale em quem morreu. Nada foi gasto."
             hora = (a.get("sheet") or {}).get("morreu_hora")
-            if hora is None or td._agora_em_horas() - int(hora) >= 1:
+            prazo = ef.get("prazo_horas", 1)
+            if prazo is not None and (hora is None or td._agora_em_horas() - int(hora) >= prazo):
                 return (f"Aviso: {a['name']} morreu há tempo demais para {nome_pt} "
                         f"(só vale logo depois da morte). Nada foi gasto.")
             if not _diamante(char):
                 return (f"Aviso: {nome_pt} precisa de um diamante (300 po) na mochila de "
                         f"{char['name']}. Nada foi gasto.")
-        if ef.get("zona"):
+        if ef.get("zona") and not ef.get("zona_do_conjurador"):
             from rpg import tools_dnd as td
             if td._zonas_ativas() and modo not in td._zonas():
                 return (f"Aviso: escolha a zona de {nome_pt} ({', '.join(td._zonas())}). Nada foi gasto.")
@@ -949,7 +1079,9 @@ def validar(char: dict, hab: dict, alvo: str, modo: str) -> str:
             return f"Aviso: escolha quem a Arma Espiritual ataca. Nada foi gasto."
         if ef.get("teleporte"):
             from rpg import tools_dnd as td
-            if td._zonas_ativas() and modo not in _zonas_vizinhas(char):
+            destinos = ([z for z in td._zonas() if z != td._zona_de(char["name"])]
+                        if ef.get("teleporte_longe") else _zonas_vizinhas(char))
+            if td._zonas_ativas() and modo not in destinos:
                 return (f"Aviso: escolha para qual zona vizinha {nome_pt} leva "
                         f"({', '.join(_zonas_vizinhas(char)) or 'nenhuma'}). Nada foi gasto.")
     # A regra deixa abençoar quem quiser: a tela oferece os aliados primeiro,
@@ -1039,6 +1171,8 @@ def aplicar_magia(char: dict, hab: dict, alvo_nome: str, modo: str = "") -> str:
         ef = dict(ef, max=int(ef.get("max", 1)) + extra_circ)
     if ef.get("zona"):
         return _magia_de_zona(char, hab, ef, modo, nome_pt, alvo_nome)
+    if ef.get("palavra_divina"):
+        return _palavra_divina(char, nome_pt)
     alvos = _alvos_da_magia(char, ef, alvo_nome)
     if not alvos:
         return f"\n   Ninguém ao alcance de {nome_pt}."
@@ -1076,6 +1210,9 @@ def aplicar_magia(char: dict, hab: dict, alvo_nome: str, modo: str = "") -> str:
             efeito["golpe_dado"] = f"{n + extra_circ}d{faces}"
         if ef.get("armadura_arcana"):
             efeito["ca_minima"] = 13 + _mod(a, "destreza")
+        if efeito and ef.get("horas"):
+            efeito["ate_hora"] = td._agora_em_horas() + int(ef["horas"])
+            efeito["ate"] = "horas"
         if efeito:
             efeito["nome"] = nome_pt
             efeito["origem"] = char.get("name", "")
@@ -1143,6 +1280,51 @@ def _magia_especial(char: dict, hab: dict, ef: dict, a: dict, modo: str, nome_pt
     from rpg import encantos, tools_dnd as td
     if ef.get("invocar"):
         return _invocar(char, hab, ef, modo, nome_pt)
+    if ef.get("dissipar"):
+        return _dissipar(char, hab, a, modo, nome_pt)
+    if ef.get("palavra_matar"):
+        st_a = a.setdefault("sheet", {})
+        vida = int(st_a.get("vida_atual", 0) or 0)
+        if vida > 100:
+            return f"\n   {nome_pt}: {a['name']} tem {vida} de vida — mais de 100, nada acontece."
+        if any(e.get("protecao_morte") for e in td._efeitos(st_a)):
+            st_a["efeitos"] = [e for e in st_a.get("efeitos") or [] if not e.get("protecao_morte")]
+            return f"\n   {nome_pt}: a Proteção contra a Morte de {a['name']} se desfaz no lugar dele."
+        st_a["vida_atual"] = 0
+        td._mark_at_zero_hp(a, char["name"])
+        a["status"] = "morto"
+        st_a["morreu_hora"] = td._agora_em_horas()
+        return f"\n   {nome_pt}: {a['name']} ({vida} de vida) MORRE."
+    if ef.get("lufada"):
+        return _lufada(char, a, nome_pt)
+    if ef.get("telecinese"):
+        return _telecinese(char, a, modo, nome_pt)
+    if ef.get("condicao_direta"):
+        cfg = ef["condicao_direta"]
+        pre = ""
+        if ef.get("save_se_inimigo") and not _mesmo_lado(char, a):
+            passou, linha = td._rolar_salvaguarda(a, ef["save_se_inimigo"], _cd(char))
+            if passou:
+                return f"\n   {nome_pt}: {a['name']}: {linha} — resistiu."
+            pre = f"\n   {a['name']}: {linha} — falhou."
+        if cfg.get("imune_se") and td._imune_a_condicao(a, cfg["imune_se"]):
+            return f"\n   {nome_pt}: {a['name']} não pode ser {cfg['imune_se']} — imune."
+        _tirar_condicoes(a, (cfg["nome"],))
+        cond = {"nome": cfg["nome"], "duracao": None, "por": char["name"], "magia": hab.get("nome", "")}
+        m_c = _magia_srd(hab) or {}
+        if m_c.get("concentracao"):
+            cond["concentracao_de"] = memory.char_key(char.get("name", ""))
+        if cfg.get("salvaguarda_fim"):
+            cond["salvaguarda_fim"] = {"atributo": cfg["salvaguarda_fim"], "cd": int(cfg.get("cd_fixa") or _cd(char))}
+        a.setdefault("sheet", {}).setdefault("condicoes", []).append(cond)
+        if ef.get("efeito"):
+            efeito = dict(ef["efeito"], nome=nome_pt, origem=char.get("name", ""), magia=hab.get("nome", ""))
+            if m_c.get("concentracao"):
+                efeito["concentracao_de"] = memory.char_key(char.get("name", ""))
+            td.dar_efeito_de_combate(a, efeito)
+        return pre + f"\n   {nome_pt}: {a['name']} — {ef['texto']}."
+    if ef.get("palavra_divina"):
+        return _palavra_divina(char, nome_pt)
     if ef.get("transformar"):
         from rpg import criaturas
         if not _mesmo_lado(char, a):
@@ -1188,10 +1370,10 @@ def _magia_especial(char: dict, hab: dict, ef: dict, a: dict, modo: str, nome_pt
         if pedra["qtd"] <= 0:
             char["inventario"] = [x for x in char.get("inventario") or [] if x is not pedra]
         a["status"] = "vivo" if memory.is_party_member(a) else (a.get("lado") or "aliado")
-        st["vida_atual"] = 1
+        st["vida_atual"] = int(st.get("vida_max", 1) or 1) if ef.get("vida") == "max" else 1
         st["death_saves_sucessos"] = st["death_saves_falhas"] = 0
         st.pop("morreu_hora", None)
-        return (f"\n   {nome_pt}: {a['name']} volta à vida com 1 PV. "
+        return (f"\n   {nome_pt}: {a['name']} volta à vida com {st['vida_atual']} PV. "
                 f"O diamante ({pedra.get('nome')}) virou pó.")
     if ef.get("teleporte"):
         if not td._zonas_ativas():
@@ -1216,6 +1398,146 @@ def _magia_especial(char: dict, hab: dict, ef: dict, a: dict, modo: str, nome_pt
     return None
 
 
+# ── Dissipar Magia, Lufada de Vento, Telecinésia, Palavra Divina ─────────────
+
+def _nivel_da_magia_nome(nome: str) -> int:
+    m = _magia_srd({"nome": nome or ""}) or {}
+    return int(m.get("nivel", 0) or 0)
+
+
+def _dissipar(char: dict, hab: dict, a: dict, modo: str, nome_pt: str) -> str:
+    """Encerra as magias sobre a criatura: até o círculo usado sem teste; acima, teste."""
+    from rpg import criaturas, encantos, tools_dnd as td
+    circ = circulo_do_modo(hab, modo) or 3
+    attr = td._atributo_de_conjuracao(char.get("sheet") or {}) or "sabedoria"
+    linhas = []
+
+    def _vence(nivel: int, rotulo: str) -> bool:
+        if nivel <= circ:
+            return True
+        d20 = random.randint(1, 20)
+        total = d20 + _mod(char, attr)
+        ok = total >= 10 + nivel
+        linhas.append(f"{rotulo} ({nivel}º círculo): teste {d20} + mod = {total} vs CD {10 + nivel} — "
+                      + ("dissipada" if ok else "resiste"))
+        return ok
+
+    if isinstance(a.get("invocacao"), dict):
+        n = _nivel_da_magia_nome(a["invocacao"].get("magia", ""))
+        if _vence(n, a["invocacao"].get("magia", "")):
+            return f"\n   {nome_pt}: " + criaturas.dispensar(a, "dissipada")
+    st = a.setdefault("sheet", {})
+    if encantos.ativo(a):
+        n = _nivel_da_magia_nome(encantos.ativo(a).get("magia_srd", ""))
+        if _vence(n, "encanto"):
+            linhas.append(encantos.quebrar(a, nome_pt))
+    fs = st.get("_forma_selvagem")
+    if fs and fs.get("magia"):
+        if _vence(_nivel_da_magia_nome(fs["magia"]), fs.get("origem", "transformação")):
+            linhas.append(criaturas.voltar(a, nome_pt))
+    for c in list(st.get("condicoes") or []):
+        if isinstance(c, dict) and c.get("magia") and not c.get("encanto"):
+            if _vence(_nivel_da_magia_nome(c["magia"]), c.get("nome", "")):
+                st["condicoes"].remove(c)
+                linhas.append(f"{c.get('nome')} acaba")
+    for e in list(td._efeitos(st)):
+        if e.get("magia"):
+            if _vence(_nivel_da_magia_nome(e["magia"]), e.get("nome", "")):
+                st["efeitos"] = [x for x in st.get("efeitos") or [] if x is not e]
+                linhas.append(f"{e.get('nome')} acaba")
+    if not linhas:
+        return f"\n   {nome_pt}: nenhuma magia sobre {a['name']} para dissipar."
+    return f"\n   {nome_pt} em {a['name']}:" + "".join(f"\n   • {l}" for l in linhas)
+
+
+def _empurrar_para_longe(quem: dict, de: dict) -> str:
+    from rpg import tools_dnd as td
+    zonas = td._zonas()
+    za, zq = td._zona_de(de["name"]), td._zona_de(quem["name"])
+    if zq not in zonas:
+        return ""
+    i = zonas.index(zq)
+    passo = 1 if (za not in zonas or zonas.index(za) <= i) else -1
+    j = i + passo if 0 <= i + passo < len(zonas) else i - passo
+    if not 0 <= j < len(zonas) or j == i:
+        return ""
+    memory.campaign["combat_state"].setdefault("posicoes", {})[memory.char_key(quem["name"])] = zonas[j]
+    return zonas[j]
+
+
+def _lufada(char: dict, a: dict, nome_pt: str) -> str:
+    from rpg import tools_dnd as td
+    afetados = [c for c in _combatentes_vivos() if c is not char and _perto(a, c)] if td._zonas_ativas() else [a]
+    linhas = []
+    for c in afetados:
+        passou, linha = td._rolar_salvaguarda(c, "forca", _cd(char))
+        if passou:
+            linhas.append(f"{c['name']}: {linha} — firme")
+            continue
+        destino = _empurrar_para_longe(c, char) if td._zonas_ativas() else ""
+        linhas.append(f"{c['name']}: {linha} — empurrado" + (f" para {destino}" if destino else " (o Mestre narra)"))
+    return f"\n   {nome_pt}:" + "".join(f"\n   • {l}" for l in linhas)
+
+
+def _telecinese(char: dict, a: dict, modo: str, nome_pt: str) -> str:
+    from rpg import tools_dnd as td
+    attr = td._atributo_de_conjuracao(char.get("sheet") or {}) or "inteligencia"
+    d1, d2 = random.randint(1, 20), random.randint(1, 20)
+    meu, dele = d1 + _mod(char, attr), d2 + _mod(a, "forca")
+    if meu <= dele:
+        return (f"\n   {nome_pt}: {meu} contra FOR {dele} de {a['name']} — ele resiste.")
+    onde = ""
+    if modo == "afastar" and td._zonas_ativas():
+        destino = _empurrar_para_longe(a, char)
+        onde = f" e o leva para {destino}" if destino else ""
+    _tirar_condicoes(a, ("contido",))
+    a.setdefault("sheet", {}).setdefault("condicoes", []).append(
+        {"nome": "Contido", "duracao": None, "por": char["name"], "magia": "Telekinesis",
+         "ate_fim_turno_de": memory.char_key(char.get("name", "")), "desde_token": _token()})
+    return (f"\n   {nome_pt}: {meu} contra FOR {dele} de {a['name']} — {char['name']} o ergue{onde}: "
+            f"CONTIDO até o fim do próximo turno de {char['name']}.")
+
+
+_BANIDOS_PELA_PALAVRA = ("celestial", "elemental", "fey", "fada", "feerico", "fiend", "infernal", "demon", "devil")
+
+
+def _palavra_divina(char: dict, nome_pt: str) -> str:
+    from rpg import tools_dnd as td
+    linhas = []
+    for c in _combatentes_vivos():
+        if _mesmo_lado(char, c) or not _perto(char, c, 1):
+            continue
+        passou, linha = td._rolar_salvaguarda(c, "carisma", _cd(char))
+        if passou:
+            linhas.append(f"{c['name']}: {linha} — resiste")
+            continue
+        st = c.setdefault("sheet", {})
+        vida = int(st.get("vida_atual", 0) or 0)
+        if _e_do_tipo(c, _BANIDOS_PELA_PALAVRA):
+            _tirar_condicoes(c, ("banido",))
+            st.setdefault("condicoes", []).append({"nome": "Banido", "duracao": None, "magia": "Divine Word"})
+            linhas.append(f"{c['name']}: {linha} — BANIDO para o plano de origem")
+            continue
+        if vida <= 20:
+            st["vida_atual"] = 0
+            td._mark_at_zero_hp(c, char["name"])
+            c["status"] = "morto"
+            st["morreu_hora"] = td._agora_em_horas()
+            linhas.append(f"{c['name']}: {linha} — MORRE ({vida} de vida)")
+            continue
+        novas = ["Surdo"] + (["Cego"] if vida <= 40 else []) + (["Atordoado"] if vida <= 30 else [])
+        if vida > 50:
+            linhas.append(f"{c['name']}: {linha} — com {vida} de vida, nada sofre")
+            continue
+        for n in novas:
+            _tirar_condicoes(c, (n,))
+            st.setdefault("condicoes", []).append({"nome": n, "duracao": None, "magia": "Divine Word"})
+        linhas.append(f"{c['name']}: {linha} — {', '.join(novas).upper()} ({vida} de vida)")
+    if not linhas:
+        return f"\n   {nome_pt}: nenhum inimigo perto o bastante para ouvir."
+    return f"\n   {nome_pt}:" + "".join(f"\n   • {l}" for l in linhas)
+
+
 # ── Magias de zona (Escuridão, Névoa Obscurecente, Silêncio) ──────────────────
 
 def _magia_de_zona(char: dict, hab: dict, ef: dict, modo: str, nome_pt: str, alvo_nome: str = "") -> str:
@@ -1234,7 +1556,12 @@ def _magia_de_zona(char: dict, hab: dict, ef: dict, modo: str, nome_pt: str, alv
                      and norm(z.get("magia", "")) == norm(hab.get("nome", "")))]
     entrada = {"tipo": ef["zona"], "nome": nome_pt,
                "concentracao_de": memory.char_key(char.get("name", "")), "magia": hab.get("nome", "")}
-    if td._zonas_ativas():
+    if ef.get("zona_do_conjurador"):
+        # Acompanha quem conjurou: a zona é calculada na hora (_efeitos_de_zona).
+        entrada["segue"] = memory.char_key(char.get("name", ""))
+        entrada["criatura"] = entrada["segue"]
+        onde = f"em torno de {char['name']}"
+    elif td._zonas_ativas():
         entrada["zona"] = modo
         onde = f"em {modo}"
     else:
@@ -1325,6 +1652,9 @@ def reuso_gratis(char: dict, hab: dict) -> bool:
     """A Arma Espiritual já está em campo: atacar de novo não gasta mana."""
     from rpg import tools_dnd as td
     m = _magia_srd(hab) or {}
+    if m.get("nome_srd") == "Telekinesis":
+        atual = ((char.get("sheet") or {}).get("concentracao") or {})
+        return norm(atual.get("magia", "")) == norm(hab.get("nome", ""))
     return m.get("nome_srd") == "Spiritual Weapon" and any(
         e.get("arma_espiritual") for e in td._efeitos_de(char))
 
@@ -1377,7 +1707,7 @@ def _escala(m: dict) -> bool:
     return bool(m.get("escala_espaco") or m.get("alvos_por_espaco")
                 or _ESCALA_RE.search(m.get("nivel_superior_en") or "")
                 or m.get("nome_srd") in ("Aid", "False Life", "Magic Weapon", "Branding Smite",
-                                         "Spiritual Weapon"))
+                                         "Spiritual Weapon", "Dispel Magic"))
 
 
 def circulos_da_magia(hab: dict, char: dict | None) -> dict:

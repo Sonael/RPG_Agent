@@ -2542,6 +2542,9 @@ def _imune_a_condicao(char: dict | None, condicao: str) -> bool:
     for hab, conds in _IMUNIDADES_DE_CLASSE.items():
         if c in conds and _tem_habilidade(char, hab):
             return True
+    for e in _efeitos_de(char):
+        if c in {_norm_txt(x) for x in e.get("imune_condicoes") or []}:
+            return True
     return False
 
 
@@ -3187,6 +3190,12 @@ CONDITION_EFFECTS: dict[str, dict] = {
     "etéreo":      {"untargetable": True},
     # Polimorfia Verdadeira em objeto: fora da luta.
     "objeto":      {"no_actions": True, "no_movement": True, "untargetable": True},
+    # Dança Irresistível, Esfera Resiliente, Labirinto, Forma Gasosa, Levitação.
+    "dançando":    {"attack_disadvantage": True, "defense_disadvantage": True, "no_movement": True},
+    "na esfera":   {"no_actions": True, "no_movement": True, "untargetable": True},
+    "no labirinto": {"no_actions": True, "no_movement": True, "untargetable": True},
+    "forma gasosa": {"no_actions": True},
+    "levitando":   {"no_movement": True, "fora_do_corpo_a_corpo": True},
     # Raio do Enfraquecimento: metade do dano com armas de FOR.
     "enfraquecido": {"metade_dano_for": True},
     "transformado":{},
@@ -3682,6 +3691,14 @@ def _apply_damage(target: dict, amount: int = 0, damage_type: str = "",
     hp_depois = sheet["vida_atual"]
 
     # Forma Selvagem: a fera caiu, o druida volta e leva o dano que sobrou.
+    if hp_depois == 0 and hp_antes > 0 and not sheet.get("_forma_selvagem"):
+        _guarda_m = next((e for e in _efeitos(sheet) if e.get("protecao_morte")), None)
+        if _guarda_m:
+            sheet["vida_atual"] = hp_depois = 1
+            sheet["efeitos"] = [x for x in sheet.get("efeitos") or [] if x is not _guarda_m]
+            notas.append(f"{_guarda_m.get('nome', 'Proteção contra a Morte')}: {target.get('name')} fica com 1 PV "
+                         f"(a magia acaba)")
+
     if hp_depois == 0 and sheet.get("_forma_selvagem"):
         from rpg import criaturas
         notas.append(criaturas.quando_a_fera_cai(target, max(0, dano - hp_antes)))
@@ -3801,7 +3818,10 @@ def _efeitos_de_zona(zona: str) -> list[dict]:
         return []
     saida = []
     for e in cs.get("efeitos_de_zona") or []:
-        if not isinstance(e, dict) or e.get("zona") != zona:
+        if not isinstance(e, dict):
+            continue
+        onde = _zona_de(e["segue"]) if e.get("segue") else e.get("zona")
+        if onde != zona:
             continue
         if e.get("concentracao_de") and not _concentracao_segue(e):
             continue
@@ -3831,6 +3851,20 @@ def _zona_obscurecida(nome: str) -> str:
         if e.get("tipo") in ("escuridao", "nevoa"):
             return e.get("nome", "Escuridão")
     return ""
+
+
+def _area_do_tipo(nome: str, tipo: str) -> dict | None:
+    return next((e for e in _areas_sobre(nome) if e.get("tipo") == tipo), None)
+
+
+def _protegido_pelo_globo(conjurador: str, alvo: str, circulo: int) -> str:
+    """O Globo de Invulnerabilidade barra a magia de até 5º círculo vinda de fora."""
+    if circulo > 5:
+        return ""
+    globo = _area_do_tipo(alvo, "globo")
+    if not globo or _area_do_tipo(conjurador, "globo") is globo:
+        return ""
+    return globo.get("nome", "Globo de Invulnerabilidade")
 
 
 def _zona_silenciada(nome: str) -> str:
@@ -6523,6 +6557,12 @@ def attack_roll(
     if _fora:
         return f"Erro: {target['name']} está {_fora} e ninguém o alcança agora."
 
+    _no_ar = _condicao_com(target, "fora_do_corpo_a_corpo") or _condicao_com(attacker, "fora_do_corpo_a_corpo")
+    if _no_ar and not any(r in (weapon or "").lower() for r in RANGED_WEAPONS) \
+            and not (_npc_attack_entry(attacker.get("sheet") or {}, weapon) or {}).get("ranged"):
+        return (f"Erro: {'quem ataca' if _condicao_com(attacker, 'fora_do_corpo_a_corpo') else target['name']} "
+                f"está {_no_ar}: fora do alcance corpo a corpo. Use um ataque à distância.")
+
     _notas_santuario = []
     _meu_sant = [e for e in _efeitos_de(attacker) if e.get("santuario")]
     if _meu_sant and memory.luta_com_o_grupo(attacker) != memory.luta_com_o_grupo(target):
@@ -7021,6 +7061,16 @@ def attack_roll(
         if hp_depois > 0:
             for _nome_g, _cfg_g in _g_conds:
                 result += _aplicar_condicao_de_golpe(attacker, target, _nome_g, _cfg_g)
+            _escudo_f = next((e for e in _efeitos(st) if e.get("escudo_de_fogo")), None)
+            if _escudo_f and not is_ranged and attacker.get("sheet", {}).get("vida_atual", 0) > 0:
+                _ef_d = [random.randint(1, 8), random.randint(1, 8)]
+                _res_f = _apply_damage(attacker, sum(_ef_d), _escudo_f["escudo_de_fogo"],
+                                       source_name=target["name"], arma_magica=True)
+                result += (f"\n   {_escudo_f.get('nome', 'Escudo de Fogo')} de {target['name']}: {attacker['name']} "
+                           f"leva 2d8 [{' + '.join(map(str, _ef_d))}] = {_res_f['dano']} "
+                           f"({_res_f['hp_antes']} → {_res_f['hp_depois']})")
+                if _res_f["hp_depois"] == 0 and _res_f["hp_antes"] > 0:
+                    result += _mark_at_zero_hp(attacker, target["name"])
             if _g_manobras:
                 from rpg import superioridade as _sup
                 for _e_m in _g_manobras:
@@ -7222,6 +7272,18 @@ def use_ability(
     # ── Escuridão, Névoa, Silêncio ────────────────────────────────────────
     _m_zona = _resolucao._magia_srd(hab) or {}
     if _m_zona:
+        _alvo_am = (target_name or "").split(",")[0].strip()
+        _campo = _area_do_tipo(char["name"], "antimagia") or (
+            _area_do_tipo(_alvo_am, "antimagia") if _alvo_am else None)
+        if _campo and _m_zona.get("nome_srd") != "Antimagic Field":
+            return (f"Erro: {_campo.get('nome', 'Campo Antimagia')}: nenhuma magia funciona ali. "
+                    f"Nada foi gasto.")
+        if _alvo_am and memory.char_key(_alvo_am) != memory.char_key(char["name"]):
+            _circ_g = _resolucao.circulo_do_modo(hab, modo) or int(_m_zona.get("nivel", 0) or 0)
+            _globo = _protegido_pelo_globo(char["name"], _alvo_am, _circ_g)
+            if _globo:
+                return (f"Erro: o {_globo} protege {_alvo_am}: magia de até 5º círculo vinda de fora não "
+                        f"o afeta. Nada foi gasto.")
         _cala = _zona_silenciada(char["name"])
         if _cala and "V" in [c.strip() for c in str(_m_zona.get("componentes") or "").split(",")]:
             return (f"Erro: {char['name']} está no {_cala}: {hab['nome']} tem componente verbal e não "
@@ -7255,7 +7317,8 @@ def use_ability(
     # Arma Espiritual em campo: atacar de novo é ação bônus, sem mana.
     if _resolucao.reuso_gratis(char, hab):
         custo = 0
-        modo = ""
+        if _resolucao.circulo_do_modo(hab, modo):
+            modo = ""
     # Ritual (fora do combate, pelo Grimório): sem mana, dez minutos a mais.
     if _ritual:
         if not _resolucao.pode_ritual(char, hab):
@@ -7582,6 +7645,11 @@ def use_ability(
         for _alvo in _alvos_area:
             _dano_nele = total_dano
             _linha_save = ""
+            _globo_a = _protegido_pelo_globo(char["name"], _alvo.get("name", ""),
+                                             _circulo or int((_resolucao._magia_srd(hab) or {}).get("nivel", 0) or 0))
+            if _globo_a:
+                result += f"\n   {_alvo['name']}: dentro do {_globo_a} — a magia não o alcança."
+                continue
             if _save_area:
                 _passou, _linha_save = _rolar_salvaguarda(_alvo, _save_area, _cd_area)
                 if _passou:

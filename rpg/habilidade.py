@@ -182,7 +182,7 @@ def resolver(hab: dict, char: dict | None = None) -> dict:
         r["alvo_modo"] = {"aliado": "aliado", "aliados": "aliado", "si": "si",
                           "inimigo_ataque": "inimigo", "inimigo": "inimigo", "nenhum": "nenhum",
                           "marca": "inimigo", "inimigos": "inimigo", "area": "inimigo"}.get(_ef["alvos"], "")
-    if _ef and _ef.get("zona") and not td._zonas_ativas():
+    if _ef and _ef.get("zona") and not _ef.get("zona_do_conjurador") and not td._zonas_ativas():
         r["alvo_modo"] = "aliado"          # qualquer criatura, inclusive você
     if como["slot"]:
         r["acao"] = como["slot"]
