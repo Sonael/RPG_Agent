@@ -2612,6 +2612,19 @@ body.combat-on { overflow: hidden; }
   font-size: 0.72rem; font-weight: 400; color: var(--cbt-muted);
 }
 .cbt-hab-aviso { color: var(--cbt-red); font-weight: 700; }
+/* O que acontece quando se usa (rpg/resolucao.py): a resposta para "isso faz
+   alguma coisa no combate?" antes de gastar o turno. */
+.cbt-hab-como {
+  font-size: 0.74rem; font-weight: 400; font-style: italic; line-height: 1.35;
+  color: var(--cbt-muted);
+}
+.cbt-hab-como.cbt-como-narrativa { color: #6a4c9c; }
+.cbt-eco-tag.cbt-selo-efeito { background: rgba(47,106,163,0.14); color: #2f6aa3; }
+.cbt-eco-tag.cbt-selo-acao_de_classe { background: rgba(138,106,30,0.15); color: #6d5416; }
+.cbt-eco-tag.cbt-selo-narrativa { background: rgba(106,76,156,0.14); color: #6a4c9c; }
+.cbt-livre-nota { font-size: 0.8rem; font-style: italic; color: var(--cbt-muted); margin: var(--esp-1) 0; }
+.cbt-modos .cbt-modo { display: flex; flex-direction: column; align-items: flex-start; text-align: left; }
+.cbt-modos .cbt-modo small { font-size: 0.74rem; }
 .cbt-hab-trava { color: var(--cbt-red); font-style: italic; }
 /* Preso ao rodapé do botão de usar, não do cartão: com a descrição aberta o
    cartão cresce para baixo e o "Fechar" tem de ficar onde estava. */

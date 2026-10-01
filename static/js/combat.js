@@ -469,7 +469,12 @@
     // dividido não há o que mover, e um selo permanentemente apagado só
     // confundiria.
     const temZonas  = (snap.zonas || []).length > 1;
-    const moveUsed  = !!eco.movimento_usado;
+    // Disparada de bônus (Ação Ardilosa) devolve movimento: com zona extra
+    // sobrando, o movimento não está gasto.
+    const moveExtra = Number(eco.movimento_extra || 0);
+    const moveUsed  = !!eco.movimento_usado && moveExtra <= 0;
+    // Ataque Extra: golpes da mesma ação Atacar que ainda faltam.
+    const golpes    = Number(eco.ataques_restantes || 0);
     promptEl.innerHTML =
       slot('Ação', acaoUsed, acaoUsed ? 'Ação já usada neste turno' : 'Ação disponível')
       + slot('Bônus', bonusUsed, bonusUsed ? 'Ação bônus já usada neste turno' : 'Ação bônus disponível')
@@ -484,17 +489,20 @@
     const actorEsc = jsNome(cur.name);
     const acaoDis  = (acaoUsed || _busy) ? 'disabled' : '';
 
-    const hasAcaoAbil  = (cur.habilidades || []).some(h => h.tipo_acao !== 'bonus');
+    const hasAcaoAbil  = (cur.habilidades || []).some(h => h.tipo_acao === 'acao');
     const hasBonusAbil = (cur.habilidades || []).some(h => h.tipo_acao === 'bonus');
+    const hasLivreAbil = (cur.habilidades || []).some(h => h.tipo_acao === 'livre');
     // Item sem efeito conhecido aparece na lista, mas não conta como opção.
     const itensUsaveis = (cur.itens_combate || []).filter(i => i.usavel !== false);
     const hasAcaoItem  = itensUsaveis.some(i => i.tipo_acao !== 'bonus');
     const hasBonusItem = itensUsaveis.some(i => i.tipo_acao === 'bonus');
-    const habUsable  = (hasAcaoAbil && !acaoUsed) || (hasBonusAbil && !bonusUsed);
+    const habUsable  = (hasAcaoAbil && !acaoUsed) || (hasBonusAbil && !bonusUsed) || hasLivreAbil;
     const itemUsable = (hasAcaoItem && !acaoUsed) || (hasBonusItem && !bonusUsed);
+    const atkDis = ((acaoUsed && golpes <= 0) || _busy) ? 'disabled' : '';
 
     const botoes = [
-      `<button class="cbt-btn" ${acaoDis} onclick="window.Combat._sel('attack')">Atacar</button>`,
+      `<button class="cbt-btn" ${atkDis} onclick="window.Combat._sel('attack')">Atacar${
+        golpes > 0 ? ` <small>· mais ${golpes}</small>` : ''}</button>`,
     ];
     if ((cur.habilidades || []).length) {
       const d = (habUsable && !_busy) ? '' : 'disabled';
@@ -563,7 +571,10 @@
     _pick = Object.assign({ kind }, opts || {});
     const cur = (snap.combatants || []).find(c => c.is_current);
     const h   = _pick.hab || null;
-    const apoio = !!(h && MIRA_ALIADO.includes(h.rotulo));
+    // A ação de classe e a magia de efeito dizem quem miram (alvo_modo):
+    // Inspiração de Bardo num aliado, Marca do Caçador num inimigo.
+    const apoio = !!(h && (h.alvo_modo === 'aliado'
+      || (h.alvo_modo !== 'inimigo' && MIRA_ALIADO.includes(h.rotulo))));
     let live = (snap.combatants || []).filter(c =>
       !isOut(c.status) && (apoio || c.name !== (cur && cur.name)));
     // O lado que a habilidade costuma mirar vem primeiro.
@@ -806,10 +817,20 @@
   function travaDaHabilidade(h, cur, eco) {
     if (h.usos_max != null && h.usos <= 0) return 'sem usos até o descanso';
     if ((h.custo_mana || 0) > (cur.mp || 0)) return `mana insuficiente (${cur.mp || 0}/${h.custo_mana})`;
-    if (h.tipo_acao === 'bonus' ? eco.bonus_usada : eco.acao_usada)
-      return h.tipo_acao === 'bonus' ? 'ação bônus já usada' : 'ação já usada';
+    if (h.tipo_acao === 'bonus' && eco.bonus_usada) return 'ação bônus já usada';
+    if (h.tipo_acao === 'acao' && eco.acao_usada) return 'ação já usada';
+    // Sacerdote de Guerra, Rajada de Golpes: só depois da ação Atacar.
+    if (h.exige_ataque && !eco.atacou) return 'ataque primeiro (ação Atacar)';
     return '';
   }
+
+  // O que acontece quando se usa, em uma linha (rpg/resolucao.py). É a
+  // resposta para "isso faz alguma coisa no combate?" antes de gastar o turno.
+  const SELO_DA_RESOLUCAO = {
+    efeito: ['efeito', 'o motor aplica o efeito nos ataques, na CA ou nas salvaguardas'],
+    acao_de_classe: ['regra de classe', 'o motor resolve pela regra da classe'],
+    narrativa: ['o Mestre decide', 'sem regra no motor: você descreve, o Mestre narra o efeito'],
+  };
 
   function cartaoDeHabilidade(h, i, cur, eco) {
     const cor    = COR_DO_EFEITO[h.rotulo] || 'util';
@@ -833,18 +854,25 @@
       h.reacao ? ['Uso', 'reação'] : null,
     ].filter(Boolean).map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join('');
     const nome = h.nome_exibido || h.nome;
-    return `<div class="cbt-hab cbt-ef-${cor}${trava ? ' cbt-hab-travada' : ''}">
+    const selo = SELO_DA_RESOLUCAO[h.resolucao];
+    const comoResolve = h.resolucao_texto && h.resolucao !== 'motor'
+      ? `<span class="cbt-hab-como cbt-como-${esc(h.resolucao)}">${esc(h.resolucao_texto)}</span>`
+      : (h.resolucao_texto ? `<span class="cbt-hab-como">${esc(h.resolucao_texto)}</span>` : '');
+    return `<div class="cbt-hab cbt-ef-${cor}${trava ? ' cbt-hab-travada' : ''}${
+      h.resolucao === 'narrativa' ? ' cbt-hab-narrativa' : ''}" data-resolucao="${esc(h.resolucao || 'motor')}">
       <div class="cbt-hab-cabeca">
       <button class="cbt-btn cbt-hab-usar" ${trava || _busy ? 'disabled' : ''}
               onclick="window.Combat._usarHab(${i})">
         <span class="cbt-hab-topo">
           <span class="cbt-hab-nome">${esc(nome)}</span>
           ${h.reacao ? '<em class="cbt-eco-tag eco-reacao" title="No jogo de mesa é uma reação, usada fora do seu turno">reação</em>' : ''}
+          ${selo ? `<em class="cbt-eco-tag cbt-selo-${esc(h.resolucao)}" title="${esc(selo[1])}">${esc(selo[0])}</em>` : ''}
         </span>
         <span class="cbt-hab-linha">
           <span class="cbt-hab-efeito">${esc(h.rotulo || 'Utilidade')}</span>
           <span class="cbt-hab-resumo">${esc(resto || h.dado || '')}</span>
         </span>
+        ${comoResolve}
         <span class="cbt-hab-pe">
           <span class="cbt-hab-custo">${esc(custo)}</span>${fogoAmigo}
           ${trava ? `<span class="cbt-hab-trava">${esc(trava)}</span>` : ''}
@@ -866,11 +894,11 @@
     _habs = (cur && cur.habilidades) || [];
     // Agrupadas pelo que gastam: o jogador procura "o que ainda posso fazer
     // com a ação bônus", não a ordem em que a ficha listou.
-    const grupos = [['acao', 'Ação'], ['bonus', 'Ação bônus']];
+    const grupos = [['acao', 'Ação'], ['bonus', 'Ação bônus'], ['livre', 'Sem custo de ação']];
     const html = grupos.map(([slot, titulo]) => {
       const itens = _habs
         .map((h, i) => [h, i])
-        .filter(([h]) => (h.tipo_acao === 'bonus' ? 'bonus' : 'acao') === slot);
+        .filter(([h]) => (['bonus', 'livre'].includes(h.tipo_acao) ? h.tipo_acao : 'acao') === slot);
       if (!itens.length) return '';
       return `<div class="cbt-hab-grupo"><div class="cbt-hab-grupo-titulo">${titulo}</div>`
         + `<div class="cbt-hab-lista">${itens.map(([h, i]) => cartaoDeHabilidade(h, i, cur, eco)).join('')}</div></div>`;
@@ -932,12 +960,15 @@
       const zonas = snap.zonas || [];
       const aqui  = (cur && cur.zona) || '';
       const i     = zonas.indexOf(aqui);
-      // Uma zona e movimento comum; duas exigem a Disparada, que custa a
-      // Acao: por isso essas somem quando a Acao ja foi gasta.
+      // O movimento do turno alcança uma zona, mais as da Disparada de
+      // bônus (Ação Ardilosa). Uma zona além disso exige a Disparada de
+      // Ação — essas somem quando a Ação já foi gasta.
+      const livres = (eco.movimento_usado ? 0 : 1) + Number(eco.movimento_extra || 0);
       const opcoes = zonas
         .map((z, j) => ({ z, passos: i < 0 ? 1 : Math.abs(j - i) }))
-        .filter(o => o.passos >= 1 && o.passos <= 2)
-        .filter(o => o.passos === 1 || !eco.acao_usada);
+        .filter(o => o.passos >= 1
+                  && (o.passos <= livres || (o.passos === livres + 1 && !eco.acao_usada)))
+        .map(o => Object.assign(o, { dash: o.passos > livres }));
       if (!opcoes.length) {
         if (window.showToast) window.showToast('Nenhuma zona ao alcance.');
         return;
@@ -946,7 +977,7 @@
         `<div class="cbt-tgt-title">Mover para${aqui ? ' (de ' + esc(aqui) + ')' : ''}:</div>`
         + `<div class="cbt-picker-btns">`
         + opcoes.map(o => {
-            const dash = o.passos === 2;
+            const dash = o.dash;
             // Avisa quem espera la: entrar numa zona ocupada tranca o
             // combatente, e sair depois provoca ataque de oportunidade.
             const ocupada = (snap.combatants || [])
@@ -1061,12 +1092,49 @@
     if (h) _selHab(h.nome, h.target_mode || 'single');
   }
 
+  // Ação de classe com escolha (Ação Ardilosa: disparada, desengajar,
+  // esconder). A escolha viaja em `weapon`, como a Disparada do movimento.
+  function seletorDeModos(cur, h) {
+    _pick = { kind: 'modo', ability: h.nome, hab: h };
+    abrirSeletor(
+      `<div class="cbt-tgt-title">${esc(h.nome_exibido || h.nome)}:</div>`
+      + `<div class="cbt-picker-btns cbt-modos">`
+      + (h.modos || []).map(m =>
+          `<button class="cbt-btn cbt-modo" onclick="window.Combat._modo('${jsNome(m.id)}')">`
+          + `${esc(m.texto.split(':')[0])}<small>${esc(m.texto.includes(':') ? ':' + m.texto.split(':').slice(1).join(':') : '')}</small></button>`
+        ).join('')
+      + BOTAO_CANCELAR
+      + `</div>`, false);
+  }
+
+  function _modo(id) {
+    if (_busy || !_pick || _pick.kind !== 'modo') return;
+    const cur = (_last.combatants || []).find(c => c.is_current);
+    if (!cur) return;
+    act({ action: 'ability', actor: cur.name, ability: _pick.ability, target: '', weapon: id });
+  }
+
   function _selHab(name, mode) {
     if (_busy) return;
     const cur = (_last && _last.combatants || []).find(c => c.is_current);
     if (!cur) return;
     const h = (cur.habilidades || []).find(x => x.nome === name) || { nome: name };
-    if (mode === 'self') {
+    // Sem regra no motor (Taumaturgia, Luz): o jogador diz o que quer, o
+    // Mestre arbitra. Antes gastava a Ação e o motor respondia "usa X no
+    // Orc!" sem efeito nenhum.
+    if (h.resolucao === 'narrativa') {
+      _free(h);
+      return;
+    }
+    if ((h.modos || []).length) {
+      seletorDeModos(cur, h);
+      return;
+    }
+    if (h.alvo_modo === 'nenhum') {
+      act({ action: 'ability', actor: cur.name, ability: name, target: '' });
+      return;
+    }
+    if (mode === 'self' || h.alvo_modo === 'si') {
       act({ action: 'ability', actor: cur.name, ability: name, target: cur.name });
       return;
     }
@@ -1191,22 +1259,40 @@
   // perdia o campo de batalha de vista para pedir uma manobra que o motor
   // não tem botão. Agora o pedido e a arbitragem acontecem aqui dentro; o
   // chat continua recebendo os dois, que é onde a crônica mora.
-  function _free() {
+  //
+  // Habilidade sem regra no motor (Taumaturgia, Luz) entra por aqui também:
+  // o pedido já vem com o nome dela, e enviar gasta a habilidade no motor (a
+  // Ação, a mana, o uso) antes de o Mestre narrar o efeito.
+  let _livreHab = null;
+
+  function _free(hab) {
     if (_busy) return;
     _cancel();
     const el = document.getElementById('cbt-livre');
     if (!el) return;
+    _livreHab = (hab && hab.nome) ? hab : null;
+    const nome = _livreHab ? (_livreHab.nome_exibido || _livreHab.nome) : '';
+    const gasta = _livreHab ? [
+      _livreHab.tipo_acao === 'bonus' ? 'a ação bônus' : (_livreHab.tipo_acao === 'livre' ? '' : 'a Ação'),
+      _livreHab.custo_mana ? `${_livreHab.custo_mana} de mana` : '',
+      _livreHab.usos_max != null ? 'um uso' : '',
+    ].filter(Boolean).join(', ') : '';
     el.classList.remove('hidden');
     el.innerHTML =
-      '<div class="cbt-picker-title">Ação livre — o Mestre arbitra:</div>' +
+      (_livreHab
+        ? `<div class="cbt-picker-title">${esc(nome)} — o Mestre decide o efeito:</div>`
+          + `<div class="cbt-livre-nota">O motor não tem regra para ${esc(nome)}. Diga o que você quer que aconteça`
+          + `${gasta ? `; enviar gasta ${esc(gasta)}` : ''}.</div>`
+        : '<div class="cbt-picker-title">Ação livre — o Mestre arbitra:</div>') +
       '<textarea id="cbt-livre-texto" class="cbt-livre-texto" rows="2" ' +
       'placeholder="Ex.: empurro a mesa contra o goblin e salto por cima"></textarea>' +
       '<div class="cbt-livre-botoes">' +
       '<button class="cbt-btn" onclick="window.Combat._livreFechar()">Cancelar</button>' +
       '<button class="cbt-btn cbt-primary" id="cbt-livre-enviar" ' +
-      'onclick="window.Combat._livreEnviar()">Pedir ao Mestre</button></div>' +
+      `onclick="window.Combat._livreEnviar()">${_livreHab ? 'Usar e pedir ao Mestre' : 'Pedir ao Mestre'}</button></div>` +
       '<div id="cbt-livre-resposta" class="cbt-livre-resposta hidden"></div>';
     const ta = document.getElementById('cbt-livre-texto');
+    if (_livreHab) ta.value = `Uso ${nome}: `;
     ta.addEventListener('keydown', ev => {
       // Enter envia; Shift+Enter quebra linha, como no chat.
       if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); _livreEnviar(); }
@@ -1219,6 +1305,7 @@
   function _livreFechar() {
     const el = document.getElementById('cbt-livre');
     if (el) { el.classList.add('hidden'); el.innerHTML = ''; }
+    _livreHab = null;
     acompanharAlturaDaBarra();
   }
 
@@ -1239,6 +1326,21 @@
 
     let ouviu = false;
     try {
+      // Habilidade narrativa: primeiro o motor gasta o que ela custa (e
+      // recusa se não puder: mana, usos, ação já usada). Só então o Mestre.
+      if (_livreHab) {
+        const cur = ((_last || {}).combatants || []).find(c => c.is_current);
+        const res = await doAction({ action: 'ability', actor: cur ? cur.name : '',
+                                     ability: _livreHab.nome, target: '' });
+        if (!res || !res.ok) {
+          const motivo = String((res && res.message) || 'Não foi possível usar a habilidade.')
+            .split('\n')[0].replace(/\*\*/g, '');
+          resp.textContent = motivo;
+          return;
+        }
+        if (res.snapshot) _last = res.snapshot;
+        _livreHab = null;
+      }
       if (typeof window.appendUser === 'function') window.appendUser(texto);
       await window.sendToAgent(texto, true, '', fala => {
         ouviu = true;
@@ -1296,7 +1398,7 @@
   // ---- API pública -------------------------------------------------
   window.Combat = {
     sync,
-    _sel, _selHab, _usarHab, _info, _selWeapon, _selItem, _target, _mover, _cancel, _free,
+    _sel, _selHab, _usarHab, _modo, _info, _selWeapon, _selItem, _target, _mover, _cancel, _free,
     _confirmarArea,
     _livreEnviar, _livreFechar,
     _act: act,

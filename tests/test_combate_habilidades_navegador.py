@@ -180,6 +180,39 @@ def test_detalhes_mostra_a_descricao_no_toque(celular):
     assert not erros, erros[:3]
 
 
+def test_o_cartao_diz_o_que_acontece_ao_usar(celular):
+    """
+    "Isso faz alguma coisa no combate?" — a pergunta sobre a Taumaturgia. A
+    resposta aparece no cartão, antes de gastar o turno.
+    """
+    pg, erros = celular()
+    pg.click("#cbt-buttons button:has-text('Habilidade')")
+    taumaturgia = _cartao(pg, "Taumaturgia")
+    assert taumaturgia.get_attribute("data-resolucao") == "narrativa"
+    assert "o Mestre decide" in taumaturgia.inner_text()
+    bencao = _cartao(pg, "Bênção")
+    assert bencao.get_attribute("data-resolucao") == "efeito"
+    assert "O motor aplica" in bencao.inner_text()
+    # Sacerdote de Guerra: só depois de atacar, e o cartão diz por quê.
+    sacerdote = _cartao(pg, "Sacerdote de Guerra")
+    assert "ataque primeiro" in sacerdote.inner_text()
+    assert sacerdote.locator(".cbt-hab-usar").is_disabled()
+    assert not erros, erros[:3]
+
+
+def test_habilidade_narrativa_abre_o_pedido_ao_mestre(celular):
+    pg, erros = celular()
+    pg.click("#cbt-buttons button:has-text('Habilidade')")
+    _cartao(pg, "Taumaturgia").locator(".cbt-hab-usar").click()
+    pg.wait_for_selector("#cbt-livre:not(.hidden) #cbt-livre-texto")
+    assert pg.input_value("#cbt-livre-texto").startswith("Uso Taumaturgia")
+    assert "Usar e pedir ao Mestre" in pg.inner_text("#cbt-livre-enviar")
+    assert "o Mestre decide" in pg.inner_text("#cbt-livre")
+    # Abrir o pedido não gasta nada: a Ação continua livre até enviar.
+    assert pg.is_enabled("#cbt-buttons button:has-text('Atacar')")
+    assert not erros, erros[:3]
+
+
 # ---------------------------------------------------------------------------
 # 3. Fogo amigo: regra do jogo, nunca sem aviso
 # ---------------------------------------------------------------------------

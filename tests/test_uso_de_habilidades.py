@@ -94,7 +94,10 @@ def test_sem_dado_a_linha_do_dado_nem_aparece(mesa):
     _habilidades("Sonael", _hab("Mage Armor"))
     saida = td.use_ability("Sonael", "Mage Armor", "Helena", end_turn=False)
     assert "d6:" not in saida and "d6: [" not in saida
-    assert "sem mudança na vida" in saida
+    # A Armadura Arcana deixou de ser "sem mudança na vida" e nada mais: ela
+    # vira CA (rpg/resolucao.py). A vida continua intacta.
+    efeitos = [e["nome"] for e in mesa["characters"]["helena"]["sheet"].get("efeitos", [])]
+    assert "Armadura Arcana" in efeitos, saida
 
 
 def test_o_parse_ainda_cai_em_1d6_de_proposito(mesa):
@@ -112,8 +115,12 @@ def test_bencao_nao_machuca_quem_recebe(mesa):
     antes = _vida("Helena")
     saida = td.use_ability("Sonael", "Bless", "Helena", end_turn=False)
     assert _vida("Helena") == antes
-    assert "bônus" in saida          # o dado é rolado e mostrado
     assert "1d4" in saida
+    # O 1d4 não é mais rolado na hora e jogado fora: vira efeito que os
+    # ataques e as salvaguardas de Helena somam.
+    bencao = [e for e in mesa["characters"]["helena"]["sheet"].get("efeitos", [])
+              if e.get("nome") == "Bênção"]
+    assert bencao and bencao[0]["atk_dado"] == "1d4", saida
 
 
 def test_o_tipo_do_dado(mesa):
@@ -154,8 +161,10 @@ def test_cura_lida_em_ingles():
     assert td.dado_de_cura_no_texto(SRD["Cure Wounds"]) == "1d8"
 
 
-def test_inflict_wounds_causa_o_dano_do_srd(mesa):
+def test_inflict_wounds_causa_o_dano_do_srd(mesa, monkeypatch):
     _habilidades("Sonael", _hab("Inflict Wounds"))
+    # Agora é ataque mágico de verdade e pode errar: o d20 fica fixo em 15.
+    monkeypatch.setattr(td, "_roll_d20_with_adv", lambda a, d: (15, "d20=15"))
     antes = _vida("Goblin")
     td.use_ability("Sonael", "Inflict Wounds", "Goblin", end_turn=False)
     assert antes - _vida("Goblin") >= 3        # 3d10, nunca 1d6 de 1

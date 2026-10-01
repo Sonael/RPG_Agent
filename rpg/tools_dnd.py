@@ -250,6 +250,9 @@ def _normalize_for_new_combat(char: dict) -> None:
     hp = int(sh.get("vida_atual", 0) or 0)
     if st == "dormindo" or (hp > 0 and st in ("inconsciente", "estabilizado")):
         char["status"] = "vivo" if memory.is_party_member(char) else "inimigo"
+    # A Reação é marcada pelo NÚMERO da rodada. Quem reagiu na rodada 1 da
+    # luta anterior entrava na rodada 1 da seguinte já sem Reação.
+    sh.pop("reacao_rodada", None)
     conds = sh.get("condicoes")
     if isinstance(conds, list):
         sh["condicoes"] = [
@@ -293,6 +296,9 @@ def _fim_do_turno(nome: str, token: int) -> list[str]:
     ch = memory.campaign.get("characters", {}).get(memory.char_key(nome or ""))
     if not ch:
         return []
+    # Efeitos que duram "até o fim do próximo turno" de quem os sofre
+    # (Zombaria Viciosa) acabam aqui.
+    _expirar_efeitos(memory.char_key(nome or ""), "fim")
     s = ch.get("sheet") or {}
     conds = s.get("condicoes")
     if not isinstance(conds, list) or not conds:
@@ -2403,9 +2409,12 @@ def _rolar_salvaguarda(alvo: dict, atributo: str, cd: int) -> tuple[bool, str]:
     if atributo in CLASS_DATA.get(classe, {}).get("saves", []):
         mod += int(s.get("proficiencia", 2) or 2)
     d20 = random.randint(1, 20)
-    total = d20 + mod
+    # Bênção, Perdição, Resistência: o dado do efeito entra na conta.
+    extra, nota = _bonus_de_salvaguarda(alvo)
+    total = d20 + mod + extra
     sigla = _ATRIBUTO_SIGLA.get(atributo, atributo[:3].upper())
-    return total >= cd, f"salvaguarda de {sigla}: {d20}{mod:+d} = {total} vs CD {cd}"
+    extra_txt = f" {extra:+d} ({nota})" if nota else ""
+    return total >= cd, f"salvaguarda de {sigla}: {d20}{mod:+d}{extra_txt} = {total} vs CD {cd}"
 
 
 # ---------------------------------------------------------------------------
@@ -2652,13 +2661,25 @@ def _usos_de_furia(nivel: int) -> int:
     return 2
 
 
-# nome normalizado → (qual descanso devolve, quantos usos por nível)
+def _mod_da_ficha(s: dict, atributo: str) -> int:
+    return _modifier(int((s or {}).get(atributo, 10) or 10))
+
+
+# nome normalizado → (qual descanso devolve, quantos usos pelo nível e ficha)
 _USOS_POR_DESCANSO = {
-    "segunda folego":      ("curto", lambda n: 1),
-    "surto de acao":       ("curto", lambda n: 2 if n >= 17 else 1),
-    "canalizar divindade": ("curto", lambda n: 3 if n >= 18 else (2 if n >= 6 else 1)),
-    "furia":               ("longo", _usos_de_furia),
-    "furia implacavel":    ("longo", lambda n: 1),
+    "segunda folego":      ("curto", lambda n, s: 1),
+    "surto de acao":       ("curto", lambda n, s: 2 if n >= 17 else 1),
+    "canalizar divindade": ("curto", lambda n, s: 3 if n >= 18 else (2 if n >= 6 else 1)),
+    "furia":               ("longo", lambda n, s: _usos_de_furia(n)),
+    "furia implacavel":    ("longo", lambda n, s: 1),
+    # O texto da ficha dizia "Usos = mod. SAB por descanso longo" e nada
+    # contava: o clérigo de guerra atacava de bônus todo turno.
+    "sacerdote de guerra": ("longo", lambda n, s: max(1, _mod_da_ficha(s, "sabedoria"))),
+    "inspiracao de bardo": ("longo", lambda n, s: max(1, _mod_da_ficha(s, "carisma"))),
+    # Pontos de ki: um por nível de monge, a partir do 2º.
+    "ki":                  ("curto", lambda n, s: n if n >= 2 else 0),
+    # Reserva de cura, não usos: 5 × nível; a Cura pelas Mãos gasta o que cura.
+    "cura pelas maos":     ("longo", lambda n, s: 5 * n),
 }
 
 
@@ -2666,12 +2687,21 @@ def _chave_de_uso(nome: str) -> str:
     """
     A chave da tabela. "Canalizar Divindade (Arma Sagrada)" e "Canalizar
     Divindade (Preservar Vida)" são efeitos DIFERENTES do MESMO recurso — o
-    paladino não ganha um uso a mais por conhecer dois efeitos.
+    paladino não ganha um uso a mais por conhecer dois efeitos. Rajada de
+    Golpes, Defesa Paciente e Passo do Vento gastam o mesmo ki.
     """
     n = _norm_txt(nome or "")
     if n.startswith("canalizar divindade"):
         return "canalizar divindade"
-    return n if n in _USOS_POR_DESCANSO else ""
+    if n in _USOS_POR_DESCANSO:
+        return n
+    from rpg import resolucao
+    chave, acao = resolucao.acao_de_classe(nome)
+    if acao:
+        uso = acao.get("uso") or chave
+        if uso in _USOS_POR_DESCANSO:
+            return uso
+    return ""
 
 
 def usos_maximos(char: dict, nome: str) -> int | None:
@@ -2686,7 +2716,7 @@ def usos_maximos(char: dict, nome: str) -> int | None:
     # 2 a partir do 6 para os dois. Achado ao gerar o compêndio do SRD.
     if chave == "canalizar divindade" and _norm_txt(s.get("classe", "")) == "paladino":
         return 1
-    return _USOS_POR_DESCANSO[chave][1](nivel)
+    return _USOS_POR_DESCANSO[chave][1](nivel, s)
 
 
 def usos_restantes(char: dict, nome: str) -> int | None:
@@ -2957,6 +2987,9 @@ CONDITION_EFFECTS: dict[str, dict] = {
     "paralisado":  {"attack_disadvantage": True, "auto_crit": True},
     "atordoado":   {"attack_disadvantage": True, "defense_disadvantage": True},
     "invisível":   {"attack_advantage": True},
+    # Ação Ardilosa (Esconder): o primeiro ataque sai com vantagem e revela
+    # quem estava escondido (attack_roll tira a condição).
+    "escondido":   {"attack_advantage": True},
     "enfeitiçado": {},
     "agarrado":    {},
     "incapacitado":{"attack_disadvantage": True},
@@ -3190,10 +3223,11 @@ def _traits_lookup(sheet: dict, campo: str) -> list[dict]:
         base = _parse_damage_traits(bruto)
     if campo == "resistencias":
         # Poção de Resistência: vale enquanto o efeito estiver na ficha.
-        extra = [{"tipos": [e["resistencia"]], "requer_magica": False,
-                  "origem": e.get("origem", "")}
+        # Fúria e Pele de Pedra: vários tipos de uma vez (`resistencias`).
+        extra = [{"tipos": [e["resistencia"]] if e.get("resistencia") else list(e["resistencias"]),
+                  "requer_magica": False, "origem": e.get("origem", e.get("nome", ""))}
                  for e in _efeitos(sheet or {})
-                 if e.get("resistencia")]
+                 if e.get("resistencia") or e.get("resistencias")]
         if extra:
             return list(base) + extra
     return base
@@ -3786,7 +3820,8 @@ def describe_battlefield() -> str:
     return "\n".join(linhas)
 
 
-def move_combatant(name: str, zone: str, dash: bool = False) -> str:
+def move_combatant(name: str, zone: str, dash: bool = False,
+                   sem_oportunidade: bool = False) -> str:
     """
     Move um combatente para outra zona.
 
@@ -3839,10 +3874,13 @@ def move_combatant(name: str, zone: str, dash: bool = False) -> str:
         return (f"Erro: **{destino}** está a {passos} zonas de **{origem}**. "
                 f"O movimento alcança {maximo}{extra}.")
 
-    # O bote de quem fica: só dispara se havia inimigo trancando a origem.
+    # O bote de quem fica: só dispara se havia inimigo trancando a origem —
+    # e não para quem desengajou (Ação Ardilosa, Passo do Vento).
     oportunidade = ""
-    if _inimigos_na_zona(nome_real, origem):
+    if _inimigos_na_zona(nome_real, origem) and not sem_oportunidade:
         oportunidade = _provoke_opportunity_attacks(nome_real, "sair da zona")
+    elif _inimigos_na_zona(nome_real, origem):
+        oportunidade = "\n   Desengajou: sai sem provocar ataque de oportunidade."
 
     # Um ataque de oportunidade pode ter derrubado quem estava saindo.
     if int((ch.get("sheet") or {}).get("vida_atual", 0) or 0) <= 0:
@@ -6231,6 +6269,17 @@ def attack_roll(
     # ── Crítico Aprimorado / Superior (Campeão) ─────────────────────────────
     crit_min = _crit_threshold(attacker)
 
+    # ── Efeitos de combate (Bênção, Esquiva, Fúria, Marca do Caçador…) ──────
+    # Antes eles eram texto: a Bênção rolava 1d4 na hora de conjurar e o
+    # número não ia para ataque nenhum; a Esquiva não impunha desvantagem.
+    _corpo_for = (not is_ranged) and attack_attribute.lower() == "forca"
+    _mods = _mods_de_ataque(attacker, target, _corpo_for)
+    if _mods["vantagem"]:
+        advantage = True
+    if _mods["desvantagem"]:
+        disadvantage = True
+    cond_notes.extend(_mods["notas"])
+
     # ── A arma existe? Tem munição? É mágica? Carrega algo? ─────────────────
     _mag = _bonus_magico_da_arma(attacker, weapon)
     _rider = efeito_extra_da_arma(attacker, weapon)
@@ -6241,8 +6290,19 @@ def attack_roll(
 
     # ── Rolagem do ataque ───────────────────────────────────────────────────
     d20, roll_log = _roll_d20_with_adv(advantage, disadvantage)
-    attack_total  = d20 + mod + prof + style_atk_bonus + _mag
-    target_ca     = st["ca"]
+    attack_total  = d20 + mod + prof + style_atk_bonus + _mag + _mods["bonus"]
+    # CA com os efeitos do alvo (Escudo da Fé, Pele de Árvore).
+    target_ca     = _ca_efetiva(target)
+    # Uso único (Guiar Ataque, o Raio Guia que marcou o alvo) acaba neste golpe.
+    for _sh_e, _e in _mods["gastar"]:
+        _gastar_efeito(_sh_e, _e)
+    # Escondido: atacar revela quem estava escondido.
+    _conds_atk = sa.get("condicoes") or []
+    if any(_norm_txt(c.get("nome", "") if isinstance(c, dict) else str(c)) == "escondido"
+           for c in _conds_atk):
+        sa["condicoes"] = [c for c in _conds_atk
+                           if _norm_txt(c.get("nome", "") if isinstance(c, dict) else str(c)) != "escondido"]
+        cond_notes.append(f"{attacker['name']} sai do esconderijo ao atacar")
     critico       = force_crit or (d20 >= crit_min)
     falha_critica = (not force_crit) and (d20 == 1)
     if critico and crit_min < 20 and not force_crit and d20 < 20:
@@ -6259,7 +6319,8 @@ def attack_roll(
             result += f"   {_nota}\n"
     _atk_style_str = f" +{style_atk_bonus}(estilo)" if style_atk_bonus else ""
     _atk_mag_str = f" +{_mag}(mágica)" if _mag else ""
-    result += (f"   {roll_log} +{mod}(mod) +{prof}(prof){_atk_style_str}{_atk_mag_str} "
+    _atk_efeito_str = f" {_mods['bonus']:+d}(efeitos)" if _mods["bonus"] else ""
+    result += (f"   {roll_log} +{mod}(mod) +{prof}(prof){_atk_style_str}{_atk_mag_str}{_atk_efeito_str} "
                f"= **{attack_total}** vs CA {target_ca}\n")
 
     if falha_critica:
@@ -6269,6 +6330,7 @@ def attack_roll(
                                f"d20=1 → ERRO CRÍTICO"),
                           weapon=weapon, d20=1, atk_total=attack_total,
                           ca=target_ca)
+        _marcar_que_atacou(attacker)
         if end_turn:
             result += _auto_advance_turn(attacker_name)
         memory.save_campaign()
@@ -6351,6 +6413,21 @@ def attack_roll(
             if _rider.get("nota"):
                 result += f"   ({_rider['nota']})\n"
 
+        # Ataque Furtivo: uma vez por turno, com o tipo da arma.
+        _furtivo_d, _furtivo_motivo = _ataque_furtivo(attacker, target, weapon, advantage,
+                                                      disadvantage, is_ranged)
+        if _furtivo_d:
+            _fr = [random.randint(1, 6) for _ in range(_furtivo_d * (2 if critico else 1))]
+            _componentes.append((sum(_fr), dmg_type))
+            sa["_furtivo_token"] = (memory.campaign.get("combat_state") or {}).get("turn_token")
+            result += (f"   Ataque Furtivo ({_furtivo_motivo}): {len(_fr)}d6 "
+                       f"[{' + '.join(map(str, _fr))}] = {sum(_fr)}\n")
+
+        # Efeitos de quem ataca: Marca do Caçador, Favor Divino, Fúria.
+        for _x in _dano_de_efeitos(attacker, target, _corpo_for, critico):
+            _componentes.append((_x["valor"], _x["tipo"] or dmg_type))
+            result += f"   {_x['texto']}\n"
+
         _res = _apply_damage(target, components=_componentes,
                              source_name=attacker["name"],
                              arma_magica=_bypasses_material_resistance(weapon))
@@ -6414,6 +6491,8 @@ def attack_roll(
                                f"vs CA {target_ca} • ERROU"),
                           weapon=weapon, d20=d20, atk_total=attack_total,
                           ca=target_ca)
+
+    _marcar_que_atacou(attacker)
 
     if end_turn:
         result += _auto_advance_turn(attacker_name)
@@ -6491,10 +6570,15 @@ def use_ability(
     saving_throw_dc: int = 0,
     end_turn: bool = True,
     _skip_turn_check: bool = False,
+    modo: str = "",
 ) -> str:
     """
     Usa uma habilidade do personagem: verifica mana, desconta o custo,
     rola o dado de efeito e retorna o resultado para narrar.
+
+    Ações de classe com escolha (Ação Ardilosa: disparada, desengajar ou
+    esconder) recebem a escolha em `modo`. Habilidade sem regra no motor
+    (Taumaturgia, Luz) gasta o que custa e devolve a nota para o Mestre narrar.
     Avança o turno ao final (a menos que end_turn=False para ações bônus).
 
     Saving Throw (opcional): se saving_throw_stat e saving_throw_dc forem fornecidos,
@@ -6543,18 +6627,28 @@ def use_ability(
     # Tradição Arcana, Arquétipo, Aumento de Atributo: são ESCOLHAS de ficha.
     # Usá-las gastava o turno e produzia a linha sem sentido que apareceu na
     # partida ("Sonael usou Tradição Arcana em Mineiro Corrompido 2").
-    if _e_traco_passivo(hab.get("nome", "")) or _e_traco_passivo(ability_name):
+    # Conjuração, Estilo de Combate, Ataque Furtivo: passivas. A tela deixava
+    # "usar" e o Ataque Furtivo rolava 1d6 de dano solto, fora de qualquer
+    # ataque. Agora o motor aplica sozinho onde vale (rpg/resolucao.py).
+    from rpg import resolucao as _resolucao
+    _como = _resolucao.como_resolve(hab, char)
+    if (_e_traco_passivo(hab.get("nome", "")) or _e_traco_passivo(ability_name)
+            or _como["tipo"] == "passiva"):
+        _porque = f" {_como['texto']}" if _como["tipo"] == "passiva" and _como["texto"] else ""
         return (
             f"Erro: '{hab.get('nome', ability_name)}' é um traço da ficha de "
             f"{char['name']}, não uma ação — não se usa em ninguém e não gasta "
-            f"o turno. Ele já vale sozinho; narre o efeito, se houver."
+            f"o turno. Ele já vale sozinho; narre o efeito, se houver.{_porque}"
         )
 
     # ── Coerção de alvo por modo da habilidade ────────────────────────────
     # Self-only (Segunda Fôlego, Fúria, Surto de Ação…) sempre afeta o
     # próprio conjurador, ignorando o que a UI/LLM passou como target.
-    if _is_self_only_ability(hab.get("nome", "")) or _is_self_only_ability(ability_name):
+    if (_is_self_only_ability(hab.get("nome", "")) or _is_self_only_ability(ability_name)
+            or _como.get("alvo") == "si"):
         target_name = char["name"]
+    elif _como.get("alvo") == "nenhum":
+        target_name = ""
 
     # ── Alcance da habilidade ─────────────────────────────────────────────
     # Cone e toque nascem no conjurador: só pegam quem está na zona dele. Só
@@ -6612,6 +6706,13 @@ def use_ability(
                 + "\n   Use outra ação nesta rodada. Nada foi gasto."
             )
 
+    # Ação de classe e magia de efeito conferem o que precisam (a escolha, o
+    # alvo, ter atacado antes) ANTES de gastar mana ou uso.
+    if _como["tipo"] in ("acao_de_classe", "efeito"):
+        _recusa = _resolucao.validar(char, hab, target_name, modo)
+        if _recusa:
+            return _recusa
+
     if custo > 0:
         if s["mana_atual"] < custo:
             return (
@@ -6620,11 +6721,49 @@ def use_ability(
             )
         s["mana_atual"] -= custo
 
-    if _usos_max is not None:
+    # A reserva da Cura pelas Mãos é gasta pelo quanto curou, não por uso.
+    _por_reserva = (_como["tipo"] == "acao_de_classe"
+                    and (_resolucao.ACOES_DE_CLASSE.get(_como.get("chave", "")) or {}).get("pool"))
+    if _usos_max is not None and not _por_reserva:
         _gastar_uso(char, hab["nome"])
 
     if _rec:
         _gastar_recarga(char, _rec)
+
+    # ── Efeito, ação de classe e narrativa: caminho próprio ────────────────
+    # (rpg/resolucao.py). Nenhum deles rola o "dado" da ficha como dano ou
+    # cura: a Bênção vira +1d4 nos ataques, a Ação Ardilosa vira movimento, a
+    # Taumaturgia vira nota para o Mestre.
+    if _como["tipo"] in ("efeito", "acao_de_classe", "narrativa"):
+        _alvo_txt = (f" em {target_name}" if target_name
+                     and memory.char_key(target_name) != memory.char_key(char["name"]) else "")
+        result = (f"{char['name']} usa {hab['nome']}{_alvo_txt}!\n"
+                  f"   Custo: {custo} mana | Mana restante: {s['mana_atual']}/{s['mana_max']}")
+        if _usos_max is not None:
+            _chave_u = _chave_de_uso(hab["nome"])
+            _quando_volta = _USOS_POR_DESCANSO[_chave_u][0]
+            result += (f"\n   {'Reserva' if _por_reserva else 'Usos'}: "
+                       f"{usos_restantes(char, hab['nome'])}/{_usos_max} "
+                       f"(volta no descanso {_quando_volta})")
+        _magia = _resolucao._magia_srd(hab) or {}
+        if _requires_concentration(hab) or _magia.get("concentracao"):
+            result += _start_concentration(char, hab["nome"])
+            result += f"\n   {char['name']} está concentrado em {hab['nome']}."
+        result += _resolucao.executar(char, hab, target_name, modo)
+        _log_combat_event(
+            "ability", char["name"], target_name,
+            msg=(f"{char['name']} usou {hab['nome']}"
+                 + (f" ({modo})" if modo else "")
+                 + (f" em {target_name}" if _alvo_txt else "")
+                 + (" — efeito narrado pelo Mestre" if _como["tipo"] == "narrativa" else "")),
+            ability=hab["nome"], resolucao=_como["tipo"],
+        )
+        memory.save_campaign()
+        # Sem custo de ação (Guiar Ataque, Ataque Imprudente) não encerra turno.
+        if end_turn and _como.get("slot") != "livre":
+            result += _auto_advance_turn(char_name)
+        memory.save_campaign()
+        return result
 
     # O dado só existe se a habilidade tiver um — e só vira ferida se o texto
     # disser que é dano (ver efeito_do_dado). Sem isso, benzer um aliado
@@ -6806,6 +6945,32 @@ def use_ability(
         if target and target.get("sheet"):
             st = target["sheet"]
 
+            # ── MAGIA DE ATAQUE ROLA ACERTO ──────────────────────────────
+            # Raio Guia, Raio de Fogo, Infligir Ferimentos: o SRD manda
+            # rolar ataque mágico contra a CA. O motor aplicava o dano
+            # direto — magia de ataque nunca errava.
+            _tipo_atk = _ataque_da_magia(hab)
+            if (_tipo_atk and _efeito == "dano"
+                    and memory.char_key(target.get("name", "")) != memory.char_key(char["name"])):
+                _acertou, _critico, _linha_atk = _rolar_ataque_magico(char, target, hab)
+                result += _linha_atk
+                if not _acertou:
+                    _log_combat_event(
+                        "ability", char["name"], target["name"],
+                        msg=f"{char['name']} usou {hab['nome']} em {target['name']} • ERROU",
+                        ability=hab["nome"])
+                    memory.save_campaign()
+                    if end_turn:
+                        result += _auto_advance_turn(char_name)
+                    memory.save_campaign()
+                    return result
+                if _critico and sides:
+                    _extra = [random.randint(1, sides) for _ in range(n_dice)]
+                    rolls = list(rolls) + _extra
+                    total_dano += sum(_extra)
+                    detail = " + ".join(str(r) for r in rolls)
+                    result += f"\n   Crítico: dados dobrados [{' + '.join(map(str, _extra))}] → {total_dano}"
+
             # ── A MAGIA TEM TESTE E O MESTRE NÃO PEDIU ───────────────────
             # O SRD diz qual é o teste; quando o alvo é um NPC, o motor rola
             # e resolve na hora. Antes, mestre que esquecia a salvaguarda
@@ -6830,9 +6995,22 @@ def use_ability(
                             memory.save_campaign()
                             return result + (_auto_advance_turn(char_name) if end_turn else "")
                     else:
-                        total_dano = total_dano // 2 if _passou else total_dano
-                        result += (f" — passou: metade do dano ({total_dano})"
+                        # Chama Sagrada, Zombaria Viciosa: quem passa não leva
+                        # NADA. O motor dava metade a toda magia de teste.
+                        _metade = _metade_se_passar(hab)
+                        if _passou:
+                            total_dano = total_dano // 2 if _metade else 0
+                        result += ((f" — passou: metade do dano ({total_dano})" if _metade
+                                    else " — passou: nenhum dano")
                                    if _passou else f" — falhou: dano cheio ({total_dano})")
+                        if _passou and not _metade:
+                            _log_combat_event(
+                                "ability", char["name"], target["name"],
+                                msg=(f"{char['name']} usou {hab['nome']} em {target['name']} "
+                                     f"• {target['name']} passou na salvaguarda"),
+                                ability=hab["nome"])
+                            memory.save_campaign()
+                            return result + (_auto_advance_turn(char_name) if end_turn else "")
 
             # ── MODO INTERATIVO: saving throw → PAUSA, não aplica efeito ──────
             if saving_throw_stat and saving_throw_dc > 0:
@@ -6903,6 +7081,11 @@ def use_ability(
                 result += f"\n   {target['name']}: {hp_antes} → {st['vida_atual']}/{st['vida_max']}"
                 if st["vida_atual"] == 0:
                     result += _mark_at_zero_hp(target, char["name"])
+                else:
+                    # O que a magia deixa no alvo: o Raio Guia marca (o
+                    # próximo ataque tem vantagem), a Zombaria Viciosa abala.
+                    from rpg import resolucao as _resolucao_r
+                    result += _resolucao_r.aplicar_rider(char, hab, target)
 
     # ── Linha do log da habilidade ────────────────────────────────────────
     # Para pool spells (Sleep, Color Spray) o dado representa um POOL de HP,
@@ -11197,6 +11380,12 @@ def roll_initiative(characters_names: str, allies: str = "") -> str:
     cs["result"]             = None   # resultado do combate anterior limpo
     _log_combat_event("combat_start", msg="Combate iniciado",
                       order=[r["name"] for r in results])
+    # A economia do turno também é do combate anterior: sem isto o primeiro
+    # da ordem herdava a "Ação usada" do último turno da luta passada e
+    # começava a luta sem poder atacar (relatado numa partida: "várias vezes
+    # o primeiro personagem na vez fica sem ação"). É também o início do
+    # turno dele: recargas e efeitos de "no início do seu turno" valem.
+    _reset_turn_economy(cs)
 
     memory.save_campaign()
 
@@ -13742,6 +13931,22 @@ _ABILITY_BONUS_PATTERNS = (
 )
 
 
+def _slot_da_habilidade(name: str, hab: dict | None = None, char: dict | None = None) -> str | None:
+    """
+    O que a habilidade gasta da economia do turno: "acao", "bonus" ou None
+    (sem custo de ação — Guiar Ataque, Ataque Imprudente). A ação de classe
+    diz o próprio slot (rpg/resolucao.py); o resto segue _ability_action_type.
+    """
+    if hab is not None:
+        from rpg import resolucao
+        slot = resolucao.como_resolve(hab, char).get("slot")
+        if slot == "livre":
+            return None
+        if slot in ("acao", "bonus"):
+            return slot
+    return "bonus" if _ability_action_type(name, hab) == "bonus" else "acao"
+
+
 def _ability_action_type(name: str, hab: dict | None = None) -> str:
     """
     'bonus' se a habilidade é Ação Bônus pela regra 5e; senão 'acao'.
@@ -13833,7 +14038,9 @@ _ABILITY_SELF_ONLY_PATTERNS = (
     "action surge", "surto de acao",
     "patient defense", "defesa paciente",
     "step of the wind", "passo do vento",
-    "shield of faith",  # cast in self (concentração; alvo único = self)
+    # O Escudo da Fé estava aqui: no SRD ele vai em "uma criatura à sua
+    # escolha". Como era só texto, ninguém notou; agora que ele dá +2 de CA
+    # de verdade, mandá-lo sempre para quem conjura roubava o aliado.
 )
 
 
@@ -13928,6 +14135,9 @@ def _inicio_de_turno(cs: dict) -> None:
     ch = memory.campaign.get("characters", {}).get(memory.char_key(order[idx]))
     if not ch:
         return
+    # A Esquiva, o Ataque Imprudente e o Raio Guia duram "até o seu próximo
+    # turno": acabam aqui, quando ele começa.
+    _expirar_efeitos(memory.char_key(order[idx]), "inicio")
     _rolar_recargas(ch)
     _repor_lendarias(ch)
     cs["_lendarias_msg"] = _gastar_lendarias_dos_chefes(order[idx])
@@ -14251,6 +14461,11 @@ def _efeitos(sheet: dict) -> list[dict]:
     """
     Efeitos ativos. Os de combate valem até end_combat; os bebidos fora dele
     têm prazo no relógio do mundo (`ate_hora`) e somem quando a hora passa.
+
+    Efeito de magia de concentração (`concentracao_de` + `magia`) só vale
+    enquanto quem conjurou continua concentrado NELA: a Bênção cai sozinha
+    quando o clérigo perde a concentração ou conjura outra magia que exige
+    concentração. Não precisa de gancho em cada lugar onde a concentração cai.
     """
     agora = None
     ativos = []
@@ -14261,8 +14476,361 @@ def _efeitos(sheet: dict) -> list[dict]:
             agora = _agora_em_horas() if agora is None else agora
             if int(e["ate_hora"]) <= agora:
                 continue
+        if e.get("concentracao_de") and not _concentracao_segue(e):
+            continue
         ativos.append(e)
     return ativos
+
+
+# ===========================================================================
+# EFEITOS DE COMBATE
+# ---------------------------------------------------------------------------
+# Bênção, Escudo da Fé, Marca do Caçador, Fúria, Esquiva: até aqui o motor
+# rolava o dado da magia, escrevia "sem mudança na vida" e nada mais
+# acontecia — o +1d4 da Bênção nunca entrava num ataque, a Esquiva não impunha
+# desvantagem a ninguém. Agora cada um vira um efeito na ficha, e os pontos que
+# decidem a luta (o ataque, a CA, o dano, a salvaguarda) o consultam.
+#
+# Campos de um efeito (todos opcionais, além de "nome"):
+#   atk_dado "1d4"/"-1d4"     somado a cada ataque de quem tem o efeito
+#   atk_fixo  10              somado ao próximo ataque (Guiar Ataque)
+#   save_dado "1d4"/"-1d4"    somado a cada salvaguarda
+#   teste_dado "1d4"          somado ao próximo teste de atributo
+#   ca 2 / ca_minima 16       CA de quem tem o efeito
+#   dano_dado "1d6", dano_tipo, contra   dano extra nos ataques (contra = só
+#                                        no alvo marcado: Marca do Caçador)
+#   dano_fixo_for 2           dano extra em ataque corpo a corpo de FOR (Fúria)
+#   vantagem_ataque / vantagem_ataque_for / desvantagem_ataque
+#   vantagem_contra_mim / desvantagem_contra_mim   ataques CONTRA quem tem
+#   resistencias [tipos]      resistência enquanto durar
+#   usos 1                    acaba depois de consumido N vezes
+#   ate "fim_do_combate"      limpo por end_combat
+#   ate_turno_de chave        acaba no INÍCIO do próximo turno de `chave`
+#   ate_fim_turno_de chave    acaba no FIM do próximo turno de `chave`
+#   concentracao_de chave + magia   cai com a concentração de quem conjurou
+# ===========================================================================
+
+def _concentracao_segue(e: dict) -> bool:
+    """O conjurador do efeito ainda está concentrado nesta magia?"""
+    conj = memory.campaign.get("characters", {}).get(e.get("concentracao_de") or "")
+    if not conj:
+        return False
+    atual = ((conj.get("sheet") or {}).get("concentracao") or {})
+    return _norm_txt(atual.get("magia", "")) == _norm_txt(e.get("magia", ""))
+
+
+def _efeitos_de(char: dict | None) -> list[dict]:
+    return _efeitos((char or {}).get("sheet") or {}) if char else []
+
+
+def dar_efeito_de_combate(char: dict, efeito: dict) -> None:
+    """Grava um efeito de combate; o mesmo nome de novo só renova."""
+    efeito = dict(efeito)
+    efeito.setdefault("ate", "fim_do_combate")
+    _dar_efeito(char.setdefault("sheet", {}), efeito)
+
+
+def _rolar_expr(expr) -> tuple[int, str]:
+    """'1d4' → (3, '1d4=3'); '-1d4' → (-2, '-1d4=-2'); 5 → (5, '5')."""
+    if isinstance(expr, (int, float)):
+        return int(expr), str(int(expr))
+    texto = str(expr or "").strip()
+    if not texto:
+        return 0, ""
+    sinal = -1 if texto.startswith("-") else 1
+    corpo = texto.lstrip("+-")
+    if "d" not in corpo.lower():
+        # Número puro: _parse_dice o leria como 1d6.
+        try:
+            v = sinal * int(corpo)
+        except ValueError:
+            return 0, ""
+        return v, f"{v:+d}"
+    n, faces, bonus = _parse_dice(corpo)
+    rolls = [random.randint(1, faces) for _ in range(n)]
+    total = sinal * (sum(rolls) + bonus)
+    return total, f"{texto}={total:+d}"
+
+
+def _gastar_efeito(sheet: dict, efeito: dict) -> None:
+    """Consome um uso de efeito de usos contados; some no zero."""
+    if efeito.get("usos") is None:
+        return
+    efeito["usos"] = int(efeito["usos"]) - 1
+    if efeito["usos"] <= 0:
+        sheet["efeitos"] = [e for e in (sheet.get("efeitos") or []) if e is not efeito]
+
+
+def _expirar_efeitos(chave: str, momento: str) -> list[str]:
+    """
+    Tira os efeitos que acabam no início ('inicio') ou no fim ('fim') do turno
+    de `chave` — a Esquiva dura até o próximo turno de quem esquivou, a
+    Zombaria Viciosa até o fim do próximo turno de quem a sofreu.
+    """
+    campo = "ate_turno_de" if momento == "inicio" else "ate_fim_turno_de"
+    acabaram = []
+    for ch in (memory.campaign.get("characters") or {}).values():
+        s = (ch or {}).get("sheet") or {}
+        lista = s.get("efeitos")
+        if not isinstance(lista, list) or not lista:
+            continue
+        ficam = []
+        for e in lista:
+            if isinstance(e, dict) and e.get(campo) == chave:
+                acabaram.append(f"{e.get('nome', 'efeito')} de {ch.get('name', '')}")
+            else:
+                ficam.append(e)
+        if len(ficam) != len(lista):
+            s["efeitos"] = ficam
+    return acabaram
+
+
+def _ca_efetiva(char: dict) -> int:
+    """CA da ficha com os efeitos (Escudo da Fé +2, Pele de Árvore no mínimo 16)."""
+    s = (char or {}).get("sheet") or {}
+    ca = int(s.get("ca", 10) or 10)
+    minima = 0
+    for e in _efeitos(s):
+        ca += int(e.get("ca", 0) or 0)
+        minima = max(minima, int(e.get("ca_minima", 0) or 0))
+    return max(ca, minima)
+
+
+def _mods_de_ataque(atacante: dict, alvo: dict, corpo_for: bool) -> dict:
+    """
+    O que os efeitos fazem com UM ataque de `atacante` em `alvo`:
+    {vantagem, desvantagem, bonus, notas, gastar}. `gastar` são os efeitos de
+    uso único que este ataque consome — só depois de rolar.
+    """
+    r = {"vantagem": False, "desvantagem": False, "bonus": 0, "notas": [], "gastar": []}
+    sa = (atacante or {}).get("sheet") or {}
+    for e in _efeitos(sa):
+        nome = e.get("nome", "efeito")
+        if e.get("atk_dado"):
+            v, txt = _rolar_expr(e["atk_dado"])
+            r["bonus"] += v
+            r["notas"].append(f"{nome}: {txt}")
+            # Inspiração de Bardo: um dado só, no primeiro uso que aparecer.
+            if e.get("usos") is not None:
+                r["gastar"].append((sa, e))
+        if e.get("atk_fixo"):
+            r["bonus"] += int(e["atk_fixo"])
+            r["notas"].append(f"{nome}: {int(e['atk_fixo']):+d}")
+            r["gastar"].append((sa, e))
+        if e.get("vantagem_ataque") or (e.get("vantagem_ataque_for") and corpo_for):
+            r["vantagem"] = True
+            r["notas"].append(f"{nome}: vantagem")
+        if e.get("desvantagem_ataque"):
+            r["desvantagem"] = True
+            r["notas"].append(f"{nome}: desvantagem")
+            if e.get("usos") is not None:
+                r["gastar"].append((sa, e))
+    st = (alvo or {}).get("sheet") or {}
+    for e in _efeitos(st):
+        nome = e.get("nome", "efeito")
+        if e.get("vantagem_contra_mim"):
+            r["vantagem"] = True
+            r["notas"].append(f"{nome} em {alvo.get('name', '')}: vantagem")
+            if e.get("usos") is not None:
+                r["gastar"].append((st, e))
+        if e.get("desvantagem_contra_mim"):
+            r["desvantagem"] = True
+            r["notas"].append(f"{nome} em {alvo.get('name', '')}: desvantagem")
+    return r
+
+
+def _dano_de_efeitos(atacante: dict, alvo: dict, corpo_for: bool, critico: bool) -> list[dict]:
+    """
+    Dano extra que os efeitos somam a um golpe que ACERTOU: [{valor, tipo,
+    texto}]. Dados extras dobram no crítico, como todo dado de dano.
+    """
+    saida = []
+    sa = (atacante or {}).get("sheet") or {}
+    alvo_chave = memory.char_key((alvo or {}).get("name", ""))
+    for e in _efeitos(sa):
+        nome = e.get("nome", "efeito")
+        if e.get("dano_dado") and (not e.get("contra") or e["contra"] == alvo_chave):
+            n, faces, bonus = _parse_dice(str(e["dano_dado"]))
+            rolls = [random.randint(1, faces) for _ in range(n * (2 if critico else 1))]
+            valor = sum(rolls) + bonus
+            saida.append({"valor": valor, "tipo": e.get("dano_tipo", ""),
+                          "texto": f"{nome}: [{' + '.join(map(str, rolls))}] = {valor}"})
+        if e.get("dano_fixo_for") and corpo_for:
+            valor = int(e["dano_fixo_for"])
+            saida.append({"valor": valor, "tipo": "", "texto": f"{nome}: +{valor}"})
+    return saida
+
+
+def _bonus_de_salvaguarda(alvo: dict) -> tuple[int, str]:
+    """Bênção (+1d4), Perdição (-1d4), Resistência (+1d4, uma vez)."""
+    s = (alvo or {}).get("sheet") or {}
+    total, notas = 0, []
+    for e in list(_efeitos(s)):
+        if e.get("save_dado"):
+            v, txt = _rolar_expr(e["save_dado"])
+            total += v
+            notas.append(f"{e.get('nome', 'efeito')} {txt}")
+            _gastar_efeito(s, e)
+    return total, ("; ".join(notas))
+
+
+def _bonus_de_teste(alvo: dict) -> tuple[int, str]:
+    """Orientação: +1d4 no próximo teste de atributo, e acaba."""
+    s = (alvo or {}).get("sheet") or {}
+    total, notas = 0, []
+    for e in list(_efeitos(s)):
+        if e.get("teste_dado"):
+            v, txt = _rolar_expr(e["teste_dado"])
+            total += v
+            notas.append(f"{e.get('nome', 'efeito')} {txt}")
+            _gastar_efeito(s, e)
+    return total, ("; ".join(notas))
+
+
+# ── Ataque Furtivo ─────────────────────────────────────────────────────────
+# O dano que define o ladino não existia no motor: a ficha tinha o texto, o
+# ataque rolava só a arma. Agora, uma vez por turno, com arma de acuidade ou à
+# distância, e com vantagem OU um aliado de pé ao lado do alvo (sem
+# desvantagem), soma 1d6 a cada dois níveis de ladino.
+_ARMAS_DE_ACUIDADE = ("adaga", "dagger", "rapieira", "rapier", "espada curta",
+                      "shortsword", "cimitarra", "scimitar", "chicote", "whip")
+
+
+def _tem_ataque_furtivo(char: dict) -> bool:
+    nomes = {_norm_txt(h.get("nome", "")) for h in (char.get("habilidades") or [])
+             if isinstance(h, dict)}
+    return bool(nomes & {"ataque furtivo", "sneak attack"})
+
+
+def _dados_do_furtivo(char: dict) -> int:
+    nivel = int(((char.get("sheet") or {}).get("nivel", 1)) or 1)
+    return max(1, (nivel + 1) // 2)
+
+
+def _aliado_ao_lado_do_alvo(atacante: dict, alvo: dict) -> bool:
+    """Um aliado de quem ataca, de pé, na zona do alvo (sem zonas: na luta)."""
+    lado = memory.luta_com_o_grupo(atacante)
+    zona_alvo = _zona_de(alvo.get("name", "")) if _zonas_ativas() else ""
+    cs = memory.campaign.get("combat_state") or {}
+    for nm in cs.get("initiative_order") or []:
+        ch = memory.campaign["characters"].get(memory.char_key(nm))
+        if not ch or ch is atacante or ch is alvo:
+            continue
+        if memory.luta_com_o_grupo(ch) != lado:
+            continue
+        if (ch.get("status") or "").lower() in OUT_OF_COMBAT_STATUSES:
+            continue
+        if not zona_alvo or _zona_de(ch.get("name", "")) == zona_alvo:
+            return True
+    return False
+
+
+def _ataque_furtivo(atacante: dict, alvo: dict, arma: str, vantagem: bool,
+                    desvantagem: bool, a_distancia: bool) -> tuple[int, str]:
+    """Quantos d6 de Ataque Furtivo este golpe ganha (0 = nenhum) e por quê."""
+    if not _tem_ataque_furtivo(atacante):
+        return 0, ""
+    arma_n = _norm_txt(arma or "")
+    if not (a_distancia or any(a in arma_n for a in _ARMAS_DE_ACUIDADE)):
+        return 0, ""
+    sa = atacante.get("sheet") or {}
+    cs = memory.campaign.get("combat_state") or {}
+    if cs.get("is_active") and sa.get("_furtivo_token") == cs.get("turn_token"):
+        return 0, ""
+    vale_vantagem = vantagem and not desvantagem
+    if vale_vantagem:
+        return _dados_do_furtivo(atacante), "com vantagem"
+    if not desvantagem and _aliado_ao_lado_do_alvo(atacante, alvo):
+        return _dados_do_furtivo(atacante), "com um aliado ao lado do alvo"
+    return 0, ""
+
+
+def _marcar_que_atacou(atacante: dict) -> None:
+    """
+    Quem está na vez atacou: Sacerdote de Guerra e Rajada de Golpes só valem
+    depois da ação Atacar. Marca no attack_roll para valer pela tela e pelo
+    Mestre (que chama attack_roll direto).
+    """
+    cs = memory.campaign.get("combat_state") or {}
+    ordem = cs.get("initiative_order") or []
+    i = cs.get("current_turn_index", 0)
+    if (cs.get("is_active") and isinstance(i, int) and 0 <= i < len(ordem)
+            and memory.char_key(ordem[i]) == memory.char_key(atacante.get("name", ""))):
+        cs.setdefault("turn_economy", {})["atacou"] = True
+
+
+# ── Magia de ataque e magia de teste ───────────────────────────────────────
+
+def _ataque_da_magia(hab: dict) -> str:
+    """'corpo' | 'distancia' | '' — a magia rola ataque mágico?"""
+    from rpg import resolucao
+    m = resolucao._magia_srd(hab)
+    if m is not None:
+        return m.get("ataque") or ""
+    texto = _norm_txt(hab.get("descricao", ""))
+    if any(k in texto for k in ("ataque magico", "ataque de magia", "spell attack")):
+        return "corpo" if "corpo a corpo" in texto or "melee" in texto else "distancia"
+    return ""
+
+
+def _metade_se_passar(hab: dict) -> bool:
+    """Quem passa no teste leva metade? Truques de teste: nada."""
+    from rpg import resolucao
+    m = resolucao._magia_srd(hab)
+    if m is not None and m.get("salvaguarda"):
+        return bool(m.get("metade_se_passar"))
+    return True
+
+
+def _rolar_ataque_magico(char: dict, alvo: dict, hab: dict) -> tuple[bool, bool, str]:
+    """(acertou, crítico, linha) do ataque mágico de `char` em `alvo`."""
+    s = char.get("sheet") or {}
+    prof = int(s.get("proficiencia", _proficiency_bonus(int(s.get("nivel", 1) or 1))) or 2)
+    attr = _atributo_de_conjuracao(s)
+    if attr:
+        mod = _modifier(int(s.get(attr, 10) or 10))
+    else:
+        # Monstro ou classe sem conjuração na tabela: o melhor dos três.
+        mod = max(_modifier(int(s.get(a, 10) or 10)) for a in ("inteligencia", "sabedoria", "carisma"))
+    vantagem = _has_condition_effect(char, "attack_advantage") or _has_condition_effect(alvo, "defense_disadvantage")
+    desvantagem = _has_condition_effect(char, "attack_disadvantage")
+    mods = _mods_de_ataque(char, alvo, False)
+    vantagem = vantagem or mods["vantagem"]
+    desvantagem = desvantagem or mods["desvantagem"]
+    d20, log = _roll_d20_with_adv(vantagem, desvantagem)
+    total = d20 + prof + mod + mods["bonus"]
+    ca = _ca_efetiva(alvo)
+    for sh, e in mods["gastar"]:
+        _gastar_efeito(sh, e)
+    critico = d20 == 20
+    acertou = critico or (d20 != 1 and total >= ca)
+    efeitos = f" {mods['bonus']:+d}(efeitos)" if mods["bonus"] else ""
+    notas = f" [{'; '.join(mods['notas'])}]" if mods["notas"] else ""
+    veredito = "CRÍTICO" if critico else ("ACERTO" if acertou else "ERROU")
+    return acertou, critico, (f"\n   Ataque mágico: {log} {prof + mod:+d}{efeitos} = **{total}** "
+                              f"vs CA {ca}{notas} — {veredito}")
+
+
+# ── Ataque Extra ───────────────────────────────────────────────────────────
+# Guerreiro, bárbaro, paladino, patrulheiro e monge do 5º nível atacam duas
+# vezes com a ação Atacar; o guerreiro três no 11º e quatro no 20º. O motor
+# não tinha isso: a ficha dizia "Ataque Extra" e o turno acabava no 1º golpe.
+def _numero_de_ataques(char: dict) -> int:
+    s = (char or {}).get("sheet") or {}
+    nomes = {_norm_txt(h.get("nome", "")) for h in ((char or {}).get("habilidades") or [])
+             if isinstance(h, dict)}
+    classe = _norm_txt(s.get("classe", ""))
+    nivel = int(s.get("nivel", 1) or 1)
+    n = 1
+    if nomes & {"ataque extra", "extra attack"}:
+        n = 2
+    if nomes & {"ataque extra adicional"}:
+        n = 3
+    if classe == "guerreiro":
+        n = max(n, 4 if nivel >= 20 else 3 if nivel >= 11 else 2 if nivel >= 5 else 1)
+    elif classe in ("barbaro", "paladino", "patrulheiro", "monge") and nivel >= 5:
+        n = max(n, 2)
+    return n
 
 
 def _dar_efeito(sheet: dict, efeito: dict) -> None:
@@ -14399,7 +14967,15 @@ def _combatant_snapshot(name: str) -> dict | None:
             "alcance":      r["alcance"],
             "concentracao": r["concentracao"],
             "reacao":       r["acao"] == "reacao",
-            "tipo_acao":    _ability_action_type(h.get("nome", ""), h),
+            # "acao" | "bonus" | "livre" (Guiar Ataque, Ataque Imprudente).
+            "tipo_acao":    (_slot_da_habilidade(h.get("nome", ""), h, ch) or "livre"),
+            # O que acontece ao usar: motor | efeito | acao_de_classe |
+            # narrativa (o Mestre decide). O cartão mostra o texto.
+            "resolucao":    r["resolucao"],
+            "resolucao_texto": r["resolucao_texto"],
+            "modos":        r["modos"],
+            "alvo_modo":    r["alvo_modo"],
+            "exige_ataque": r["exige_ataque"],
             # Modo de alvo: "self" | "pool" | "single". A UI usa para decidir
             # se mostra o picker ou despacha direto (self/pool não pedem alvo).
             "target_mode": _ability_target_mode(h.get("nome", ""), h),
@@ -14473,7 +15049,8 @@ def _combatant_snapshot(name: str) -> dict | None:
         "vulnerabilidades": _defesas_visiveis(ch, s, "vulnerabilidades"),
         "mp":         int(s.get("mana_atual", 0) or 0),
         "mp_max":     int(s.get("mana_max", 0) or 0),
-        "ca":         int(s.get("ca", 10) or 10),
+        # A CA que os ataques enfrentam: com Escudo da Fé, Pele de Árvore.
+        "ca":         _ca_efetiva(ch),
         "nivel":      int(s.get("nivel", 1) or 1),
         "classe":     s.get("classe", ""),
         "arma":       (s.get("equipamentos", {}) or {}).get("arma_principal") or "",
@@ -14619,23 +15196,40 @@ def combat_action(action: str, actor: str = "", target: str = "",
         eco = cs.setdefault("turn_economy",
                             {"acao_usada": False, "bonus_usada": False})
         force_end = False  # se True ao final, encerra o turno (flee/pass)
+        narrar = False     # habilidade sem regra no motor: a tela chama o Mestre
 
         if a == "attack":
             if not target:
                 return {"ok": False, "message": "Ataque exige target.",
                         "snapshot": combat_snapshot()}
-            err = _use_slot(eco, "acao")
-            if err:
-                return {"ok": False, "message": err, "snapshot": combat_snapshot()}
+            # Ataque Extra: os golpes seguintes da MESMA ação Atacar não gastam
+            # outra Ação. Antes o turno do guerreiro de nível 5 acabava no 1º.
+            ch_atk = memory.campaign["characters"].get(memory.char_key(actor), {}) or {}
+            restantes = int(eco.get("ataques_restantes", 0) or 0)
+            golpe_extra = restantes > 0
+            if golpe_extra:
+                eco["ataques_restantes"] = restantes - 1
+            else:
+                err = _use_slot(eco, "acao")
+                if err:
+                    return {"ok": False, "message": err, "snapshot": combat_snapshot()}
+                eco["ataques_restantes"] = _numero_de_ataques(ch_atk) - 1
+
+            def _devolver_ataque():
+                if golpe_extra:
+                    eco["ataques_restantes"] = int(eco.get("ataques_restantes", 0) or 0) + 1
+                else:
+                    eco["acao_usada"] = False
+                    eco["ataques_restantes"] = 0
+
             if not weapon:
-                ch = memory.campaign["characters"].get(memory.char_key(actor), {})
-                weapon = ((ch.get("sheet", {}) or {}).get("equipamentos", {}) or {}
+                weapon = ((ch_atk.get("sheet", {}) or {}).get("equipamentos", {}) or {}
                           ).get("arma_principal") or "ataque desarmado"
             # Mesma checagem que attack_roll faz, antes de gastar: recusa de
             # alcance não é ataque, e a Ação tem de continuar disponível.
             recusa, _ = _checar_alcance(actor, target, weapon)
             if recusa:
-                eco["acao_usada"] = False
+                _devolver_ataque()
                 zona_alvo = _zona_de(target) or "outra zona"
                 return {"ok": False,
                         "message": (f"Fora de alcance: {target} está em {zona_alvo}. "
@@ -14644,9 +15238,13 @@ def combat_action(action: str, actor: str = "", target: str = "",
                         "snapshot": combat_snapshot()}
             msg = attack_roll(actor, target, weapon, 6, end_turn=False)
             if msg.startswith(("Erro:", "Aviso:")):
-                eco["acao_usada"] = False
+                _devolver_ataque()
                 return {"ok": False, "message": msg + "\nA Ação não foi gasta.",
                         "snapshot": combat_snapshot()}
+            if int(eco.get("ataques_restantes", 0) or 0) > 0:
+                n = eco["ataques_restantes"]
+                msg += (f"\n   Ataque Extra: mais {n} {'ataque' if n == 1 else 'ataques'} "
+                        f"nesta mesma ação.")
 
         elif a == "ability":
             if not ability:
@@ -14688,12 +15286,17 @@ def combat_action(action: str, actor: str = "", target: str = "",
                         "message": f"Erro: {actor} já usou Surto de Ação neste turno.",
                         "snapshot": combat_snapshot()}
 
-            slot = None if surto else ("bonus" if _ability_action_type(ability, hab_pre) == "bonus" else "acao")
+            slot = None if surto else _slot_da_habilidade(ability, hab_pre, ch_pre)
             if slot:
                 err = _use_slot(eco, slot)
                 if err:
                     return {"ok": False, "message": err, "snapshot": combat_snapshot()}
-            msg = use_ability(actor, ability, target, end_turn=False)
+            # A escolha da ação (Ação Ardilosa: disparada, desengajar ou
+            # esconder) viaja em `weapon`, como a Disparada no movimento.
+            msg = use_ability(actor, ability, target, end_turn=False, modo=(weapon or "").strip())
+            if hab_pre is not None:
+                from rpg import resolucao as _res_mod
+                narrar = _res_mod.como_resolve(hab_pre, ch_pre)["tipo"] == "narrativa"
             if msg.startswith(("Erro:", "Aviso:")):
                 if slot:
                     eco[slot + "_usada"] = False
@@ -14870,21 +15473,48 @@ def combat_action(action: str, actor: str = "", target: str = "",
             if not destino:
                 return {"ok": False, "message": "Movimento exige a zona de destino.",
                         "snapshot": combat_snapshot()}
-            if eco.get("movimento_usado"):
+            # Zonas de movimento do turno: a de sempre, mais as da Disparada
+            # de bônus (Ação Ardilosa, Passo do Vento). A Disparada de Ação
+            # (dash) soma mais uma.
+            extra = int(eco.get("movimento_extra", 0) or 0)
+            livres = (0 if eco.get("movimento_usado") else 1) + extra
+            dash = bool(weapon and weapon.lower() == "dash")
+            if livres <= 0 and not dash:
                 return {"ok": False,
                         "message": f"Erro: {actor} já se moveu neste turno.",
                         "snapshot": combat_snapshot()}
-            dash = bool(weapon and weapon.lower() == "dash")
+            origem_mv = _zona_de(actor)
+            zonas_mv = _zonas()
+            destino_mv = _zona_canonica(destino)
+            passos = (abs(zonas_mv.index(destino_mv) - zonas_mv.index(origem_mv))
+                      if origem_mv in zonas_mv and destino_mv in zonas_mv else 1)
             if dash:
                 err = _use_slot(eco, "acao")
                 if err:
                     return {"ok": False, "message": err, "snapshot": combat_snapshot()}
-            msg = move_combatant(actor, destino, dash=dash)
+            alcance_mv = livres + (1 if dash else 0)
+            if passos > alcance_mv:
+                if dash:
+                    eco["acao_usada"] = False
+                return {"ok": False,
+                        "message": (f"Erro: **{destino_mv or destino}** está a {passos} zonas; "
+                                    f"o movimento que resta neste turno alcança {alcance_mv}."),
+                        "snapshot": combat_snapshot()}
+            msg = move_combatant(actor, destino, dash=passos > 1,
+                                 sem_oportunidade=bool(eco.get("desengajado")))
             # Só marca o movimento como gasto se ele realmente aconteceu —
             # uma recusa (zona inexistente, longe demais) não pode queimar o
             # turno do jogador.
             if not msg.startswith(("Erro:", "Aviso:")):
-                eco["movimento_usado"] = True
+                gastar = max(1, passos) - (1 if dash else 0)
+                if gastar > 0 and not eco.get("movimento_usado"):
+                    eco["movimento_usado"] = True
+                    gastar -= 1
+                if gastar > 0:
+                    eco["movimento_extra"] = max(0, extra - gastar)
+                # Sem movimento nenhum sobrando, a régua mostra "Movimento" gasto.
+                if int(eco.get("movimento_extra", 0) or 0) == 0:
+                    eco["movimento_usado"] = True
             elif dash:
                 eco["acao_usada"] = False
 
@@ -14892,9 +15522,16 @@ def combat_action(action: str, actor: str = "", target: str = "",
             err = _use_slot(eco, "acao")  # Dodge = Ação
             if err:
                 return {"ok": False, "message": err, "snapshot": combat_snapshot()}
+            # A Esquiva escrevia "esquiva-se" e nada mudava. Agora os ataques
+            # contra ele têm desvantagem até o próximo turno dele.
+            ch_def = memory.campaign["characters"].get(memory.char_key(actor))
+            if ch_def:
+                dar_efeito_de_combate(ch_def, {"nome": "Esquiva", "desvantagem_contra_mim": True,
+                                               "ate_turno_de": memory.char_key(actor)})
             _log_combat_event("defend", actor, "",
                               msg=f"{actor} defendeu-se (Esquivar — Ação)")
-            msg = f"{actor} esquiva-se (Dodge)."
+            msg = (f"{actor} esquiva-se (Dodge): ataques contra {actor} têm desvantagem "
+                   f"até o próximo turno.")
 
         elif a == "flee":
             err = _use_slot(eco, "acao")
@@ -14905,8 +15542,10 @@ def combat_action(action: str, actor: str = "", target: str = "",
                 return {"ok": False, "message": f"'{actor}' não encontrado.",
                         "snapshot": combat_snapshot()}
             # Ataque de oportunidade ANTES de marcar como fugido — senão o
-            # motor considera o alvo fora de combate e ninguém reage.
-            oportunidade = _provoke_opportunity_attacks(actor, "fugir")
+            # motor considera o alvo fora de combate e ninguém reage. Quem
+            # desengajou (Ação Ardilosa) sai sem provocar.
+            oportunidade = ("" if eco.get("desengajado")
+                            else _provoke_opportunity_attacks(actor, "fugir"))
             ch["status"] = "fugiu"
             _log_combat_event("flee", actor, "", msg=f"{actor} fugiu do combate")
             memory.save_campaign()
@@ -14927,8 +15566,12 @@ def combat_action(action: str, actor: str = "", target: str = "",
         # ── Decisão de AVANÇO de turno (regra 5e) ────────────────────────
         cs_now  = memory.campaign.get("combat_state", {}) or {}
         eco_now = cs_now.get("turn_economy", {}) or {}
-        if force_end or (eco_now.get("acao_usada") and eco_now.get("bonus_usada")):
+        # Com golpe do Ataque Extra pendente o turno ainda não acabou.
+        if force_end or (eco_now.get("acao_usada") and eco_now.get("bonus_usada")
+                         and not eco_now.get("ataques_restantes")):
             msg += _auto_advance_turn(actor)
+        if narrar:
+            return {"ok": True, "message": msg, "narrar": True, "snapshot": combat_snapshot()}
 
     # FIM AUTOMÁTICO: na tela tática, se um lado foi todo derrotado/fugiu,
     # encerra o combate (o motor só encerrava se TODOS estavam fora).

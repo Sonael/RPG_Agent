@@ -198,8 +198,11 @@ COMO PREENCHER
   traição, um trato fechado. Conversa de passagem não é acontecimento: uma
   por turno, no máximo, e só quando houve.
 • "diário:" é a mesma cena contada para o JOGADOR reler depois, com a voz da
-  narração e não a do sistema: "Título — o que aconteceu". Uma por turno, e
-  só quando a cena mereceu uma página. O diário é dele.
+  narração e não a do sistema: "Título — o que aconteceu". Uma página por
+  CENA, não por resposta: uma luta inteira, da emboscada ao saque, é UMA
+  página. Escreva quando uma cena termina ou vira; o que vier logo depois
+  continua a página aberta, e o que já está no diário é descartado. O diário
+  é dele.
 • "capítulo:" só quando a história realmente virou de capítulo, e só para o
   número seguinte. O sistema recusa pulo.
 • "tempo:" aceita horas, minutos ou os dois ("2h", "30m", "1h30"). Minutos que

@@ -543,24 +543,83 @@ def clear_flag(name: str) -> str:
 # Diário de campanha
 # ---------------------------------------------------------------------------
 
+# Uma página por CENA, não por resposta. Numa campanha de teste, poucos
+# minutos de jogo deram 21 páginas: "Emboscada na Trilha", "A Queda do
+# Batedouro", "O Espólio da Trilha" — três páginas para uma luta de três
+# turnos — e "A Queda dos Guardiões" duas vezes, palavra por palavra. O
+# fechamento pede uma página por resposta e o mestre obedece; o diário, que é
+# o que o jogador abre para lembrar a história, virou o log do chat.
+#
+# Agora o que chega poucos turnos depois da página aberta, no mesmo capítulo,
+# CONTINUA a página em vez de abrir outra; e o que já está no diário não entra
+# de novo.
+TURNOS_POR_PAGINA = 4
+TAMANHO_DA_PAGINA = 900
+
+
+def _texto_de_comparar(s: str) -> str:
+    import unicodedata
+    s = unicodedata.normalize("NFD", str(s or "").lower())
+    s = "".join(c for c in s if unicodedata.category(c) != "Mn")
+    return " ".join("".join(c if c.isalnum() else " " for c in s).split())
+
+
+def registrar_pagina(title: str, content: str) -> tuple[str, dict | None]:
+    """
+    Grava no diário pela regra da página por cena. Devolve ("nova" |
+    "continuou" | "repetida", a entrada tocada).
+    """
+    diario = memory.campaign.setdefault("diary", [])
+    capitulo = memory.campaign.get("chapter", 1)
+    turno = memory.turno_atual()
+    t_tit, t_con = _texto_de_comparar(title), _texto_de_comparar(content)
+    for e in diario[-6:]:
+        if not isinstance(e, dict):
+            continue
+        tit, con = _texto_de_comparar(e.get("title", "")), _texto_de_comparar(e.get("content", ""))
+        if (t_tit and t_tit == tit) or (t_con and (t_con == con or t_con in con)):
+            return "repetida", e
+    ultima = diario[-1] if diario and isinstance(diario[-1], dict) else None
+    if (ultima is not None and ultima.get("chapter") == capitulo
+            and ultima.get("turno") is not None
+            and turno - int(ultima["turno"]) < TURNOS_POR_PAGINA
+            and len(ultima.get("content", "")) + len(content) <= TAMANHO_DA_PAGINA):
+        ultima["content"] = (ultima.get("content", "").rstrip() + " " + content.strip()).strip()
+        memory.marcar_upkeep("diario")
+        memory.save_campaign()
+        return "continuou", ultima
+    entry = {
+        "chapter": capitulo,
+        "title":   title,
+        "content": content,
+        # O turno em que a página abriu: é o que decide se a próxima
+        # anotação ainda é a mesma cena.
+        "turno":   turno,
+    }
+    diario.append(entry)
+    memory.marcar_upkeep("diario")
+    memory.save_campaign()
+    return "nova", entry
+
+
 def add_diary_entry(title: str, content: str) -> str:
     """
     Adiciona uma entrada ao diário da campanha.
     Use para registrar acontecimentos importantes, decisões dos jogadores
-    e mudanças significativas no mundo.
+    e mudanças significativas no mundo — uma página por CENA, não por
+    resposta: o que vier logo depois na mesma cena continua a página aberta.
 
     Args:
         title:   Título da entrada (ex: 'O encontro na taverna').
         content: Texto detalhado do acontecimento (narrado em terceira pessoa).
     """
-    entry = {
-        "chapter": memory.campaign["chapter"],
-        "title":   title,
-        "content": content,
-    }
-    memory.campaign["diary"].append(entry)
-    memory.marcar_upkeep("diario")
-    memory.save_campaign()
+    como, entry = registrar_pagina(title, content)
+    if como == "repetida":
+        return (f"Nota: o diário já tem isso (\"{(entry or {}).get('title', '')}\"). "
+                f"Nada foi gravado duas vezes.")
+    if como == "continuou":
+        return (f"A cena continua: o texto entrou na página '{entry.get('title', '')}' "
+                f"(Capítulo {entry.get('chapter')}).")
     return f"Entrada '{title}' adicionada ao diário (Capítulo {entry['chapter']})."
 
 

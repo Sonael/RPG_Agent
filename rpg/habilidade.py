@@ -160,9 +160,26 @@ def resolver(hab: dict, char: dict | None = None) -> dict:
         "usos_max": td.usos_maximos(char, nome) if char else None,
         "descricao": (hab.get("descricao") or (caract or {}).get("descricao")
                       or (srd or {}).get("descricao_en") or ""),
-        "passiva": efeito == "passiva" or td._ability_is_passive(hab),
         "chave": chave_canonica(hab),
     }
+    # O que acontece quando se usa (rpg/resolucao.py): o jogador vê no cartão,
+    # antes de gastar o turno, se o motor resolve, se vira efeito, se é
+    # passiva ou se quem decide é o Mestre.
+    from rpg import resolucao
+    como = resolucao.como_resolve(hab, char)
+    r["resolucao"] = como["tipo"]
+    r["resolucao_texto"] = como["texto"]
+    r["modos"] = [{"id": m, "texto": resolucao.MODOS_DE_MOVIMENTO.get(m, m)} for m in como["modos"]]
+    r["alvo_modo"] = como["alvo"]
+    r["exige_ataque"] = bool((resolucao.ACOES_DE_CLASSE.get(como.get("chave", "")) or {}).get("exige_ataque"))
+    # Quem a magia de efeito alcança: a tela oferece aliados ou inimigos.
+    _, _ef = resolucao.efeito_de_magia(hab)
+    if _ef:
+        r["alvo_modo"] = {"aliado": "aliado", "aliados": "aliado", "si": "si",
+                          "marca": "inimigo", "inimigos": "inimigo", "area": "inimigo"}.get(_ef["alvos"], "")
+    if como["slot"]:
+        r["acao"] = como["slot"]
+    r["passiva"] = como["tipo"] == "passiva"
     if srd:
         r["resumo"] = srd["resumo"]
         # O dado do resumo é o da base; com o truque crescido, o da ficha vale.

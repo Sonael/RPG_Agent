@@ -256,10 +256,26 @@ def _quem_aparece(narracao: str, limite: int = 6) -> list[str]:
     Os personagens conhecidos citados nesta narração. É o que faz o
     acontecimento aparecer na ficha de cada um deles ("últimas cenas com…").
     """
+    # Para lembrar QUEM esteve na cena, uma palavra só vale se for só deste
+    # nome. Numa campanha, "os goblins" citava todo Goblin Batedor já criado
+    # — inclusive os mortos de lutas anteriores — e, com o limite de seis, os
+    # heróis da cena ficavam de fora. O grupo vem primeiro na lista.
+    chars = [c for c in (memory.campaign.get("characters") or {}).values()
+             if isinstance(c, dict) and c.get("name")]
+    contagem: dict[str, int] = {}
+    for c in chars:
+        for p in set(_norm(c["name"]).split()):
+            contagem[p] = contagem.get(p, 0) + 1
+    texto = _norm(narracao)
+    chars.sort(key=lambda c: 0 if memory.is_party_member(c) else 1)
     achados = []
-    for ch in (memory.campaign.get("characters") or {}).values():
-        nome = (ch or {}).get("name", "")
-        if nome and _tem_evidencia(nome, narracao):
+    for c in chars:
+        nome = c["name"]
+        n = _norm(nome)
+        unicas = [p for p in n.split() if len(p) >= 4 and contagem.get(p, 0) == 1]
+        citado = (bool(re.search(rf"\b{re.escape(n)}\b", texto))
+                  or any(re.search(rf"\b{re.escape(p)}", texto) for p in unicas))
+        if citado:
             achados.append(nome)
         if len(achados) >= limite:
             break
@@ -518,9 +534,15 @@ def aplicar(campos: dict[str, list[str]], narracao: str) -> dict:
             recusa("diario", valor, "página curta demais: escreva 'Título — o que aconteceu'")
             continue
         try:
-            tl.add_diary_entry(titulo or conteudo[:50], conteudo)
-            feitos.append(f"add_diary_entry({(titulo or conteudo)[:40]!r})")
-            avisos.append(f"Nova página no diário: {titulo or conteudo[:50]}")
+            # Uma página por cena (tools.registrar_pagina): logo depois da
+            # página aberta, o texto a continua; o que já está lá não entra.
+            como, pagina = tl.registrar_pagina(titulo or conteudo[:50], conteudo)
+            if como == "repetida":
+                recusa("diario", titulo, "o diário já tem esta página")
+                continue
+            feitos.append(f"add_diary_entry({(titulo or conteudo)[:40]!r}, {como})")
+            if como == "nova":
+                avisos.append(f"Nova página no diário: {titulo or conteudo[:50]}")
         except Exception as e:
             recusa("diario", titulo, f"falhou: {e}")
 

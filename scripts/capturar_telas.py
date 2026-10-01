@@ -901,6 +901,12 @@ COMBATE_MAGIAS["characters"].update({
              "descricao": "Toque necrótico."},
             {"nome": "Bênção", "dado": "", "custo_mana": 1,
              "descricao": "Abençoa até três criaturas."},
+            # Sem regra no motor: o cartão diz "o Mestre decide" e abre a
+            # Ação Livre com o pedido já começado.
+            {"nome": "Taumaturgia", "dado": "", "custo_mana": 0,
+             "descricao": "[Truque] Manifesta um prodígio sobrenatural menor: vozes, luzes, tremores."},
+            {"nome": "Sacerdote de Guerra", "dado": "", "custo_mana": 0,
+             "descricao": "Ação bônus: faz 1 ataque adicional. Usos = mod. SAB por descanso longo."},
             {"nome": "Espíritos Guardiões", "dado": "", "custo_mana": 3,
              "descricao": "Espíritos protegem você."},
             {"nome": "Coluna de Chamas", "dado": "", "custo_mana": 5,
