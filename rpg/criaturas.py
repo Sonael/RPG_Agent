@@ -64,17 +64,17 @@ FICHAS: dict[str, dict] = {
 
     # ── Familiares (Convocar Familiar): não atacam ──────────────────────
     "coruja": {"nome": "Coruja", "nd": "0", "tipo": "beast", "ca": 11, "pv": 1,
-               "atr": (3, 13, 8, 2, 12, 7), "voa": True, "nao_ataca": True, "ataques": []},
+               "atr": (3, 13, 8, 2, 12, 7), "voa": True, "nao_ataca": True, "ataques": [{"nome": "garras", "dado": "1d1", "tipo": "slashing"}]},
     "gato": {"nome": "Gato", "nd": "0", "tipo": "beast", "ca": 12, "pv": 2,
-             "atr": (3, 15, 10, 3, 12, 7), "nao_ataca": True, "ataques": []},
+             "atr": (3, 15, 10, 3, 12, 7), "nao_ataca": True, "ataques": [{"nome": "garras", "dado": "1d1", "tipo": "slashing"}]},
     "corvo": {"nome": "Corvo", "nd": "0", "tipo": "beast", "ca": 12, "pv": 1,
-              "atr": (2, 14, 8, 2, 12, 6), "voa": True, "nao_ataca": True, "ataques": []},
+              "atr": (2, 14, 8, 2, 12, 6), "voa": True, "nao_ataca": True, "ataques": [{"nome": "bico", "dado": "1d1", "tipo": "piercing"}]},
     "morcego": {"nome": "Morcego", "nd": "0", "tipo": "beast", "ca": 12, "pv": 1,
-                "atr": (2, 15, 8, 2, 12, 4), "voa": True, "nao_ataca": True, "ataques": []},
+                "atr": (2, 15, 8, 2, 12, 4), "voa": True, "nao_ataca": True, "ataques": [{"nome": "mordida", "dado": "1d1", "tipo": "piercing"}]},
     "rato": {"nome": "Rato", "nd": "0", "tipo": "beast", "ca": 10, "pv": 1,
-             "atr": (2, 11, 9, 2, 10, 4), "nao_ataca": True, "ataques": []},
+             "atr": (2, 11, 9, 2, 10, 4), "nao_ataca": True, "ataques": [{"nome": "mordida", "dado": "1d1", "tipo": "piercing"}]},
     "aranha": {"nome": "Aranha", "nd": "0", "tipo": "beast", "ca": 12, "pv": 1,
-               "atr": (2, 14, 8, 1, 10, 2), "nao_ataca": True, "ataques": []},
+               "atr": (2, 14, 8, 1, 10, 2), "nao_ataca": True, "ataques": [{"nome": "mordida", "dado": "1d1", "tipo": "piercing"}]},
 
     # ── Montarias (Encontrar Montaria) ──────────────────────────────────
     "cavalo de guerra": {"nome": "Cavalo de Guerra", "nd": "1/2", "tipo": "celestial", "ca": 11, "pv": 19,
@@ -149,6 +149,8 @@ def montar_sheet(chave: str) -> dict:
 _CAMPOS_DA_FERA = ("forca", "destreza", "constituicao", "ca", "vida_atual", "vida_max",
                    "ataques", "arma_dado", "multiattack", "equipamentos",
                    "resistencias", "imunidades", "vulnerabilidades")
+# Polimorfia troca também a mente (SRD): INT, SAB, CAR e a proficiência.
+_CAMPOS_DA_MENTE = ("inteligencia", "sabedoria", "carisma", "proficiencia")
 
 
 def nd_maximo(nivel: int, circulo_da_lua: bool) -> float:
@@ -178,16 +180,24 @@ def em_forma_selvagem(char: dict) -> dict | None:
     return ((char or {}).get("sheet") or {}).get("_forma_selvagem")
 
 
-def transformar(char: dict, chave: str) -> str:
+def transformar(char: dict, chave: str, origem: str = "Forma Selvagem", concentracao_de: str = "",
+                magia: str = "", mental: bool = False) -> str:
+    """
+    A ficha vira a da fera. Forma Selvagem mantém a mente do druida;
+    Polimorfia (`mental`) troca tudo e acaba com a concentração de quem conjurou.
+    """
     s = char.setdefault("sheet", {})
     if s.get("_forma_selvagem"):
         voltar(char, "")
     fera = montar_sheet(chave)
-    s["_forma_selvagem"] = {"forma": FICHAS[chave]["nome"], "chave": chave,
-                            "original": {k: copy.deepcopy(s.get(k)) for k in _CAMPOS_DA_FERA}}
-    for k in _CAMPOS_DA_FERA:
+    campos = _CAMPOS_DA_FERA + (_CAMPOS_DA_MENTE if mental else ())
+    s["_forma_selvagem"] = {"forma": FICHAS[chave]["nome"], "chave": chave, "origem": origem,
+                            "concentracao_de": concentracao_de, "magia": magia,
+                            "original": {k: copy.deepcopy(s.get(k)) for k in campos}}
+    for k in campos:
         s[k] = copy.deepcopy(fera.get(k))
-    return (f"{char['name']} assume a forma de {FICHAS[chave]['nome']}: "
+    return (f"{char['name']} assume a forma de {FICHAS[chave]['nome']}"
+            + (f" ({origem})" if origem != "Forma Selvagem" else "") + ": "
             f"{s['vida_atual']} PV, CA {s['ca']}, ataques: "
             f"{', '.join(a['nome'] for a in s['ataques']) or 'nenhum'}."
             + (f" {FICHAS[chave]['nota']}" if FICHAS[chave].get("nota") else ""))
@@ -285,6 +295,14 @@ def limpar(fim_do_combate: bool = False) -> list[str]:
     """
     from rpg import memory, resolucao, tools_dnd as td
     linhas = []
+    for c in list((memory.campaign.get("characters") or {}).values()):
+        fs = ((c or {}).get("sheet") or {}).get("_forma_selvagem") if isinstance(c, dict) else None
+        if not fs or not fs.get("concentracao_de"):
+            continue
+        conj = memory.campaign["characters"].get(fs["concentracao_de"]) or {}
+        atual = ((conj.get("sheet") or {}).get("concentracao") or {})
+        if resolucao.norm(atual.get("magia", "")) != resolucao.norm(fs.get("magia", "")):
+            linhas.append(voltar(c, "a concentração caiu"))
     for c in _invocadas():
         inv = c["invocacao"]
         dono = memory.campaign["characters"].get(inv.get("por", ""))

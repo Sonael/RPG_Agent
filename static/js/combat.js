@@ -418,8 +418,11 @@
            deles ? `<span class="cbt-conta-inimigo">${deles} inimigo${deles === 1 ? '' : 's'}</span>` : '']
             .filter(Boolean).join(' · ')
         : '<span class="cbt-zona-vazia">vazia</span>';
-      return `<div class="cbt-zona${aqui}" title="${esc(desc[z] || '')}">`
+      // Escuridão, Névoa, Silêncio: a área cobre a zona inteira.
+      const cobre = ((snap.zonas_efeito || {})[z] || []);
+      return `<div class="cbt-zona${aqui}${cobre.length ? ' cbt-zona-coberta' : ''}" title="${esc(desc[z] || '')}">`
            + `<div class="cbt-zona-nome">${esc(z)}</div>`
+           + (cobre.length ? `<div class="cbt-zona-efeito">${esc(cobre.join(' · '))}</div>` : '')
            + `<div class="cbt-zona-pins">${fichas || '<span class="cbt-zona-vazia">vazia</span>'}</div>`
            + `<div class="cbt-zona-conta">${conta}</div>`
            + `</div>`;

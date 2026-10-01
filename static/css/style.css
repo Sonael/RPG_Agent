@@ -2206,6 +2206,13 @@ body.combat-on { overflow: hidden; }
   font-family: 'Playfair Display', serif; font-weight: 700;
   font-size: 0.82rem; color: var(--cbt-dark); margin-bottom: var(--esp-1);
 }
+/* Escuridão, Névoa, Silêncio sobre a zona. */
+.cbt-zona.cbt-zona-coberta { background-image: repeating-linear-gradient(
+  135deg, rgba(40,40,60,0.10) 0 6px, transparent 6px 12px); }
+.cbt-zona-efeito {
+  font-size: 0.72rem; font-weight: 600; color: var(--cbt-mp);
+  margin: -2px 0 var(--esp-1);
+}
 .cbt-zona-pins { display: flex; flex-wrap: wrap; gap: var(--esp-1); }
 .cbt-zona-vazia { font-size: 0.72rem; color: var(--cbt-muted); font-style: italic; }
 /* Contagem por lado: só no celular, no lugar dos nomes (ver @media). */

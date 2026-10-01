@@ -3613,6 +3613,12 @@ def _apply_damage(target: dict, amount: int = 0, damage_type: str = "",
         canon = _norm_damage_type(tipo_comp) if tipo_comp else ""
         if not tipo:
             tipo = canon
+        # Silêncio: dentro dele, dano de trovão não fere. É a zona, não a
+        # criatura — não vira imunidade descoberta da ficha.
+        if canon == "thunder" and _zona_silenciada(target.get("name", "")):
+            notas.append(f"{_zona_silenciada(target.get('name', ''))}: imune a trovão "
+                         f"({parcela_bruta} de dano trovejante anulado)")
+            continue
         mult, nota_tipo = _damage_multiplier(sheet, canon, arma_magica)
         if nota_tipo:
             # O golpe mostrou a defesa na prática: ela deixa de ser segredo.
@@ -3750,6 +3756,46 @@ def _zona_canonica(nome: str) -> str:
 def _zona_de(char_name: str) -> str:
     cs = memory.campaign.get("combat_state") or {}
     return (cs.get("posicoes") or {}).get(memory.char_key(char_name), "")
+
+
+# ===========================================================================
+# EFEITOS DE ZONA: Escuridão, Névoa Obscurecente, Silêncio
+# ---------------------------------------------------------------------------
+# A área da magia é a zona escolhida. Vale enquanto quem conjurou mantém a
+# concentração nela, e acaba com o combate.
+#   escuridao / nevoa  ninguém vê quem está lá, e quem está lá não vê nada:
+#                      nos ataques, vantagem e desvantagem se anulam; magia
+#                      que exige ver o alvo não passa; esconder-se é automático
+#   silencio           nada de componente verbal lá dentro; imune a trovão
+# ===========================================================================
+
+def _efeitos_de_zona(zona: str) -> list[dict]:
+    cs = memory.campaign.get("combat_state") or {}
+    if not zona or not cs.get("is_active"):
+        return []
+    saida = []
+    for e in cs.get("efeitos_de_zona") or []:
+        if not isinstance(e, dict) or e.get("zona") != zona:
+            continue
+        if e.get("concentracao_de") and not _concentracao_segue(e):
+            continue
+        saida.append(e)
+    return saida
+
+
+def _zona_obscurecida(nome: str) -> str:
+    """O nome da magia que cega a zona de `nome` (Escuridão, Névoa), ou ''."""
+    for e in _efeitos_de_zona(_zona_de(nome) if _zonas_ativas() else ""):
+        if e.get("tipo") in ("escuridao", "nevoa"):
+            return e.get("nome", "Escuridão")
+    return ""
+
+
+def _zona_silenciada(nome: str) -> str:
+    for e in _efeitos_de_zona(_zona_de(nome) if _zonas_ativas() else ""):
+        if e.get("tipo") == "silencio":
+            return e.get("nome", "Silêncio")
+    return ""
 
 
 def _por_zona(char_name: str, zona: str) -> None:
@@ -6649,6 +6695,12 @@ def attack_roll(
         disadvantage = True
     cond_notes.extend(_mods["notas"])
     cond_notes.extend(_notas_santuario)
+    # Escuridão, Névoa: quem ataca não vê o alvo (desvantagem) e o alvo não
+    # vê quem ataca (vantagem) — as duas se anulam, como manda o SRD.
+    _cego_por = _zona_obscurecida(attacker_name) or _zona_obscurecida(target_name)
+    if _cego_por:
+        advantage = disadvantage = True
+        cond_notes.append(f"{_cego_por}: ninguém vê ninguém — vantagem e desvantagem se anulam")
 
     # ── A arma existe? Tem munição? É mágica? Carrega algo? ─────────────────
     _mag = _bonus_magico_da_arma(attacker, weapon)
@@ -7105,6 +7157,22 @@ def use_ability(
         target_name = char["name"]
     elif _como.get("alvo") == "nenhum":
         target_name = ""
+
+    # ── Escuridão, Névoa, Silêncio ────────────────────────────────────────
+    _m_zona = _resolucao._magia_srd(hab) or {}
+    if _m_zona:
+        _cala = _zona_silenciada(char["name"])
+        if _cala and "V" in [c.strip() for c in str(_m_zona.get("componentes") or "").split(",")]:
+            return (f"Erro: {char['name']} está no {_cala}: {hab['nome']} tem componente verbal e não "
+                    f"sai sem som. Saia da zona ou use outra coisa. Nada foi gasto.")
+        _alvo_z = (target_name or "").split(",")[0].strip()
+        if (_alvo_z and memory.char_key(_alvo_z) != memory.char_key(char["name"])
+                and _m_zona.get("origem") == "alvo"
+                and "you can see" in (_m_zona.get("descricao_en") or "")):
+            _nao_ve = _zona_obscurecida(char["name"]) or _zona_obscurecida(_alvo_z)
+            if _nao_ve:
+                return (f"Erro: {hab['nome']} exige ver o alvo, e o {_nao_ve} não deixa "
+                        f"{char['name']} ver {_alvo_z}. Nada foi gasto.")
 
     # ── Alcance da habilidade ─────────────────────────────────────────────
     # Cone e toque nascem no conjurador: só pegam quem está na zona dele. Só
@@ -12087,6 +12155,7 @@ def end_combat() -> str:
     _log_combat_event("combat_end", msg="Combate encerrado")
     from rpg import criaturas
     criaturas.limpar(fim_do_combate=True)
+    cs.pop("efeitos_de_zona", None)
     cs["is_active"]           = False
     cs["initiative_order"]    = []
     cs["current_turn_index"]  = 0
@@ -15713,6 +15782,10 @@ def _rolar_ataque_magico(char: dict, alvo: dict, hab: dict) -> tuple[bool, bool,
     mods = _mods_de_ataque(char, alvo, False, com_arma=False)
     vantagem = vantagem or mods["vantagem"]
     desvantagem = desvantagem or mods["desvantagem"]
+    _cego_por = _zona_obscurecida(char.get("name", "")) or _zona_obscurecida(alvo.get("name", ""))
+    if _cego_por:
+        vantagem = desvantagem = True
+        mods["notas"].append(f"{_cego_por}: vantagem e desvantagem se anulam")
     d20, log = _roll_d20_with_adv(vantagem, desvantagem)
     total = d20 + prof + mod + mods["bonus"]
     ca = _ca_efetiva(alvo)
@@ -16035,6 +16108,7 @@ def combat_snapshot() -> dict:
         # Campo de batalha: lista vazia = combate sem posicionamento.
         "zonas":       _zonas(),
         "zona_desc":   dict(cs.get("zona_desc") or {}),
+        "zonas_efeito": {z: [e.get("nome", "") for e in _efeitos_de_zona(z)] for z in _zonas()},
         "combatants":  combatants,
         "log":         list(cs.get("log", []) or [])[-60:],
         "result":      cs.get("result"),   # painel de fim (None até acabar)

@@ -387,6 +387,22 @@ EFEITOS_DE_MAGIA: dict[str, dict] = {
                           "gasta um diamante da mochila"},
     "Misty Step": {"alvos": "si", "teleporte": True,
                    "texto": "teleporta você para uma zona vizinha, sem ataque de oportunidade"},
+    # ── Zonas e transformação ───────────────────────────────────────────────
+    "Darkness": {"alvos": "nenhum", "zona": "escuridao",
+                 "texto": "a zona escolhida fica em escuridão mágica até a concentração cair: quem está nela "
+                          "não vê nem é visto (nos ataques, vantagem e desvantagem se anulam), magia que exige "
+                          "ver o alvo não entra nem sai dela, e esconder-se lá dentro é automático"},
+    "Fog Cloud": {"alvos": "nenhum", "zona": "nevoa",
+                  "texto": "a zona escolhida fica tomada por névoa espessa até a concentração cair: quem está "
+                           "nela não vê nem é visto (nos ataques, vantagem e desvantagem se anulam), magia que "
+                           "exige ver o alvo não entra nem sai dela, e esconder-se lá dentro é automático"},
+    "Silence": {"alvos": "nenhum", "zona": "silencio",
+                "texto": "nenhum som na zona escolhida até a concentração cair: ninguém lá dentro conjura magia "
+                         "com componente verbal, e quem está nela fica surdo e imune a dano de trovão"},
+    "Polymorph": {"alvos": "aliado", "transformar": True, "save_se_inimigo": "sabedoria",
+                  "texto": "transforma uma criatura numa fera de ND até o nível (ou ND) dela: a ficha vira a da "
+                           "fera, inclusive a mente; não fala nem conjura. Inimigo faz SAB. Quando a vida da fera "
+                           "chega a 0, volta com o dano que sobrou. Acaba se a concentração cair"},
     # ── Lote 5: invocações ──────────────────────────────────────────────────
     "Spiritual Weapon": {"alvos": "inimigo", "arma_espiritual": True,
                          "texto": "uma arma espectral ataca agora (ataque mágico corpo a corpo, 1d8 + seu "
@@ -459,7 +475,7 @@ TEXTO_DA_CONDICAO = {
 # Aplicam "Enfeitiçado" no compêndio, mas o efeito é uma ordem, um transe ou
 # uma calma que só o Mestre sabe narrar. O motor rola o teste; o Mestre narra.
 NARRATIVAS_COM_TESTE = {"Suggestion", "Mass Suggestion", "Enthrall", "Calm Emotions",
-                        "Compulsion", "Geas", "Polymorph", "True Polymorph",
+                        "Compulsion", "Geas", "True Polymorph",
                         "Gust of Wind", "Divine Word"}
 
 
@@ -644,6 +660,11 @@ def como_resolve(hab: dict, char: dict | None = None) -> dict:
             saida.update(tipo="efeito", texto="O motor aplica: " + ef["texto"]
                          + (", enquanto durar a concentração" if m.get("concentracao") else "") + ".")
             modos = dict(ef.get("modos") or {})
+            if ef.get("zona"):
+                from rpg import tools_dnd as td
+                modos = {z: f"{z}: a área cobre esta zona" for z in td._zonas()} if td._zonas_ativas() else {}
+            if ef.get("transformar"):
+                modos = _modos_da_polimorfia()
             if ef.get("teleporte") and char:
                 from rpg import tools_dnd as td
                 if td._zonas_ativas():
@@ -862,6 +883,20 @@ def validar(char: dict, hab: dict, alvo: str, modo: str) -> str:
             if not _diamante(char):
                 return (f"Aviso: {nome_pt} precisa de um diamante (300 po) na mochila de "
                         f"{char['name']}. Nada foi gasto.")
+        if ef.get("zona"):
+            from rpg import tools_dnd as td
+            if td._zonas_ativas() and modo not in td._zonas():
+                return (f"Aviso: escolha a zona de {nome_pt} ({', '.join(td._zonas())}). Nada foi gasto.")
+        if ef.get("transformar"):
+            from rpg import criaturas
+            if not a or not a.get("sheet"):
+                return f"Aviso: escolha quem {nome_pt} transforma. Nada foi gasto."
+            if modo not in criaturas.FICHAS:
+                return (f"Aviso: escolha a fera de {nome_pt}. Nada foi gasto.")
+            nd_fera = criaturas.nd_valor(criaturas.FICHAS[modo]["nd"])
+            if nd_fera > _nd_de(a):
+                return (f"Aviso: {criaturas.FICHAS[modo]['nome']} (ND {criaturas.FICHAS[modo]['nd']}) é forte "
+                        f"demais para {a['name']}: a fera precisa de ND até o nível (ou ND) dele. Nada foi gasto.")
         if ef.get("fora_de_combate") and (memory.campaign.get("combat_state") or {}).get("is_active"):
             return (f"Aviso: {nome_pt} leva {ef['fora_de_combate']} para conjurar — não dá no meio da luta. "
                     f"Nada foi gasto.")
@@ -957,6 +992,8 @@ def aplicar_magia(char: dict, hab: dict, alvo_nome: str, modo: str = "") -> str:
     extra_circ = max(0, circ - base)
     if ef.get("alvos") in ("aliados", "inimigos") and extra_circ and m.get("alvos_por_espaco"):
         ef = dict(ef, max=int(ef.get("max", 1)) + extra_circ)
+    if ef.get("zona"):
+        return _magia_de_zona(char, hab, ef, modo, nome_pt)
     alvos = _alvos_da_magia(char, ef, alvo_nome)
     if not alvos:
         return f"\n   Ninguém ao alcance de {nome_pt}."
@@ -1061,6 +1098,18 @@ def _magia_especial(char: dict, hab: dict, ef: dict, a: dict, modo: str, nome_pt
     from rpg import encantos, tools_dnd as td
     if ef.get("invocar"):
         return _invocar(char, hab, ef, modo, nome_pt)
+    if ef.get("transformar"):
+        from rpg import criaturas
+        if not _mesmo_lado(char, a):
+            passou, linha = td._rolar_salvaguarda(a, "sabedoria", _cd(char))
+            if passou:
+                return f"\n   {nome_pt}: {a['name']}: {linha} — resistiu."
+            pre = f"\n   {a['name']}: {linha} — falhou."
+        else:
+            pre = ""
+        return pre + "\n   " + criaturas.transformar(
+            a, modo, origem=nome_pt, concentracao_de=memory.char_key(char.get("name", "")),
+            magia=hab.get("nome", ""), mental=True)
     if ef.get("arma_espiritual"):
         return _arma_espiritual(char, hab, a, modo, nome_pt)
     st = a.setdefault("sheet", {})
@@ -1111,6 +1160,40 @@ def _magia_especial(char: dict, hab: dict, ef: dict, a: dict, modo: str, nome_pt
         st.setdefault("condicoes", []).append(cond)
         return linha + f"\n   {nome_pt}: {a['name']} fica {cfg['nome'].upper()} — {ef['texto']}."
     return None
+
+
+# ── Magias de zona (Escuridão, Névoa Obscurecente, Silêncio) ──────────────────
+
+def _magia_de_zona(char: dict, hab: dict, ef: dict, modo: str, nome_pt: str) -> str:
+    from rpg import tools_dnd as td
+    if not td._zonas_ativas():
+        return (f"\n   {nome_pt}: sem zonas neste combate, o motor não tem onde pôr a área. "
+                f"(Mestre: narre a área e o efeito.)")
+    cs = memory.campaign["combat_state"]
+    lista = [z for z in cs.get("efeitos_de_zona") or []
+             if not (z.get("concentracao_de") == memory.char_key(char.get("name", ""))
+                     and norm(z.get("magia", "")) == norm(hab.get("nome", "")))]
+    lista.append({"zona": modo, "tipo": ef["zona"], "nome": nome_pt,
+                  "concentracao_de": memory.char_key(char.get("name", "")), "magia": hab.get("nome", "")})
+    cs["efeitos_de_zona"] = lista
+    return f"\n   {nome_pt} em {modo}: {ef['texto']}."
+
+
+def _modos_da_polimorfia() -> dict:
+    from rpg import criaturas
+    return {chave: f"{f['nome']}: ND {f['nd']}, {f['pv']} PV, CA {f['ca']}"
+            for chave, f in criaturas.FICHAS.items() if f["tipo"] == "beast"}
+
+
+def _nd_de(ch: dict) -> float:
+    from rpg import criaturas
+    s = ch.get("sheet") or {}
+    if memory.is_party_member(ch) or norm(s.get("classe", "")) not in ("npc", ""):
+        return float(int(s.get("nivel", 1) or 1))
+    try:
+        return criaturas.nd_valor(str(s.get("cr") or s.get("nivel", 1)))
+    except (ValueError, ZeroDivisionError):
+        return float(int(s.get("nivel", 1) or 1))
 
 
 # ── Invocações ───────────────────────────────────────────────────────────────
@@ -1284,8 +1367,15 @@ def _acao_de_movimento(char: dict, modo: str, nome: str) -> str:
     if modo == "desengajar":
         eco["desengajado"] = True
         return f"\n   {nome}: Desengajar — sair de zona não provoca ataque de oportunidade neste turno."
-    # Esconder: Furtividade contra a melhor Percepção passiva dos inimigos.
+    # Na Escuridão ou na Névoa, ninguém vê: esconder-se é automático.
     s = char.get("sheet") or {}
+    obsc = td._zona_obscurecida(char.get("name", ""))
+    if obsc:
+        conds = s.setdefault("condicoes", [])
+        if not any(norm(c.get("nome", "") if isinstance(c, dict) else c) == "escondido" for c in conds):
+            conds.append({"nome": "Escondido", "duracao": None})
+        return f"\n   {nome}: dentro da {obsc}, ninguém o vê — ESCONDIDO. O próximo ataque tem vantagem."
+    # Esconder: Furtividade contra a melhor Percepção passiva dos inimigos.
     bonus = _mod(char, "destreza")
     if td._proficiente_na_pericia(s, "furtividade"):
         bonus += int(s.get("proficiencia", 2) or 2)

@@ -50,9 +50,11 @@ def abrir(app_no_ar):
     with sync_playwright() as pw:
         nav = pw.chromium.launch()
 
-        def _abrir(agarrado=False, viewport=None):
+        def _abrir(agarrado=False, viewport=None, mudar=None):
             estado = copy.deepcopy(cap.COMBATE_ZONAS)
             estado["combat_state"]["posicoes"]["victoria"] = "Pátio"
+            if mudar:
+                mudar(estado)
             if agarrado:
                 estado["characters"]["stelar"]["sheet"]["condicoes"] = [
                     {"nome": "Agarrado", "duracao": None, "por": "Victoria"}]
@@ -108,6 +110,20 @@ def test_agarrado_ve_escapar(abrir):
     pg, _ = abrir(agarrado=True)
     pg.click("#cbt-buttons button:has-text('Manobras')")
     assert "Escapar" in pg.inner_text("#cbt-targets")
+
+
+def test_zona_coberta_mostra_a_magia(abrir):
+    """Escuridão na Sacada: a faixa de zonas diz o que cobre a zona."""
+    def escuridao(estado):
+        estado["characters"]["helena"]["sheet"]["concentracao"] = {"magia": "Darkness", "rodada": 3}
+        estado["combat_state"]["efeitos_de_zona"] = [
+            {"zona": "Sacada", "tipo": "escuridao", "nome": "Escuridão",
+             "concentracao_de": "helena", "magia": "Darkness"}]
+    pg, erros = abrir(mudar=escuridao)
+    pg.wait_for_selector(".cbt-zona.cbt-zona-coberta", timeout=8000)
+    assert "Escuridão" in pg.inner_text(".cbt-zona.cbt-zona-coberta")
+    assert pg.locator(".cbt-zona-coberta").count() == 1
+    assert not erros, erros[:3]
 
 
 def test_celular_sem_rolagem_lateral(abrir):

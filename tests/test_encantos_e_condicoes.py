@@ -271,7 +271,8 @@ def test_contido_nao_sai_da_zona(luta):
     ("Hold Person", "motor", "Paralisado"),
     ("Web", "motor", "não sai da zona"),
     ("Suggestion", "narrativa", "salvaguarda"),
-    ("Polymorph", "narrativa", "Mestre"),
+    ("Polymorph", "efeito", "fera"),
+    ("True Polymorph", "narrativa", "Mestre"),
 ])
 def test_o_cartao_diz_o_que_a_magia_faz(nome, tipo, trecho):
     r = resolucao.como_resolve({"nome": nome, "custo_mana": 2})
