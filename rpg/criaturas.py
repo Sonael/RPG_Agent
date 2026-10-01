@@ -84,6 +84,31 @@ FICHAS: dict[str, dict] = {
               "atr": (15, 10, 13, 6, 11, 7),
               "ataques": [{"nome": "cascos", "dado": "2d4", "tipo": "bludgeoning"}]},
 
+    # ── Elementais (Conjurar Elemental), ND 5 ───────────────────────────
+    "elemental do ar": {"nome": "Elemental do Ar", "nd": "5", "tipo": "elemental", "ca": 15, "pv": 90,
+                        "atr": (14, 20, 14, 6, 10, 6), "multiataque": 2, "voa": True,
+                        "ataques": [{"nome": "pancada", "dado": "2d8", "tipo": "bludgeoning"}],
+                        "resistencias": ["lightning", "thunder"],
+                        "resistencias_nao_magicas": ["bludgeoning", "piercing", "slashing"],
+                        "imunidades": ["poison"]},
+    "elemental da terra": {"nome": "Elemental da Terra", "nd": "5", "tipo": "elemental", "ca": 17, "pv": 126,
+                           "atr": (20, 8, 20, 5, 10, 5), "multiataque": 2,
+                           "ataques": [{"nome": "pancada", "dado": "2d8", "tipo": "bludgeoning"}],
+                           "vulnerabilidades": ["thunder"],
+                           "resistencias_nao_magicas": ["bludgeoning", "piercing", "slashing"],
+                           "imunidades": ["poison"]},
+    "elemental do fogo": {"nome": "Elemental do Fogo", "nd": "5", "tipo": "elemental", "ca": 13, "pv": 102,
+                          "atr": (10, 17, 16, 6, 10, 7), "multiataque": 2,
+                          "ataques": [{"nome": "toque", "dado": "2d6", "tipo": "fire"}],
+                          "resistencias_nao_magicas": ["bludgeoning", "piercing", "slashing"],
+                          "imunidades": ["fire", "poison"]},
+    "elemental da agua": {"nome": "Elemental da Água", "nd": "5", "tipo": "elemental", "ca": 14, "pv": 114,
+                          "atr": (18, 14, 18, 5, 10, 8), "multiataque": 2, "nada": True,
+                          "ataques": [{"nome": "pancada", "dado": "2d8", "tipo": "bludgeoning"}],
+                          "resistencias": ["acid"],
+                          "resistencias_nao_magicas": ["bludgeoning", "piercing", "slashing"],
+                          "imunidades": ["poison"]},
+
     # ── Mortos-vivos (Animar Mortos) ────────────────────────────────────
     "esqueleto": {"nome": "Esqueleto", "nd": "1/4", "tipo": "undead", "ca": 13, "pv": 13,
                   "atr": (10, 14, 15, 6, 8, 5),
@@ -130,7 +155,9 @@ def montar_sheet(chave: str) -> dict:
         "ataques": ataques,
         "arma_dado": ataques[0]["dado"] if ataques else "",
         "multiattack": int(f.get("multiataque", 1)),
-        "resistencias": [{"tipos": [t]} for t in f.get("resistencias", [])],
+        "resistencias": ([{"tipos": [t]} for t in f.get("resistencias", [])]
+                         + ([{"tipos": list(f["resistencias_nao_magicas"]), "requer_magica": True}]
+                            if f.get("resistencias_nao_magicas") else [])),
         "imunidades": [{"tipos": [t]} for t in f.get("imunidades", [])],
         "vulnerabilidades": [{"tipos": [t]} for t in f.get("vulnerabilidades", [])],
         "vida_temp": 0, "concentracao": None, "condicoes": [],
@@ -181,7 +208,7 @@ def em_forma_selvagem(char: dict) -> dict | None:
 
 
 def transformar(char: dict, chave: str, origem: str = "Forma Selvagem", concentracao_de: str = "",
-                magia: str = "", mental: bool = False) -> str:
+                magia: str = "", mental: bool = False, permanente_em: int | None = None) -> str:
     """
     A ficha vira a da fera. Forma Selvagem mantém a mente do druida;
     Polimorfia (`mental`) troca tudo e acaba com a concentração de quem conjurou.
@@ -193,6 +220,7 @@ def transformar(char: dict, chave: str, origem: str = "Forma Selvagem", concentr
     campos = _CAMPOS_DA_FERA + (_CAMPOS_DA_MENTE if mental else ())
     s["_forma_selvagem"] = {"forma": FICHAS[chave]["nome"], "chave": chave, "origem": origem,
                             "concentracao_de": concentracao_de, "magia": magia,
+                            "permanente_em": permanente_em,
                             "original": {k: copy.deepcopy(s.get(k)) for k in campos}}
     for k in campos:
         s[k] = copy.deepcopy(fera.get(k))
@@ -233,7 +261,8 @@ def _invocadas() -> list[dict]:
 
 
 def invocar(conjurador: dict, chave: str, quantos: int, magia: str, *,
-            concentracao: bool, persistente: bool, ate_hora: int | None = None) -> list[str]:
+            concentracao: bool, persistente: bool, ate_hora: int | None = None,
+            acompanha: bool | None = None, hostil_ao_perder: bool = False) -> list[str]:
     """Cria as criaturas e, com combate em andamento, põe na iniciativa e na zona de quem invocou."""
     from rpg import memory, tools_dnd as td
     f = FICHAS[chave]
@@ -249,7 +278,9 @@ def invocar(conjurador: dict, chave: str, quantos: int, magia: str, *,
             "traits": "", "notes": f.get("nota", ""), "status": "vivo", "lado": "aliado",
             "sheet": sheet, "inventario": [], "habilidades": [],
             "invocacao": {"por": memory.char_key(dono), "magia": magia, "concentracao": concentracao,
-                          "persistente": persistente, "ate_hora": ate_hora},
+                          "persistente": persistente, "ate_hora": ate_hora,
+                          "acompanha": persistente if acompanha is None else acompanha,
+                          "hostil_ao_perder": hostil_ao_perder},
         }
         nomes.append(nome)
     cs = memory.campaign.get("combat_state") or {}
@@ -296,7 +327,23 @@ def limpar(fim_do_combate: bool = False) -> list[str]:
     from rpg import memory, resolucao, tools_dnd as td
     linhas = []
     for c in list((memory.campaign.get("characters") or {}).values()):
-        fs = ((c or {}).get("sheet") or {}).get("_forma_selvagem") if isinstance(c, dict) else None
+        s_c = ((c or {}).get("sheet") or {}) if isinstance(c, dict) else {}
+        # Polimorfia Verdadeira com uma hora de concentração: fica para sempre.
+        for marca in [s_c.get("_forma_selvagem")] + [x for x in s_c.get("condicoes") or []
+                                                     if isinstance(x, dict) and x.get("permanente_em") is not None]:
+            if not marca or not marca.get("concentracao_de") or marca.get("permanente_em") is None:
+                continue
+            conj = memory.campaign["characters"].get(marca["concentracao_de"]) or {}
+            atual = ((conj.get("sheet") or {}).get("concentracao") or {})
+            segue = resolucao.norm(atual.get("magia", "")) == resolucao.norm(marca.get("magia", ""))
+            if segue and td._agora_em_horas() >= int(marca["permanente_em"]):
+                marca.update(concentracao_de="", permanente=True)
+                if marca is not s_c.get("_forma_selvagem"):
+                    # A condição sem "magia" sobrevive ao fim do combate.
+                    marca.pop("magia", None)
+                linhas.append(f"A {marca.get('origem', 'Polimorfia Verdadeira')} sobre {c.get('name')} "
+                              f"agora é permanente.")
+        fs = s_c.get("_forma_selvagem")
         if not fs or not fs.get("concentracao_de"):
             continue
         conj = memory.campaign["characters"].get(fs["concentracao_de"]) or {}
@@ -319,6 +366,15 @@ def limpar(fim_do_combate: bool = False) -> list[str]:
             motivo = "fim do combate"
         if not motivo and (c.get("status") or "").lower() == "morto":
             motivo = "caiu em combate"
+        # Conjurar Elemental: perdida a concentração, o elemental não some —
+        # vira inimigo de quem o chamou, até o prazo da magia acabar.
+        if motivo == "a concentração caiu" and inv.get("hostil_ao_perder"):
+            inv.update(concentracao=False, hostil_ao_perder=False, acompanha=False, persistente=False)
+            c["lado"] = "inimigo"
+            c["status"] = "inimigo"
+            linhas.append(f"{c.get('name')} se liberta do controle de {dono.get('name')} e se volta "
+                          f"contra o grupo!")
+            continue
         if motivo:
             linhas.append(dispensar(c, motivo))
     return linhas
@@ -329,7 +385,8 @@ def companheiros_de(nomes: list[str]) -> list[str]:
     from rpg import memory
     donos = {memory.char_key(n) for n in nomes}
     return [c["name"] for c in _invocadas()
-            if c["invocacao"].get("persistente") and c["invocacao"].get("por") in donos
+            if c["invocacao"].get("acompanha", c["invocacao"].get("persistente"))
+            and c["invocacao"].get("por") in donos
             and (c.get("status") or "").lower() not in ("morto", "fugiu")]
 
 

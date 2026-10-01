@@ -403,6 +403,21 @@ EFEITOS_DE_MAGIA: dict[str, dict] = {
                   "texto": "transforma uma criatura numa fera de ND até o nível (ou ND) dela: a ficha vira a da "
                            "fera, inclusive a mente; não fala nem conjura. Inimigo faz SAB. Quando a vida da fera "
                            "chega a 0, volta com o dano que sobrou. Acaba se a concentração cair"},
+    "True Polymorph": {"alvos": "aliado", "transformar": True, "verdadeira": True,
+                       "save_se_inimigo": "sabedoria",
+                       "texto": "transforma uma criatura em outra de ND até o nível (ou ND) dela — fera, "
+                                "elemental, morto-vivo — ou num objeto, que sai da luta. Inimigo faz SAB. "
+                                "Com uma hora de concentração, fica permanente"},
+    "Conjure Elemental": {"alvos": "si", "fora_de_combate": "1 minuto",
+                          "invocar": {"concentracao": True, "persistente": False, "acompanha": True,
+                                      "hostil_ao_perder": True, "horas": 1},
+                          "modos": {"elemental do ar:1": "Elemental do Ar (ND 5)",
+                                    "elemental da terra:1": "Elemental da Terra (ND 5)",
+                                    "elemental do fogo:1": "Elemental do Fogo (ND 5)",
+                                    "elemental da agua:1": "Elemental da Água (ND 5)"},
+                          "texto": "um elemental de ND 5 obedece a você enquanto durar a concentração (até "
+                                   "1 hora) e entra na próxima luta ao seu lado; se a concentração cair, "
+                                   "ele não some: vira inimigo do grupo"},
     # ── Lote 5: invocações ──────────────────────────────────────────────────
     "Spiritual Weapon": {"alvos": "inimigo", "arma_espiritual": True,
                          "texto": "uma arma espectral ataca agora (ataque mágico corpo a corpo, 1d8 + seu "
@@ -475,7 +490,7 @@ TEXTO_DA_CONDICAO = {
 # Aplicam "Enfeitiçado" no compêndio, mas o efeito é uma ordem, um transe ou
 # uma calma que só o Mestre sabe narrar. O motor rola o teste; o Mestre narra.
 NARRATIVAS_COM_TESTE = {"Suggestion", "Mass Suggestion", "Enthrall", "Calm Emotions",
-                        "Compulsion", "Geas", "True Polymorph",
+                        "Compulsion", "Geas",
                         "Gust of Wind", "Divine Word"}
 
 
@@ -664,7 +679,7 @@ def como_resolve(hab: dict, char: dict | None = None) -> dict:
                 from rpg import tools_dnd as td
                 modos = {z: f"{z}: a área cobre esta zona" for z in td._zonas()} if td._zonas_ativas() else {}
             if ef.get("transformar"):
-                modos = _modos_da_polimorfia()
+                modos = _modos_da_polimorfia(bool(ef.get("verdadeira")))
             if ef.get("teleporte") and char:
                 from rpg import tools_dnd as td
                 if td._zonas_ativas():
@@ -891,9 +906,9 @@ def validar(char: dict, hab: dict, alvo: str, modo: str) -> str:
             from rpg import criaturas
             if not a or not a.get("sheet"):
                 return f"Aviso: escolha quem {nome_pt} transforma. Nada foi gasto."
-            if modo not in criaturas.FICHAS:
-                return (f"Aviso: escolha a fera de {nome_pt}. Nada foi gasto.")
-            nd_fera = criaturas.nd_valor(criaturas.FICHAS[modo]["nd"])
+            if modo not in _modos_da_polimorfia(bool(ef.get("verdadeira"))):
+                return (f"Aviso: escolha a forma de {nome_pt}. Nada foi gasto.")
+            nd_fera = criaturas.nd_valor(criaturas.FICHAS[modo]["nd"]) if modo != "objeto" else 0.0
             if nd_fera > _nd_de(a):
                 return (f"Aviso: {criaturas.FICHAS[modo]['nome']} (ND {criaturas.FICHAS[modo]['nd']}) é forte "
                         f"demais para {a['name']}: a fera precisa de ND até o nível (ou ND) dele. Nada foi gasto.")
@@ -1107,9 +1122,18 @@ def _magia_especial(char: dict, hab: dict, ef: dict, a: dict, modo: str, nome_pt
             pre = f"\n   {a['name']}: {linha} — falhou."
         else:
             pre = ""
+        permanente_em = td._agora_em_horas() + 1 if ef.get("verdadeira") else None
+        if modo == "objeto":
+            _tirar_condicoes(a, ("objeto",))
+            a.setdefault("sheet", {}).setdefault("condicoes", []).append(
+                {"nome": "Objeto", "duracao": None, "por": char["name"], "magia": hab.get("nome", ""),
+                 "concentracao_de": memory.char_key(char.get("name", "")), "permanente_em": permanente_em,
+                 "origem": nome_pt})
+            return (pre + f"\n   {nome_pt}: {a['name']} vira um objeto inerte — sai da luta enquanto "
+                    f"durar a concentração (permanente depois de uma hora).")
         return pre + "\n   " + criaturas.transformar(
             a, modo, origem=nome_pt, concentracao_de=memory.char_key(char.get("name", "")),
-            magia=hab.get("nome", ""), mental=True)
+            magia=hab.get("nome", ""), mental=True, permanente_em=permanente_em)
     if ef.get("arma_espiritual"):
         return _arma_espiritual(char, hab, a, modo, nome_pt)
     st = a.setdefault("sheet", {})
@@ -1179,10 +1203,14 @@ def _magia_de_zona(char: dict, hab: dict, ef: dict, modo: str, nome_pt: str) -> 
     return f"\n   {nome_pt} em {modo}: {ef['texto']}."
 
 
-def _modos_da_polimorfia() -> dict:
+def _modos_da_polimorfia(verdadeira: bool = False) -> dict:
+    """Polimorfia: só feras. Polimorfia Verdadeira: qualquer criatura, ou um objeto."""
     from rpg import criaturas
-    return {chave: f"{f['nome']}: ND {f['nd']}, {f['pv']} PV, CA {f['ca']}"
-            for chave, f in criaturas.FICHAS.items() if f["tipo"] == "beast"}
+    saida = {chave: f"{f['nome']}: ND {f['nd']}, {f['pv']} PV, CA {f['ca']}"
+             for chave, f in criaturas.FICHAS.items() if verdadeira or f["tipo"] == "beast"}
+    if verdadeira:
+        saida["objeto"] = "Objeto: vira uma coisa inerte e sai da luta"
+    return saida
 
 
 def _nd_de(ch: dict) -> float:
@@ -1208,13 +1236,16 @@ def _invocar(char: dict, hab: dict, ef: dict, modo: str, nome_pt: str) -> str:
     ate = td._agora_em_horas() + int(cfg["horas"]) if cfg.get("horas") else None
     nomes = criaturas.invocar(char, chave, quantos, hab.get("nome", ""),
                               concentracao=bool(cfg.get("concentracao")),
-                              persistente=bool(cfg.get("persistente")), ate_hora=ate)
+                              persistente=bool(cfg.get("persistente")), ate_hora=ate,
+                              acompanha=cfg.get("acompanha"),
+                              hostil_ao_perder=bool(cfg.get("hostil_ao_perder")))
     na_luta = (memory.campaign.get("combat_state") or {}).get("is_active")
     return (f"\n   {nome_pt}: " + ", ".join(nomes) + (" entram na luta ao lado de " + char["name"]
                                                     + " (o motor conduz o turno delas)." if na_luta and len(nomes) > 1
                                                     else (" entra na luta ao lado de " + char["name"] + "."
                                                           if na_luta else f" acompanha {char['name']}."))
-            + (f" Some em 24 horas." if cfg.get("horas") else ""))
+            + (f" Some em {cfg['horas']} hora{'s' if int(cfg['horas']) > 1 else ''}."
+               if cfg.get("horas") else ""))
 
 
 def _arma_espiritual(char: dict, hab: dict, alvo: dict, modo: str, nome_pt: str) -> str:

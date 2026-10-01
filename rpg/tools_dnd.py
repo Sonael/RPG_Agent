@@ -3161,6 +3161,8 @@ CONDITION_EFFECTS: dict[str, dict] = {
     "banido":      {"no_actions": True, "untargetable": True},
     # Piscar: no Plano Etéreo até o início do próximo turno — ninguém alcança.
     "etéreo":      {"untargetable": True},
+    # Polimorfia Verdadeira em objeto: fora da luta.
+    "objeto":      {"no_actions": True, "no_movement": True, "untargetable": True},
     # Raio do Enfraquecimento: metade do dano com armas de FOR.
     "enfraquecido": {"metade_dano_for": True},
     "transformado":{},
@@ -12170,7 +12172,7 @@ def end_combat() -> str:
             _sh["concentracao"] = None
         _sh.pop("reacao_rodada", None)
         # A fera volta a ser druida, e o Frenesi cobra a exaustão.
-        if _sh.get("_forma_selvagem"):
+        if _sh.get("_forma_selvagem") and not _sh["_forma_selvagem"].get("permanente"):
             from rpg import criaturas
             criaturas.voltar(_ch, "fim do combate")
         if _sh.pop("_frenesi", None):
