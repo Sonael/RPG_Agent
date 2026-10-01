@@ -204,6 +204,117 @@ def voltar(char: dict, motivo: str = "") -> str:
             + (f" ({motivo})" if motivo else "") + f": {s.get('vida_atual')}/{s.get('vida_max')} PV.")
 
 
+# ===========================================================================
+# INVOCAÇÕES
+# ===========================================================================
+# A criatura invocada entra na história como personagem do lado "aliado": o
+# motor conduz o turno dela, como o de qualquer aliado (memory.lado_no_combate).
+# `invocacao` guarda de onde ela veio e o que a faz sumir:
+#   por          chave de quem invocou
+#   magia        o nome da magia na ficha
+#   concentracao some quando quem invocou perde a concentração nesta magia
+#   persistente  fica depois do combate (familiar, montaria, mortos animados)
+#   ate_hora     some quando o relógio do mundo chega lá (Animar Mortos: 24 h)
+
+def _invocadas() -> list[dict]:
+    from rpg import memory
+    return [c for c in (memory.campaign.get("characters") or {}).values()
+            if isinstance(c, dict) and isinstance(c.get("invocacao"), dict)]
+
+
+def invocar(conjurador: dict, chave: str, quantos: int, magia: str, *,
+            concentracao: bool, persistente: bool, ate_hora: int | None = None) -> list[str]:
+    """Cria as criaturas e, com combate em andamento, põe na iniciativa e na zona de quem invocou."""
+    from rpg import memory, tools_dnd as td
+    f = FICHAS[chave]
+    dono = conjurador.get("name", "")
+    nomes = []
+    for i in range(quantos):
+        nome = f"{f['nome']} de {dono}" + (f" {i + 1}" if quantos > 1 else "")
+        sheet = montar_sheet(chave)
+        if f.get("nao_ataca"):
+            sheet["nao_ataca"] = True
+        memory.campaign["characters"][memory.char_key(nome)] = {
+            "name": nome, "description": f"{f['nome']} invocado por {dono} ({magia}).",
+            "traits": "", "notes": f.get("nota", ""), "status": "vivo", "lado": "aliado",
+            "sheet": sheet, "inventario": [], "habilidades": [],
+            "invocacao": {"por": memory.char_key(dono), "magia": magia, "concentracao": concentracao,
+                          "persistente": persistente, "ate_hora": ate_hora},
+        }
+        nomes.append(nome)
+    cs = memory.campaign.get("combat_state") or {}
+    if cs.get("is_active") and nomes:
+        td._entrar_no_combate_em_andamento(nomes, cs)
+        zona = td._zona_de(dono)
+        if zona:
+            for n in nomes:
+                cs.setdefault("posicoes", {})[memory.char_key(n)] = zona
+    return nomes
+
+
+def dispensar(criatura: dict, motivo: str) -> str:
+    from rpg import memory
+    nome = criatura.get("name", "")
+    chave = memory.char_key(nome)
+    cs = memory.campaign.get("combat_state") or {}
+    ordem = cs.get("initiative_order") or []
+    idx = next((i for i, n in enumerate(ordem) if memory.char_key(n) == chave), None)
+    if idx is not None:
+        ordem.pop(idx)
+        atual = cs.get("current_turn_index", 0)
+        if isinstance(atual, int) and idx < atual:
+            cs["current_turn_index"] = atual - 1
+        elif isinstance(atual, int) and atual >= len(ordem):
+            cs["current_turn_index"] = 0
+        (cs.get("posicoes") or {}).pop(chave, None)
+    memory.campaign["characters"].pop(chave, None)
+    return f"{nome} desaparece ({motivo})."
+
+
+def dispensar_de(dono_chave: str, magia: str, motivo: str) -> list[str]:
+    from rpg import resolucao
+    return [dispensar(c, motivo) for c in _invocadas()
+            if c["invocacao"].get("por") == dono_chave
+            and resolucao.norm(c["invocacao"].get("magia", "")) == resolucao.norm(magia)]
+
+
+def limpar(fim_do_combate: bool = False) -> list[str]:
+    """
+    Tira as invocações que acabaram: concentração perdida, prazo do relógio
+    vencido, quem invocou morto, ou (no fim do combate) as que só duram a luta.
+    """
+    from rpg import memory, resolucao, tools_dnd as td
+    linhas = []
+    for c in _invocadas():
+        inv = c["invocacao"]
+        dono = memory.campaign["characters"].get(inv.get("por", ""))
+        motivo = ""
+        if not dono or (dono.get("status") or "").lower() == "morto":
+            motivo = "quem a invocou se foi"
+        elif inv.get("concentracao"):
+            atual = ((dono.get("sheet") or {}).get("concentracao") or {})
+            if resolucao.norm(atual.get("magia", "")) != resolucao.norm(inv.get("magia", "")):
+                motivo = "a concentração caiu"
+        if not motivo and inv.get("ate_hora") is not None and td._agora_em_horas() >= int(inv["ate_hora"]):
+            motivo = "o tempo da magia acabou"
+        if not motivo and fim_do_combate and not inv.get("persistente"):
+            motivo = "fim do combate"
+        if not motivo and (c.get("status") or "").lower() == "morto":
+            motivo = "caiu em combate"
+        if motivo:
+            linhas.append(dispensar(c, motivo))
+    return linhas
+
+
+def companheiros_de(nomes: list[str]) -> list[str]:
+    """Os companheiros persistentes (familiar, montaria, mortos animados) destes personagens."""
+    from rpg import memory
+    donos = {memory.char_key(n) for n in nomes}
+    return [c["name"] for c in _invocadas()
+            if c["invocacao"].get("persistente") and c["invocacao"].get("por") in donos
+            and (c.get("status") or "").lower() not in ("morto", "fugiu")]
+
+
 def quando_a_fera_cai(char: dict, sobra: int) -> str:
     """A fera chegou a 0 PV: o druida volta e o dano que sobrou passa a ele."""
     linha = voltar(char, "a fera caiu")

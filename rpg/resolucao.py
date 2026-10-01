@@ -387,6 +387,34 @@ EFEITOS_DE_MAGIA: dict[str, dict] = {
                           "gasta um diamante da mochila"},
     "Misty Step": {"alvos": "si", "teleporte": True,
                    "texto": "teleporta você para uma zona vizinha, sem ataque de oportunidade"},
+    # ── Lote 5: invocações ──────────────────────────────────────────────────
+    "Spiritual Weapon": {"alvos": "inimigo", "arma_espiritual": True,
+                         "texto": "uma arma espectral ataca agora (ataque mágico corpo a corpo, 1d8 + seu "
+                                  "modificador de força); nos turnos seguintes, ação bônus para atacar de novo "
+                                  "sem gastar mana, até o fim do combate"},
+    "Conjure Animals": {"alvos": "si", "invocar": {"concentracao": True, "persistente": False},
+                        "modos": {"urso polar:1": "1 urso-polar (ND 2)",
+                                  "lobo atroz:2": "2 lobos atrozes (ND 1)",
+                                  "urso pardo:2": "2 ursos-pardos (ND 1)",
+                                  "urso negro:4": "4 ursos-negros (ND 1/2)",
+                                  "lobo:8": "8 lobos (ND 1/4)"},
+                        "texto": "feras do seu lado entram na luta; o motor conduz o turno delas e elas somem "
+                                 "se a concentração cair ou no fim do combate"},
+    "Find Familiar": {"alvos": "si", "invocar": {"concentracao": False, "persistente": True, "um_so": True},
+                      "fora_de_combate": "1 hora",
+                      "modos": {"coruja:1": "Coruja", "gato:1": "Gato", "corvo:1": "Corvo",
+                                "morcego:1": "Morcego", "rato:1": "Rato", "aranha:1": "Aranha"},
+                      "texto": "um familiar acompanha você (não ataca; na luta, ajuda: o próximo ataque contra "
+                               "o inimigo ao lado dele tem vantagem)"},
+    "Find Steed": {"alvos": "si", "invocar": {"concentracao": False, "persistente": True, "um_so": True},
+                   "fora_de_combate": "10 minutos",
+                   "modos": {"cavalo de guerra:1": "Cavalo de guerra", "ponei:1": "Pônei"},
+                   "texto": "uma montaria leal acompanha você e luta ao seu lado"},
+    "Animate Dead": {"alvos": "si", "invocar": {"concentracao": False, "persistente": True, "horas": 24},
+                     "fora_de_combate": "1 minuto",
+                     "modos": {"esqueleto:1": "Esqueleto", "zumbi:1": "Zumbi"},
+                     "texto": "um morto-vivo obedece a você por 24 horas e luta ao seu lado (precisa de um "
+                              "cadáver ou ossos, que o Mestre narra)"},
 }
 
 # Quem a Proteção contra o Bem e o Mal protege.
@@ -620,9 +648,11 @@ def como_resolve(hab: dict, char: dict | None = None) -> dict:
                 from rpg import tools_dnd as td
                 if td._zonas_ativas():
                     modos = {z: f"{z}: zona vizinha" for z in _zonas_vizinhas(char)}
-            if not modos:
+            if not modos and not (ef.get("arma_espiritual") and char and reuso_gratis(char, hab)):
                 modos = circulos_da_magia(hab, char)
             saida.update(modos=list(modos), modos_texto=modos)
+            if ef.get("arma_espiritual") and char and reuso_gratis(char, hab):
+                saida["texto"] = "A arma espectral já está em campo: ação bônus para atacar de novo, sem gastar mana."
             return saida
         efeito = m.get("efeito")
         if efeito in ("dano", "cura", "pool") and (m.get("dado") or efeito == "pool"):
@@ -832,6 +862,11 @@ def validar(char: dict, hab: dict, alvo: str, modo: str) -> str:
             if not _diamante(char):
                 return (f"Aviso: {nome_pt} precisa de um diamante (300 po) na mochila de "
                         f"{char['name']}. Nada foi gasto.")
+        if ef.get("fora_de_combate") and (memory.campaign.get("combat_state") or {}).get("is_active"):
+            return (f"Aviso: {nome_pt} leva {ef['fora_de_combate']} para conjurar — não dá no meio da luta. "
+                    f"Nada foi gasto.")
+        if ef.get("arma_espiritual") and not a:
+            return f"Aviso: escolha quem a Arma Espiritual ataca. Nada foi gasto."
         if ef.get("teleporte"):
             from rpg import tools_dnd as td
             if td._zonas_ativas() and modo not in _zonas_vizinhas(char):
@@ -907,7 +942,7 @@ def _alvos_da_magia(char: dict, ef: dict, alvo_nome: str) -> list[dict]:
         if not alvo:
             return []
         return [c for c in _combatentes_vivos() if _perto(alvo, c)]
-    if tipo == "inimigo_ataque":
+    if tipo in ("inimigo_ataque", "inimigo"):
         return [alvo] if alvo else []
     return []
 
@@ -1024,6 +1059,10 @@ def _magia_especial(char: dict, hab: dict, ef: dict, a: dict, modo: str, nome_pt
     caminho comum de aplicar_magia.
     """
     from rpg import encantos, tools_dnd as td
+    if ef.get("invocar"):
+        return _invocar(char, hab, ef, modo, nome_pt)
+    if ef.get("arma_espiritual"):
+        return _arma_espiritual(char, hab, a, modo, nome_pt)
     st = a.setdefault("sheet", {})
     if ef.get("tira_um"):
         for alvo_c in ef["tira_um"]:
@@ -1074,6 +1113,80 @@ def _magia_especial(char: dict, hab: dict, ef: dict, a: dict, modo: str, nome_pt
     return None
 
 
+# ── Invocações ───────────────────────────────────────────────────────────────
+
+def _invocar(char: dict, hab: dict, ef: dict, modo: str, nome_pt: str) -> str:
+    from rpg import criaturas, tools_dnd as td
+    cfg = ef["invocar"]
+    chave, _, n = (modo or "").partition(":")
+    quantos = int(n or 1)
+    if cfg.get("um_so"):
+        criaturas.dispensar_de(memory.char_key(char.get("name", "")), hab.get("nome", ""), "substituído")
+    ate = td._agora_em_horas() + int(cfg["horas"]) if cfg.get("horas") else None
+    nomes = criaturas.invocar(char, chave, quantos, hab.get("nome", ""),
+                              concentracao=bool(cfg.get("concentracao")),
+                              persistente=bool(cfg.get("persistente")), ate_hora=ate)
+    na_luta = (memory.campaign.get("combat_state") or {}).get("is_active")
+    return (f"\n   {nome_pt}: " + ", ".join(nomes) + (" entram na luta ao lado de " + char["name"]
+                                                    + " (o motor conduz o turno delas)." if na_luta and len(nomes) > 1
+                                                    else (" entra na luta ao lado de " + char["name"] + "."
+                                                          if na_luta else f" acompanha {char['name']}."))
+            + (f" Some em 24 horas." if cfg.get("horas") else ""))
+
+
+def _arma_espiritual(char: dict, hab: dict, alvo: dict, modo: str, nome_pt: str) -> str:
+    """Cria (ou reusa) a arma espectral e ataca: 1d8 + mod de força, +1d8 a cada 2 círculos acima do 2º."""
+    from rpg import tools_dnd as td
+    ativa = next((e for e in td._efeitos_de(char) if e.get("arma_espiritual")), None)
+    if not ativa:
+        circ = circulo_do_modo(hab, modo) or 2
+        dados = 1 + max(0, circ - 2) // 2
+        ativa = {"nome": "Arma Espiritual", "arma_espiritual": f"{dados}d8", "magia": hab.get("nome", "")}
+        td.dar_efeito_de_combate(char, ativa)
+        abre = f"\n   {nome_pt}: uma arma espectral surge ao lado de {alvo['name']}."
+    else:
+        abre = f"\n   {nome_pt}: a arma espectral ataca de novo (sem gastar mana)."
+    acertou, critico, linha = td._rolar_ataque_magico(char, alvo, hab)
+    if not acertou:
+        return abre + linha
+    n, faces, _b = td._parse_dice(ativa["arma_espiritual"])
+    rolls = [random.randint(1, faces) for _ in range(n * (2 if critico else 1))]
+    attr = td._atributo_de_conjuracao(char.get("sheet") or {}) or "sabedoria"
+    total = sum(rolls) + max(0, _mod(char, attr))
+    res = td._apply_damage(alvo, total, "force", source_name=char["name"], arma_magica=True)
+    texto = (abre + linha + f"\n   Dano: [{' + '.join(map(str, rolls))}] + mod = **{total}** de força"
+             + td._fmt_notas(res["notas"])
+             + f"\n   {alvo['name']}: {res['hp_antes']} → {res['hp_depois']}/{alvo['sheet'].get('vida_max')}")
+    if res["hp_depois"] == 0 and res["hp_antes"] > 0:
+        texto += td._mark_at_zero_hp(alvo, char["name"])
+    return texto
+
+
+def reuso_gratis(char: dict, hab: dict) -> bool:
+    """A Arma Espiritual já está em campo: atacar de novo não gasta mana."""
+    from rpg import tools_dnd as td
+    m = _magia_srd(hab) or {}
+    return m.get("nome_srd") == "Spiritual Weapon" and any(
+        e.get("arma_espiritual") for e in td._efeitos_de(char))
+
+
+# ── Rituais ──────────────────────────────────────────────────────────────────
+_CLASSES_DE_RITUAL = ("bardo", "clerigo", "druida", "mago")
+
+
+def pode_ritual(char: dict, hab: dict) -> bool:
+    """A magia é ritual e a classe conjura rituais (bruxo só com o Livro das Sombras)."""
+    from rpg import tools_dnd as td
+    m = _magia_srd(hab) or {}
+    if not m.get("ritual"):
+        return False
+    classe = norm((char.get("sheet") or {}).get("classe", ""))
+    if classe in _CLASSES_DE_RITUAL:
+        return True
+    return classe == "bruxo" and td._tem_habilidade(
+        char, "livro das sombras", "pacto do tomo", "book of ancient secrets", "livro de segredos antigos")
+
+
 # ── Conjurar com mais mana ───────────────────────────────────────────────────
 _ESCALA_RE = re.compile(r"increases? by (\d+)d(\d+) for (each|every two) slot levels? above", re.I)
 
@@ -1104,7 +1217,8 @@ def dado_no_circulo(hab: dict, formula: str, circulo: int) -> str:
 def _escala(m: dict) -> bool:
     return bool(m.get("escala_espaco") or m.get("alvos_por_espaco")
                 or _ESCALA_RE.search(m.get("nivel_superior_en") or "")
-                or m.get("nome_srd") in ("Aid", "False Life", "Magic Weapon", "Branding Smite"))
+                or m.get("nome_srd") in ("Aid", "False Life", "Magic Weapon", "Branding Smite",
+                                         "Spiritual Weapon"))
 
 
 def circulos_da_magia(hab: dict, char: dict | None) -> dict:

@@ -3516,7 +3516,10 @@ def _break_concentration(char: dict, motivo: str = "") -> str:
     sufixo = f" ({motivo})" if motivo else ""
     _log_combat_event("concentration_break", char.get("name", ""), "",
                       msg=f"{char.get('name','')} perdeu a concentração em {magia}{sufixo}")
-    return f"{char.get('name','')} PERDEU a concentração em {magia}{sufixo}!"
+    from rpg import criaturas
+    sumiram = criaturas.limpar()
+    return (f"{char.get('name','')} PERDEU a concentração em {magia}{sufixo}!"
+            + (" " + " ".join(sumiram) if sumiram else ""))
 
 
 def _start_concentration(char: dict, magia: str) -> str:
@@ -3533,6 +3536,11 @@ def _start_concentration(char: dict, magia: str) -> str:
                 f"{atual['magia']} para conjurar {magia}.")
     cs = memory.campaign.get("combat_state", {}) or {}
     sheet["concentracao"] = {"magia": magia, "rodada": int(cs.get("round", 1) or 1)}
+    if nota:
+        from rpg import criaturas
+        sumiram = criaturas.limpar()
+        if sumiram:
+            nota += "\n   " + " ".join(sumiram)
     return nota
 
 
@@ -7014,6 +7022,7 @@ def use_ability(
     end_turn: bool = True,
     _skip_turn_check: bool = False,
     modo: str = "",
+    _ritual: bool = False,
 ) -> str:
     """
     Usa uma habilidade do personagem: verifica mana, desconta o custo,
@@ -7114,6 +7123,16 @@ def use_ability(
 
     s     = char["sheet"]
     custo = hab.get("custo_mana", 0)
+    # Arma Espiritual em campo: atacar de novo é ação bônus, sem mana.
+    if _resolucao.reuso_gratis(char, hab):
+        custo = 0
+        modo = ""
+    # Ritual (fora do combate, pelo Grimório): sem mana, dez minutos a mais.
+    if _ritual:
+        if not _resolucao.pode_ritual(char, hab):
+            return (f"Aviso: {hab['nome']} não pode ser conjurada como ritual por {char['name']} "
+                    f"(a magia não é ritual, ou a classe não conjura rituais). Nada foi gasto.")
+        custo = 0
 
     # ── Conjurar com mais mana (círculo acima do da magia) ────────────────
     _circulo = _resolucao.circulo_do_modo(hab, modo)
@@ -10873,8 +10892,10 @@ def advance_time(hours: int, reason: str = "") -> str:
     memory.marcar_upkeep("relogio")
     # Enfeitiçar Pessoa dura uma hora: passada a hora, o encanto acaba (e o
     # alvo sabe o que fizeram com ele). O mestre recebe a linha para narrar.
-    from rpg import encantos
+    from rpg import criaturas, encantos
     acabaram = encantos.expirar()
+    # Animar Mortos dura 24 horas: o morto-vivo some quando o relógio chega lá.
+    acabaram += criaturas.limpar()
     memory.save_campaign()
 
     motivo = f" — {reason}" if reason else ""
@@ -11855,6 +11876,9 @@ def roll_initiative(characters_names: str, allies: str = "") -> str:
     )
     if not names:
         return "Informe ao menos um personagem."
+    from rpg import criaturas as _criaturas
+    names = names + [n for n in _criaturas.companheiros_de(names)
+                     if memory.char_key(n) not in {memory.char_key(x) for x in names}]
 
     # Marca os aliados ANTES de montar a ordem: o lado de cada um é congelado
     # ao entrar na luta (_marcar_lado_na_entrada).
@@ -12061,6 +12085,8 @@ def end_combat() -> str:
     """
     cs = memory.campaign.get("combat_state", {})
     _log_combat_event("combat_end", msg="Combate encerrado")
+    from rpg import criaturas
+    criaturas.limpar(fim_do_combate=True)
     cs["is_active"]           = False
     cs["initiative_order"]    = []
     cs["current_turn_index"]  = 0
@@ -12844,6 +12870,7 @@ def grimoire_snapshot(char_name: str = "", query: str = "",
     # Para conjurar fora do combate pela tela: o que acontece ao usar e quem
     # a magia mira (rpg/resolucao.py), como no cartão do combate.
     from rpg import habilidade as _habilidade
+    from rpg import resolucao as _resolucao_g
 
     def _conhecida(h: dict) -> dict:
         r = _habilidade.resolver(h, alvo)
@@ -12851,7 +12878,12 @@ def grimoire_snapshot(char_name: str = "", query: str = "",
                 "custo_mana": int(h.get("custo_mana", 0) or 0), "dado": h.get("dado", ""),
                 "descricao": h.get("descricao", ""), "resumo": r["resumo"],
                 "resolucao": r["resolucao"], "resolucao_texto": r["resolucao_texto"],
-                "alvo_modo": r["alvo_modo"] or ("si" if r["alvos"] == "si" else "")}
+                "alvo_modo": r["alvo_modo"] or ("si" if r["alvos"] == "si" else ""),
+                # Convocar Familiar pede a forma; círculos não fazem sentido aqui.
+                "modos": [m for m in r["modos"] if not str(m["id"]).startswith("c")
+                          or not str(m["id"])[1:].isdigit()],
+                "ritual": bool(_resolucao_g._magia_srd(h) and _resolucao_g._magia_srd(h).get("ritual")),
+                "pode_ritual": _resolucao_g.pode_ritual(alvo, h)}
 
     conhecidas = sorted((_conhecida(h) for h in _magias_da_ficha(alvo)),
                         key=lambda m: (m["nivel"], m["nome"].lower()))
@@ -12932,7 +12964,8 @@ def alvos_fora_de_combate(ator: str) -> dict:
     return {"aqui": sorted(aqui, key=str.lower), "outros": sorted(outros, key=str.lower)}
 
 
-def conjurar_fora_de_combate(ator: str, habilidade: str, alvo: str = "") -> dict:
+def conjurar_fora_de_combate(ator: str, habilidade: str, alvo: str = "", modo: str = "",
+                             ritual: bool = False) -> dict:
     """
     Conjura uma magia FORA do combate pela tela (Grimório): o motor gasta a
     mana, rola o que é dele rolar (salvaguarda, cura, o encanto) e devolve o
@@ -12945,10 +12978,22 @@ def conjurar_fora_de_combate(ator: str, habilidade: str, alvo: str = "") -> dict
     if cs.get("is_active"):
         return {"ok": False, "message": ("Aviso: há um combate em andamento — conjure pela "
                                          "tela de combate, que cobra a ação do turno.")}
-    msg = use_ability(ator, habilidade, alvo, end_turn=False)
+    msg = use_ability(ator, habilidade, alvo, end_turn=False, modo=modo, _ritual=ritual)
     recusou = msg.startswith(("Erro:", "Aviso:")) or "não conhece" in msg.split("\n")[0]
     if recusou:
         return {"ok": False, "message": msg}
+    # O tempo de conjuração: uma hora (Convocar Familiar) passa no relógio;
+    # o ritual soma dez minutos, que o relógio de horas não registra.
+    from rpg import resolucao as _res
+    _m = _res._magia_srd({"nome": habilidade}) or {}
+    _ch_c = memory.campaign["characters"].get(memory.char_key(ator)) or {}
+    _hab_c = next((h for h in _ch_c.get("habilidades") or []
+                   if isinstance(h, dict) and _norm_txt(h.get("nome", "")) == _norm_txt(habilidade)), None)
+    _m = _res._magia_srd(_hab_c or {"nome": habilidade}) or _m
+    if "hora" in _norm_txt(_m.get("tempo_de_conjuracao", "")):
+        msg += "\n   " + advance_time(1, f"conjurar {habilidade}").split("\n")[0]
+    if ritual:
+        msg += "\n   Como ritual: sem mana, e dez minutos a mais de conjuração."
     memory.save_campaign()
     em = f" em {alvo}" if alvo and memory.char_key(alvo) != memory.char_key(ator) else ""
     para_o_mestre = (f"[MAGIA FORA DE COMBATE, resolvida na tela] {ator} conjurou "
@@ -14367,6 +14412,23 @@ def _executar_turno_npc(npc_name: str = "") -> str:
         _log_combat_event("pass", npc_name, "", msg=f"{npc_name} está {preso} e não age")
         memory.save_campaign()
         return f"{npc_name} está **{preso}** e não age neste turno." + _auto_advance_turn(npc_name)
+
+    # Familiar: não ataca (SRD). Ajuda contra o inimigo da zona dele, ou se esquiva.
+    if (npc.get("sheet") or {}).get("nao_ataca"):
+        from rpg import manobras as _manobras
+        _inimigos_aqui = _inimigos_na_zona(npc_name, _zona_de(npc_name)) if _zonas_ativas() else [
+            c["name"] for c in (memory.campaign.get("characters") or {}).values()
+            if memory.char_key(c.get("name", "")) in {memory.char_key(n) for n in
+                                                      (memory.campaign["combat_state"].get("initiative_order") or [])}
+            and not memory.luta_com_o_grupo(c) and (c.get("status") or "").lower() not in OUT_OF_COMBAT_STATUSES]
+        if _inimigos_aqui:
+            _txt_f = _manobras.ajudar(npc_name, _inimigos_aqui[0])
+        else:
+            dar_efeito_de_combate(npc, {"nome": "Esquiva", "desvantagem_contra_mim": True,
+                                        "ate_turno_de": memory.char_key(npc_name)})
+            _txt_f = f"{npc_name} se esquiva e fica por perto."
+        memory.save_campaign()
+        return _txt_f + _auto_advance_turn(npc_name)
 
     # Quem preparou um ataque contra ele (ação Preparar) ataca antes.
     from rpg import manobras as _manobras
@@ -15941,8 +16003,9 @@ def _encanto_nota(ch: dict) -> str:
 
 def combat_snapshot() -> dict:
     """Estado completo do combate para a tela tática (JSON-serializável)."""
-    from rpg import encantos
+    from rpg import criaturas, encantos
     encantos.expirar()
+    criaturas.limpar()
     camp = memory.campaign
     cs   = camp.get("combat_state", {}) or {}
     order = list(cs.get("initiative_order", []) or [])

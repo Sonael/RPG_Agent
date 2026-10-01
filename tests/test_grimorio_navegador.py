@@ -402,3 +402,23 @@ def test_em_combate_o_botao_conjurar_some(navegador):
     pg.evaluate("window.Grimoire._abrir('Helena')")
     pg.wait_for_selector(".grm-conhecida", timeout=10000)
     assert pg.locator(".grm-conjurar-btn").count() == 0
+
+
+def test_familiar_como_ritual_escolhe_a_forma_e_nao_gasta_mana(navegador):
+    """Convocar Familiar pede a forma; como ritual, não gasta mana (clérigo conjura rituais)."""
+    import capturar_telas as cap
+    estado = copy.deepcopy(cap.GRIMORIO)
+    estado["characters"]["helena"]["habilidades"].append(
+        cap._magia_de_captura("Convocar Familiar", 1, "Conjuração",
+                              "Um espírito toma a forma de um animal e serve você."))
+    pg, erros = navegador(estado)
+    mana_antes = _estado(pg)["personagem"]["mana_atual"]
+    linha = ".grm-conhecida[data-nome='Convocar Familiar']"
+    _clicar(pg, f"{linha} .grm-ritual-btn", 600)
+    assert "Qual?" in pg.inner_text(".grm-conjurar-painel")
+    _clicar(pg, ".grm-conjurar-painel .grm-modo:has-text('Coruja')", 1500)
+    assert pg.evaluate("() => document.getElementById('grimoire-overlay').classList.contains('hidden')")
+    enviado = pg.evaluate("() => window.__enviado")
+    assert enviado and "Coruja de Helena" in enviado[-1]
+    assert _estado(pg)["personagem"]["mana_atual"] == mana_antes
+    assert not erros, f"erros no console: {erros[:3]}"

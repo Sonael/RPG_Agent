@@ -211,6 +211,9 @@
             ${_last.em_combate ? '' : `<button class="grm-conjurar-btn" type="button"
                 title="${esc(m.resolucao_texto || 'Conjurar agora, fora do combate')}"
                 onclick="window.Grimoire._conjurar('${esc(m.nome).replace(/'/g, "\\'")}')">Conjurar</button>`}
+            ${(!_last.em_combate && m.ritual && m.pode_ritual) ? `<button class="grm-conjurar-btn grm-ritual-btn" type="button"
+                title="Como ritual: sem gastar mana, com dez minutos a mais de conjuração"
+                onclick="window.Grimoire._conjurar('${esc(m.nome).replace(/'/g, "\\'")}', true)">Como ritual</button>` : ''}
           </div>`).join('')}
       </div>`).join('');
   }
@@ -219,11 +222,36 @@
   // Antes a magia fora da luta só existia se o Mestre lembrasse de chamar a
   // ferramenta: o Enfeitiçar Pessoa no guarda podia não gastar mana nem
   // deixar o guarda enfeitiçado. Aqui o motor resolve e o Mestre narra.
-  async function conjurar(nome) {
+  // O que está sendo conjurado: a escolha (forma do familiar...) e se é ritual
+  // seguem até o alvo.
+  let _conj = { modo: '', ritual: false };
+
+  async function conjurar(nome, ritual, modo) {
     if (_busy) return;
     const p = _last.personagem || {};
     const m = (p.conhecidas || []).find(x => x.nome === nome);
     if (!p.nome || !m) return;
+    _conj = { modo: modo || '', ritual: !!ritual };
+    // Convocar Familiar, Encontrar Montaria, Animar Mortos: primeiro a forma.
+    if ((m.modos || []).length && !modo) {
+      const el0 = [...document.querySelectorAll('#grimoire-overlay .grm-conhecida')].find(e => e.dataset.nome === nome);
+      if (!el0) return;
+      document.querySelectorAll('#grimoire-overlay .grm-conjurar-painel').forEach(x => x.remove());
+      const painel0 = document.createElement('div');
+      painel0.className = 'grm-conjurar-painel';
+      painel0.innerHTML = `
+        <div class="grm-conjurar-como">${esc(m.resolucao_texto || m.resumo || '')}</div>
+        <div class="grm-conjurar-titulo">Qual?</div>
+        <div class="grm-alvos">${m.modos.map(o => `<button class="grm-alvo grm-modo" type="button"
+            data-modo="${esc(o.id)}"
+            onclick="window.Grimoire._conjurar('${esc(nome).replace(/'/g, "\\'")}', ${!!ritual}, '${esc(o.id).replace(/'/g, "\\'")}')">${esc(o.texto)}</button>`).join('')}</div>
+        <div class="grm-alvos-rodape">
+          <button class="grm-alvo grm-alvo-cancelar" type="button"
+                  onclick="this.closest('.grm-conjurar-painel').remove()">Cancelar</button>
+        </div>`;
+      el0.after(painel0);
+      return;
+    }
     if (m.alvo_modo === 'si') { lancar(p.nome, m, p.nome); return; }
     let alvos = { aqui: [], outros: [] };
     try { alvos = await api(`/api/magia/alvos?actor=${encodeURIComponent(p.nome)}`); } catch (_) { /* segue sem lista */ }
@@ -259,7 +287,8 @@
       res = await api('/api/magia/conjurar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ actor: ator, ability: m.nome, target: alvo || '' }),
+        body: JSON.stringify({ actor: ator, ability: m.nome, target: alvo || '',
+                               modo: _conj.modo || '', ritual: !!_conj.ritual }),
       });
     } catch (_) { res = null; }
     _busy = false;

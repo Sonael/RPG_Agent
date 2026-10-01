@@ -3624,6 +3624,8 @@ def magia_conjurar_route():
         (d.get("actor") or "").strip(),
         (d.get("ability") or "").strip(),
         (d.get("target") or "").strip(),
+        modo=(d.get("modo") or "").strip(),
+        ritual=bool(d.get("ritual")),
     ))
 
 
