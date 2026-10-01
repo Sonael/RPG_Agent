@@ -3785,16 +3785,32 @@ def _efeitos_de_zona(zona: str) -> list[dict]:
     return saida
 
 
+def _areas_sobre(nome: str) -> list[dict]:
+    """
+    As áreas que cobrem `nome`: a da zona dele, com zonas; sem zonas, as
+    centradas nele.
+    """
+    if _zonas_ativas():
+        return _efeitos_de_zona(_zona_de(nome))
+    cs = memory.campaign.get("combat_state") or {}
+    if not cs.get("is_active"):
+        return []
+    chave = memory.char_key(nome or "")
+    return [e for e in cs.get("efeitos_de_zona") or []
+            if isinstance(e, dict) and e.get("criatura") == chave
+            and not (e.get("concentracao_de") and not _concentracao_segue(e))]
+
+
 def _zona_obscurecida(nome: str) -> str:
-    """O nome da magia que cega a zona de `nome` (Escuridão, Névoa), ou ''."""
-    for e in _efeitos_de_zona(_zona_de(nome) if _zonas_ativas() else ""):
+    """O nome da magia que cega a área de `nome` (Escuridão, Névoa), ou ''."""
+    for e in _areas_sobre(nome):
         if e.get("tipo") in ("escuridao", "nevoa"):
             return e.get("nome", "Escuridão")
     return ""
 
 
 def _zona_silenciada(nome: str) -> str:
-    for e in _efeitos_de_zona(_zona_de(nome) if _zonas_ativas() else ""):
+    for e in _areas_sobre(nome):
         if e.get("tipo") == "silencio":
             return e.get("nome", "Silêncio")
     return ""
@@ -15929,6 +15945,11 @@ def _combatant_snapshot(name: str) -> dict | None:
     s = ch.get("sheet") or {}
     conds = []
     _seen_cond = set()
+    if not _zonas_ativas():
+        for _area in _areas_sobre(ch.get("name", "")):
+            if _area.get("nome") and _area["nome"].lower() not in _seen_cond:
+                _seen_cond.add(_area["nome"].lower())
+                conds.append(_area["nome"])
     for c in (s.get("condicoes") or []):
         nm  = (c.get("nome", "") if isinstance(c, dict) else str(c)) or ""
         key = nm.lower().strip()

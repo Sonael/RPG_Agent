@@ -678,6 +678,11 @@ def como_resolve(hab: dict, char: dict | None = None) -> dict:
             if ef.get("zona"):
                 from rpg import tools_dnd as td
                 modos = {z: f"{z}: a área cobre esta zona" for z in td._zonas()} if td._zonas_ativas() else {}
+                if not td._zonas_ativas() and (memory.campaign.get("combat_state") or {}).get("is_active"):
+                    saida["texto"] = (saida["texto"]
+                                      .replace("a zona escolhida", "a área (centrada na criatura que você escolher)")
+                                      .replace("na zona escolhida", "na área (centrada na criatura que você escolher)")
+                                      .replace("na zona", "na área").replace("da zona", "da área"))
             if ef.get("transformar"):
                 modos = _modos_da_polimorfia(bool(ef.get("verdadeira")))
             if ef.get("teleporte") and char:
@@ -902,6 +907,10 @@ def validar(char: dict, hab: dict, alvo: str, modo: str) -> str:
             from rpg import tools_dnd as td
             if td._zonas_ativas() and modo not in td._zonas():
                 return (f"Aviso: escolha a zona de {nome_pt} ({', '.join(td._zonas())}). Nada foi gasto.")
+            if (not td._zonas_ativas() and (memory.campaign.get("combat_state") or {}).get("is_active")
+                    and not a):
+                return (f"Aviso: sem zonas, {nome_pt} fica centrada numa criatura: escolha em quem "
+                        f"(pode ser você). Nada foi gasto.")
         if ef.get("transformar"):
             from rpg import criaturas
             if not a or not a.get("sheet"):
@@ -1008,7 +1017,7 @@ def aplicar_magia(char: dict, hab: dict, alvo_nome: str, modo: str = "") -> str:
     if ef.get("alvos") in ("aliados", "inimigos") and extra_circ and m.get("alvos_por_espaco"):
         ef = dict(ef, max=int(ef.get("max", 1)) + extra_circ)
     if ef.get("zona"):
-        return _magia_de_zona(char, hab, ef, modo, nome_pt)
+        return _magia_de_zona(char, hab, ef, modo, nome_pt, alvo_nome)
     alvos = _alvos_da_magia(char, ef, alvo_nome)
     if not alvos:
         return f"\n   Ninguém ao alcance de {nome_pt}."
@@ -1188,19 +1197,34 @@ def _magia_especial(char: dict, hab: dict, ef: dict, a: dict, modo: str, nome_pt
 
 # ── Magias de zona (Escuridão, Névoa Obscurecente, Silêncio) ──────────────────
 
-def _magia_de_zona(char: dict, hab: dict, ef: dict, modo: str, nome_pt: str) -> str:
+def _magia_de_zona(char: dict, hab: dict, ef: dict, modo: str, nome_pt: str, alvo_nome: str = "") -> str:
+    """
+    Com zonas, a área cobre a zona escolhida. Sem zonas — o combate não sabe
+    quem está ao lado de quem — a área fica centrada numa criatura escolhida
+    e cobre a ela, como a Bola de Fogo sem zonas cai no alvo escolhido.
+    """
     from rpg import tools_dnd as td
-    if not td._zonas_ativas():
-        return (f"\n   {nome_pt}: sem zonas neste combate, o motor não tem onde pôr a área. "
+    cs = memory.campaign.get("combat_state") or {}
+    if not cs.get("is_active"):
+        return (f"\n   {nome_pt}: fora do combate, o motor não tem área para marcar. "
                 f"(Mestre: narre a área e o efeito.)")
-    cs = memory.campaign["combat_state"]
     lista = [z for z in cs.get("efeitos_de_zona") or []
              if not (z.get("concentracao_de") == memory.char_key(char.get("name", ""))
                      and norm(z.get("magia", "")) == norm(hab.get("nome", "")))]
-    lista.append({"zona": modo, "tipo": ef["zona"], "nome": nome_pt,
-                  "concentracao_de": memory.char_key(char.get("name", "")), "magia": hab.get("nome", "")})
+    entrada = {"tipo": ef["zona"], "nome": nome_pt,
+               "concentracao_de": memory.char_key(char.get("name", "")), "magia": hab.get("nome", "")}
+    if td._zonas_ativas():
+        entrada["zona"] = modo
+        onde = f"em {modo}"
+    else:
+        a = _char(alvo_nome) or char
+        entrada["criatura"] = memory.char_key(a.get("name", ""))
+        onde = f"centrada em {a['name']}"
+    lista.append(entrada)
     cs["efeitos_de_zona"] = lista
-    return f"\n   {nome_pt} em {modo}: {ef['texto']}."
+    texto = ef["texto"] if td._zonas_ativas() else ef["texto"].replace("a zona escolhida", "a área")\
+        .replace("na zona escolhida", "na área").replace("na zona", "na área").replace("da zona", "da área")
+    return f"\n   {nome_pt} {onde}: {texto}."
 
 
 def _modos_da_polimorfia(verdadeira: bool = False) -> dict:

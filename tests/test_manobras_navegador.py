@@ -126,6 +126,23 @@ def test_zona_coberta_mostra_a_magia(abrir):
     assert not erros, erros[:3]
 
 
+def test_sem_zonas_a_area_aparece_no_cartao(abrir):
+    """Sem zonas, o Silêncio fica centrado numa criatura e aparece no cartão dela."""
+    def silencio(estado):
+        estado["combat_state"].pop("zonas", None)
+        estado["combat_state"].pop("posicoes", None)
+        estado["characters"]["helena"]["sheet"]["concentracao"] = {"magia": "Silence", "rodada": 3}
+        estado["combat_state"]["efeitos_de_zona"] = [
+            {"criatura": "victoria", "tipo": "silencio", "nome": "Silêncio",
+             "concentracao_de": "helena", "magia": "Silence"}]
+    pg, erros = abrir(mudar=silencio)
+    pg.wait_for_selector(".cbt-card[data-nome='Victoria']", timeout=8000)
+    # O selo de condição sai em caixa alta pelo CSS.
+    assert "silêncio" in pg.inner_text(".cbt-card[data-nome='Victoria']").lower()
+    assert "silêncio" not in pg.inner_text(".cbt-card[data-nome='Stelar']").lower()
+    assert not erros, erros[:3]
+
+
 def test_celular_sem_rolagem_lateral(abrir):
     pg, _ = abrir(viewport={"width": 375, "height": 812})
     largura = pg.evaluate("document.documentElement.scrollWidth")

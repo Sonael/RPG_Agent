@@ -106,9 +106,84 @@ def test_a_area_cai_com_a_concentracao_e_com_o_combate(luta):
     assert "efeitos_de_zona" not in memory.campaign["combat_state"]
 
 
-def test_sem_zonas_o_mestre_narra(luta):
-    memory.campaign["combat_state"].pop("zonas")
+# ---------------------------------------------------------------------------
+# Sem zonas: a área fica centrada numa criatura
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def sem_zonas(luta):
+    cs = memory.campaign["combat_state"]
+    cs.pop("zonas")
+    cs.pop("posicoes")
+    return luta
+
+
+def test_sem_zonas_pede_a_criatura_do_centro(sem_zonas):
     r = _usar("Mira", "Darkness")
+    assert not r["ok"] and "centrada numa criatura" in r["message"]
+    assert _ch("Mira")["sheet"]["mana_atual"] == 60
+    texto = resolucao.como_resolve(_hab("Darkness"), _ch("Mira"))["texto"]
+    assert "centrada na criatura" in texto and "zona" not in texto
+
+
+def test_silencio_no_mago_inimigo_o_cala(sem_zonas):
+    _ch("Ogro")["habilidades"] = [_hab("Fire Bolt", 0)]
+    r = _usar("Mira", "Silence", "Ogro")
+    assert r["ok"] and "centrada em Ogro" in r["message"], r["message"]
+    _vez("Ogro")
+    assert td.use_ability("Ogro", "Fire Bolt", "Mira", _skip_turn_check=True).startswith("Erro")
+    # Só ele: Mira, fora da área, conjura.
+    assert _usar("Mira", "Fire Bolt", "Orc")["ok"]
+    assert td._zona_silenciada("Ogro") and not td._zona_silenciada("Mira")
+
+
+def test_escuridao_em_si_esconde_e_anula(sem_zonas, monkeypatch):
+    assert _usar("Mira", "Darkness", "Mira")["ok"]
+    pedidos = []
+    monkeypatch.setattr(td, "_roll_d20_with_adv",
+                        lambda v, d: (pedidos.append((v, d)), (10, "d20=10"))[1])
+    td.attack_roll("Orc", "Mira", "machado grande", 12, end_turn=False, _skip_turn_check=True)
+    # O primeiro d20 é o do ataque (o segundo, se houver, é o teste de
+    # concentração de Mira, que tomou dano mantendo a Escuridão).
+    assert pedidos[0] == (True, True)
+    # Outro alvo, fora da área: ataque normal.
+    pedidos.clear()
+    td.attack_roll("Orc", "Alden", "machado grande", 12, end_turn=False, _skip_turn_check=True)
+    assert pedidos == [(False, False)]
+    monkeypatch.setattr(random, "randint", lambda a, b: 1)
+    _vez("Mira")
+    assert "ESCONDIDO" in td.combat_action("hide", actor="Mira")["message"]
+
+
+def test_nevoa_no_alvo_bloqueia_magia_que_exige_ver(sem_zonas):
+    _usar("Mira", "Fog Cloud", "Orc")
+    r = _usar("Mira", "Hold Person", "Orc")
+    assert not r["ok"] and "exige ver o alvo" in r["message"]
+
+
+def test_sem_zonas_a_area_aparece_no_cartao(sem_zonas):
+    _usar("Mira", "Silence", "Ogro")
+    assert "Silêncio" in td._combatant_snapshot("Ogro")["condicoes"]
+    assert "Silêncio" not in td._combatant_snapshot("Mira")["condicoes"]
+
+
+def test_sem_zonas_a_area_cai_com_a_concentracao(sem_zonas):
+    _usar("Mira", "Silence", "Ogro")
+    _usar("Mira", "Bless", "Alden")
+    assert not td._zona_silenciada("Ogro")
+
+
+def test_tela_pede_alvo_sem_zonas(sem_zonas):
+    from rpg import habilidade
+    assert habilidade.resolver(_hab("Darkness"), _ch("Mira"))["alvo_modo"] == "aliado"
+    memory.campaign["combat_state"]["zonas"] = ["Portão", "Pátio"]
+    assert habilidade.resolver(_hab("Darkness"), _ch("Mira"))["alvo_modo"] == "nenhum"
+
+
+def test_fora_do_combate_o_mestre_narra(campanha, povoar):
+    povoar(criar_ficha("Mira", grupo=True, classe="mago", nivel=9, mana=60,
+                       habilidades=[_hab("Darkness")]))
+    r = td.conjurar_fora_de_combate("Mira", "Darkness", "Mira")
     assert r["ok"] and "Mestre" in r["message"]
 
 
