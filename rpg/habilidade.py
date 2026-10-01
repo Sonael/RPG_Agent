@@ -181,7 +181,8 @@ def resolver(hab: dict, char: dict | None = None) -> dict:
                           "marca": "inimigo", "inimigos": "inimigo", "area": "inimigo"}.get(_ef["alvos"], "")
     if como["slot"]:
         r["acao"] = como["slot"]
-    r["passiva"] = como["tipo"] == "passiva"
+    r["passiva"] = como["tipo"] in ("passiva", "reacao")
+    r["reacao"] = como["tipo"] == "reacao"
     if srd:
         r["resumo"] = srd["resumo"]
         # O dado do resumo é o da base; com o truque crescido, o da ficha vale.

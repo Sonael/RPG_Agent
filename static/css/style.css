@@ -2626,6 +2626,22 @@ body.combat-on { overflow: hidden; }
 .cbt-modos .cbt-modo { display: flex; flex-direction: column; align-items: flex-start; text-align: left; }
 .cbt-modos .cbt-modo small { font-size: 0.74rem; }
 .cbt-hab-trava { color: var(--cbt-red); font-style: italic; }
+
+/* Reações que o motor usa sozinho no turno do inimigo: liga e desliga. */
+.cbt-reacoes {
+  grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  padding-top: 6px; border-top: 1px dashed var(--cbt-borda, rgba(0,0,0,0.15));
+  font-size: 0.8rem; color: var(--cbt-muted);
+}
+.cbt-reacoes-titulo { margin-right: 2px; }
+.cbt-reacao-chip {
+  display: inline-flex; align-items: baseline; gap: 4px; min-height: 32px;
+  padding: 4px 10px; border-radius: 999px; cursor: pointer; font: inherit;
+  border: 1px solid var(--cbt-mp); background: rgba(59,116,168,0.12); color: var(--cbt-text);
+}
+.cbt-reacao-chip small { color: var(--cbt-mp); font-weight: 600; }
+.cbt-reacao-chip.desligada { border-style: dashed; background: transparent; opacity: 0.75; }
+.cbt-reacao-chip.desligada small { color: var(--cbt-muted); }
 /* Preso ao rodapé do botão de usar, não do cartão: com a descrição aberta o
    cartão cresce para baixo e o "Fechar" tem de ficar onde estava. */
 .cbt-hab-cabeca { position: relative; }

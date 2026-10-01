@@ -18,7 +18,7 @@ from rpg import memory, resolucao, tools_dnd as td, tools
 
 from conftest import criar_ficha, iniciar_combate
 
-TIPOS = {"motor", "efeito", "acao_de_classe", "passiva", "narrativa"}
+TIPOS = {"motor", "efeito", "acao_de_classe", "passiva", "narrativa", "reacao"}
 
 
 def _hab(nome, **kw):
@@ -85,8 +85,10 @@ def test_toda_magia_do_srd_tem_resposta():
         r = resolucao.como_resolve({"nome": m["nome_srd"], "custo_mana": 1, "dado": ""})
         assert r["tipo"] in TIPOS, m["nome_srd"]
         tipos.setdefault(r["tipo"], []).append(m["nome_srd"])
-    # Nenhuma magia vira "passiva": magia se conjura.
+    # Nenhuma magia vira "passiva": magia se conjura. As de reação o motor
+    # conjura sozinho no turno do inimigo (rpg/reacoes.py).
     assert "passiva" not in tipos
+    assert set(tipos["reacao"]) == {"Shield", "Hellish Rebuke", "Counterspell"}
     assert "Bless" in tipos["efeito"] and "Fireball" in tipos["motor"]
     assert "Thaumaturgy" in tipos["narrativa"]
 

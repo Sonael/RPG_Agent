@@ -540,8 +540,38 @@
     const sobra = botoes.length % 4;
     const vao = sobra === 0 ? 4 : (4 - sobra >= 2 ? 4 - sobra : 4);
     btnEl.innerHTML = botoes.join('')
-      + `<button class="cbt-btn cbt-primary" style="--cbt-span:${vao}" ${dis} onclick="window.Combat._act({action:'end_turn',actor:'${actorEsc}'})">Encerrar Turno</button>`;
+      + `<button class="cbt-btn cbt-primary" style="--cbt-span:${vao}" ${dis} onclick="window.Combat._act({action:'end_turn',actor:'${actorEsc}'})">Encerrar Turno</button>`
+      + linhaDeReacoes(cur);
     acompanharAlturaDaBarra();
+  }
+
+  // Reações que o motor usa sozinho no turno do inimigo (Escudo Arcano,
+  // Esquiva Sobrenatural, Indomável...). O turno do inimigo não para para
+  // perguntar; aqui o jogador desliga a que não quer que o motor use.
+  function linhaDeReacoes(cur) {
+    const lista = (cur && cur.reacoes) || [];
+    if (!lista.length) return '';
+    return `<div class="cbt-reacoes" role="group" aria-label="Reações automáticas">`
+      + `<span class="cbt-reacoes-titulo" title="O motor usa sozinho no turno do inimigo, quando faz diferença">Reações automáticas:</span>`
+      + lista.map(r => `<button type="button" class="cbt-reacao-chip ${r.ligada ? 'ligada' : 'desligada'}" `
+        + `aria-pressed="${r.ligada ? 'true' : 'false'}" ${_busy ? 'disabled' : ''} `
+        + `onclick="window.Combat._reacao('${jsNome(cur.name)}','${jsNome(r.chave)}',${!r.ligada})">`
+        + `${esc(r.nome)}<small>${r.ligada ? 'ligada' : 'desligada'}</small></button>`).join('')
+      + `</div>`;
+  }
+
+  async function _reacao(ator, chave, ligada) {
+    if (_busy) return;
+    try {
+      const res = await api('/api/combat/reacao', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ actor: ator, reacao: chave, ligada }),
+      });
+      if (res && res.message && window.showToast) window.showToast(res.message);
+      if (res && res.snapshot) await refresh(res.snapshot);
+    } catch (_) {
+      if (window.showToast) window.showToast('Falha de conexão no combate.');
+    }
   }
 
   // Marca as linhas dos combatentes: `alvos` (nome → 'ok'|'fora'|...) diz
@@ -1125,6 +1155,12 @@
     if (_busy || !_pick || _pick.kind !== 'modo') return;
     const cur = (_last.combatants || []).find(c => c.is_current);
     if (!cur) return;
+    const h = _pick.hab || {};
+    // Aumentar/Reduzir: a escolha e depois o alvo. A escolha segue em `weapon`.
+    if (h.alvo_modo === 'inimigo' || h.alvo_modo === 'aliado') {
+      showTargets('ability', { ability: _pick.ability, hab: h, modo: id });
+      return;
+    }
     act({ action: 'ability', actor: cur.name, ability: _pick.ability, target: '', weapon: id });
   }
 
@@ -1174,7 +1210,8 @@
     else if (_pick.mode === 'area')
       conferirArea(cur, _pick.hab || { nome: _pick.ability }, name);
     else
-      act({ action: 'ability', actor: cur.name, ability: _pick.ability, target: name });
+      act({ action: 'ability', actor: cur.name, ability: _pick.ability, target: name,
+            weapon: _pick.modo || '' });
   }
 
   // Antes de uma magia em área, pergunta ao motor quem ela vai atingir. Sem
@@ -1412,7 +1449,7 @@
   // ---- API pública -------------------------------------------------
   window.Combat = {
     sync,
-    _sel, _selHab, _usarHab, _modo, _info, _selWeapon, _selItem, _target, _mover, _cancel, _free,
+    _sel, _selHab, _usarHab, _modo, _info, _reacao, _selWeapon, _selItem, _target, _mover, _cancel, _free,
     _confirmarArea,
     _livreEnviar, _livreFechar,
     _act: act,

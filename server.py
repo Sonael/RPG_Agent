@@ -3402,6 +3402,22 @@ def combat_action_route():
     return jsonify(res)
 
 
+@app.route("/api/combat/reacao", methods=["POST"])
+@require_auth
+def combat_reacao_route():
+    """
+    Liga ou desliga uma reação que o motor usa sozinho (Escudo Arcano,
+    Esquiva Sobrenatural, Indomável...). O turno do inimigo não para para
+    perguntar; quem não quer que o motor use, desliga aqui.
+    """
+    from rpg import reacoes, tools_dnd
+    d = request.json or {}
+    msg = reacoes.alternar((d.get("actor") or "").strip(), (d.get("reacao") or "").strip(),
+                           bool(d.get("ligada")))
+    return jsonify({"ok": not msg.startswith("Erro:"), "message": msg,
+                    "snapshot": tools_dnd.combat_snapshot()})
+
+
 @app.route("/api/combat/preview", methods=["POST"])
 @require_auth
 def combat_preview_route():

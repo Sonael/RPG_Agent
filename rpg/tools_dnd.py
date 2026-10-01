@@ -2776,6 +2776,8 @@ _USOS_POR_DESCANSO = {
     "toque purificador":   ("longo", lambda n, s: max(1, _mod_da_ficha(s, "carisma"))),
     "corpo curativo":      ("longo", lambda n, s: 1),
     "indomavel":           ("longo", lambda n, s: 3 if n >= 17 else (2 if n >= 13 else 1)),
+    "bandeira de aviso":   ("longo", lambda n, s: max(1, _mod_da_ficha(s, "sabedoria"))),
+    "eu ilusorio":         ("curto", lambda n, s: 1),
 }
 
 
@@ -6359,6 +6361,8 @@ def attack_roll(
         return f"Atacante '{attacker_name}' não encontrado ou sem ficha D&D."
     if attacker.get("status") == "morto":
         return f"Erro: {attacker_name} está morto e não pode atacar."
+    if (attacker.get("status") or "").lower() in ("inconsciente", "estabilizado", "dormindo"):
+        return f"Erro: {attacker_name} está {attacker['status']} e não pode atacar."
     if not target or not target.get("sheet"):
         return f"Alvo '{target_name}' não encontrado ou sem ficha D&D."
 
@@ -6577,6 +6581,13 @@ def attack_roll(
     if _recusa_mun:
         return _recusa_mun
 
+    # Reação do alvo antes do dado (Bandeira de Aviso).
+    from rpg import reacoes as _reacoes
+    _desv_reacao, _linhas_antes = _reacoes.antes_do_ataque(attacker, target, disadvantage)
+    if _desv_reacao:
+        disadvantage = True
+        cond_notes.extend(_linhas_antes)
+
     # ── Rolagem do ataque ───────────────────────────────────────────────────
     d20, roll_log = _roll_d20_with_adv(advantage, disadvantage)
     attack_total  = d20 + mod + prof + style_atk_bonus + _mag + _mods["bonus"]
@@ -6603,6 +6614,15 @@ def attack_roll(
                 _sorte = _e.get("nome", "Golpe de Sorte")
                 falha_critica = False
                 break
+    _ca_antes_da_reacao = target_ca
+    _linhas_reacao = []
+    _erra_por_reacao = False
+    if not _sorte and not falha_critica and (critico or attack_total >= target_ca):
+        _erra_por_reacao, _linhas_reacao = _reacoes.ao_ser_atingido(
+            attacker, target, attack_total, target_ca, critico)
+        if _erra_por_reacao:
+            critico = False
+    _acerta = (critico or attack_total >= target_ca or bool(_sorte)) and not _erra_por_reacao
     if critico and crit_min < 20 and not force_crit and d20 < 20:
         style_note = (style_note + " · " if style_note else "") + \
                      f"Crítico ampliado ({crit_min}-20)"
@@ -6619,7 +6639,9 @@ def attack_roll(
     _atk_mag_str = f" +{_mag}(mágica)" if _mag else ""
     _atk_efeito_str = f" {_mods['bonus']:+d}(efeitos)" if _mods["bonus"] else ""
     result += (f"   {roll_log} +{mod}(mod) +{prof}(prof){_atk_style_str}{_atk_mag_str}{_atk_efeito_str} "
-               f"= **{attack_total}** vs CA {target_ca}\n")
+               f"= **{attack_total}** vs CA {_ca_antes_da_reacao}\n")
+    for _l in _linhas_reacao:
+        result += f"   {_l}\n"
 
     if falha_critica:
         result += "   ERRO CRÍTICO! O ataque falha miseravelmente."
@@ -6634,7 +6656,7 @@ def attack_roll(
         memory.save_campaign()
         return result
 
-    if critico or attack_total >= target_ca or _sorte:
+    if _acerta:
         if _sorte:
             result += f"   {_sorte}: o erro vira acerto.\n"
         n_dice = damage_dice_count * (2 if critico else 1)
@@ -6744,6 +6766,10 @@ def attack_roll(
         _componentes.extend(_g_comps)
         for _l in _g_linhas:
             result += f"   {_l}\n"
+        _componentes, _linhas_reducao = _reacoes.reduzir_dano(attacker, target, _componentes,
+                                                              is_ranged, not matched_hab)
+        for _l in _linhas_reducao:
+            result += f"   {_l}\n"
 
         _res = _apply_damage(target, components=_componentes,
                              source_name=attacker["name"],
@@ -6790,6 +6816,8 @@ def attack_roll(
         if hp_depois > 0:
             for _nome_g, _cfg_g in _g_conds:
                 result += _aplicar_condicao_de_golpe(attacker, target, _nome_g, _cfg_g)
+            for _l in _reacoes.depois_do_dano(attacker, target, dmg):
+                result += f"\n   {_l}"
 
         _was_asleep = (target.get("status", "") or "").lower() == "dormindo"
         if hp_depois == 0:
@@ -6805,7 +6833,8 @@ def attack_roll(
 
         memory.save_campaign()
     else:
-        result += f"   ERROU! ({attack_total} < CA {target_ca})"
+        result += (f"   ERROU! ({attack_total} < CA {target_ca})" if not _erra_por_reacao
+                   else "   ERROU! (reação)")
         _log_combat_event("attack_miss", attacker["name"], target["name"],
                           msg=(f"{attacker['name']} → {target['name']} ({weapon}): "
                                f"d20={d20} +{mod}+{prof} = {attack_total} "
@@ -6953,6 +6982,10 @@ def use_ability(
     # ataque. Agora o motor aplica sozinho onde vale (rpg/resolucao.py).
     from rpg import resolucao as _resolucao
     _como = _resolucao.como_resolve(hab, char)
+    if _como["tipo"] == "reacao":
+        return (f"Erro: '{hab.get('nome', ability_name)}' é reação: acontece no turno do inimigo, "
+                f"e o motor a usa sozinho quando faz diferença. {_como['texto']} "
+                f"Para impedir, desligue na tela de combate. Nada foi gasto.")
     if (_e_traco_passivo(hab.get("nome", "")) or _e_traco_passivo(ability_name)
             or _como["tipo"] == "passiva"):
         _porque = f" {_como['texto']}" if _como["tipo"] == "passiva" and _como["texto"] else ""
@@ -7067,6 +7100,25 @@ def use_ability(
     if _rec:
         _gastar_recarga(char, _rec)
 
+    # ── Contramágica de quem está do outro lado ────────────────────────────
+    # A mana já foi: a magia anulada gasta o espaço (SRD).
+    from rpg import reacoes as _reacoes
+    _contra = _reacoes.contramagica(char, hab) if _como["tipo"] != "acao_de_classe" else ""
+    if _contra and not _contra.startswith("("):
+        result = (f"{char['name']} conjura {hab['nome']}"
+                  + (f" em {target_name}" if target_name else "") + "!\n"
+                  f"   Custo: {custo} mana | Mana restante: {s['mana_atual']}/{s['mana_max']}\n"
+                  f"   {_contra}")
+        _log_combat_event("ability", char["name"], target_name,
+                          msg=f"{char['name']} usou {hab['nome']} — anulada por Contramágica",
+                          ability=hab["nome"])
+        memory.save_campaign()
+        if end_turn and _como.get("slot") != "livre":
+            result += _auto_advance_turn(char_name)
+        memory.save_campaign()
+        return result
+    _nota_contra = f"\n   {_contra}" if _contra else ""
+
     # ── Efeito, ação de classe e narrativa: caminho próprio ────────────────
     # (rpg/resolucao.py). Nenhum deles rola o "dado" da ficha como dano ou
     # cura: a Bênção vira +1d4 nos ataques, a Ação Ardilosa vira movimento, a
@@ -7075,7 +7127,8 @@ def use_ability(
         _alvo_txt = (f" em {target_name}" if target_name
                      and memory.char_key(target_name) != memory.char_key(char["name"]) else "")
         result = (f"{char['name']} usa {hab['nome']}{_alvo_txt}!\n"
-                  f"   Custo: {custo} mana | Mana restante: {s['mana_atual']}/{s['mana_max']}")
+                  f"   Custo: {custo} mana | Mana restante: {s['mana_atual']}/{s['mana_max']}"
+                  + _nota_contra)
         if _usos_max is not None:
             _chave_u = _chave_de_uso(hab["nome"])
             _quando_volta = _USOS_POR_DESCANSO[_chave_u][0]
@@ -7129,7 +7182,8 @@ def use_ability(
     result = (
         f"{char['name']} usa {hab['nome']}{target_str}!\n"
         f"   Custo: {custo} mana | Mana restante: {s['mana_atual']}/{s['mana_max']}\n"
-        f"{_linha_dado}"
+        + (_nota_contra.lstrip("\n") + "\n" if _nota_contra else "")
+        + f"{_linha_dado}"
         f"   Efeito: {hab['descricao']}"
     )
 
@@ -15681,6 +15735,8 @@ def _combatant_snapshot(name: str) -> dict | None:
         "hp_temp":    _temp_hp(s),
         "concentracao": (s.get("concentracao") or {}).get("magia", ""),
         "reacao_disponivel": _reaction_available(ch),
+        "reacoes":    (__import__("rpg.reacoes", fromlist=["x"]).disponiveis(ch)
+                       if memory.is_party_member(ch) else []),
         "resistencias":     _defesas_visiveis(ch, s, "resistencias"),
         "imunidades":       _defesas_visiveis(ch, s, "imunidades"),
         "vulnerabilidades": _defesas_visiveis(ch, s, "vulnerabilidades"),

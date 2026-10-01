@@ -26,6 +26,9 @@ Agora toda habilidade tem UMA resposta para "o que acontece quando eu uso?":
                   (Ação Ardilosa, Sacerdote de Guerra, Canalizar Divindade…)
   passiva         não se usa: ou o motor aplica sozinho (Ataque Furtivo,
                   Estilo de Combate) ou vale fora do combate (Especialização)
+  reacao          acontece no turno do inimigo e o motor usa sozinho, quando
+                  faz diferença (Escudo Arcano, Esquiva Sobrenatural) — ver
+                  rpg/reacoes.py
   narrativa       o motor não tem regra: gasta o que custa e o Mestre decide o
                   efeito (Taumaturgia, Luz, Mãos Mágicas…)
 
@@ -513,7 +516,17 @@ def como_resolve(hab: dict, char: dict | None = None) -> dict:
                 saida.update(tipo="passiva", texto="Passiva: " + PASSIVAS_NO_MOTOR[parte] + ".")
                 return saida
 
+    from rpg import reacoes
+    chave_r = reacoes.chave_do_nome(nome)
+    if chave_r and not reacoes.REACOES[chave_r].get("recurso"):
+        saida.update(tipo="reacao", texto=reacoes.REACOES[chave_r]["texto"], reacao=chave_r)
+        return saida
+
     m = _magia_srd(hab)
+    if m and reacoes.chave_da_magia(m["nome_srd"]):
+        saida.update(tipo="reacao", texto=reacoes.REACOES[reacoes.chave_da_magia(m["nome_srd"])]["texto"],
+                     reacao=reacoes.chave_da_magia(m["nome_srd"]))
+        return saida
     if m:
         from rpg import encantos
         if encantos.do_encanto(m["nome_srd"]):
