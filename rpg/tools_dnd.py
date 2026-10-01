@@ -1188,6 +1188,28 @@ FEATURE_VARIANTS: dict[str, dict] = {
             "Limos":          {"descricao": "Especialista em limos: vantagem para rastrear, +PROF info, +2 dano.",                            "narrative_hint": "passive"},
         },
     },
+    # Guerreiro Mestre de Batalha — 3º nível (mais duas no 10º e no 15º).
+    # As que o motor resolve (rpg/superioridade.py).
+    "Manobras de Combate": {
+        "pick": 3,
+        "pick_label": "manobras",
+        "options": {
+            "Ataque Ameaçador":   {"descricao": "+dado no dano; SAB ou fica Amedrontado até o fim do seu próximo turno.", "narrative_hint": "active"},
+            "Ataque Derrubador":  {"descricao": "+dado no dano; FOR ou fica Caído.", "narrative_hint": "active"},
+            "Ataque de Empurrão": {"descricao": "+dado no dano; FOR ou é empurrado para a zona vizinha.", "narrative_hint": "active"},
+            "Ataque Desarmante":  {"descricao": "+dado no dano; FOR ou larga a arma.", "narrative_hint": "active"},
+            "Ataque Distrativo":  {"descricao": "+dado no dano; o próximo ataque de um aliado contra o alvo tem vantagem.", "narrative_hint": "active"},
+            "Ataque Provocador":  {"descricao": "+dado no dano; SAB ou tem desvantagem para atacar outros que não você.", "narrative_hint": "active"},
+            "Ataque Varredor":    {"descricao": "Se acertar, o dado fere outro inimigo ao alcance.", "narrative_hint": "active"},
+            "Ataque Preciso":     {"descricao": "Soma o dado a um ataque que errou.", "narrative_hint": "active"},
+            "Finta":              {"descricao": "Ação bônus: vantagem no próximo ataque contra o alvo e +dado no dano.", "narrative_hint": "active"},
+            "Reagrupar":          {"descricao": "Ação bônus: um aliado ganha PV temporários (dado + CAR).", "narrative_hint": "active"},
+            "Contra-Ataque":      {"descricao": "Reação: quando um inimigo erra você corpo a corpo, você ataca (+dado).", "narrative_hint": "reaction"},
+            "Aparar":             {"descricao": "Reação: reduz o dano de um ataque corpo a corpo em dado + DES.", "narrative_hint": "reaction"},
+        },
+    },
+    "Manobras Aprimoradas": {"pick": 2, "pick_label": "manobras", "options": "ref:Manobras de Combate"},
+    "Manobras Relâmpago":   {"pick": 2, "pick_label": "manobras", "options": "ref:Manobras de Combate"},
     "Inimigo Favorecido Adicional": {  # 6º nível — herda mesmas opções
         "pick": 1,
         "pick_label": "tipo",
@@ -2796,6 +2818,8 @@ _USOS_POR_DESCANSO = {
     "indomavel":           ("longo", lambda n, s: 3 if n >= 17 else (2 if n >= 13 else 1)),
     "bandeira de aviso":   ("longo", lambda n, s: max(1, _mod_da_ficha(s, "sabedoria"))),
     "eu ilusorio":         ("curto", lambda n, s: 1),
+    # Mestre de Batalha: 4 dados por descanso curto, 5 no 7º, 6 no 15º.
+    "dados de superioridade": ("curto", lambda n, s: 6 if n >= 15 else (5 if n >= 7 else 4)),
 }
 
 
@@ -4704,6 +4728,8 @@ def _defesa_sem_armadura(char: dict, dex: int) -> int | None:
 
 def _atributo_de_conjuracao(sheet: dict) -> str:
     """Atributo de conjuração da classe, ou "" para quem não conjura."""
+    if sheet.get("atributo_conjuracao"):
+        return sheet["atributo_conjuracao"]
     classe = _norm_txt(sheet.get("classe", ""))
     for nome, dados in CLASS_DATA.items():
         if _norm_txt(nome) == classe:
@@ -6761,6 +6787,14 @@ def attack_roll(
                 _sorte = _e.get("nome", "Golpe de Sorte")
                 falha_critica = False
                 break
+    _prec = next((e for e in _efeitos(sa) if e.get("precisao")), None)
+    if (_prec and not _sorte and not falha_critica and not critico and attack_total < target_ca
+            and (usos_restantes(attacker, "Dados de Superioridade") or 0) > 0):
+        _v_prec, _t_prec = _rolar_expr(_prec["precisao"])
+        _gastar_uso(attacker, "Dados de Superioridade")
+        sa["efeitos"] = [x for x in sa.get("efeitos") or [] if x is not _prec]
+        attack_total += _v_prec
+        cond_notes.append(f"Ataque Preciso: o ataque errava; +{_t_prec} → {attack_total}")
     _ca_antes_da_reacao = target_ca
     _linhas_reacao = []
     _erra_por_reacao = False
@@ -6932,8 +6966,8 @@ def attack_roll(
 
         # O que estava armado para o próximo acerto: Destruição Divina,
         # Ataque Atordoante, Destruição Marcante.
-        _g_comps, _g_linhas, _g_conds = _golpes_armados(attacker, target, is_ranged,
-                                                        matched_hab, critico)
+        _g_comps, _g_linhas, _g_conds, _g_manobras = _golpes_armados(attacker, target, is_ranged,
+                                                                     matched_hab, critico, dmg_type)
         _componentes.extend(_g_comps)
         for _l in _g_linhas:
             result += f"   {_l}\n"
@@ -6987,6 +7021,10 @@ def attack_roll(
         if hp_depois > 0:
             for _nome_g, _cfg_g in _g_conds:
                 result += _aplicar_condicao_de_golpe(attacker, target, _nome_g, _cfg_g)
+            if _g_manobras:
+                from rpg import superioridade as _sup
+                for _e_m in _g_manobras:
+                    result += _sup.depois_do_acerto(attacker, target, _e_m, dmg_type)
             for _l in _reacoes.depois_do_dano(attacker, target, dmg):
                 result += f"\n   {_l}"
 
@@ -7006,6 +7044,8 @@ def attack_roll(
     else:
         result += (f"   ERROU! ({attack_total} < CA {target_ca})" if not _erra_por_reacao
                    else "   ERROU! (reação)")
+        for _l in _reacoes.ao_errar(attacker, target, is_ranged):
+            result += f"\n   {_l}"
         _log_combat_event("attack_miss", attacker["name"], target["name"],
                           msg=(f"{attacker['name']} → {target['name']} ({weapon}): "
                                f"d20={d20} +{mod}+{prof} = {attack_total} "
@@ -7170,7 +7210,10 @@ def use_ability(
     # ── Coerção de alvo por modo da habilidade ────────────────────────────
     # Self-only (Segunda Fôlego, Fúria, Surto de Ação…) sempre afeta o
     # próprio conjurador, ignorando o que a UI/LLM passou como target.
-    if (_is_self_only_ability(hab.get("nome", "")) or _is_self_only_ability(ability_name)
+    _alvo_escolha = _resolucao.alvo_do_modo(hab, char, modo)
+    if _alvo_escolha in ("inimigo", "aliado"):
+        pass                                   # Finta, Reagrupar: o alvo é o escolhido
+    elif (_is_self_only_ability(hab.get("nome", "")) or _is_self_only_ability(ability_name)
             or _como.get("alvo") == "si"):
         target_name = char["name"]
     elif _como.get("alvo") == "nenhum":
@@ -7292,6 +7335,17 @@ def use_ability(
         if _recusa:
             return _recusa
 
+    # Pontos de magia (a variante que o jogo usa): do 6º círculo em diante,
+    # cada círculo só uma vez por descanso longo.
+    _circ_alto = 0
+    if custo > 0 and int(s.get("mana_max", 0) or 0) > 0:
+        _m_alto = _resolucao._magia_srd(hab) or {}
+        _circ_alto = _circulo or int(_m_alto.get("nivel", 0) or 0)
+        if _circ_alto >= 6 and _circ_alto in (s.get("circulos_altos_usados") or []):
+            return (f"Aviso: {char['name']} já conjurou uma magia de {_circ_alto}º círculo desde o último "
+                    f"descanso longo — com pontos de magia, do 6º em diante é uma de cada por descanso. "
+                    f"Nada foi gasto.")
+
     if custo > 0:
         if s["mana_atual"] < custo:
             return (
@@ -7299,6 +7353,8 @@ def use_ability(
                 f"Mana: {s['mana_atual']}/{s['mana_max']} (necessário: {custo})"
             )
         s["mana_atual"] -= custo
+        if _circ_alto >= 6:
+            s.setdefault("circulos_altos_usados", []).append(_circ_alto)
 
     # A reserva da Cura pelas Mãos é gasta pelo quanto curou, não por uso.
     _por_reserva = (_como["tipo"] == "acao_de_classe"
@@ -11408,6 +11464,7 @@ def long_rest(char_name: str) -> str:
         from rpg import criaturas
         criaturas.voltar(char, "descanso longo")
     s["mana_atual"] = s["mana_max"]
+    s.pop("circulos_altos_usados", None)
     # O longo devolve TUDO: quem dorme a noite inteira também teve a hora do
     # descanso curto.
     restaurar_usos(char, "longo")
@@ -14065,6 +14122,11 @@ def spawn_monster(
 
         # Extrai habilidades especiais (special abilities) do Open5e
         habilidades = []
+        # O mago do Open5e trazia "Spellcasting" como texto cortado em 200
+        # letras: nenhuma magia virava habilidade e ele só atacava de adaga.
+        for sa in (m.get("special_abilities") or []):
+            if "spellcasting" in (sa.get("name", "") or "").lower():
+                _dar_magias_do_bloco(sheet, habilidades, sa.get("desc", "") or "")
         for sa in (m.get("special_abilities") or [])[:3]:
             sa_name = sa.get("name", "")
             sa_desc = (sa.get("desc", "") or "")[:200]
@@ -14278,6 +14340,118 @@ def _npc_poder_de_recarga(npc: dict) -> str:
         if isinstance(cfg, dict) and cfg.get("pronto", False):
             return nome
     return ""
+
+
+# ── Conjuração do monstro (bloco "Spellcasting" do Open5e) ─────────────────
+_ATRIBUTO_EN = {"intelligence": "inteligencia", "wisdom": "sabedoria", "charisma": "carisma"}
+_LINHA_CIRCULO_RE = re.compile(r"(cantrips|(\d)(?:st|nd|rd|th)[- ]level)[^:]*:\s*(.+)", re.I)
+_LINHA_INATA_RE = re.compile(r"(at will|\d+/day(?: each)?)\s*:\s*(.+)", re.I)
+
+
+def _magias_do_bloco(texto: str) -> dict:
+    """
+    Lê o bloco "Spellcasting"/"Innate Spellcasting" do stat block:
+    {nivel_conjurador, atributo, magias: [(nome_srd, nivel, a_vontade)]}.
+    Só entram as magias que o compêndio conhece.
+    """
+    from rpg import compendio
+    texto = texto or ""
+    nivel = re.search(r"(\d+)(?:st|nd|rd|th)-level spellcaster", texto, re.I)
+    attr = re.search(r"spellcasting ability is (\w+)", texto, re.I)
+    magias = []
+    for linha in re.split(r"[\n•]+", texto):
+        linha = linha.strip(" -*")
+        m1 = _LINHA_CIRCULO_RE.search(linha)
+        m2 = None if m1 else _LINHA_INATA_RE.search(linha)
+        if not (m1 or m2):
+            continue
+        lista = (m1.group(3) if m1 else m2.group(2))
+        a_vontade = bool((m1 and m1.group(1).lower() == "cantrips") or (m2 and m2.group(1).lower() == "at will"))
+        for bruto in lista.split(","):
+            nome = re.sub(r"\(.*?\)", "", bruto).replace("*", "").replace("_", "").strip(" .")
+            m = compendio.magia(nome) if nome else None
+            if m and all(m["nome_srd"] != x[0] for x in magias):
+                magias.append((m["nome_srd"], int(m.get("nivel", 0) or 0), a_vontade))
+    return {"nivel_conjurador": int(nivel.group(1)) if nivel else 0,
+            "atributo": _ATRIBUTO_EN.get((attr.group(1) if attr else "").lower(), ""),
+            "magias": magias}
+
+
+def _dar_magias_do_bloco(sheet: dict, habilidades: list, texto: str) -> int:
+    """Põe na ficha do monstro as magias do bloco, com mana de conjurador. Devolve quantas."""
+    from rpg import compendio
+    bloco = _magias_do_bloco(texto)
+    if not bloco["magias"]:
+        return 0
+    if bloco["atributo"]:
+        sheet["atributo_conjuracao"] = bloco["atributo"]
+    if bloco["nivel_conjurador"]:
+        pontos = SPELL_POINTS_BY_LEVEL.get(min(20, bloco["nivel_conjurador"]), 0)
+        sheet["mana_max"] = sheet["mana_atual"] = max(int(sheet.get("mana_max", 0) or 0), pontos)
+    for nome_srd, nivel, a_vontade in bloco["magias"]:
+        m = compendio.magia(nome_srd) or {}
+        habilidades.append({
+            "nome": nome_srd, "nivel_magia": nivel,
+            "descricao": f"[{m.get('escola', 'Magia')}] {m.get('resumo', '')}",
+            "custo_mana": 0 if (a_vontade or nivel == 0) else SPELL_MANA_COST.get(nivel, 2),
+            "dado": "",
+        })
+    # Inata sem nível de conjurador: mana para as magias por dia.
+    if not bloco["nivel_conjurador"] and not sheet.get("mana_max"):
+        sheet["mana_max"] = sheet["mana_atual"] = sum(
+            SPELL_MANA_COST.get(n, 2) for _, n, a in bloco["magias"] if not a and n > 0)
+    return len(bloco["magias"])
+
+
+def _media_da_formula(formula: str) -> float:
+    if not formula:
+        return 0.0
+    n, faces, bonus = _parse_dice(formula)
+    return n * (faces + 1) / 2 + bonus
+
+
+def _npc_conjurar(npc: dict, npc_name: str, alvo_nome: str, targets: list, golpe_medio: float) -> str:
+    """
+    O NPC conjura em vez de atacar quando a magia rende mais: dano esperado
+    maior (somando os inimigos que a área pega, e nunca com aliado dentro),
+    ou uma magia de controle quando ele ainda não está concentrado.
+    Devolve "" quando não vale a pena ou o motor recusa (aí ele ataca).
+    """
+    from rpg import resolucao
+    s = npc.get("sheet") or {}
+    mana = int(s.get("mana_atual", 0) or 0)
+    lado = memory.luta_com_o_grupo(npc)
+    alvo_ch = memory.campaign["characters"].get(memory.char_key(alvo_nome)) or {}
+    opcoes = []
+    for h in npc.get("habilidades") or []:
+        m = resolucao._magia_srd(h) if isinstance(h, dict) else None
+        if not m or int(h.get("custo_mana", 0) or 0) > mana:
+            continue
+        tipo = resolucao.como_resolve(h, npc)["tipo"]
+        if tipo != "motor":
+            continue
+        if m.get("efeito") == "dano" and dado_efetivo(h, npc):
+            valor = _media_da_formula(dado_efetivo(h, npc))
+            if area_da_habilidade(h):
+                _z, atingidos = _alvos_em_area(npc_name, h, alvo_nome)
+                if atingidos:
+                    if any(memory.luta_com_o_grupo(a) == lado for a in atingidos):
+                        continue
+                    valor *= len(atingidos)
+            opcoes.append((valor, h))
+        elif (m.get("efeito") == "condicao" and m.get("condicao") and not s.get("concentracao")
+              and not any(_norm_txt(c.get("nome", "") if isinstance(c, dict) else str(c))
+                          == _norm_txt(m["condicao"]) for c in (alvo_ch.get("sheet") or {}).get("condicoes") or [])):
+            opcoes.append((max(12.0, golpe_medio + 1), h))
+    if not opcoes:
+        return ""
+    valor, hab = max(opcoes, key=lambda x: x[0])
+    if valor <= golpe_medio:
+        return ""
+    resultado = use_ability(npc_name, hab["nome"], alvo_nome, end_turn=True, _skip_turn_check=True)
+    if resultado.startswith(("Erro", "Aviso")):
+        return ""
+    return f"{npc_name} conjura **{(resolucao._magia_srd(hab) or {}).get('nome', hab['nome'])}**!\n{resultado}"
 
 
 def _npc_usar_poder(npc: dict, npc_name: str, poder: str, alvo: str) -> str:
@@ -14654,6 +14828,19 @@ def _executar_turno_npc(npc_name: str = "") -> str:
         disparo = _npc_usar_poder(npc, npc_name, poder, target["name"])
         if disparo:
             return "\n".join(avisos_recarga + [disparo])
+
+    # 2b) MAGIA. O inimigo que conjura só atacava de arma: o mago da partida
+    #     morreu de adaga na mão com a Bola de Fogo na ficha. Agora ele conjura
+    #     quando a magia rende mais que os golpes.
+    _rep_m = [a for a in (npc_sheet.get("ataques") or []) if isinstance(a, dict) and a.get("nome")]
+    _dado_m = _npc_attack_dice(npc_sheet, _rep_m[0]["nome"]) if _rep_m else None
+    _golpe_medio = ((_dado_m[0] * (_dado_m[1] + 1) / 2 if _dado_m else 3.5)
+                    + max(_modifier(int(npc_sheet.get("forca", 10) or 10)),
+                          _modifier(int(npc_sheet.get("destreza", 10) or 10))))
+    _golpe_medio *= max(1, min(_MULTIATTACK_MAX, int(npc_sheet.get("multiattack", 1) or 1)))
+    magia = _npc_conjurar(npc, npc_name, target["name"], targets, _golpe_medio)
+    if magia:
+        return "\n".join(avisos_recarga + [magia])
 
     # 3) ATIRADOR trancado no corpo-a-corpo recua antes de atirar. Sem isso,
     #    um arqueiro com inimigo colado ficava atirando com desvantagem para
@@ -15480,6 +15667,9 @@ def _mods_de_ataque(atacante: dict, alvo: dict, corpo_for: bool, com_arma: bool 
         nome = e.get("nome", "efeito")
         if e.get("so_arma") and not com_arma:
             continue
+        if e.get("provocado_por") and e["provocado_por"] != memory.char_key((alvo or {}).get("name", "")):
+            r["desvantagem"] = True
+            r["notas"].append(f"{nome}: desvantagem")
         if e.get("atk_dado"):
             v, txt = _rolar_expr(e["atk_dado"])
             r["bonus"] += v
@@ -15676,11 +15866,11 @@ def _e_profano(ch: dict) -> bool:
 
 
 def _golpes_armados(atacante: dict, alvo: dict, a_distancia: bool, habilidade,
-                    critico: bool) -> tuple[list, list, list]:
-    """(componentes de dano, linhas, condições a aplicar depois do dano)."""
-    comps, linhas, conds = [], [], []
+                    critico: bool, tipo_arma: str = "") -> tuple[list, list, list, list]:
+    """(componentes de dano, linhas, condições a aplicar depois do dano, manobras)."""
+    comps, linhas, conds, manobras = [], [], [], []
     if habilidade:
-        return comps, linhas, conds
+        return comps, linhas, conds, manobras
     sa = atacante.get("sheet") or {}
     for e in list(_efeitos(sa)):
         if not any(e.get(k) for k in ("golpe_dado", "golpe_condicao")):
@@ -15703,6 +15893,12 @@ def _golpes_armados(atacante: dict, alvo: dict, a_distancia: bool, habilidade,
                 continue
             _gastar_uso(atacante, "Ki", int(e["golpe_ki"]))
             custo.append(f"{e['golpe_ki']} ki")
+        if e.get("golpe_superioridade"):
+            if (usos_restantes(atacante, "Dados de Superioridade") or 0) < 1:
+                linhas.append(f"{nome}: sem Dado de Superioridade — não sai.")
+                continue
+            _gastar_uso(atacante, "Dados de Superioridade")
+            custo.append("1 Dado de Superioridade")
         if e.get("golpe_dado"):
             n, faces, bonus = _parse_dice(str(e["golpe_dado"]))
             extra = ""
@@ -15711,7 +15907,7 @@ def _golpes_armados(atacante: dict, alvo: dict, a_distancia: bool, habilidade,
                 extra = " (+1d8: morto-vivo ou infernal)"
             rolls = [random.randint(1, faces) for _ in range(n * (2 if critico else 1))]
             valor = sum(rolls) + bonus
-            comps.append((valor, e.get("golpe_tipo", "")))
+            comps.append((valor, tipo_arma if e.get("golpe_tipo_da_arma") else e.get("golpe_tipo", "")))
             linhas.append(f"{nome}: {len(rolls)}d{faces} [{' + '.join(map(str, rolls))}] = {valor}"
                           f"{' ' + e['golpe_tipo'] if e.get('golpe_tipo') else ''}{extra}"
                           + (f" — gasta {', '.join(custo)}" if custo else ""))
@@ -15719,7 +15915,9 @@ def _golpes_armados(atacante: dict, alvo: dict, a_distancia: bool, habilidade,
             linhas.append(f"{nome}: gasta {', '.join(custo)}")
         if e.get("golpe_condicao"):
             conds.append((nome, e["golpe_condicao"]))
-    return comps, linhas, conds
+        if e.get("manobra"):
+            manobras.append(e)
+    return comps, linhas, conds, manobras
 
 
 def _aplicar_condicao_de_golpe(atacante: dict, alvo: dict, nome: str, cfg: dict) -> str:
@@ -16326,9 +16524,13 @@ def combat_action(action: str, actor: str = "", target: str = "",
                         "snapshot": combat_snapshot()}
 
             slot = None if surto else _slot_da_habilidade(ability, hab_pre, ch_pre)
-            # Voltar da Forma Selvagem é ação bônus (SRD), não a ação de virar fera.
-            if slot and (weapon or "").strip() == "voltar":
-                slot = "bonus"
+            # A escolha muda o custo: voltar da Forma Selvagem e Finta são ação
+            # bônus; as manobras de golpe não custam ação.
+            if hab_pre is not None and not surto:
+                from rpg import resolucao as _res_slot
+                _ov = _res_slot.slot_do_modo(hab_pre, ch_pre, (weapon or "").strip())
+                if _ov:
+                    slot = None if _ov == "livre" else _ov
             if slot:
                 err = _use_slot(eco, slot)
                 if err:

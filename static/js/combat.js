@@ -1236,7 +1236,7 @@
     if (_busy) return;
     const cur = (_last && _last.combatants || []).find(c => c.is_current);
     if (!cur) return;
-    const h = (cur.habilidades || []).find(x => x.nome === name) || { nome: name };
+    let h = (cur.habilidades || []).find(x => x.nome === name) || { nome: name };
     // Sem regra no motor (Taumaturgia, Luz): o jogador diz o que quer, o
     // Mestre arbitra. Antes gastava a Ação e o motor respondia "usa X no
     // Orc!" sem efeito nenhum.
@@ -1255,6 +1255,12 @@
       return;
     }
     const w = modo || (soCirculos ? h.modos[0].id : '');
+    // A escolha pode mudar o alvo (Finta: inimigo; Reagrupar: aliado).
+    const alvoEscolha = (modo && ((h.modos || []).find(x => x.id === modo) || {}).alvo) || '';
+    if (alvoEscolha && alvoEscolha !== h.alvo_modo) {
+      h = Object.assign({}, h, { alvo_modo: alvoEscolha });
+      if (alvoEscolha !== 'si') mode = 'single';
+    }
     if (h.alvo_modo === 'nenhum') {
       act({ action: 'ability', actor: cur.name, ability: name, target: '', weapon: w });
       return;

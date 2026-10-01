@@ -175,7 +175,7 @@ def test_eu_ilusorio_faz_o_golpe_errar_uma_vez(luta, monkeypatch):
 def magos(campanha, povoar):
     povoar(_mago(),
            criar_ficha("Necro", vida=40, inteligencia=16, mana=30,
-                       habilidades=[_hab("Fire Bolt"), _hab("Cone of Cold", 7)]))
+                       habilidades=[_hab("Fire Bolt"), _hab("Magic Missile", 2), _hab("Cone of Cold", 7)]))
     iniciar_combate(["Mira", "Necro"], indice=1)
     td._reset_turn_economy(memory.campaign["combat_state"])
     return memory.campaign
@@ -183,7 +183,7 @@ def magos(campanha, povoar):
 
 def test_contramagica_anula_magia_ate_o_terceiro_circulo(magos, monkeypatch):
     _d20(monkeypatch, 19)
-    saida = td.use_ability("Necro", "Fire Bolt", "Mira", end_turn=False, _skip_turn_check=True)
+    saida = td.use_ability("Necro", "Magic Missile", "Mira", end_turn=False, _skip_turn_check=True)
     assert "Contramágica" in saida and "anulada" in saida, saida
     assert _ch("Mira")["sheet"]["vida_atual"] == 30
     assert _ch("Mira")["sheet"]["mana_atual"] == 5
@@ -199,8 +199,15 @@ def test_contramagica_acima_do_terceiro_e_teste(magos, monkeypatch):
 
 def test_contramagica_nao_anula_aliado(magos):
     _ch("Necro")["lado"] = "aliado"
+    saida = td.use_ability("Necro", "Magic Missile", "Mira", end_turn=False, _skip_turn_check=True)
+    assert "Contramágica" not in saida
+
+
+def test_contramagica_nao_gasta_terceiro_circulo_em_truque(magos, monkeypatch):
+    _d20(monkeypatch, 19)
     saida = td.use_ability("Necro", "Fire Bolt", "Mira", end_turn=False, _skip_turn_check=True)
     assert "Contramágica" not in saida
+    assert _ch("Mira")["sheet"]["mana_atual"] == 10
 
 
 # ---------------------------------------------------------------------------

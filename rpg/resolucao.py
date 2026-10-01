@@ -208,6 +208,13 @@ ACOES_DE_CLASSE: dict[str, dict] = {
         "slot": "acao", "alvo": "inimigo",
         "texto": "Ação: o alvo faz salvaguarda de SAB (CD 8 + prof. + CAR); se falhar, fica Amedrontado até o fim do seu próximo turno.",
     },
+    "manobras de combate": {
+        "slot": "livre", "alvo": "si", "modos_dinamicos": True, "uso": "dados de superioridade",
+        "gasta_no_acerto": True,
+        "texto": "Manobras do Mestre de Batalha, pagas com um Dado de Superioridade: as de golpe se armam "
+                 "sem gastar ação e valem no próximo acerto com arma do turno (o dado só é gasto se acertar); "
+                 "Finta e Reagrupar são ação bônus; Contra-Ataque e Aparar o motor usa sozinho, como reação.",
+    },
     "frenesi": {
         "slot": "bonus", "alvo": "inimigo",
         "texto": "Durante a Fúria, ação bônus: um ataque corpo a corpo. Ao fim do combate, ganha 1 nível de exaustão.",
@@ -261,6 +268,9 @@ APELIDOS_DE_ACAO = {
     "font of magic": "fonte de magia",
     "intimidating presence": "presenca intimidadora",
     "frenzy": "frenesi",
+    "combat superiority": "manobras de combate",
+    "superioridade em combate": "manobras de combate",
+    "maneuvers": "manobras de combate",
 }
 
 
@@ -558,6 +568,11 @@ PASSIVAS_NO_MOTOR = {
     "improved divine smite": "o motor soma 1d8 radiante a todo acerto com arma corpo a corpo",
     "uso de forma selvagem adicional": "a Forma Selvagem passa a ter 3 usos por descanso",
     "forma selvagem do combate": "a Forma Selvagem vira ação bônus e aceita feras de ND 1 já no 2º nível",
+    "dado de superioridade": "o motor gasta os dados nas Manobras de Combate (d8; d10 no 10º, d12 no 18º; "
+                             "4 por descanso curto, 5 no 7º, 6 no 15º)",
+    "superiority dice": "o motor gasta os dados nas Manobras de Combate",
+    "manobras aprimoradas": "o motor sobe o Dado de Superioridade para d10 e oferece as manobras escolhidas",
+    "manobras relampago": "o motor dá mais um Dado de Superioridade e oferece as manobras escolhidas",
     "combat wild shape": "a Forma Selvagem vira ação bônus e aceita feras de ND 1 já no 2º nível",
 }
 
@@ -633,6 +648,9 @@ def como_resolve(hab: dict, char: dict | None = None) -> dict:
             slot = "bonus"
         saida.update(tipo="acao_de_classe", texto=acao["texto"], slot=slot,
                      alvo=acao["alvo"], modos=lista, modos_texto=modos, chave=chave)
+        if chave == "manobras de combate":
+            from rpg import superioridade
+            saida["modos_alvo"] = {m: superioridade.alvo_do_modo(m) for m in lista}
         return saida
 
     # "Mente Vazia" é a característica do monge e também o nome em português
@@ -839,6 +857,9 @@ def validar(char: dict, hab: dict, alvo: str, modo: str) -> str:
             from rpg import tools_dnd as td
             if (td.usos_restantes(char, "Forma Selvagem") or 0) <= 0:
                 return "Aviso: a Forma Selvagem está gasta. Volta no descanso curto. Nada foi gasto."
+        if chave == "manobras de combate" and alvo_do_modo(hab, char, modo) in ("inimigo", "aliado") \
+                and not _char(alvo):
+            return f"Aviso: escolha o alvo da manobra. Nada foi gasto."
         if chave == "frenesi":
             from rpg import tools_dnd as td
             if not any(e.get("nome") == "Fúria" for e in td._efeitos_de(char)):
@@ -1892,11 +1913,38 @@ def modos_de(chave: str, char: dict | None) -> dict:
         return {m: MODOS_DE_MOVIMENTO.get(m, m) for m in acao.get("modos") or []}
     if not char:
         return {}
+    from rpg import superioridade
     return {"destruicao divina": _modos_da_destruicao, "forma selvagem": _modos_da_forma,
-            "fonte de magia": _modos_da_fonte}[chave](char)
+            "fonte de magia": _modos_da_fonte, "manobras de combate": superioridade.modos}[chave](char)
+
+
+def alvo_do_modo(hab: dict, char: dict | None, modo: str) -> str:
+    """O alvo que a ESCOLHA pede, quando muda com ela (Finta: inimigo; Reagrupar: aliado)."""
+    chave, _ = acao_de_classe((hab or {}).get("nome", ""), ((char or {}).get("sheet") or {}).get("classe", ""))
+    if chave == "manobras de combate" and modo:
+        from rpg import superioridade
+        return superioridade.alvo_do_modo(modo)
+    return ""
+
+
+def slot_do_modo(hab: dict, char: dict | None, modo: str) -> str:
+    """O custo de ação que a ESCOLHA muda: voltar da Forma Selvagem, Finta, Reagrupar."""
+    chave, _ = acao_de_classe((hab or {}).get("nome", ""), ((char or {}).get("sheet") or {}).get("classe", ""))
+    if chave == "forma selvagem" and modo == "voltar":
+        return "bonus"
+    if chave == "manobras de combate" and modo:
+        from rpg import superioridade
+        return superioridade.slot_do_modo(modo)
+    return ""
+
+
+def _manobras_de_combate(char, hab, alvo, modo):
+    from rpg import superioridade
+    return superioridade.usar(char, modo, alvo)
 
 
 _ACOES = {
+    "manobras de combate": _manobras_de_combate,
     "destruicao divina": _destruicao_divina,
     "arma sagrada": _arma_sagrada,
     "voto de inimizade": _voto_de_inimizade,

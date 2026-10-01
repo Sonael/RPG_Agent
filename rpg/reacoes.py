@@ -70,6 +70,14 @@ REACOES: dict[str, dict] = {
         "texto": "Reação: quando um ataque acertaria você, uma cópia ilusória o recebe e ele erra "
                  "(uma vez por descanso curto).",
     },
+    # Mestre de Batalha (rpg/superioridade.py): gastam um Dado de Superioridade.
+    "contra ataque": {"nome": "Contra-Ataque", "manobra": "Contra-Ataque",
+                      "texto": "Reação: quando um inimigo erra você corpo a corpo, o motor ataca de volta (+dado de superioridade)."},
+    "aparar": {"nome": "Aparar", "manobra": "Aparar",
+               "texto": "Reação: quando um ataque corpo a corpo acerta você, o motor reduz o dano em dado de superioridade + DES."},
+    # Estilo de Combate Proteção: com escudo, desvantagem no ataque contra o aliado ao lado.
+    "protecao": {"nome": "Proteção (estilo)", "estilo": "Proteção",
+                 "texto": "Reação, com escudo: o primeiro ataque contra um aliado na sua zona em cada rodada tem desvantagem."},
     # Não são reações, mas reagem sozinhos e podem ser desligados na mesma lista.
     "indomavel": {"nome": "Indomável", "nomes": ("indomavel", "indomitable"), "recurso": True,
                   "texto": ""},
@@ -101,8 +109,18 @@ def chave_do_nome(nome: str) -> str:
 
 def habilidade_da_reacao(char: dict, chave: str) -> dict | None:
     """A habilidade da ficha que dá esta reação, ou None."""
-    from rpg import resolucao
+    from rpg import resolucao, tools_dnd as td
     cfg = REACOES[chave]
+    if cfg.get("manobra"):
+        from rpg import superioridade
+        if superioridade.tem(char) and cfg["manobra"] in superioridade.conhecidas(char):
+            return {"nome": cfg["manobra"]}
+        return None
+    if cfg.get("estilo"):
+        eq = ((char or {}).get("sheet") or {}).get("equipamentos") or {}
+        if td._get_feature_choice(char, "Estilo de Combate") == cfg["estilo"] and eq.get("escudo"):
+            return {"nome": cfg["nome"]}
+        return None
     for h in (char or {}).get("habilidades") or []:
         if not isinstance(h, dict):
             continue
@@ -193,10 +211,22 @@ def _registrar(char: dict, nome: str, alvo: str, msg: str) -> None:
 # ---------------------------------------------------------------------------
 
 def antes_do_ataque(atacante: dict, alvo: dict, ja_tem_desvantagem: bool) -> tuple[bool, list[str]]:
-    """Bandeira de Aviso: desvantagem no ataque. (desvantagem?, linhas)"""
+    """Bandeira de Aviso ou o estilo Proteção: desvantagem no ataque. (desvantagem?, linhas)"""
     from rpg import tools_dnd as td
     if ja_tem_desvantagem or memory.luta_com_o_grupo(atacante) == memory.luta_com_o_grupo(alvo):
         return False, []
+    cs = memory.campaign.get("combat_state") or {}
+    for nm in cs.get("initiative_order") or []:
+        guarda = memory.campaign["characters"].get(memory.char_key(nm))
+        if (not guarda or guarda is alvo or memory.luta_com_o_grupo(guarda) != memory.luta_com_o_grupo(alvo)):
+            continue
+        d = td._distancia(guarda.get("name", ""), alvo.get("name", ""))
+        if d not in (None, 0) or not _pode_reagir(guarda, "protecao"):
+            continue
+        msg = (f"{guarda['name']} ergue o escudo (Proteção): o ataque de {atacante['name']} contra "
+               f"{alvo['name']} tem desvantagem.")
+        _registrar(guarda, "Proteção", atacante.get("name", ""), msg)
+        return True, [msg]
     hab = _pode_reagir(alvo, "bandeira de aviso")
     if not hab or (td.usos_restantes(alvo, "Bandeira de Aviso") or 0) <= 0:
         return False, []
@@ -254,6 +284,21 @@ def reduzir_dano(atacante: dict, alvo: dict, componentes: list, a_distancia: boo
                f"(1d10={d10} + DES + nível = {reducao}).")
         _registrar(alvo, "Defletir Projéteis", atacante.get("name", ""), msg)
         return novos, [msg]
+    if not a_distancia and _pode_reagir(alvo, "aparar"):
+        from rpg import superioridade
+        if superioridade.restantes(alvo) > 0:
+            superioridade.gastar(alvo)
+            d = random.randint(1, superioridade.dado(alvo))
+            reducao = d + td._modifier(int(alvo["sheet"].get("destreza", 10) or 10))
+            resto, novos = max(0, reducao), []
+            for v, t in componentes:
+                corte = min(max(0, int(v or 0)), resto)
+                resto -= corte
+                novos.append((int(v or 0) - corte, t))
+            msg = (f"{alvo['name']} apara o golpe: reduz {min(max(0, reducao), total)} do dano "
+                   f"(d{superioridade.dado(alvo)}={d} + DES).")
+            _registrar(alvo, "Aparar", atacante.get("name", ""), msg)
+            return novos, [msg]
     hab = _pode_reagir(alvo, "esquiva sobrenatural")
     if hab:
         novos = [(int(v or 0) // 2, t) for v, t in componentes]
@@ -304,6 +349,33 @@ def depois_do_dano(atacante: dict, alvo: dict, dano: int) -> list[str]:
     return linhas
 
 
+def ao_errar(atacante: dict, alvo: dict, a_distancia: bool) -> list[str]:
+    """Contra-Ataque: quem errou o Mestre de Batalha corpo a corpo leva o troco."""
+    from rpg import superioridade, tools_dnd as td
+    if a_distancia or memory.luta_com_o_grupo(atacante) == memory.luta_com_o_grupo(alvo):
+        return []
+    if int((atacante.get("sheet") or {}).get("vida_atual", 0) or 0) <= 0:
+        return []
+    if not _pode_reagir(alvo, "contra ataque") or superioridade.restantes(alvo) <= 0:
+        return []
+    if td._distancia(alvo.get("name", ""), atacante.get("name", "")):
+        return []
+    superioridade.gastar(alvo)
+    td._consume_reaction(alvo)
+    face = superioridade.dado(alvo)
+    td.dar_efeito_de_combate(alvo, {"nome": "Contra-Ataque", "golpe_dado": f"1d{face}",
+                                    "golpe_tipo_da_arma": True, "golpe_so_corpo": True,
+                                    "ate_fim_turno_de": memory.char_key(atacante.get("name", ""))})
+    arma = ((alvo["sheet"].get("equipamentos") or {}).get("arma_principal")
+            or td._melee_weapon_of(alvo) or "ataque desarmado")
+    golpe = td.attack_roll(alvo["name"], atacante["name"], arma, 6, end_turn=False, _skip_turn_check=True)
+    # Errou: o dado já foi; o efeito armado não fica para depois.
+    alvo["sheet"]["efeitos"] = [e for e in alvo["sheet"].get("efeitos") or [] if e.get("nome") != "Contra-Ataque"]
+    td._log_combat_event("reaction", alvo["name"], atacante["name"],
+                         msg=f"{alvo['name']} usa Contra-Ataque contra {atacante['name']}", reacao="Contra-Ataque")
+    return [f"{alvo['name']} usa Contra-Ataque:\n" + golpe.replace(td._BONUS_ACTION_HINT, "")]
+
+
 def contramagica(conjurador: dict, hab: dict) -> str:
     """
     Alguém do outro lado, ao alcance, anula a magia? Devolve a linha do que
@@ -315,6 +387,9 @@ def contramagica(conjurador: dict, hab: dict) -> str:
         return ""
     m = resolucao._magia_srd(hab)
     if not m or m.get("nome_srd") == "Counterspell":
+        return ""
+    # Truque não vale um espaço de 3º círculo: o motor deixa passar.
+    if int(m.get("nivel", 0) or 0) < 1:
         return ""
     lado = memory.luta_com_o_grupo(conjurador)
     for nm in cs.get("initiative_order") or []:

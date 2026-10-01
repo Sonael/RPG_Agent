@@ -170,7 +170,9 @@ def resolver(hab: dict, char: dict | None = None) -> dict:
     r["resolucao"] = como["tipo"]
     r["resolucao_texto"] = como["texto"]
     textos = como.get("modos_texto") or {}
-    r["modos"] = [{"id": m, "texto": textos.get(m) or resolucao.MODOS_DE_MOVIMENTO.get(m, m)}
+    alvos_m = como.get("modos_alvo") or {}
+    r["modos"] = [{"id": m, "texto": textos.get(m) or resolucao.MODOS_DE_MOVIMENTO.get(m, m),
+                   "alvo": alvos_m.get(m, "")}
                   for m in como["modos"]]
     r["alvo_modo"] = como["alvo"]
     r["exige_ataque"] = bool((resolucao.ACOES_DE_CLASSE.get(como.get("chave", "")) or {}).get("exige_ataque"))

@@ -143,6 +143,30 @@ def test_sem_zonas_a_area_aparece_no_cartao(abrir):
     assert not erros, erros[:3]
 
 
+def test_finta_pede_o_alvo_e_gasta_o_bonus(abrir):
+    """A manobra escolhida muda o alvo: Finta pede o inimigo e gasta a ação bônus."""
+    def mestre_de_batalha(estado):
+        s = estado["characters"]["stelar"]
+        s.setdefault("sheet", {}).update({"classe": "guerreiro", "nivel": 7,
+                                          "feature_choices": {"Manobras de Combate": ["Finta", "Ataque Derrubador",
+                                                                                      "Aparar"]}})
+        s["habilidades"] = [{"nome": "Manobras de Combate", "custo_mana": 0, "dado": "", "descricao": ""}]
+    pg, erros = abrir(mudar=mestre_de_batalha)
+    pg.click("#cbt-buttons button:has-text('Habilidade')")
+    pg.locator("#cbt-targets .cbt-hab", has=pg.locator(".cbt-hab-nome", has_text="Manobras")) \
+      .first.locator(".cbt-hab-usar").click()
+    pg.wait_for_selector("#cbt-targets .cbt-modo:has-text('Finta')")
+    assert pg.locator("#cbt-targets .cbt-modo:has-text('Aparar')").count() == 0     # reação: o motor usa
+    pg.click("#cbt-targets .cbt-modo:has-text('Finta')")
+    pg.wait_for_selector("#cbt-targets button:has-text('Victoria')")
+    pg.click("#cbt-targets button:has-text('Victoria')")
+    pg.wait_for_function(
+        "() => [...document.querySelectorAll('.cbt-slot.gasto')].some(s => s.textContent.includes('Bônus'))",
+        timeout=8000)
+    assert not [s for s in pg.locator(".cbt-slot.gasto").all_inner_texts() if "Ação" == s.strip()]
+    assert not erros, erros[:3]
+
+
 def test_celular_sem_rolagem_lateral(abrir):
     pg, _ = abrir(viewport={"width": 375, "height": 812})
     largura = pg.evaluate("document.documentElement.scrollWidth")
