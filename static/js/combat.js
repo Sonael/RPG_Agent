@@ -531,8 +531,7 @@
       botoes.push(`<button class="cbt-btn" ${d} onclick="window.Combat._sel('move')">Mover</button>`);
     }
     botoes.push(
-      `<button class="cbt-btn" ${acaoDis} onclick="window.Combat._act({action:'defend',actor:'${actorEsc}'})">Defender</button>`,
-      `<button class="cbt-btn" ${acaoDis} onclick="window.Combat._act({action:'flee',actor:'${actorEsc}'})">Fugir</button>`,
+      `<button class="cbt-btn" ${acaoDis} onclick="window.Combat._manobras()" title="Defender, Ajudar, Esconder-se, Agarrar, Empurrar, Preparar, Fugir">Manobras</button>`,
       `<button class="cbt-btn" ${dis} onclick="window.Combat._free()">Ação Livre</button>`);
     // No celular a grade tem 4 colunas: o "Encerrar Turno" ocupa o que sobra
     // da última fileira, e nunca menos de duas colunas — numa só o rótulo
@@ -625,7 +624,9 @@
     const querAliado = apoio;
     live = live.slice().sort((a, b) =>
       (comOGrupo(b) === querAliado) - (comOGrupo(a) === querAliado));
-    const titulo = kind === 'attack'
+    const titulo = kind === 'manobra'
+      ? `${esc(_pick.rotulo || 'Manobra')}:`
+      : kind === 'attack'
       ? `Alvo de ${esc(_pick.weapon || 'ataque')}:`
       : (kind === 'ability' ? `Alvo de ${esc((h && h.nome_exibido) || _pick.ability || 'habilidade')}:` : 'Alvo:');
     // Alcance de cada alvo para a arma escolhida, calculado pelo motor. Sem
@@ -664,6 +665,8 @@
             + `onclick="window.Combat._target('${jsNome(c.name)}')">${esc(c.name)}${quem}`
             + ` <small>${c.hp}/${c.hp_max}</small>${nota}</button>`;
         }).join('')
+      + (_pick.permiteNenhum
+          ? `<button class="cbt-btn" onclick="window.Combat._target('')">O primeiro que chegar</button>` : '')
       + BOTAO_CANCELAR
       + `</div>`;
     abrirSeletor(html, false);
@@ -1161,6 +1164,53 @@
       + `</div>`, false);
   }
 
+  // Ajudar, Esconder-se, Agarrar, Empurrar, Preparar (e Escapar, quando
+  // agarrado): as ações do SRD que antes só existiam na Ação Livre, sem a
+  // regra. Todas gastam a Ação (rpg/manobras.py).
+  const MANOBRAS = [
+    ['defend', 'Defender', 'Esquivar: ataques contra você têm desvantagem até o seu próximo turno'],
+    ['help', 'Ajudar', 'o próximo ataque de um aliado contra o alvo tem vantagem'],
+    ['hide', 'Esconder-se', 'Furtividade contra a Percepção dos inimigos; escondido, o próximo ataque tem vantagem'],
+    ['grapple', 'Agarrar', 'Atletismo contra Atletismo ou Acrobacia: o alvo não sai da zona'],
+    ['shove:derrubar', 'Derrubar', 'Atletismo contra Atletismo ou Acrobacia: o alvo fica Caído'],
+    ['shove:afastar', 'Empurrar', 'Atletismo contra Atletismo ou Acrobacia: o alvo vai para a zona vizinha'],
+    ['ready', 'Preparar ataque', 'ataca quando o alvo for agir, ou o primeiro inimigo que chegar (usa a reação)'],
+    ['escape', 'Escapar', 'Atletismo ou Acrobacia contra o Atletismo de quem agarra'],
+    ['flee', 'Fugir', 'sair do combate; quem está perto ganha ataque de oportunidade'],
+  ];
+
+  function _manobras() {
+    if (_busy) return;
+    const cur = (_last.combatants || []).find(c => c.is_current);
+    if (!cur) return;
+    _livreFechar();
+    const agarrado = (cur.condicoes || []).some(c => /agarrad/i.test(String(c)));
+    const temZonas = ((_last || {}).zonas || []).length > 1;
+    const lista = MANOBRAS.filter(([id]) =>
+      (id !== 'escape' || agarrado) && (id !== 'shove:afastar' || temZonas));
+    abrirSeletor(
+      `<div class="cbt-tgt-title">Manobras <small>· gastam a Ação</small></div>`
+      + `<div class="cbt-picker-btns cbt-modos">`
+      + lista.map(([id, rotulo, dica]) =>
+          `<button class="cbt-btn cbt-modo" data-manobra="${esc(id)}" onclick="window.Combat._manobra('${jsNome(id)}')">`
+          + `${esc(rotulo)}<small>: ${esc(dica)}</small></button>`).join('')
+      + BOTAO_CANCELAR
+      + `</div>`, false);
+  }
+
+  function _manobra(id) {
+    if (_busy) return;
+    const cur = (_last.combatants || []).find(c => c.is_current);
+    if (!cur) return;
+    const [acao, modo] = id.split(':');
+    const rotulo = (MANOBRAS.find(m => m[0] === id) || [id, id])[1];
+    if (acao === 'hide' || acao === 'escape' || acao === 'defend' || acao === 'flee') {
+      act({ action: acao, actor: cur.name });
+      return;
+    }
+    showTargets('manobra', { acao, modo: modo || '', rotulo, permiteNenhum: acao === 'ready' });
+  }
+
   // Troca o círculo marcado no seletor de alvo.
   function _circulo(id) {
     if (!_pick) return;
@@ -1225,7 +1275,9 @@
     if (_busy || !_pick) return;
     const cur = (_last.combatants || []).find(c => c.is_current);
     if (!cur) return;
-    if (_pick.kind === 'attack')
+    if (_pick.kind === 'manobra')
+      act({ action: _pick.acao, actor: cur.name, target: name, weapon: _pick.modo || '' });
+    else if (_pick.kind === 'attack')
       act({ action: 'attack', actor: cur.name, target: name, weapon: _pick.weapon || '' });
     else if (_pick.kind === 'item')
       act({ action: 'item', actor: cur.name, item: _pick.item, target: name });
@@ -1472,7 +1524,7 @@
   // ---- API pública -------------------------------------------------
   window.Combat = {
     sync,
-    _sel, _selHab, _usarHab, _modo, _circulo, _info, _reacao, _selWeapon, _selItem, _target, _mover, _cancel, _free,
+    _sel, _selHab, _usarHab, _modo, _circulo, _info, _reacao, _manobras, _manobra, _selWeapon, _selItem, _target, _mover, _cancel, _free,
     _confirmarArea,
     _livreEnviar, _livreFechar,
     _act: act,

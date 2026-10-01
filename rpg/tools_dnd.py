@@ -201,6 +201,8 @@ def _mark_at_zero_hp(target: dict, source_name: str = "") -> str:
     a ser anexado ao resultado da ferramenta.
     """
     name = target.get("name", "")
+    from rpg import manobras as _manobras
+    _manobras.soltar_quem_agarrou(name)
     if memory.is_party_member(target):
         target["status"] = "inconsciente"
         _log_combat_event("down", source_name, name, msg=f"{name} caiu inconsciente")
@@ -4077,6 +4079,10 @@ def move_combatant(name: str, zone: str, dash: bool = False,
                 f"{oportunidade}\n   Cai antes de chegar.")
 
     _por_zona(nome_real, destino)
+    from rpg import manobras as _manobras
+    _soltos = _manobras.soltar_quem_agarrou(nome_real)
+    if _soltos:
+        oportunidade += "\n   " + "; ".join(_soltos) + "."
     verbo = "dispara" if dash else "avança"
     _log_combat_event("move", nome_real, "",
                       msg=f"{nome_real} move-se de {origem} para {destino}",
@@ -14213,6 +14219,15 @@ def _npc_aproximar(npc_name: str, alvo: str) -> tuple[str, bool]:
     za, zb = _zona_de(npc_name), _zona_de(alvo)
     if za not in zonas or zb not in zonas or za == zb:
         return "", True
+    # Agarrado, Contido, Aprisionado: não sai da zona. Agarrado gasta a Ação
+    # tentando escapar; o resto espera.
+    _npc_ch = memory.campaign["characters"].get(memory.char_key(npc_name)) or {}
+    _preso_mv = _condicao_com(_npc_ch, "no_movement")
+    if _preso_mv:
+        if _norm_txt(_preso_mv) == "agarrado":
+            from rpg import manobras as _manobras
+            return _manobras.escapar(npc_name), False
+        return f"{npc_name} está {_preso_mv} e não sai da zona.", False
     i, j = zonas.index(za), zonas.index(zb)
     dist = abs(j - i)
     passo = 1 if j > i else -1
@@ -14353,6 +14368,13 @@ def _executar_turno_npc(npc_name: str = "") -> str:
         memory.save_campaign()
         return f"{npc_name} está **{preso}** e não age neste turno." + _auto_advance_turn(npc_name)
 
+    # Quem preparou um ataque contra ele (ação Preparar) ataca antes.
+    from rpg import manobras as _manobras
+    _preparados = _manobras.disparar_preparadas(npc_name)
+    if _preparados and int((npc.get("sheet") or {}).get("vida_atual", 0) or 0) <= 0:
+        memory.save_campaign()
+        return "\n".join(_preparados) + _auto_advance_turn(npc_name)
+
     # Confusão: o d10 decide o turno (SRD).
     if any(_norm_txt(c.get("nome", "") if isinstance(c, dict) else str(c)) == "confuso"
            for c in _get_conditions(npc)):
@@ -14365,7 +14387,7 @@ def _executar_turno_npc(npc_name: str = "") -> str:
 
     # O que voltou a estar disponível neste turno. _inicio_de_turno já rolou os
     # d6 quando o ponteiro chegou aqui; isto só traz o aviso para a narração.
-    avisos_recarga = []
+    avisos_recarga = list(_preparados)
     for _nome_rec, _cfg in (npc_sheet.get("recargas") or {}).items():
         if _cfg.get("pronto") and _cfg.get("ultimo_d6"):
             avisos_recarga.append(
@@ -14527,6 +14549,11 @@ def _executar_turno_npc(npc_name: str = "") -> str:
             aproximacao, pode_atacar = _npc_aproximar(npc_name, alvo_nome)
             if aproximacao:
                 partes.append(aproximacao)
+            # Chegou na zona de quem preparou "o primeiro que chegar".
+            partes.extend(_manobras.disparar_preparadas(npc_name))
+            if int((npc.get("sheet") or {}).get("vida_atual", 0) or 0) <= 0:
+                partes.append(_auto_advance_turn(npc_name))
+                return "\n".join(partes)
             if not pode_atacar:
                 partes.append(_auto_advance_turn(npc_name))
                 return "\n".join(partes)
@@ -14814,6 +14841,8 @@ def _inicio_de_turno(cs: dict) -> None:
     # turno": acabam aqui, quando ele começa. O Etéreo do Piscar também.
     _expirar_efeitos(memory.char_key(order[idx]), "inicio")
     _expirar_efeitos(memory.char_key(order[idx]), "inicio", qual="condicoes")
+    from rpg import manobras as _manobras
+    _manobras.expirar_preparadas(order[idx])
     _rolar_recargas(ch)
     _repor_lendarias(ch)
     cs["_lendarias_msg"] = _gastar_lendarias_dos_chefes(order[idx])
@@ -16391,6 +16420,31 @@ def combat_action(action: str, actor: str = "", target: str = "",
                               msg=f"{actor} defendeu-se (Esquivar — Ação)")
             msg = (f"{actor} esquiva-se (Dodge): ataques contra {actor} têm desvantagem "
                    f"até o próximo turno.")
+
+        elif a in ("help", "hide", "grapple", "escape", "shove", "ready"):
+            # Ajudar, Esconder-se, Agarrar, Escapar, Empurrar, Preparar: todas
+            # gastam a Ação (rpg/manobras.py).
+            from rpg import manobras as _manobras
+            err = _use_slot(eco, "acao")
+            if err:
+                return {"ok": False, "message": err, "snapshot": combat_snapshot()}
+            alvo_m = (target or "").strip()
+            if a == "help":
+                msg = _manobras.ajudar(actor, alvo_m)
+            elif a == "hide":
+                msg = _manobras.esconder(actor)
+            elif a == "grapple":
+                msg = _manobras.agarrar(actor, alvo_m)
+            elif a == "escape":
+                msg = _manobras.escapar(actor)
+            elif a == "shove":
+                msg = _manobras.empurrar(actor, alvo_m, (weapon or "").strip())
+            else:
+                msg = _manobras.preparar(actor, alvo_m)
+            if msg.startswith(("Erro:", "Aviso:")):
+                eco["acao_usada"] = False
+                return {"ok": False, "message": msg, "snapshot": combat_snapshot()}
+            _log_combat_event(a, actor, alvo_m, msg=msg.split("\n")[0])
 
         elif a == "flee":
             err = _use_slot(eco, "acao")
