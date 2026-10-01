@@ -428,6 +428,37 @@ EFEITOS_DE_MAGIA: dict[str, dict] = {
                           "texto": "um elemental de ND 5 obedece a você enquanto durar a concentração (até "
                                    "1 hora) e entra na próxima luta ao seu lado; se a concentração cair, "
                                    "ele não some: vira inimigo do grupo"},
+    # ── Magias que se ligam aos sistemas do jogo ────────────────────────────
+    "Identify": {"alvos": "si", "identificar": True, "fora_de_combate": "1 minuto",
+                 "texto": "identifica um item da sua mochila (o que ele é, raridade, propriedades)"},
+    "Goodberry": {"alvos": "si", "bom_fruto": True,
+                  "texto": "dez frutas vão para a mochila; cada uma cura 1 PV ao ser comida, e a magia acaba em "
+                           "24 horas"},
+    "Enhance Ability": {"alvos": "aliado",
+                        "modos": {"touro": "Força do Touro: vantagem nos testes de FOR",
+                                  "gato": "Graça do Gato: vantagem nos testes de DES",
+                                  "urso": "Vigor do Urso: vantagem nos testes de CON e 2d6 PV temporários",
+                                  "aguia": "Esplendor da Águia: vantagem nos testes de CAR",
+                                  "raposa": "Astúcia da Raposa: vantagem nos testes de INT",
+                                  "coruja": "Sabedoria da Coruja: vantagem nos testes de SAB"},
+                        "efeito_por_modo": {"touro": {"vantagem_teste_atributos": ["forca"]},
+                                            "gato": {"vantagem_teste_atributos": ["destreza"]},
+                                            "urso": {"vantagem_teste_atributos": ["constituicao"]},
+                                            "aguia": {"vantagem_teste_atributos": ["carisma"]},
+                                            "raposa": {"vantagem_teste_atributos": ["inteligencia"]},
+                                            "coruja": {"vantagem_teste_atributos": ["sabedoria"]}},
+                        "pv_temp_por_modo": {"urso": "2d6"},
+                        "texto": "vantagem nos testes de um atributo (o motor rola o segundo d20 nos testes "
+                                 "de perícia e sociais)"},
+    "Pass without Trace": {"alvos": "aliados", "max": 8, "efeito": {"bonus_pericia": {"furtividade": 10}},
+                           "texto": "+10 nos testes de Furtividade do grupo"},
+    "See Invisibility": {"alvos": "si", "horas": 1, "efeito": {"ver_invisivel": True},
+                         "texto": "você vê quem está Invisível: atacar não tem desvantagem, e ele não tem "
+                                  "vantagem contra você"},
+    "True Seeing": {"alvos": "aliado", "horas": 1, "efeito": {"ver_invisivel": True},
+                    "texto": "o aliado vê quem está Invisível (e o que é ilusão, o Mestre narra)"},
+    "Daylight": {"alvos": "nenhum", "zona": "luz",
+                 "texto": "luz do dia na zona escolhida; a Escuridão nela acaba"},
     # ── Segunda leva: magias de combate que faltavam ────────────────────────
     "Dispel Magic": {"alvos": "aliado", "dissipar": True,
                      "texto": "encerra as magias sobre uma criatura (efeitos, condições, encanto, transformação); "
@@ -829,6 +860,9 @@ def como_resolve(hab: dict, char: dict | None = None) -> dict:
                                       .replace("na zona", "na área").replace("da zona", "da área"))
             if ef.get("transformar"):
                 modos = _modos_da_polimorfia(bool(ef.get("verdadeira")))
+            if ef.get("identificar") and char:
+                modos = {i["nome"]: i["nome"] for i in (char.get("inventario") or [])
+                         if isinstance(i, dict) and i.get("nome") and not i.get("identificado")}
             if ef.get("teleporte") and char:
                 from rpg import tools_dnd as td
                 if td._zonas_ativas():
@@ -1062,6 +1096,10 @@ def validar(char: dict, hab: dict, alvo: str, modo: str) -> str:
                     and not a):
                 return (f"Aviso: sem zonas, {nome_pt} fica centrada numa criatura: escolha em quem "
                         f"(pode ser você). Nada foi gasto.")
+        if ef.get("identificar"):
+            itens = [i.get("nome") for i in (char.get("inventario") or []) if isinstance(i, dict)]
+            if modo not in itens:
+                return f"Aviso: escolha o item da mochila que {nome_pt} vai identificar. Nada foi gasto."
         if ef.get("transformar"):
             from rpg import criaturas
             if not a or not a.get("sheet"):
@@ -1138,7 +1176,12 @@ def _alvos_da_magia(char: dict, ef: dict, alvo_nome: str) -> list[dict]:
         return [alvo or char]
     if tipo == "aliados":
         lista = []
-        for c in [alvo, char] + _combatentes_vivos():
+        # Fora do combate não há ordem de iniciativa: os aliados são o grupo.
+        grupo = ([] if (memory.campaign.get("combat_state") or {}).get("is_active") else
+                 [c for c in (memory.campaign.get("characters") or {}).values()
+                  if isinstance(c, dict) and c.get("sheet") and memory.is_party_member(c)
+                  and (c.get("status") or "").lower() not in ("morto", "fugiu")])
+        for c in [alvo, char] + _combatentes_vivos() + grupo:
             if c and _mesmo_lado(char, c) and c not in lista:
                 lista.append(c)
         perto = [c for c in lista if c is alvo or c is char or _perto(char, c)]
@@ -1222,6 +1265,11 @@ def aplicar_magia(char: dict, hab: dict, alvo_nome: str, modo: str = "") -> str:
             if m.get("concentracao"):
                 efeito["concentracao_de"] = memory.char_key(char.get("name", ""))
             td.dar_efeito_de_combate(a, efeito)
+        if (ef.get("pv_temp_por_modo") or {}).get(modo):
+            valor_pv, _ = td._rolar_expr(ef["pv_temp_por_modo"][modo])
+            st_pv = a.setdefault("sheet", {})
+            st_pv["vida_temp"] = max(int(st_pv.get("vida_temp", 0) or 0), valor_pv)
+            linhas.append(f"{a['name']}: {st_pv['vida_temp']} PV temporários")
         if ef.get("movimento_agora"):
             _eco()["movimento_extra"] = int(_eco().get("movimento_extra", 0) or 0) + 1
         if ef.get("pv_temp"):
@@ -1282,6 +1330,14 @@ def _magia_especial(char: dict, hab: dict, ef: dict, a: dict, modo: str, nome_pt
         return _invocar(char, hab, ef, modo, nome_pt)
     if ef.get("dissipar"):
         return _dissipar(char, hab, a, modo, nome_pt)
+    if ef.get("identificar"):
+        return f"\n   {nome_pt}: " + td.identify_item(char["name"], modo)
+    if ef.get("bom_fruto"):
+        inv = char.setdefault("inventario", [])
+        inv.append({"nome": "Bom Fruto", "qtd": 10, "descricao": "Cura 1 PV ao ser comido. Perde a magia em 24 h.",
+                    "expira_hora": td._agora_em_horas() + 24, "identificado": True, "custom": False})
+        return f"\n   {nome_pt}: dez Bons Frutos na mochila de {char['name']} (1 PV cada, por 24 horas)."
+
     if ef.get("palavra_matar"):
         st_a = a.setdefault("sheet", {})
         vida = int(st_a.get("vida_atual", 0) or 0)
@@ -1556,6 +1612,10 @@ def _magia_de_zona(char: dict, hab: dict, ef: dict, modo: str, nome_pt: str, alv
                      and norm(z.get("magia", "")) == norm(hab.get("nome", "")))]
     entrada = {"tipo": ef["zona"], "nome": nome_pt,
                "concentracao_de": memory.char_key(char.get("name", "")), "magia": hab.get("nome", "")}
+    if ef["zona"] == "luz":
+        alvo_luz = memory.char_key((_char(alvo_nome) or char).get("name", ""))
+        lista = [z for z in lista if not (z.get("tipo") == "escuridao" and (
+            (td._zonas_ativas() and z.get("zona") == modo) or (not td._zonas_ativas() and z.get("criatura") == alvo_luz)))]
     if ef.get("zona_do_conjurador"):
         # Acompanha quem conjurou: a zona é calculada na hora (_efeitos_de_zona).
         entrada["segue"] = memory.char_key(char.get("name", ""))

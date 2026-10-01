@@ -4650,6 +4650,16 @@ def _condicao_com(char: dict, chave: str) -> str:
     return ""
 
 
+def _invisivel(char: dict) -> bool:
+    return any(_norm_txt(c.get("nome", "") if isinstance(c, dict) else str(c)) == "invisivel"
+               for c in _get_conditions(char))
+
+
+def _ve_invisivel(char: dict) -> bool:
+    """Ver o Invisível (e Visão da Verdade): enxerga o invisível."""
+    return any(e.get("ver_invisivel") for e in _efeitos_de(char))
+
+
 def _impedido_de_agir(char: dict) -> str:
     """Paralisado, Atordoado, Incapacitado, Banido…: não age. '' quando age."""
     return _condicao_com(char, "no_actions")
@@ -6043,14 +6053,21 @@ def make_skill_check(
         prof_pericia = int(s.get("proficiencia", _proficiency_bonus(int(s.get("nivel", 1) or 1))) or 2)
     # Usa a rolagem do JOGADOR quando fornecida e válida (1–20); senão o
     # mestre/sistema rola (com vantagem/desvantagem se aplicável).
+    _bonus_ef, _vant_ef, _notas_ef = _efeitos_no_teste(char, attr_key, skill)
     if isinstance(player_roll, int) and 1 <= player_roll <= 20:
         d20      = player_roll
         roll_log = f"d20={d20} (rolado pelo jogador)"
+        if _vant_ef and not disadvantage:
+            _segundo = random.randint(1, 20)
+            roll_log += f", vantagem: segundo d20 = {_segundo}"
+            d20 = max(d20, _segundo)
     else:
-        d20, roll_log = _roll_d20_with_adv(advantage, disadvantage)
-    total    = d20 + mod + prof_pericia
+        d20, roll_log = _roll_d20_with_adv(advantage or _vant_ef, disadvantage)
+    total    = d20 + mod + prof_pericia + _bonus_ef
+    if _notas_ef:
+        roll_log += f" [{'; '.join(_notas_ef)}]"
     sign     = "+" if mod >= 0 else ""
-    prof_str = f" +{prof_pericia}(prof)" if prof_pericia else ""
+    prof_str = (f" +{prof_pericia}(prof)" if prof_pericia else "") + (f" {_bonus_ef:+d}(efeitos)" if _bonus_ef else "")
 
     critico       = d20 == 20
     falha_critica = d20 == 1
@@ -6142,6 +6159,14 @@ def social_check(
             nota_encanto = (f"   Vantagem: {target_name} está enfeitiçado por {char['name']} "
                             f"(segundo d20 = {segundo}).\n")
             d20 = max(d20, segundo)
+    _bonus_ef, _vant_ef, _notas_ef = _efeitos_no_teste(char, attr_key, skill_lower)
+    if _vant_ef and not nota_encanto:
+        _seg_ef = random.randint(1, 20)
+        nota_encanto += f"   Vantagem ({'; '.join(_notas_ef)}): segundo d20 = {_seg_ef}.\n"
+        d20 = max(d20, _seg_ef)
+    elif _notas_ef:
+        nota_encanto += f"   {'; '.join(_notas_ef)}\n"
+    total_mod += _bonus_ef
     total        = d20 + total_mod
     sign         = "+" if total_mod >= 0 else ""
 
@@ -6685,12 +6710,20 @@ def attack_roll(
         disadvantage = True
         cond_notes.append(f"{attacker['name']} está {', '.join(active_conds)} → desvantagem automática")
 
-    # Atacante tem condição que concede vantagem (ex: invisível)?
+    # Atacante tem condição que concede vantagem (ex: invisível)? Contra quem
+    # vê o invisível, a invisibilidade não conta.
     if _has_condition_effect(attacker, "attack_advantage"):
         active_conds = [c["nome"] for c in _get_conditions(attacker)
-                        if CONDITION_EFFECTS.get(c["nome"].lower(), {}).get("attack_advantage")]
-        advantage = True
-        cond_notes.append(f"{attacker['name']} está {', '.join(active_conds)} → vantagem automática")
+                        if CONDITION_EFFECTS.get(c["nome"].lower(), {}).get("attack_advantage")
+                        and not (_norm_txt(c["nome"]) == "invisivel" and _ve_invisivel(target))]
+        if active_conds:
+            advantage = True
+            cond_notes.append(f"{attacker['name']} está {', '.join(active_conds)} → vantagem automática")
+
+    # Alvo invisível: quem ataca não o vê (desvantagem), a menos que veja o invisível.
+    if _invisivel(target) and not _ve_invisivel(attacker):
+        disadvantage = True
+        cond_notes.append(f"{target['name']} está Invisível → desvantagem")
 
     # Alvo tem condição que concede vantagem ao atacante (Cego, Paralisado, etc.)?
     if _has_condition_effect(target, "defense_disadvantage"):
@@ -11106,6 +11139,16 @@ def advance_time(hours: int, reason: str = "") -> str:
     acabaram = encantos.expirar()
     # Animar Mortos dura 24 horas: o morto-vivo some quando o relógio chega lá.
     acabaram += criaturas.limpar()
+    # Bom Fruto: a magia acaba em 24 horas, e as frutas viram frutas comuns.
+    for _ch_f in (memory.campaign.get("characters") or {}).values():
+        _inv_f = (_ch_f or {}).get("inventario")
+        if not isinstance(_inv_f, list):
+            continue
+        _vencidas = [i for i in _inv_f if isinstance(i, dict) and i.get("expira_hora") is not None
+                     and _agora_em_horas() >= int(i["expira_hora"])]
+        for i in _vencidas:
+            _inv_f.remove(i)
+            acabaram.append(f"{i.get('nome')} de {_ch_f.get('name')} perdeu a magia ({i.get('qtd', 1)})")
     memory.save_campaign()
 
     motivo = f" — {reason}" if reason else ""
@@ -15466,6 +15509,9 @@ def _efeito_de_item(item_name: str) -> dict | None:
         return {"efeito": "cura", "slot": "bonus", "dado": dado,
                 "rotulo": f"{dado[0]}d{dado[1]}+{dado[2]} PV"}
 
+    if "bom fruto" in n or "goodberry" in n:
+        return {"efeito": "cura", "slot": "acao", "dado": (1, 1, 0), "rotulo": "1 PV"}
+
     if ("resistencia" in n or "resistance" in n) and ("pocao" in n or "potion" in n):
         tipo = _damage_type_from_text(item_name)
         if not tipo:
@@ -15828,6 +15874,30 @@ def _bonus_de_salvaguarda(alvo: dict) -> tuple[int, str]:
     return total, ("; ".join(notas))
 
 
+def _efeitos_no_teste(char: dict, atributo: str, pericia: str = "") -> tuple[int, bool, list[str]]:
+    """
+    (bônus, vantagem, notas) dos efeitos num teste de atributo ou perícia:
+    Orientação e Inspiração de Bardo (o dado, uma vez), Aprimorar Habilidade
+    (vantagem no atributo), Passos sem Pegadas (+10 em Furtividade).
+
+    Antes, _bonus_de_teste existia e ninguém o chamava: a Orientação nunca
+    entrou num teste.
+    """
+    bonus, notas = _bonus_de_teste(char)
+    notas = [notas] if notas else []
+    vantagem = False
+    s = (char or {}).get("sheet") or {}
+    for e in _efeitos(s):
+        if _norm_txt(atributo) in {_norm_txt(x) for x in e.get("vantagem_teste_atributos") or []}:
+            vantagem = True
+            notas.append(f"{e.get('nome', 'efeito')}: vantagem")
+        extra = (e.get("bonus_pericia") or {}).get(_norm_txt(pericia)) if pericia else None
+        if extra:
+            bonus += int(extra)
+            notas.append(f"{e.get('nome', 'efeito')}: {int(extra):+d}")
+    return bonus, vantagem, notas
+
+
 def _bonus_de_teste(alvo: dict) -> tuple[int, str]:
     """Orientação: +1d4 no próximo teste de atributo, e acaba."""
     s = (alvo or {}).get("sheet") or {}
@@ -16061,8 +16131,10 @@ def _rolar_ataque_magico(char: dict, alvo: dict, hab: dict) -> tuple[bool, bool,
     else:
         # Monstro ou classe sem conjuração na tabela: o melhor dos três.
         mod = max(_modifier(int(s.get(a, 10) or 10)) for a in ("inteligencia", "sabedoria", "carisma"))
-    vantagem = _has_condition_effect(char, "attack_advantage") or _has_condition_effect(alvo, "defense_disadvantage")
-    desvantagem = _has_condition_effect(char, "attack_disadvantage")
+    vantagem = ((_has_condition_effect(char, "attack_advantage") and not (_invisivel(char) and _ve_invisivel(alvo)))
+                or _has_condition_effect(alvo, "defense_disadvantage"))
+    desvantagem = (_has_condition_effect(char, "attack_disadvantage")
+                   or (_invisivel(alvo) and not _ve_invisivel(char)))
     mods = _mods_de_ataque(char, alvo, False, com_arma=False)
     vantagem = vantagem or mods["vantagem"]
     desvantagem = desvantagem or mods["desvantagem"]
