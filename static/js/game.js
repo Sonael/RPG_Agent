@@ -117,36 +117,23 @@ function showLoadingScreen(message) {
 // ═══════════════════════════════════════
 //  Autocomplete de comandos /
 // ═══════════════════════════════════════
-const COMMANDS = [
-  { cmd: '/ajuda', arg: '', desc: 'Exibe todos os comandos' },
-  { cmd: '/personagens', arg: '', desc: 'Lista personagens na memória' },
-  { cmd: '/locais', arg: '', desc: 'Lista locais registrados' },
-  { cmd: '/grupo', arg: '', desc: 'Lista membros do grupo' },
-  { cmd: '/eventos', arg: '', desc: 'Mostra os últimos 5 eventos' },
-  { cmd: '/flags', arg: '', desc: 'Variáveis de estado da campanha' },
-  { cmd: '/contexto', arg: '', desc: 'Dump completo da memória' },
-  { cmd: '/diario', arg: '', desc: 'Entradas do diário' },
-  { cmd: '/resumo', arg: '', desc: 'Recapitulação da história' },
-  { cmd: '/exportar', arg: '', desc: 'Exporta diário como .md' },
-  { cmd: '/salvar local', arg: '<nome>', desc: 'Registra um local' },
-  { cmd: '/salvar personagem', arg: '<nome>', desc: 'Registra um personagem' },
-  { cmd: '/salvar evento', arg: '<desc>', desc: 'Registra um evento' },
-];
-
+// A lista dos comandos mora em comandos.js (a mesma que executa e que monta
+// a /ajuda). Aqui só o menu: depois do comando, ele sugere os nomes.
 let _cmdIdx = -1, _menuOpen = false;
 
 function openCmdMenu(filter = '') {
-  const norm = filter.toLowerCase();
-  const matches = COMMANDS.filter(c => c.cmd.startsWith(norm) || norm === '/');
+  const matches = window.Comandos ? window.Comandos.sugestoes(filter || '/') : [];
   if (!matches.length) { closeCmdMenu(); return; }
 
   const menu = document.getElementById('cmd-menu');
   const items = document.getElementById('cmd-menu-items');
+  const titulo = menu.querySelector('.cmd-menu-title');
+  if (titulo) titulo.textContent = matches[0].valor.includes(' ') ? 'Sugestões:' : 'Comandos disponíveis:';
   items.innerHTML = matches.map((c, i) => `
     <div class="cmd-item" data-i="${i}" onclick="selectCmd(${i})" onmouseenter="hlCmd(${i})">
-      <span class="cmd-item-name">${c.cmd}</span>
-      ${c.arg ? `<span class="cmd-item-arg">${c.arg}</span>` : ''}
-      <span class="cmd-item-desc">${c.desc}</span>
+      <span class="cmd-item-name">${escapeHtml(c.rotulo)}</span>
+      ${c.arg ? `<span class="cmd-item-arg">${escapeHtml(c.arg)}</span>` : ''}
+      ${c.desc ? `<span class="cmd-item-desc">${escapeHtml(c.desc)}</span>` : ''}
     </div>
   `).join('');
   menu.classList.remove('hidden'); menu.style.display = 'block';
@@ -167,8 +154,11 @@ function selectCmd(i) {
   const matches = document.getElementById('cmd-menu')._matches || [];
   if (i < 0 || i >= matches.length) return;
   const c = matches[i], input = document.getElementById('chat-input');
-  if (c.arg) { input.value = c.cmd + ' '; closeCmdMenu(); input.focus(); autoResize(input); }
-  else { input.value = c.cmd; closeCmdMenu(); sendMessage(); }
+  if (c.completo) { input.value = c.valor; closeCmdMenu(); sendMessage(); return; }
+  // Comando com argumento: fica no campo e o menu passa a sugerir os nomes.
+  input.value = c.valor + ' ';
+  input.focus(); autoResize(input);
+  openCmdMenu(input.value);
 }
 
 function onInputChange(el) {
@@ -187,7 +177,7 @@ function handleKey(e) {
     if (e.key === 'Tab' || (e.key === 'Enter' && _cmdIdx >= 0)) { e.preventDefault(); selectCmd(_cmdIdx >= 0 ? _cmdIdx : 0); return; }
     if (e.key === 'Escape') { e.preventDefault(); closeCmdMenu(); return; }
   }
-  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); closeCmdMenu(); sendMessage(); }
 }
 
 // ═══════════════════════════════════════
@@ -199,7 +189,9 @@ async function sendMessage() {
   const text = input.value.trim();
   if (!text) return;
   input.value = ''; autoResize(input);
-  if (text.startsWith('/')) { const handled = await handleSlash(text); if (handled) return; }
+  // Comando ("/ficha"): tratado aqui, certo ou errado. Comando errado ia
+  // ao Mestre como fala, gastando uma requisição e entrando na história.
+  if (text.startsWith('/') && window.Comandos && await window.Comandos.executar(text)) return;
   appendUser(text);
   await sendToAgent(text, true);
 }
@@ -362,297 +354,6 @@ function updateQuotaUI() {
     barEl.style.width = dailyPercent + '%';
     barEl.style.backgroundColor = dailyPercent > 85 ? 'var(--red)' : 'var(--ink-user)';
   }
-}
-
-// ═══════════════════════════════════════
-//  Comandos
-// ═══════════════════════════════════════
-async function handleSlash(raw) {
-  const cmd = raw.trim().toLowerCase();
-
-  if (cmd === '/ajuda') {
-    const isDnd = window._lastMem ? (window._lastMem.dnd_mode === true || window._lastMem.campaign_type === 'dnd') : false;
-    const dndText = isDnd ? `
-      <div class="cmd-list-item" style="margin-top:10px;"><b style="font-family:'Playfair Display',serif;">Comandos D&D</b></div>
-      <div class="cmd-list-item"><b>/ficha [nome]</b> · Atributos, CA e equipamentos</div>
-      <div class="cmd-list-item"><b>/inventario [nome]</b> · Itens e moedas</div>
-      <div class="cmd-list-item"><b>/habilidades [nome]</b> · Magias e poderes</div>
-      <div class="cmd-list-item"><b>/status</b> · HP e Mana rápido do grupo</div>
-      <div class="cmd-list-item"><b>/condicoes [nome]</b> · Condições ativas</div>
-      <div class="cmd-list-item"><b>/combate</b> · Iniciativa e turno atual</div>
-      <div class="cmd-list-item"><b>/rolar &lt;XdY+Z&gt;</b> · Rola dado local (ex: /rolar 2d6+3)</div>` : '';
-
-    const html = `
-    <div class="cmd-list-box">
-      <div class="cmd-list-title">Comandos Disponíveis</div>
-      <div class="cmd-list-item"><b>/personagens</b> · NPCs e status</div>
-      <div class="cmd-list-item"><b>/locais</b> · Locais registrados</div>
-      <div class="cmd-list-item"><b>/grupo</b> · Companheiros</div>
-      <div class="cmd-list-item"><b>/flags</b> · Decisões e estados</div>
-      <div class="cmd-list-item"><b>/contexto</b> · Memória completa</div>
-      <div class="cmd-list-item"><b>/diario</b> · Crônicas</div>
-      <div class="cmd-list-item"><b>/resumo</b> · Recapitulação</div>
-      <div class="cmd-list-item"><b>/exportar</b> · Exportar .md</div>
-      <hr style="border:none;border-top:1px solid var(--page-edge);margin:10px 0;">
-      <div class="cmd-list-item"><b>/salvar local &lt;nome&gt;</b></div>
-      <div class="cmd-list-item"><b>/salvar personagem &lt;nome&gt;</b></div>
-      <div class="cmd-list-item"><b>/salvar evento &lt;desc&gt;</b></div>
-      ${dndText}
-    </div>`;
-    appendSystem(html); return true;
-  }
-
-  if (['/personagens', '/locais', '/flags', '/grupo', '/eventos', '/contexto'].includes(cmd)) {
-    const mem = await (await authFetch(`${API}/api/memory`)).json(); let html = '';
-    mem.quest_flags = mem.quest_flags || {};
-    mem.party = mem.party || []; mem.characters = mem.characters || [];
-    mem.events = mem.events || []; mem.locations = mem.locations || [];
-    
-    if (cmd === '/personagens') {
-      const sep = '<hr style="border:none;border-top:1px dashed var(--page-edge);margin:8px 0;">';
-      const renderChar = c => `<div class="cmd-list-item"><b>${c.name}</b> (${c.status || 'vivo'})<br><span style="color:var(--text-muted);font-size:13px;">${c.description || ''}</span></div>`;
-      const partyList  = (mem.party || []).map(renderChar).join(sep);
-      const npcList    = (mem.characters || []).map(renderChar).join(sep);
-      const partyHtml  = partyList ? `<div class="cmd-list-title" style="font-size:11px;margin-top:10px;border:none;padding:0 0 4px;">${(window._campaignConfig?.party_label || 'Grupo').toUpperCase()}</div>${partyList}` : '';
-      const npcHtml    = npcList   ? `<div class="cmd-list-title" style="font-size:11px;margin-top:${partyList?'14px':'0'};border:none;padding:0 0 4px;">OUTROS</div>${npcList}` : '';
-      html = `<div class="cmd-list-box"><div class="cmd-list-title">Personagens na Memória</div>${partyHtml || ''}${npcHtml || ''}${!partyList && !npcList ? 'Nenhum personagem.' : ''}</div>`;
-    }
-    else if (cmd === '/locais') {
-      const list = (mem.locations || []).map(l => `<div class="cmd-list-item"><b>${l.name}</b><br><span style="color:var(--text-muted);font-size:13px;">${l.description}</span></div>`).join('<hr style="border:none;border-top:1px dashed var(--page-edge);margin:8px 0;">');
-      html = `<div class="cmd-list-box"><div class="cmd-list-title">Locais Registrados</div>${list || 'Nenhum local.'}</div>`;
-    }
-    else if (cmd === '/flags') {
-      const fl = Object.entries(mem.quest_flags);
-      const list = fl.map(([k, v]) => `<div class="cmd-list-item"><b>${k}</b> → ${v}</div>`).join('');
-      html = `<div class="cmd-list-box"><div class="cmd-list-title">Flags de História</div>${list || 'Nenhuma flag.'}</div>`;
-    }
-    else if (cmd === '/grupo') {
-      const list = mem.party.map(p => `<div class="cmd-list-item"><b>${p.name}</b> (${p.role})<br><span style="color:var(--text-muted);font-size:13px;">${p.notes || ''}</span></div>`).join('<hr style="border:none;border-top:1px dashed var(--page-edge);margin:8px 0;">');
-      html = `<div class="cmd-list-box"><div class="cmd-list-title">${window._campaignConfig?.party_label || 'Grupo de Aventureiros'}</div>${list || 'Grupo vazio.'}</div>`;
-    }
-    else if (cmd === '/eventos') {
-      const list = mem.events.slice(-5).map(e => `<div class="cmd-list-item"><b>#${e.index} — ${e.location}</b><br><span style="color:var(--text-muted);font-size:13px;">${e.summary}</span></div>`).join('<hr style="border:none;border-top:1px dashed var(--page-edge);margin:8px 0;">');
-      html = `<div class="cmd-list-box"><div class="cmd-list-title">Últimos 5 Eventos</div>${list || 'Nenhum evento.'}</div>`;
-    }
-    else if (cmd === '/contexto') {
-      html = `<div class="cmd-list-box"><div class="cmd-list-title">Memória Completa</div><div class="cmd-list-item"><b>Capítulo:</b> ${mem.chapter} · <b>Local:</b> ${mem.current_location}</div><div class="cmd-list-item" style="margin-top:10px;">${mem.story_summary}</div></div>`;
-    }
-    appendSystem(html); return true;
-  }
-
-  if (cmd === '/diario') {
-    const mem = await (await authFetch(`${API}/api/memory`)).json();
-    mem.diary = mem.diary || [];
-    const list = [...mem.diary].reverse().slice(0, 5).map(d => `<div class="cmd-list-item"><b>Cap.${d.chapter} — ${d.title}</b><br><span style="color:var(--text-muted);font-size:13px;">${d.content}</span></div>`).join('<hr style="border:none;border-top:1px dashed var(--page-edge);margin:8px 0;">');
-    appendSystem(`<div class="cmd-list-box"><div class="cmd-list-title">Diário (Últimas Entradas)</div>${list || 'Diário vazio.'}</div>`);
-    return true;
-  }
-
-  if (cmd === '/exportar') {
-    const d = await (await authFetch(`${API}/api/diary/export`, { method: 'POST' })).json();
-    appendSystem(`<div class="cmd-list-box" style="text-align:center;"><div class="cmd-list-title" style="border:none;margin:0;">Diário Exportado</div><div style="font-size:13px;color:var(--ink-main);">Arquivo: <b>${d.path.split('/').pop()}</b></div></div>`); 
-    return true;
-  }
-
-  async function _getDndChars(targetName) {
-    const mem = await (await authFetch(`${API}/api/memory`)).json();
-    if (!(mem.dnd_mode === true || mem.campaign_type === 'dnd')) return { mem, chars: null };
-    const allChars = [...(mem.party || []), ...(mem.characters || [])];
-    let chars;
-    if (targetName) {
-      // Busca por nome em todos os personagens (grupo + NPCs), com ou sem sheet
-      const c = allChars.find(ch => ch.name?.toLowerCase() === targetName);
-      chars = c ? [c] : [];
-    } else {
-      // Sem argumento: mostra todos com ficha D&D completa (grupo + inimigos)
-      chars = allChars.filter(c => c.sheet);
-    }
-    return { mem, chars };
-  }
-
-  function _mod(val) { const m = Math.floor((val - 10) / 2); return (m >= 0 ? '+' : '') + m; }
-
-  if (cmd.startsWith('/ficha')) {
-    const target = raw.trim().split(' ').slice(1).join(' ').toLowerCase();
-    const { mem, chars } = await _getDndChars(target);
-    if (!chars) { appendSystem('<p>Comando exclusivo do modo D&D.</p>'); return true; }
-    if (!chars.length) { appendSystem(`<p>${target ? `Nenhuma ficha encontrada para '${target}'.` : 'Nenhum membro possui ficha D&D.'}</p>`); return true; }
-
-    const text = chars.map(c => {
-      // Personagem sem ficha D&D completa (NPC simples registrado no combate)
-      if (!c.sheet) {
-        const hpAtual = c.vida_atual ?? c.hp ?? '?';
-        const hpMax   = c.vida_max  ?? c.hp_max ?? '?';
-        return `<div class="cmd-sheet">
-          <div class="cmd-sheet-title">${c.name}</div>
-          <div class="cmd-sheet-sub">${c.description || 'NPC'} · Status: ${c.status || 'vivo'}</div>
-          <div class="cmd-sheet-bars"><span>${hpAtual}/${hpMax} HP</span></div>
-        </div>`;
-      }
-      const s = c.sheet; const eq = s.equipamentos || {};
-      const conds = s.condicoes?.length ? s.condicoes.map(cd => cd.nome || cd).join(', ') : 'Nenhuma';
-      const hpBar = s.vida_max > 0 ? Math.round((s.vida_atual / s.vida_max) * 10) : 0;
-      const hpVis = `<span class="bar-fill">${'█'.repeat(hpBar)}</span><span class="bar-empty">${'█'.repeat(10-hpBar)}</span>`;
-
-      return `<div class="cmd-sheet">
-        <div class="cmd-sheet-title">Ficha — ${c.name}</div>
-        <div class="cmd-sheet-sub">${s.classe === 'npc'
-          ? `${s.raca ? s.raca.charAt(0).toUpperCase()+s.raca.slice(1) : 'NPC'} · CR ${s.cr ?? '—'} · HP ${s.vida_max}`
-          : `Nível ${s.nivel} ${s.classe} (${s.raca}) · XP: ${s.xp}/${s.xp_proximo}`}</div>
-        <div class="cmd-sheet-bars">
-          <span>${hpVis} ${s.vida_atual}/${s.vida_max} HP</span>
-          <span>${s.mana_atual}/${s.mana_max} Mana</span>
-          <span>CA ${s.ca}</span>
-        </div>
-        <div class="cmd-sheet-stats">
-          <div><span class="cmd-label">FOR</span><br>${s.forca}(${_mod(s.forca)})</div>
-          <div><span class="cmd-label">DES</span><br>${s.destreza}(${_mod(s.destreza)})</div>
-          <div><span class="cmd-label">CON</span><br>${s.constituicao}(${_mod(s.constituicao)})</div>
-          <div><span class="cmd-label">INT</span><br>${s.inteligencia}(${_mod(s.inteligencia)})</div>
-          <div><span class="cmd-label">SAB</span><br>${s.sabedoria}(${_mod(s.sabedoria)})</div>
-          <div><span class="cmd-label">CAR</span><br>${s.carisma}(${_mod(s.carisma)})</div>
-        </div>
-        <div class="cmd-sheet-details">
-          <span class="cmd-label">Equipado:</span> Arma: ${eq.arma_principal || '—'} · Armadura: ${eq.armadura || '—'} · Escudo: ${eq.escudo || '—'} · Amuleto: ${eq.amuleto || '—'}<br>
-          <span class="cmd-label">Condições:</span> ${conds} | <span class="cmd-label">Saves de morte:</span> ${s.death_saves_sucessos || 0} sucesso(s) / ${s.death_saves_falhas || 0} falha(s)
-        </div>
-      </div>`;
-    }).join('<hr style="border:none;border-top:1px dashed var(--page-edge);margin:15px 0;">');
-    appendSystem(`<div class="cmd-list-box">${text}</div>`); return true;
-  }
-
-  if (cmd.startsWith('/inventario')) {
-    const target = raw.trim().split(' ').slice(1).join(' ').toLowerCase();
-    const { mem, chars } = await _getDndChars(target);
-    if (!chars) { appendSystem('<p>Comando exclusivo do modo D&D.</p>'); return true; }
-    if (!chars.length) { appendSystem(`<p>${target ? `Nenhuma ficha encontrada para '${target}'.` : 'Nenhum membro possui ficha D&D.'}</p>`); return true; }
-
-    const text = chars.map(c => {
-      const s = c.sheet; const inv = c.inventario || [];
-      const items = inv.length ? inv.map(i => `<li><b>${i.nome}</b> ×${i.qtd} <span style="color:var(--text-muted);font-size:12px;">${i.descricao ? `— ${i.descricao}` : ''}</span></li>`).join('') : '<li>Bolsa vazia</li>';
-      return `<div class="cmd-sheet" style="padding-bottom:0;border:none;">
-        <div class="cmd-sheet-title">Inventário — ${c.name}</div>
-        <div class="cmd-sheet-bars" style="margin-bottom:10px;"><b>${s.ouro||0}</b> Ouro · <b>${s.prata||0}</b> Prata · <b>${s.cobre||0}</b> Cobre</div>
-        <ul class="cmd-sheet-list">${items}</ul>
-      </div>`;
-    }).join('<hr style="border:none;border-top:1px dashed var(--page-edge);margin:15px 0;">');
-    appendSystem(`<div class="cmd-list-box">${text}</div>`); return true;
-  }
-
-  if (cmd.startsWith('/habilidades')) {
-    const target = raw.trim().split(' ').slice(1).join(' ').toLowerCase();
-    const { mem, chars } = await _getDndChars(target);
-    if (!chars) { appendSystem('<p>Comando exclusivo do modo D&D.</p>'); return true; }
-    if (!chars.length) { appendSystem(`<p>${target ? `Nenhuma ficha encontrada para '${target}'.` : 'Nenhum membro possui ficha D&D.'}</p>`); return true; }
-
-    const text = chars.map(c => {
-      const habs = c.habilidades || [];
-      const list = habs.length ? habs.map(h => `<div class="cmd-list-item"><b>${h.nome}</b> <span style="font-size:12px;color:var(--text-muted);">(Dado: ${h.dado} · ${h.custo_mana} mana)</span><br><span style="font-size:13px;color:var(--text-muted);">${h.descricao}</span></div>`).join('') : '<div class="cmd-list-item">Nenhuma habilidade aprendida.</div>';
-      const mana = c.sheet ? ` — Mana: <b>${c.sheet.mana_atual}/${c.sheet.mana_max}</b>` : '';
-      return `<div class="cmd-sheet-title" style="margin-bottom:10px;">Habilidades — ${c.name}${mana}</div>${list}`;
-    }).join('<hr style="border:none;border-top:1px dashed var(--page-edge);margin:15px 0;">');
-    appendSystem(`<div class="cmd-list-box">${text}</div>`); return true;
-  }
-
-  if (cmd === '/status') {
-    const { mem, chars } = await _getDndChars('');
-    if (!chars) { appendSystem('<p>Comando exclusivo do modo D&D.</p>'); return true; }
-    if (!chars.length) { appendSystem('<p>Nenhum membro possui ficha D&D.</p>'); return true; }
-
-    const lines = chars.map(c => {
-      const s = c.sheet;
-      const hpPct = s.vida_max > 0 ? Math.round((s.vida_atual / s.vida_max) * 100) : 0;
-      const hpNivel = hpPct > 60 ? 'ok' : hpPct > 30 ? 'atencao' : 'baixo';
-      const conds = s.condicoes?.length ? ` <span style="color:var(--text-dim);font-size:12px;">${s.condicoes.map(cd => cd.nome || cd).join(', ')}</span>` : '';
-      return `<div class="cmd-list-item" style="display:flex;justify-content:space-between;border-bottom:1px dashed var(--page-edge);padding-bottom:5px;margin-bottom:8px;">
-        <span><span class="hp-ponto hp-ponto-${hpNivel}" aria-hidden="true"></span><b>${c.name}</b>${conds}</span>
-        <span style="font-size:13px;">${s.vida_atual}/${s.vida_max} HP &nbsp; ${s.mana_atual}/${s.mana_max} Mana &nbsp; CA ${s.ca}</span>
-      </div>`;
-    });
-    appendSystem(`<div class="cmd-list-box"><div class="cmd-list-title">Status do Grupo</div>${lines.join('')}</div>`); return true;
-  }
-
-  if (cmd.startsWith('/condicoes')) {
-    const target = raw.trim().split(' ').slice(1).join(' ').toLowerCase();
-    const { mem, chars } = await _getDndChars(target);
-    if (!chars) { appendSystem('<p>Comando exclusivo do modo D&D.</p>'); return true; }
-    if (!chars.length) { appendSystem(`<p>${target ? `Nenhuma ficha encontrada para '${target}'.` : 'Nenhum membro possui ficha D&D.'}</p>`); return true; }
-
-    const lines = chars.map(c => {
-      const conds = c.sheet?.condicoes || [];
-      if (!conds.length) return `<div class="cmd-list-item"><b>${c.name}</b> — Sem condições ativas</div>`;
-      return `<div class="cmd-list-item"><b>${c.name}</b> — ${conds.map(cd => `<span style="color:var(--ink-sys);">${cd.nome || cd}${typeof cd.duracao === 'number' && cd.duracao > 0 ? ` (${cd.duracao}t)` : ''}</span>`).join(' · ')}</div>`;
-    });
-    appendSystem(`<div class="cmd-list-box"><div class="cmd-list-title">Condições Ativas</div>${lines.join('')}</div>`); return true;
-  }
-
-  if (cmd === '/combate') {
-    const mem = window._lastMem || await (await authFetch(`${API}/api/memory`)).json();
-    const cs = mem.combat_state;
-    if (!cs || !cs.is_active) {
-      appendSystem('<div class="cmd-list-box"><div class="cmd-list-title">Combate</div><div style="text-align:center;">Nenhum combate em andamento.</div></div>');
-      return true;
-    }
-    const order = cs.initiative_order || [];
-    const idx   = cs.current_turn_index ?? 0;
-    const list  = order.map((n, i) => {
-      const arrow = i === idx ? ' <b style="color:var(--ink-sys);">◀ VEZ ATUAL</b>' : i < idx ? ' <span style="text-decoration:line-through;color:var(--text-muted);">(já agiu)</span>' : '';
-      return `<div class="cmd-list-item" style="padding-left:15px;">${i + 1}. ${n}${arrow}</div>`;
-    }).join('');
-    appendSystem(`<div class="cmd-list-box"><div class="cmd-list-title">Ordem de Iniciativa — Rodada ${cs.round}</div><div style="margin-bottom:10px;font-size:14px;text-align:center;"><b>Vez de:</b> <span style="color:var(--ink-user);">${order[idx] || '?'}</span></div>${list}</div>`);
-    return true;
-  }
-
-  const mRolar = raw.match(/^\/rolar\s+(.+)/i);
-  if (mRolar) {
-    const formula = mRolar[1].trim();
-    const rollRe = /^(\d*)d(\d+)([+-]\d+)?$/i;
-    const match  = formula.replace(/\s+/g, '').match(rollRe);
-    if (!match) { appendSystem(`<p>Fórmula inválida: <b>${formula}</b></p>`); return true; }
-    
-    const numDice = parseInt(match[1] || '1');
-    const sides   = parseInt(match[2]);
-    const bonus   = parseInt(match[3] || '0');
-    if (numDice < 1 || numDice > 20 || sides < 2 || sides > 100) { appendSystem('<p>Limites: 1–20 dados, d2–d100.</p>'); return true; }
-    
-    const rolls  = Array.from({ length: numDice }, () => Math.floor(Math.random() * sides) + 1);
-    const rawSum = rolls.reduce((a, b) => a + b, 0);
-    const total  = rawSum + bonus;
-    const bonStr = bonus !== 0 ? ` ${bonus >= 0 ? '+' : ''}${bonus}` : '';
-    const rollStr = numDice > 1 ? `[${rolls.join(' + ')}]` : `${rolls[0]}`;
-    const isCrit   = sides === 20 && numDice === 1 && rolls[0] === 20;
-    const isFumble = sides === 20 && numDice === 1 && rolls[0] === 1;
-    const tag = isCrit ? '<br><span class="sys-highlight">CRÍTICO NATURAL</span>' : isFumble ? '<br><span class="sys-highlight">FALHA CRÍTICA</span>' : '';
-    const row = document.createElement('div'); row.className = 'msg-row system';
-    row.innerHTML = `
-      <div class="sys-card">
-        <div class="sys-card-badge" style="color:var(--ink-user); border-color:var(--ink-user);">Rolagem Local: ${formula}</div>
-        <div class="sys-card-body">
-          Resultado: <span class="sys-number">${rollStr}</span>${bonStr} = <strong>${total}</strong>${tag}
-        </div>
-        <div style="font-family:'Lora',serif; font-size:11px; color:var(--text-dim); margin-top:10px; text-align:center; font-style:italic;">
-          Não enviado ao Mestre.
-        </div>
-      </div>`;
-    document.getElementById('chat-history').appendChild(row); scrollDown();
-    return true;
-  }
-
-  if (cmd === '/resumo') {
-    appendUser('Solicitando recapitulação...');
-    await sendToAgent('Faça um resumo dramático e imersivo de todos os eventos importantes. Use get_full_context para garantir precisão.', false);
-    return true;
-  }
-
-  const mLocal = raw.match(/^\/salvar\s+local\s+(.+)/i);
-  const mPerson = raw.match(/^\/salvar\s+personagem\s+(.+)/i);
-  const mEvento = raw.match(/^\/salvar\s+evento\s+(.+)/i);
-
-  if (mLocal) { appendSystem(`<p>Registrando local "${mLocal[1]}"...</p>`); await sendToAgent(`Salve o local "${mLocal[1]}" usando save_location com todos os detalhes mencionados. Confirme o que foi registrado.`, true, 'comando'); return true; }
-  if (mPerson) { appendSystem(`<p>Registrando "${mPerson[1]}"...</p>`); await sendToAgent(`Salve o personagem "${mPerson[1]}" usando save_character com todos os detalhes. Confirme o que foi registrado.`, true, 'comando'); return true; }
-  if (mEvento) { appendSystem(`<p>Registrando evento...</p>`); await sendToAgent(`Salve o evento "${mEvento[1]}" usando save_event. Confirme o que foi registrado.`, true, 'comando'); return true; }
-
-  return false;
 }
 
 // ═══════════════════════════════════════
@@ -1322,20 +1023,6 @@ function renderMemory(mem) {
     // esta campanha não rola dado nenhum.
     if (tray) tray.dataset.semDnd = isDnd ? '0' : '1';
     if (!isDnd && tray && !tray.classList.contains('hidden')) tray.classList.add('hidden');
-  }
-
-  const dndCmds = ['/ficha', '/inventario', '/habilidades', '/status', '/condicoes', '/combate', '/rolar'];
-  COMMANDS.splice(0, COMMANDS.length, ...COMMANDS.filter(c => !dndCmds.includes(c.cmd)));
-  if (isDnd) {
-    COMMANDS.push(
-      { cmd: '/ficha',       arg: '[nome]',  desc: 'Atributos, CA e equipamentos' },
-      { cmd: '/inventario',  arg: '[nome]',  desc: 'Itens e moedas do alvo ou grupo' },
-      { cmd: '/habilidades', arg: '[nome]',  desc: 'Magias e poderes do alvo ou grupo' },
-      { cmd: '/status',      arg: '',        desc: 'HP e Mana rápido de todo o grupo' },
-      { cmd: '/condicoes',   arg: '[nome]',  desc: 'Condições ativas no alvo ou grupo' },
-      { cmd: '/combate',     arg: '',        desc: 'Ordem de iniciativa e turno atual' },
-      { cmd: '/rolar',       arg: '<XdY+Z>', desc: 'Rola uma fórmula local' },
-    );
   }
 
   // O relance e os atalhos da barra (e a faixa e a barra de baixo no celular).

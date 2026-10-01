@@ -1024,18 +1024,34 @@ fieldset.ed-trava button { opacity: 0.62; cursor: not-allowed; }
 .cmd-list-item:last-child { margin-bottom: 0; }
 .cmd-list-item b { color: var(--ink-sys); }
 
-.cmd-sheet { font-family: 'Lora', serif; font-style: normal; text-align: center; padding: var(--esp-3) 0; color: var(--ink-main); }
-.cmd-sheet-title { font-family: 'Playfair Display', serif; font-size: 18px; font-weight: 700; color: var(--ink-user); display: block; }
-.cmd-sheet-sub { font-size: 13px; color: var(--ink-sys); margin-bottom: var(--esp-2); font-weight: 600; }
-.cmd-sheet-bars { display: flex; justify-content: center; gap: var(--esp-4); font-size: 14px; margin-bottom: var(--esp-3); font-weight: 600; }
-.bar-fill { color: var(--ink-sys); letter-spacing: -1px; font-size: 12px; }
-.bar-empty { color: var(--page-edge); letter-spacing: -1px; font-size: 12px; }
-.cmd-sheet-stats { display: flex; justify-content: center; gap: var(--esp-4); font-size: 13px; margin-bottom: var(--esp-3); }
-.cmd-label { color: var(--ink-sys); font-weight: 700; font-family: 'Playfair Display', serif; }
-.cmd-sheet-details { font-size: 13px; line-height: 1.6; color: var(--text-muted); text-align: center; }
-.cmd-sheet-list { list-style: none; padding: 0; margin: var(--esp-3) 0 0 0; text-align: left; font-size: 14px; color: var(--ink-main); }
-.cmd-sheet-list li { margin-bottom: var(--esp-2); padding-left: var(--esp-4); position: relative; }
-.cmd-sheet-list li::before { content: '•'; position: absolute; left: 0; color: var(--ink-sys); font-weight: bold; }
+/* /ajuda: seções por tipo de comando, e os apelidos ("também /missoes"). */
+.cmd-list-secao {
+  font-family: 'Playfair Display', serif; font-size: 12px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .08em; color: var(--text-muted);
+  margin: var(--esp-4) 0 var(--esp-2);
+}
+.cmd-list-secao:first-of-type { margin-top: 0; }
+.cmd-apelidos { font-size: 12px; color: var(--text-muted); font-style: italic; }
+.cmd-list-rodape { margin-top: var(--esp-3); font-size: 13px; color: var(--text-muted); font-style: italic; }
+/* /status e /combate: uma linha por pessoa, números à direita. */
+.cmd-status-linha {
+  display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: var(--esp-1) var(--esp-3);
+  padding-bottom: var(--esp-1); margin-bottom: var(--esp-2);
+  border-bottom: 1px dashed var(--page-edge); font-size: 15px; color: var(--ink-main);
+}
+.cmd-status-linha b { color: var(--ink-sys); }
+.cmd-status-marcas { font-size: 12px; color: var(--text-muted); font-style: italic; }
+.cmd-status-nums { font-size: 13px; white-space: nowrap; }
+.cmd-vez { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+.cmd-fora { opacity: .55; text-decoration: line-through; }
+/* /rolar */
+.cmd-rolagem-badge { color: var(--ink-user); border-color: var(--ink-user); }
+.cmd-rolagem-nota {
+  font-family: 'Lora', serif; font-size: 11px; color: var(--text-dim);
+  margin-top: var(--esp-3); text-align: center; font-style: italic;
+}
+/* O d20 descartado pela vantagem ou desvantagem: à vista, mas riscado. */
+.cmd-descartado { text-decoration: line-through; color: var(--text-muted); font-size: 13px; }
 
 .tool-log { display: flex; flex-wrap: wrap; gap: var(--esp-2); margin: var(--esp-3) 0; }
 .tool-item { background: rgba(0,0,0,0.03); border: 1px solid var(--page-edge); border-radius: 12px; padding: var(--esp-1) var(--esp-3); font-size: 11px; color: var(--text-muted); display: flex; align-items: center; gap: var(--esp-2); }
@@ -1444,7 +1460,6 @@ fieldset.ed-trava button { opacity: 0.62; cursor: not-allowed; }
   .wizard-header, .wizard-body, .wizard-footer { padding: var(--esp-4); }
   .cwc-row2 { grid-template-columns: 1fr; }
   .stat-grid { grid-template-columns: repeat(3, 1fr); }
-  .cmd-sheet-bars, .cmd-sheet-stats { flex-wrap: wrap; gap: var(--esp-2); }
 
   /* Animações Mobile (Folha Arrancada) */
   /* No mobile a capa usa tearPageUp, que é 2D — o 3D do livro não existe

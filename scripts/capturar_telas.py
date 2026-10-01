@@ -1152,6 +1152,18 @@ TELAS = [
      "js": "toggleDiceTray()"},
     {"nome": "jogo-menu-comandos", "pagina": "/game.html",
      "js": "document.getElementById('chat-input').value = '/'; openCmdMenu('');"},
+    # Depois do comando, o menu sugere os nomes.
+    {"nome": "jogo-menu-comandos-nomes", "pagina": "/game.html",
+     "js": "const i = document.getElementById('chat-input'); i.value = '/ficha '; openCmdMenu(i.value);",
+     "exigir": "#cmd-menu .cmd-item"},
+    {"nome": "jogo-comandos-ajuda", "pagina": "/game.html",
+     "js": "window.Comandos.executar('/ajuda')", "exigir": "#chat-history .cmd-list-secao"},
+    # No romance os comandos falam a língua do gênero (/proximos, /tramas).
+    {"nome": "jogo-comandos-ajuda-romance", "pagina": "/game.html",
+     "estado": {"campaign_type": "romance", "dnd_mode": False, "protagonist": "Stelar"},
+     "js": "window.Comandos.executar('/ajuda')", "exigir": "#chat-history .cmd-list-secao"},
+    {"nome": "jogo-comandos-status", "pagina": "/game.html",
+     "js": "window.Comandos.executar('/status')", "exigir": "#chat-history .cmd-status-linha"},
     {"nome": "jogo-modal-personagem", "pagina": "/game.html",
      "exigir": "#edit-overlay:not(.hidden)",
      "js": "openEditModal('character', 'stelar', window._lastMem.party[1])"},

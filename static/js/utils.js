@@ -1319,40 +1319,43 @@ const _GUIDE_HTML = `
       </details>
 
       <details class="guide-sec">
-        <summary>Quando o Mestre esquece de salvar algo — comandos /</summary>
+        <summary>Atalhos pelo chat — comandos /</summary>
         <div class="guide-sec-body">
           <p>
             Dentro do jogo, digite <b>/</b> no campo de mensagem para abrir o
             menu de comandos. Use as setas e <b>Enter</b> (ou <b>Tab</b>) para
-            escolher. Os comandos servem para <b>consultar</b> e
-            <b>corrigir</b> a memória.
+            escolher; depois do comando, o menu sugere os nomes. Nomes podem
+            ir sem acento e pela metade: <code>/ficha hel</code> abre a Helena.
+            <code>/ajuda</code> mostra os comandos da campanha aberta.
           </p>
-          <p><b>Para consultar (em qualquer campanha):</b></p>
+          <p><b>Em qualquer campanha:</b></p>
           <ul class="guide-cmds">
-            <li><code>/personagens</code> — lista os NPCs e seus status</li>
-            <li><code>/locais</code> — locais registrados</li>
-            <li><code>/grupo</code> — companheiros do grupo</li>
-            <li><code>/eventos</code> — os últimos acontecimentos</li>
-            <li><code>/flags</code> — as observações/decisões guardadas</li>
-            <li><code>/diario</code> — entradas do diário</li>
-            <li><code>/resumo</code> — recapitulação da história</li>
-            <li><code>/contexto</code> — a memória completa</li>
+            <li><code>/ficha [nome]</code> — a ficha de alguém (sem nome, a sua)</li>
+            <li><code>/personagens</code> — todos os personagens, com busca</li>
+            <li><code>/grupo</code> — o grupo lado a lado</li>
+            <li><code>/missoes [título]</code> — o livro de missões</li>
+            <li><code>/mapa [lugar]</code> — os lugares e quem está em cada um</li>
+            <li><code>/diario [capítulo]</code> — a história, capítulo a capítulo</li>
+            <li><code>/resumo</code> — o resumo da história e onde você está</li>
+            <li><code>/recapitular</code> — o Mestre narra o que aconteceu até aqui</li>
+            <li><code>/lembrar &lt;texto&gt;</code> — pede ao Mestre para guardar algo</li>
             <li><code>/exportar</code> — baixa o diário em .md</li>
-            <li><code>/ajuda</code> — mostra todos os comandos</li>
           </ul>
           <p>
-            <b>Esqueceu de salvar?</b> Se o Mestre não registrou um personagem,
-            local ou evento que você considera importante, salve você mesmo:
+            <b>Cada gênero fala a própria língua.</b> No romance o grupo é
+            <code>/proximos</code> (ou <code>/relacoes</code>), as missões são
+            <code>/tramas</code> e o mapa é <code>/lugares</code>, e há ainda
+            <code>/segredos</code>, <code>/tensoes</code> e <code>/encontro</code>.
+            No horror, <code>/sobreviventes</code> e <code>/objetivos</code>; no
+            mistério, <code>/aliados</code> e <code>/casos</code>; na ficção
+            científica, <code>/tripulacao</code> e <code>/contratos</code>; no
+            faroeste, <code>/comparsas</code> e <code>/servicos</code>. Os nomes
+            de sempre continuam valendo em todos.
           </p>
-          <ul class="guide-cmds">
-            <li><code>/salvar personagem &lt;nome&gt;</code></li>
-            <li><code>/salvar local &lt;nome&gt;</code></li>
-            <li><code>/salvar evento &lt;descrição&gt;</code></li>
-          </ul>
           <p class="guide-tip">
-            Você também pode simplesmente <b>pedir ao Mestre</b>: «Registre o
-            ferreiro Doran como personagem» ou «Salve que descobrimos a caverna
-            escondida». Ele guarda na memória para você.
+            O Mestre registra pessoas, lugares e acontecimentos sozinho. Se ele
+            esquecer algo importante, use <code>/lembrar</code> ou simplesmente
+            peça: «Registre o ferreiro Doran como personagem».
           </p>
         </div>
       </details>
@@ -1424,13 +1427,13 @@ const _GUIDE_HTML = `
 
           <p><b>Comandos exclusivos do D&amp;D:</b></p>
           <ul class="guide-cmds">
-            <li><code>/ficha [nome]</code> — atributos, CA e equipamentos</li>
-            <li><code>/inventario [nome]</code> — itens e moedas</li>
-            <li><code>/habilidades [nome]</code> — magias e poderes</li>
-            <li><code>/status</code> — Vida e Mana de todo o grupo</li>
-            <li><code>/condicoes [nome]</code> — condições ativas</li>
-            <li><code>/combate</code> — ordem de iniciativa e turno atual</li>
-            <li><code>/rolar &lt;XdY+Z&gt;</code> — rola uma fórmula (ex.: /rolar 2d6+3)</li>
+            <li><code>/status</code> — vida, mana, CA e condições do grupo</li>
+            <li><code>/mochila [nome]</code> — itens, moedas e carga</li>
+            <li><code>/magias [nome]</code> — magias e habilidades, com o que cada uma faz</li>
+            <li><code>/combate</code> — volta à luta em andamento</li>
+            <li><code>/rolar [fórmula]</code> — rola só para você: <code>/rolar</code>
+              (um d20), <code>/rolar 2d6+3</code>, <code>/rolar 1d8+1d6</code>,
+              <code>/rolar d20 vantagem</code></li>
           </ul>
 
           <h4 class="guide-h4">O combate: dois modos</h4>
