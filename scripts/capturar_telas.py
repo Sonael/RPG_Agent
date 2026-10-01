@@ -861,6 +861,74 @@ COMBATE_ITENS["characters"]["stelar"] = {
 }
 
 
+# MAGIAS NA TELA TÁTICA, quatro contra quatro. É o combate da partida que
+# motivou a tela nova: a vez é de Helena, clériga com a ficha cheia de
+# magias — uma delas repetida ("Truque Bônus (Chamas Sagradas)"), algumas sem
+# dado na ficha, e a Coluna de Chamas, que pega TODOS na área: Stelar está na
+# Sacada com Victoria, e mirar nela o atinge.
+def _figurante(nome, vida, ca=13, lado="inimigo", arma="cimitarra"):
+    return {
+        "name": nome, "description": "", "status": "vivo" if lado != "inimigo" else "inimigo",
+        "lado": lado, "party_member": False, "traits": "", "notes": "",
+        "inventario": [], "habilidades": [],
+        "sheet": {"classe": "npc", "raca": "humano", "nivel": 3, "xp": 0, "xp_proximo": 900,
+                  "forca": 12, "destreza": 12, "constituicao": 12, "inteligencia": 10,
+                  "sabedoria": 10, "carisma": 10, "vida_atual": vida, "vida_max": vida,
+                  "mana_atual": 0, "mana_max": 0, "ca": ca, "proficiencia": 2,
+                  "hit_die": 8, "ouro": 0, "prata": 0, "cobre": 0,
+                  "equipamentos": {"armadura": None, "escudo": None,
+                                   "arma_principal": arma, "amuleto": None},
+                  "condicoes": [], "death_saves_sucessos": 0, "death_saves_falhas": 0,
+                  "vida_temp": 0, "concentracao": None,
+                  "resistencias": [], "imunidades": [], "vulnerabilidades": []},
+    }
+
+
+COMBATE_MAGIAS = copy.deepcopy(COMBATE_ZONAS)
+COMBATE_MAGIAS["characters"].update({
+    "helena": {
+        "sheet": {"vida_atual": 14, "nivel": 9, "mana_atual": 34, "mana_max": 40},
+        "habilidades": [
+            {"nome": "Chama Sagrada", "dado": "1d8", "custo_mana": 0,
+             "descricao": "Truque: uma chama radiante desce sobre uma criatura que você possa ver."},
+            {"nome": "Truque Bônus (Chamas Sagradas)", "dado": "1d8", "custo_mana": 0,
+             "descricao": "Aprende o truque Chamas Sagradas."},
+            {"nome": "Palavra Curativa", "dado": "", "custo_mana": 1,
+             "descricao": "Uma criatura que você possa ver recupera pontos de vida."},
+            {"nome": "Raio Guia", "dado": "", "custo_mana": 1,
+             "descricao": "Um lampejo de luz atinge uma criatura."},
+            {"nome": "Infligir Ferimentos", "dado": "", "custo_mana": 1,
+             "descricao": "Toque necrótico."},
+            {"nome": "Bênção", "dado": "", "custo_mana": 1,
+             "descricao": "Abençoa até três criaturas."},
+            {"nome": "Espíritos Guardiões", "dado": "", "custo_mana": 3,
+             "descricao": "Espíritos protegem você."},
+            {"nome": "Coluna de Chamas", "dado": "", "custo_mana": 5,
+             "descricao": "Uma coluna de fogo divino desce do céu."},
+            {"nome": "Canalizar Divindade (Radiância do Amanhecer)", "dado": "2d10",
+             "custo_mana": 0,
+             "descricao": "Ação: esfera de luz 9m raio; criaturas hostis fazem save de CON "
+                          "ou 2d10+nv. dano radiante."},
+        ],
+    },
+    "cultista": _figurante("Cultista", 16),
+    "lobo sombrio": _figurante("Lobo Sombrio", 22, ca=12, arma="mordida"),
+    "acólito": _figurante("Acólito", 11, ca=11, arma="maça"),
+    "pip": _figurante("Pip", 12, ca=12, lado="aliado", arma="adaga"),
+})
+COMBATE_MAGIAS["characters"]["cultista"]["sheet"]["condicoes"] = [{"nome": "Envenenado", "duracao": 2}]
+COMBATE_MAGIAS["combat_state"].update({
+    "initiative_order": ["Victoria", "Helena", "Stelar", "Cultista", "Natasha",
+                         "Lobo Sombrio", "Pip", "Acólito"],
+    "current_turn_index": 1,
+    "posicoes": {
+        "helena": "Portão", "pip": "Portão", "acólito": "Portão",
+        "natasha": "Pátio", "lobo sombrio": "Pátio",
+        "stelar": "Sacada", "victoria": "Sacada", "cultista": "Sacada",
+    },
+})
+
+
 # Painel de fim de combate (vitória do grupo).
 COMBATE_ENCERRADO = copy.deepcopy(COMBATE_ATIVO)
 COMBATE_ENCERRADO["combat_state"].update({
@@ -1393,6 +1461,31 @@ TELAS = [
      "estado": COMBATE_ITENS, "espera": 700,
      "js": "window.Combat._sel('item'); window.Combat._selItem('Água Benta', 'arremesso')",
      "exigir": "#cbt-targets .cbt-fora"},
+    # Quatro contra quatro, vez da clériga: no celular, todos à vista e a
+    # barra de ação inteira no rodapé.
+    {"nome": "combate-quatro-contra-quatro", "pagina": "/game.html",
+     "estado": COMBATE_MAGIAS, "espera": 700,
+     "exigir": "#combat-overlay:not(.hidden) .cbt-card"},
+    # Cada magia diz o que faz: efeito, dado, salvaguarda, área, quem atinge.
+    {"nome": "combate-habilidades", "pagina": "/game.html",
+     "estado": COMBATE_MAGIAS, "espera": 700,
+     "js": "window.Combat._sel('ability')", "exigir": "#cbt-targets .cbt-hab"},
+    # A descrição completa abre no toque (antes só existia no `title`).
+    {"nome": "combate-habilidade-detalhes", "pagina": "/game.html",
+     "estado": COMBATE_MAGIAS, "espera": 700,
+     "js": "window.Combat._sel('ability');"
+           "[...document.querySelectorAll('#cbt-targets .cbt-hab')]"
+           ".find(c => c.querySelector('.cbt-hab-nome').textContent === 'Coluna de Chamas')"
+           ".querySelector('.cbt-hab-info').click()",
+     "exigir": "#cbt-targets .cbt-hab-desc:not(.hidden)"},
+    # Coluna de Chamas em Victoria: Stelar está na mesma zona. A tela mostra
+    # quem vai ser atingido e pede confirmação.
+    {"nome": "combate-fogo-amigo", "pagina": "/game.html",
+     "estado": COMBATE_MAGIAS, "espera": 900,
+     "js": "window.Combat._sel('ability');"
+           "window.Combat._selHab('Coluna de Chamas', 'area');"
+           "setTimeout(() => window.Combat._target('Victoria'), 50)",
+     "exigir": "#cbt-targets .cbt-area-aviso"},
     {"nome": "combate-vitoria", "pagina": "/game.html",
      "estado": COMBATE_ATIVO, "espera": 700,
      "estado2": COMBATE_ENCERRADO, "js2": "window.Combat.sync()",

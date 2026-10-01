@@ -2185,6 +2185,16 @@ def _get_control_effect(hab: dict) -> dict | None:
         en = _SPELL_PT_TO_EN.get(name_lower)
         if en:
             eff = CONTROL_SPELL_EFFECTS.get(en)
+    if eff is None:
+        # A tabela acima tem 30 magias; o SRD tem 47 de condição. As outras
+        # caíam no ramo de DANO do use_ability, com dado vazio: "0 de dano" no
+        # registro e a condição nunca aplicada. O compêndio sabe a condição.
+        srd = _srd(hab)
+        if srd is not None:
+            srd_en = _norm_txt(srd.get("nome_srd", ""))
+            eff = CONTROL_SPELL_EFFECTS.get(srd_en)
+            if eff is None and srd.get("efeito") == "condicao" and srd.get("condicao"):
+                eff = {"condition": srd["condicao"].capitalize(), "pool": False}
     return eff
 
 def _weapon_attr(weapon_name: str, sheet: dict) -> tuple[str, int]:
@@ -2254,14 +2264,53 @@ def _primeiro_dado(achado) -> str:
     return " ".join((next(g for g in achado.groups() if g)).split()).replace(" ", "")
 
 
+def _sem_ponto_de_abreviacao(texto: str) -> str:
+    """
+    "2d10+nv. dano radiante": o ponto de "nv." encerrava a frase para as
+    expressões acima, que não atravessam ponto — e a Radiância do Amanhecer
+    de uma clériga real era lida como reforço, sem dano.
+    """
+    return re.sub(r"\b(nv|niv|nivel|mod|lv|lvl|prof|car|sab|int|des|con|for)\.",
+                  r"\1", texto or "", flags=re.IGNORECASE)
+
+
 def dado_de_dano_no_texto(texto: str) -> str:
     """"8d6 fire damage" → "8d6". "adiciona 1d4 aos ataques" → ""."""
-    return _primeiro_dado(_DANO_NO_TEXTO.search(texto or ""))
+    return _primeiro_dado(_DANO_NO_TEXTO.search(_sem_ponto_de_abreviacao(texto)))
 
 
 def dado_de_cura_no_texto(texto: str) -> str:
     """"regains hit points equal to 1d8 + mod" → "1d8"."""
-    return _primeiro_dado(_CURA_NO_TEXTO.search(texto or ""))
+    return _primeiro_dado(_CURA_NO_TEXTO.search(_sem_ponto_de_abreviacao(texto)))
+
+
+# ── O COMPÊNDIO DO SRD VEM PRIMEIRO ───────────────────────────────────────
+# As funções abaixo (efeito_do_dado, dado_efetivo, salvaguarda, área, origem,
+# alvos) eram seis palpites independentes sobre o texto de cada magia. Quando
+# dois discordavam, a tela mostrava uma coisa e o motor fazia outra:
+# Infligir Ferimentos aparecia sem dado e rolava 3d10; uma magia que só fere
+# criaturas HOSTIS queimava os aliados da zona.
+#
+# Agora cada uma pergunta primeiro ao compêndio (rpg/compendio.py), que tem a
+# magia já interpretada e revisada à mão. O texto só decide quando a
+# habilidade NÃO é do SRD — a que o mestre criou, a da ficha antiga — e é
+# assim que todo chamador existente recebe o dado revisado sem mudar uma
+# linha.
+
+def _srd(hab: dict) -> dict | None:
+    """A magia do SRD desta habilidade, ou None se ela não for do SRD."""
+    if not isinstance(hab, dict):
+        return None
+    try:
+        from rpg import compendio
+    except Exception:                                            # pragma: no cover
+        return None
+    return (compendio.magia(hab.get("nome_srd") or "")
+            or compendio.magia(hab.get("nome") or ""))
+
+
+_EFEITO_DO_COMPENDIO = {"dano": "dano", "cura": "cura", "pool": "pool",
+                        "condicao": "condicao"}
 
 
 def efeito_do_dado(hab: dict) -> str:
@@ -2273,6 +2322,12 @@ def efeito_do_dado(hab: dict) -> str:
     """
     if not isinstance(hab, dict):
         return "nenhum"
+    srd = _srd(hab)
+    if srd is not None:
+        if srd["efeito"] in _EFEITO_DO_COMPENDIO:
+            return _EFEITO_DO_COMPENDIO[srd["efeito"]]
+        # Reforço com dado (a Bênção soma 1d4) rola e mostra, mas não fere.
+        return "bonus" if srd.get("dado") else "nenhum"
     # Magia de controle é o que a tabela do motor disser que ela é — o dado
     # dela é pool ou duração, nunca ferida.
     _ctrl = _get_control_effect(hab)
@@ -2309,11 +2364,22 @@ _SAVE_PT = {
 
 def salvaguarda_da_habilidade(hab: dict) -> str:
     """O atributo do teste de resistência desta habilidade, ou ""."""
+    srd = _srd(hab)
+    if srd is not None:
+        return srd.get("salvaguarda") or ""
     guardada = _norm_txt((hab or {}).get("salvaguarda", "") or "")
     if guardada:
         return _SAVE_PT.get(guardada, guardada)
     achado = _SAVE_NO_TEXTO.search(f"{(hab or {}).get('descricao', '')}")
     if not achado:
+        # A ficha escrita à mão usa a SIGLA: "save de CON", "teste de SAB".
+        sigla = re.search(r"\b(?:save|salvaguarda|teste|resist\w*)\s+de\s+"
+                          r"(FOR|DES|CON|INT|SAB|CAR)\b",
+                          f"{(hab or {}).get('descricao', '')}")
+        if sigla:
+            return {"FOR": "forca", "DES": "destreza", "CON": "constituicao",
+                    "INT": "inteligencia", "SAB": "sabedoria",
+                    "CAR": "carisma"}[sigla.group(1)]
         return ""
     bruto = _norm_txt(next(g for g in achado.groups() if g))
     return _SAVE_PT.get(bruto, bruto)
@@ -2391,6 +2457,12 @@ def area_da_habilidade(hab: dict) -> str:
     """
     if not isinstance(hab, dict):
         return ""
+    srd = _srd(hab)
+    if srd is not None:
+        area = srd.get("area")
+        if not area:
+            return ""
+        return f"{area['forma']} de {area['tamanho_m']:g} m".replace(".", ",")
     for texto in ((hab.get("alcance") or ""), (hab.get("descricao") or "")):
         achado = _AREA_RE.search(texto)
         if achado:
@@ -2413,8 +2485,55 @@ def origem_da_area(hab: dict) -> str:
     De onde a área nasce: "self" (cone/linha saindo do conjurador) ou "alvo"
     (esfera posta à distância, como a Bola de Fogo).
     """
+    srd = _srd(hab)
+    if srd is not None:
+        return "self" if srd.get("origem") == "si" else "alvo"
     alcance = _norm_txt((hab or {}).get("alcance", "") or "")
-    return "self" if alcance.startswith("self") or alcance.startswith("pessoal") else "alvo"
+    if alcance.startswith("self") or alcance.startswith("pessoal"):
+        return "self"
+    # Habilidade escrita à mão, sem campo de alcance: o texto ainda pode dizer
+    # que a área nasce em quem usa ("ao seu redor", "a partir de você").
+    texto = _norm_txt((hab or {}).get("descricao", "") or "")
+    if re.search(r"ao seu redor|em volta de voce|ao redor de voce|"
+                 r"centrad[ao] em voce|a partir de voce|around you|centered on you", texto):
+        return "self"
+    return "alvo"
+
+
+# ── QUEM A HABILIDADE ATINGE ──────────────────────────────────────────────
+# O campo que faltava, e cuja falta queimou aliados: a área era tratada como
+# indiscriminada mesmo quando a regra diz "criaturas hostis" ou "à sua
+# escolha". O fogo amigo continua sendo regra do jogo — a Bola de Fogo pega
+# quem estiver na esfera —, mas só nas magias em que a regra manda.
+#
+#   hostis  — só os adversários de quem usa
+#   escolha — quem usa escolhe; o motor poupa os aliados
+#   todos   — todo mundo na área, aliados inclusive
+#   uma     — um alvo
+#   si      — só quem usa
+
+def alvos_da_habilidade(hab: dict) -> str:
+    srd = _srd(hab)
+    if srd is not None:
+        return srd.get("alvos") or "uma"
+    texto = _norm_txt(f"{(hab or {}).get('descricao', '')}")
+    if re.search(r"\bhostis\b|\binimig[oa]s\b|\bhostile\b", texto):
+        return "hostis"
+    if re.search(r"a sua escolha|que voce escolher|of your choice|you choose|"
+                 r"aliados? escolhid|ate \w+ criaturas", texto):
+        return "escolha"
+    if area_da_habilidade(hab):
+        return "todos"
+    return "si" if origem_da_area(hab) == "self" and _e_traco_passivo_seguro(hab) else "uma"
+
+
+def _e_traco_passivo_seguro(hab: dict) -> bool:
+    """
+    Habilidade de alcance pessoal SEM área só é 'em si' quando ela não fere
+    ninguém. Toque Vampírico nasce em você e fere o inimigo: tratá-la como
+    'si' aplicaria o dano em quem conjura.
+    """
+    return efeito_do_dado(hab) not in ("dano",)
 
 
 def _alvos_em_area(char_name: str, hab: dict, target_name: str) -> tuple[str, list[dict]]:
@@ -2427,11 +2546,19 @@ def _alvos_em_area(char_name: str, hab: dict, target_name: str) -> tuple[str, li
 
     O conjurador fica FORA. No SRD ele estaria dentro da esfera que pusesse em
     cima de si, mas aqui a área é uma zona inteira e o mestre não escolhe o
-    ponto: cobrar dano dele seria inventar uma decisão que ninguém tomou. Os
-    ALIADOS na zona entram — é isso que faz a magia de área ser uma escolha.
+    ponto: cobrar dano dele seria inventar uma decisão que ninguém tomou.
+
+    QUEM MAIS ENTRA depende da magia (alvos_da_habilidade):
+      • "todos"  — os aliados na zona entram. É o fogo amigo, e é regra: a
+                   Bola de Fogo pega quem estiver na esfera, e é isso que faz a
+                   magia de área ser uma escolha.
+      • "hostis" / "escolha" — só os adversários de quem conjura. Foi o
+                   defeito que queimou aliados numa partida: uma magia que só
+                   fere criaturas HOSTIS era tratada como indiscriminada.
     """
     if not area_da_habilidade(hab) or not _zonas_ativas():
         return "", []
+    so_adversarios = alvos_da_habilidade(hab) in ("hostis", "escolha")
     if origem_da_area(hab) == "self":
         zona = _zona_de(char_name)
     else:
@@ -2442,6 +2569,8 @@ def _alvos_em_area(char_name: str, hab: dict, target_name: str) -> tuple[str, li
 
     eu = memory.char_key(char_name)
     chars = memory.campaign.get("characters", {})
+    conjurador = chars.get(eu) or {}
+    lado_de_quem_conjura = memory.luta_com_o_grupo(conjurador) if conjurador else None
     cs = memory.campaign.get("combat_state") or {}
     pegos = []
     for nome in cs.get("initiative_order", []) or []:
@@ -2455,9 +2584,47 @@ def _alvos_em_area(char_name: str, hab: dict, target_name: str) -> tuple[str, li
             continue
         if int((alvo.get("sheet") or {}).get("vida_atual", 0) or 0) <= 0:
             continue
-        if _zona_de(nome) == zona:
-            pegos.append(alvo)
+        if _zona_de(nome) != zona:
+            continue
+        if (so_adversarios and lado_de_quem_conjura is not None
+                and memory.luta_com_o_grupo(alvo) == lado_de_quem_conjura):
+            continue
+        pegos.append(alvo)
     return (zona, pegos) if pegos else ("", [])
+
+
+def prever_area(char_name: str, ability_name: str, target_name: str = "") -> dict:
+    """
+    Quem a habilidade VAI atingir, antes de ela acontecer — para a tela pedir
+    confirmação mostrando os aliados que estão no caminho.
+
+    O fogo amigo é regra e continua; o que não pode é acontecer sem aviso. Na
+    partida relatada, o jogador conjurou uma magia sem descrição visível e
+    atingiu os companheiros sem saber que eles estavam na área.
+    """
+    char = memory.campaign.get("characters", {}).get(memory.char_key(char_name))
+    if not char:
+        return {"ok": False, "erro": "personagem não encontrado"}
+    hab = next((h for h in (char.get("habilidades") or [])
+                if isinstance(h, dict) and _norm_txt(h.get("nome", "")) == _norm_txt(ability_name)),
+               None)
+    if hab is None:
+        return {"ok": False, "erro": "habilidade não encontrada"}
+    area = area_da_habilidade(hab)
+    alvos = alvos_da_habilidade(hab)
+    zona, pegos = _alvos_em_area(char_name, hab, target_name)
+    lado = memory.luta_com_o_grupo(char)
+    atingidos = [{"nome": a.get("name", ""),
+                  "aliado": memory.luta_com_o_grupo(a) == lado}
+                 for a in pegos]
+    return {
+        "ok": True,
+        "area": area,
+        "zona": zona,
+        "alvos": alvos,
+        "atingidos": atingidos,
+        "aliados_atingidos": [a["nome"] for a in atingidos if a["aliado"]],
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -2512,7 +2679,13 @@ def usos_maximos(char: dict, nome: str) -> int | None:
     chave = _chave_de_uso(nome)
     if not chave:
         return None
-    nivel = int(((char or {}).get("sheet") or {}).get("nivel", 1) or 1)
+    s = (char or {}).get("sheet") or {}
+    nivel = int(s.get("nivel", 1) or 1)
+    # Só o Canalizar Divindade do CLÉRIGO escala (1/2/3 nos níveis 2/6/18). O
+    # do paladino é 1 por descanso curto em qualquer nível, e esta tabela dava
+    # 2 a partir do 6 para os dois. Achado ao gerar o compêndio do SRD.
+    if chave == "canalizar divindade" and _norm_txt(s.get("classe", "")) == "paladino":
+        return 1
     return _USOS_POR_DESCANSO[chave][1](nivel)
 
 
@@ -2554,11 +2727,26 @@ def restaurar_usos(char: dict, descanso: str) -> list[str]:
     return voltaram
 
 
-def dado_efetivo(hab: dict) -> str:
+def dado_efetivo(hab: dict, char: dict | None = None) -> str:
     """
     A fórmula que vale. Quando a ficha não tem dado — o caso de toda magia
     vinda do Open5e, que não expõe dano —, ele é lido do texto do SRD.
+
+    Com `char`, o truque cresce com o nível do personagem como manda o SRD:
+    Raio de Fogo é 1d10 no nível 1 e 2d10 no 5. Antes ele ficava em 1d10 para
+    sempre.
     """
+    srd = _srd(hab)
+    if srd is not None and srd.get("efeito") in ("dano", "cura", "pool"):
+        dado = srd.get("dado") or ""
+        if char is not None and srd.get("nivel") == 0 and srd.get("escala_personagem"):
+            from rpg import compendio
+            nivel = int(((char or {}).get("sheet") or {}).get("nivel", 1) or 1)
+            dado = compendio.progressao_no_nivel(srd["escala_personagem"], nivel) or dado
+        return dado
+    if srd is not None:
+        # Reforço e condição do SRD: o dado, se houver, é o da tabela.
+        return srd.get("dado") or ""
     guardado = (hab.get("dado") or "").strip()
     if guardado:
         return guardado
@@ -6442,7 +6630,7 @@ def use_ability(
     # disser que é dano (ver efeito_do_dado). Sem isso, benzer um aliado
     # tirava 1d6 de vida dele.
     _efeito = efeito_do_dado(hab)
-    _formula = dado_efetivo(hab)
+    _formula = dado_efetivo(hab, char)
     if _formula:
         n_dice, sides, bonus = _parse_dice(_formula)
         rolls      = [random.randint(1, sides) for _ in range(n_dice)]
@@ -6679,7 +6867,10 @@ def use_ability(
             # Dado que não é dano nem cura (o 1d4 da Bênção, o da Orientação)
             # é rolado e mostrado, e a vida de ninguém muda. Habilidade sem
             # dado nenhum também não encosta em vida.
-            if _efeito in ("bonus", "nenhum") and ctrl_effect is None:
+            # "condicao" sem efeito de controle conhecido (Perdição, Confusão:
+            # o efeito é narrado, não é uma condição do SRD) também não mexe
+            # na vida. Sem isto ela caía no ramo de dano, com dado vazio.
+            if _efeito in ("bonus", "nenhum", "condicao") and ctrl_effect is None:
                 result += f"\n   {target['name']}: sem mudança na vida."
 
             elif _is_healing_ability(hab):
@@ -13551,8 +13742,18 @@ _ABILITY_BONUS_PATTERNS = (
 )
 
 
-def _ability_action_type(name: str) -> str:
-    """'bonus' se a habilidade é Ação Bônus pela regra 5e; senão 'acao'."""
+def _ability_action_type(name: str, hab: dict | None = None) -> str:
+    """
+    'bonus' se a habilidade é Ação Bônus pela regra 5e; senão 'acao'.
+
+    Com `hab`, pergunta ao compêndio primeiro. A lista de nomes abaixo não
+    conhecia Palavra Curativa nem Arma Espiritual — ações bônus no SRD —, e a
+    tela tática gastava a AÇÃO do turno inteira para usá-las. Reação continua
+    contando como ação: a economia de turno ainda não tem reação.
+    """
+    srd = _srd(hab) if hab is not None else _srd({"nome": name})
+    if srd is not None:
+        return "bonus" if srd.get("acao") == "bonus" else "acao"
     n = _norm_txt(name)
     if not n:
         return "acao"
@@ -14172,15 +14373,33 @@ def _combatant_snapshot(name: str) -> dict | None:
             conds.append(nm)
     habs = []        # só ATIVAS (viram botão)
     passivas = []    # exibição informativa
-    for h in (ch.get("habilidades") or []):
-        if not isinstance(h, dict):
-            continue
+    # O botão de cada habilidade sai do MODELO ÚNICO (rpg/habilidade.py), que
+    # lê das mesmas funções que o motor usa para resolvê-la. Antes saía do
+    # campo cru da ficha: Infligir Ferimentos aparecia sem dado e rolava 3d10,
+    # a descrição só existia ao passar o mouse, e a mesma Chama Sagrada vinha
+    # duas vezes.
+    from rpg import habilidade as _habilidade
+    for h in _habilidade.sem_duplicatas(ch.get("habilidades") or []):
+        r = _habilidade.resolver(h, ch)
         entry = {
-            "nome":       h.get("nome", ""),
-            "custo_mana": int(h.get("custo_mana", 0) or 0),
-            "dado":       h.get("dado", ""),
-            "descricao":  h.get("descricao", ""),
-            "tipo_acao":  _ability_action_type(h.get("nome", "")),
+            # `nome` é o da FICHA: é por ele que use_ability procura. O que a
+            # tela mostra é `nome_exibido`, o nome oficial em português.
+            "nome":         h.get("nome", ""),
+            "nome_exibido": r["nome"],
+            "custo_mana":   int(h.get("custo_mana", 0) or 0),
+            "dado":         r["dado"],
+            "descricao":    r["descricao"],
+            "resumo":       r["resumo"],
+            "efeito":       r["efeito"],
+            "rotulo":       r["rotulo"],
+            "tipo_dano":    r["tipo_dano"],
+            "salvaguarda":  r["salvaguarda"],
+            "area":         r["area"],
+            "alvos":        r["alvos"],
+            "alcance":      r["alcance"],
+            "concentracao": r["concentracao"],
+            "reacao":       r["acao"] == "reacao",
+            "tipo_acao":    _ability_action_type(h.get("nome", ""), h),
             # Modo de alvo: "self" | "pool" | "single". A UI usa para decidir
             # se mostra o picker ou despacha direto (self/pool não pedem alvo).
             "target_mode": _ability_target_mode(h.get("nome", ""), h),
@@ -14189,8 +14408,8 @@ def _combatant_snapshot(name: str) -> dict | None:
             "usos":     usos_restantes(ch, h.get("nome", "")),
             "usos_max": usos_maximos(ch, h.get("nome", "")),
         }
-        if _ability_is_passive(h):
-            passivas.append(entry["nome"])
+        if r["passiva"]:
+            passivas.append(entry["nome_exibido"])
         else:
             habs.append(entry)
     itens = []
@@ -14469,7 +14688,7 @@ def combat_action(action: str, actor: str = "", target: str = "",
                         "message": f"Erro: {actor} já usou Surto de Ação neste turno.",
                         "snapshot": combat_snapshot()}
 
-            slot = None if surto else ("bonus" if _ability_action_type(ability) == "bonus" else "acao")
+            slot = None if surto else ("bonus" if _ability_action_type(ability, hab_pre) == "bonus" else "acao")
             if slot:
                 err = _use_slot(eco, slot)
                 if err:

@@ -5,6 +5,19 @@
 //  Toda mecânica vive no motor já fuzzado (tools_dnd via /api/combat/*).
 //  Aqui só: (1) renderiza o snapshot, (2) envia intenções, (3) reabre/
 //  fecha a tela e dispara a narração final pela LLM.
+//
+//  A tela foi refeita pensando primeiro no celular. Antes, cada combatente
+//  era um cartão de ~150px: com quatro de cada lado o jogador rolava para ver
+//  quem estava de pé, e a lista de magias só dizia o nome — dano, cura, área
+//  e descrição existiam só no `title`, que o toque não mostra. Agora:
+//    • cada combatente é uma LINHA compacta (nome, CA, vida, condições), e o
+//      toque nela abre os detalhes ou, escolhendo alvo, escolhe o alvo;
+//    • a barra de ação fica fixa no rodapé e mostra o último acontecimento;
+//    • cada habilidade é um CARTÃO com custo, efeito, dado, salvaguarda,
+//      área e quem ela atinge, e a descrição completa abre no toque;
+//    • magia em área pergunta ao motor quem vai ser atingido e, se houver
+//      aliado no caminho, pede confirmação. O fogo amigo é regra do jogo e
+//      continua — o que não pode é acontecer sem aviso.
 // ═══════════════════════════════════════════════════════════════════
 (function () {
   'use strict';
@@ -15,12 +28,17 @@
   let _mode      = 'tela';   // ver memory.PADRAO_COMBATE
   let _autoTimer = null;
   let _autoGuard = 0;       // teto de segurança p/ turnos de IA encadeados
-  let _pick      = null;    // {kind:'attack'|'ability', ability?}
+  let _pick      = null;    // {kind:'attack'|'ability'|'item', ...}
   let _userClosed = false;  // usuário fechou a tela de propósito (combate segue)
+  let _habs      = [];      // habilidades do turno, na ordem dos cartões
+  let _confirmar = null;    // ação em área esperando o "conjurar mesmo assim"
+  const _abertos = new Set();   // linhas de combatente com os detalhes abertos
 
   const OUT = ['morto', 'inconsciente', 'estabilizado', 'fugiu', 'exilado'];
   const esc = (s) => (window.escapeHtml ? window.escapeHtml(s) : String(s == null ? '' : s));
   const isOut = (st) => OUT.includes((st || '').toLowerCase());
+  // Nome dentro de onclick='...': o esc não escapa o apóstrofo.
+  const jsNome = (s) => esc(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 
   // ---- DOM ---------------------------------------------------------
   function ensureDom() {
@@ -35,20 +53,27 @@
                   aria-label="Fechar tela de combate"
                   title="Fechar — o combate continua e pode ser retomado">✕</button>
           <h1 class="cbt-title">O Confronto <span id="cbt-round">— Rodada 1</span></h1>
+          <div id="cbt-vez" class="cbt-vez" aria-live="polite"></div>
           <div id="cbt-order" class="cbt-initiative"></div>
         </header>
 
         <div id="cbt-zonas" class="cbt-zonas hidden"></div>
 
         <div class="cbt-battlefield">
-          <div id="cbt-party"   class="cbt-team"></div>
-          <div id="cbt-stage"   class="cbt-vs">Vs.</div>
-          <div id="cbt-enemies" class="cbt-team"></div>
+          <section class="cbt-lado cbt-lado-inimigo">
+            <h2 class="cbt-lado-titulo">Inimigos <span id="cbt-n-inimigos"></span></h2>
+            <div id="cbt-enemies" class="cbt-team"></div>
+          </section>
+          <section class="cbt-lado cbt-lado-grupo">
+            <h2 class="cbt-lado-titulo">Grupo <span id="cbt-n-grupo"></span></h2>
+            <div id="cbt-party" class="cbt-team"></div>
+          </section>
         </div>
 
         <div class="cbt-lower">
           <div id="cbt-actionbar" class="cbt-action-panel">
             <div id="cbt-action-title" class="cbt-action-title">Aguardando…</div>
+            <div id="cbt-ultimo" class="cbt-ultimo"></div>
             <div id="cbt-prompt" class="cbt-economy"></div>
             <div id="cbt-buttons" class="cbt-btn-grid"></div>
             <div id="cbt-targets" class="cbt-picker hidden"></div>
@@ -69,6 +94,29 @@
     painel.addEventListener('scroll', () => {
       painel.classList.toggle('cbt-rolado', painel.scrollTop > 0);
     }, { passive: true });
+
+    // Toque na linha do combatente: escolhendo alvo, escolhe o alvo; fora
+    // disso, abre e fecha os detalhes (classe, concentração, defesas). Antes
+    // o alvo só podia ser escolhido numa segunda lista de botões, longe de
+    // quem ele era — e no celular essa lista ficava abaixo da dobra.
+    document.getElementById('cbt-frame').addEventListener('click', (ev) => {
+      const linha = ev.target.closest('.cbt-card[data-nome]');
+      if (!linha) return;
+      const nome = linha.dataset.nome;
+      if (linha.classList.contains('cbt-alvejavel')) { _target(nome); return; }
+      if (_pick) return;   // escolhendo alvo: tocar em quem não pode não faz nada
+      if (_abertos.has(nome)) _abertos.delete(nome); else _abertos.add(nome);
+      linha.classList.toggle('cbt-aberto', _abertos.has(nome));
+      linha.setAttribute('aria-expanded', _abertos.has(nome) ? 'true' : 'false');
+    });
+    // A linha é um botão (role="button"): Enter e Espaço fazem o mesmo que o toque.
+    document.getElementById('cbt-frame').addEventListener('keydown', (ev) => {
+      if (ev.key !== 'Enter' && ev.key !== ' ') return;
+      const linha = ev.target.closest && ev.target.closest('.cbt-card[data-nome]');
+      if (!linha || ev.target !== linha) return;
+      ev.preventDefault();
+      linha.click();
+    });
 
     // Pílula flutuante para RETOMAR o combate depois que o usuário fechou
     // a tela. Fica fora do #combat-overlay (que some quando fechado).
@@ -96,6 +144,13 @@
       body: JSON.stringify(p),
     });
   }
+  function preverArea(p) {
+    return api('/api/combat/preview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(p),
+    });
+  }
 
   // ---- Render ------------------------------------------------------
   function bar(label, cur, max, cls, extra = '') {
@@ -105,7 +160,7 @@
     const risco = cls === 'hp'
       ? (m <= 25 ? ' cbt-hp-baixo' : (m <= 50 ? ' cbt-hp-atencao' : ' cbt-hp-ok'))
       : '';
-    return `<div class="cbt-bar-row">
+    return `<div class="cbt-bar-row cbt-bar-row-${cls}">
       <span class="cbt-bar-label">${label}</span>
       <div class="cbt-bar"><div class="cbt-bar-fill ${cls}${risco}" style="width:${m}%"></div></div>
       <span class="cbt-bar-num">${cur}/${max}${extra}</span>
@@ -157,7 +212,11 @@
   const lado = (c) => (c && c.lado) || (c && c.is_party ? 'grupo' : 'inimigo');
   const comOGrupo = (c) => lado(c) !== 'inimigo';
 
-  function card(c) {
+  // A linha do combatente. Tudo o que decide a jogada (nome, vez, CA, vida,
+  // condições) cabe em ~56px; o que é consulta (classe, mana, concentração,
+  // defesas) fica nos detalhes, que abrem no toque. No desktop há espaço e os
+  // detalhes aparecem sempre.
+  function card(c, posicao) {
     const out    = isOut(c.status);
     // "dormindo" (Sleep): esmaece o card e mostra a tag, MAS continua
     // alvejável (não entra em isOut, então o picker de alvo o inclui).
@@ -175,17 +234,23 @@
     const meta   = `${esc(c.classe || '')}${c.nivel ? ' Nv.' + c.nivel : ''}`.trim();
     const temp   = Number(c.hp_temp || 0);
     const defs   = selosDeDefesa(c);
-    return `<div data-nome="${esc(c.name)}" class="cbt-card ${comOGrupo(c) ? 'cbt-aliado' : 'cbt-inimigo'} ${
+    const aberto = _abertos.has(c.name);
+    const detalhes = [
+      meta ? `<span class="cbt-meta">${meta}</span>` : '',
+      c.concentracao ? `<div class="cbt-conc" title="Sofrer dano exige teste de Constituição para manter">Concentrado em ${esc(c.concentracao)}</div>` : '',
+      defs ? `<div class="cbt-defs">${defs}</div>` : '',
+    ].join('');
+    return `<div data-nome="${esc(c.name)}" role="button" tabindex="0" aria-expanded="${aberto}" class="cbt-card ${comOGrupo(c) ? 'cbt-aliado' : 'cbt-inimigo'} ${
       lado(c) === 'aliado' ? 'cbt-npc-aliado' : ''} ${
       c.is_current ? 'cbt-cur' : ''} ${
-      out ? 'cbt-out' : (asleep ? 'cbt-asleep' : '')}">
+      out ? 'cbt-out' : (asleep ? 'cbt-asleep' : '')} ${
+      aberto ? 'cbt-aberto' : ''}">
       <div class="cbt-c-header">
+        ${posicao ? `<span class="cbt-ini" title="Posição na iniciativa">${posicao}</span>` : ''}
         <span class="cbt-name">${esc(c.name)}</span>
         ${lado(c) === 'aliado' ? '<span class="cbt-selo-aliado" title="Luta ao seu lado, mas não é do grupo: o motor joga por ele">aliado</span>' : ''}
-        ${c.is_current ? '<span class="cbt-arrow">▶</span>' : ''}
-      </div>
-      <div class="cbt-meta">
-        <span>${meta || '—'}</span>
+        ${c.is_current ? '<span class="cbt-arrow" title="É a vez dele">vez</span>' : ''}
+        ${c.zona ? `<span class="cbt-zona-tag" title="Zona do campo de batalha">${esc(c.zona)}</span>` : ''}
         <span class="cbt-ca" title="Classe de Armadura">CA ${c.ca}</span>
       </div>
       <div class="cbt-bars">
@@ -193,12 +258,29 @@
               temp ? ` <span class="cbt-temp" title="PV temporários — absorvem dano antes dos PV reais">+${temp}</span>` : '')}
         ${c.mp_max > 0 ? bar('MP', c.mp, c.mp_max, 'mp') : ''}
       </div>
-      ${c.concentracao ? `<div class="cbt-conc" title="Sofrer dano exige teste de Constituição para manter">Concentrado em ${esc(c.concentracao)}</div>` : ''}
       ${(conds || dim) ? `<div class="cbt-conds">${conds}${
         dim ? `<span class="cbt-cond cbt-cond-out">${esc(c.status)}</span>` : ''
       }</div>` : ''}
-      ${defs ? `<div class="cbt-defs">${defs}</div>` : ''}
+      ${detalhes ? `<div class="cbt-detalhes">${detalhes}</div>` : ''}
     </div>`;
+  }
+
+  // "Agora: X · Próximo: Y". A régua com todos os nomes não cabe no celular
+  // (rolava na horizontal e o próximo ficava escondido), e o que o jogador
+  // precisa saber de relance é só isso. A ordem inteira continua no número
+  // de cada linha e, no desktop, na régua.
+  function vezDoTurno(snap) {
+    const ordem = snap.order || [];
+    const por = n => (snap.combatants || []).find(c => c.name === n);
+    const i = snap.turn_index || 0;
+    const agora = ordem[i] || '';
+    let proximo = '';
+    for (let k = 1; k < ordem.length; k++) {
+      const n = ordem[(i + k) % ordem.length];
+      const c = por(n);
+      if (c && !isOut(c.status)) { proximo = n; break; }
+    }
+    return { agora, proximo };
   }
 
   function render(snap) {
@@ -207,8 +289,16 @@
 
     const enemies = (snap.combatants || []).filter(c => !comOGrupo(c));
     const party   = (snap.combatants || []).filter(comOGrupo);
+    const posicao = n => (snap.order || []).indexOf(n) + 1;
+    const dePe    = lista => lista.filter(c => !isOut(c.status)).length;
 
     document.getElementById('cbt-round').textContent = `— Rodada ${snap.round || 1}`;
+
+    const vez = vezDoTurno(snap);
+    document.getElementById('cbt-vez').innerHTML = vez.agora
+      ? `<span>Agora: <b>${esc(vez.agora)}</b></span>`
+        + (vez.proximo ? `<span class="cbt-vez-sep">·</span><span>Próximo: ${esc(vez.proximo)}</span>` : '')
+      : '';
 
     document.getElementById('cbt-order').innerHTML = (snap.order || [])
       .map((n, i) => {
@@ -218,16 +308,24 @@
       })
       .join('<span class="cbt-ord-sep">›</span>');
 
-    document.getElementById('cbt-enemies').innerHTML = enemies.map(card).join('') || '<div class="cbt-empty">—</div>';
-    document.getElementById('cbt-party').innerHTML   = party.map(card).join('')   || '<div class="cbt-empty">—</div>';
+    document.getElementById('cbt-n-inimigos').textContent = enemies.length ? `${dePe(enemies)}/${enemies.length}` : '';
+    document.getElementById('cbt-n-grupo').textContent    = party.length ? `${dePe(party)}/${party.length}` : '';
+    document.getElementById('cbt-enemies').innerHTML = enemies.map(c => card(c, posicao(c.name))).join('') || '<div class="cbt-empty">—</div>';
+    document.getElementById('cbt-party').innerHTML   = party.map(c => card(c, posicao(c.name))).join('')   || '<div class="cbt-empty">—</div>';
 
     renderZonas(snap);
 
-    const log = (snap.log || []).slice(-12).map(e =>
+    const linhas = (snap.log || []).slice(-12);
+    const log = linhas.map(e =>
       `<div class="cbt-logline">[R${e.round}] ${esc(e.msg || e.type || '')}</div>`).join('');
     const lg = document.getElementById('cbt-log');
     lg.innerHTML = log;
     lg.scrollTop = lg.scrollHeight;
+    // O último acontecimento, dentro da barra de ação: no celular o diário
+    // fica lá embaixo, e o jogador tocava "Atacar" sem ver o que tinha
+    // acabado de acontecer.
+    const ultimo = linhas.length ? linhas[linhas.length - 1] : null;
+    document.getElementById('cbt-ultimo').textContent = ultimo ? (ultimo.msg || ultimo.type || '') : '';
 
     renderActionBar(snap);
     animarMudancas(snap);
@@ -307,9 +405,20 @@
         `<span class="cbt-pin ${comOGrupo(c) ? 'cbt-pin-aliado' : 'cbt-pin-inimigo'}`
         + `${c.is_current ? ' cbt-pin-vez' : ''}">${esc(c.name)}</span>`).join('');
       const aqui = (atual && atual.zona === z) ? ' cbt-zona-aqui' : '';
+      // No celular os nomes empilhados faziam a faixa ocupar um quarto da
+      // tela; lá ela mostra só quantos de cada lado, e a zona de cada um vai
+      // escrita na própria linha.
+      const nosso = dentro.filter(comOGrupo).length;
+      const deles = dentro.length - nosso;
+      const conta = dentro.length
+        ? [nosso ? `<span class="cbt-conta-aliado">${nosso} do grupo</span>` : '',
+           deles ? `<span class="cbt-conta-inimigo">${deles} inimigo${deles === 1 ? '' : 's'}</span>` : '']
+            .filter(Boolean).join(' · ')
+        : '<span class="cbt-zona-vazia">vazia</span>';
       return `<div class="cbt-zona${aqui}" title="${esc(desc[z] || '')}">`
            + `<div class="cbt-zona-nome">${esc(z)}</div>`
            + `<div class="cbt-zona-pins">${fichas || '<span class="cbt-zona-vazia">vazia</span>'}</div>`
+           + `<div class="cbt-zona-conta">${conta}</div>`
            + `</div>`;
     }).join('<span class="cbt-zona-liga">→</span>');
     faixa.classList.remove('hidden');
@@ -320,7 +429,10 @@
     const promptEl = document.getElementById('cbt-prompt');
     const btnEl    = document.getElementById('cbt-buttons');
     const tgtEl    = document.getElementById('cbt-targets');
-    tgtEl.classList.add('hidden'); tgtEl.innerHTML = ''; _pick = null;
+    tgtEl.classList.add('hidden'); tgtEl.innerHTML = '';
+    _pick = null; _confirmar = null;
+    marcarLinhas({}, {});
+    document.getElementById('cbt-actionbar').classList.remove('cbt-escolhendo');
 
     const cur = (snap.combatants || []).find(c => c.is_current);
     if (!cur) {
@@ -336,10 +448,11 @@
         ? `“${esc(snap.current)} entra na luta ao seu lado…”`
         : `“${esc(snap.current)} avança nas sombras…”`}</span>`;
       btnEl.innerHTML = '';
+      acompanharAlturaDaBarra();
       return;
     }
 
-    titleEl.textContent = `O que fará ${esc(cur.name)}?`;
+    titleEl.textContent = `O que fará ${cur.name}?`;
 
     // Economia 5e do turno atual: Ação, Ação Bônus e Reação.
     // Antes eram dois "○" minúsculos sem legenda, governando o turno inteiro.
@@ -368,7 +481,7 @@
              : 'Reação já gasta nesta rodada');
 
     const dis      = _busy ? 'disabled' : '';
-    const actorEsc = esc(cur.name).replace(/'/g, "\\'");
+    const actorEsc = jsNome(cur.name);
     const acaoDis  = (acaoUsed || _busy) ? 'disabled' : '';
 
     const hasAcaoAbil  = (cur.habilidades || []).some(h => h.tipo_acao !== 'bonus');
@@ -380,64 +493,116 @@
     const habUsable  = (hasAcaoAbil && !acaoUsed) || (hasBonusAbil && !bonusUsed);
     const itemUsable = (hasAcaoItem && !acaoUsed) || (hasBonusItem && !bonusUsed);
 
-    let html =
-      `<button class="cbt-btn" ${acaoDis} onclick="window.Combat._sel('attack')">Atacar</button>`;
+    const botoes = [
+      `<button class="cbt-btn" ${acaoDis} onclick="window.Combat._sel('attack')">Atacar</button>`,
+    ];
     if ((cur.habilidades || []).length) {
       const d = (habUsable && !_busy) ? '' : 'disabled';
-      html += `<button class="cbt-btn" ${d} onclick="window.Combat._sel('ability')">Habilidade</button>`;
+      botoes.push(`<button class="cbt-btn" ${d} onclick="window.Combat._sel('ability')">Habilidade</button>`);
     }
     if ((cur.itens_combate || []).length) {
       const d = (itemUsable && !_busy) ? '' : 'disabled';
-      html += `<button class="cbt-btn" ${d} onclick="window.Combat._sel('item')">Item</button>`;
+      botoes.push(`<button class="cbt-btn" ${d} onclick="window.Combat._sel('item')">Item</button>`);
     }
     if (temZonas) {
       const d = (moveUsed || _busy) ? 'disabled' : '';
-      html += `<button class="cbt-btn" ${d} onclick="window.Combat._sel('move')">Mover</button>`;
+      botoes.push(`<button class="cbt-btn" ${d} onclick="window.Combat._sel('move')">Mover</button>`);
     }
-    html +=
-      `<button class="cbt-btn" ${acaoDis} onclick="window.Combat._act({action:'defend',actor:'${actorEsc}'})">Defender</button>` +
-      `<button class="cbt-btn" ${acaoDis} onclick="window.Combat._act({action:'flee',actor:'${actorEsc}'})">Fugir</button>` +
-      `<button class="cbt-btn" ${dis} onclick="window.Combat._free()">Ação Livre</button>` +
-      `<button class="cbt-btn cbt-primary" ${dis} onclick="window.Combat._act({action:'end_turn',actor:'${actorEsc}'})">Encerrar Turno</button>`;
-    btnEl.innerHTML = html;
+    botoes.push(
+      `<button class="cbt-btn" ${acaoDis} onclick="window.Combat._act({action:'defend',actor:'${actorEsc}'})">Defender</button>`,
+      `<button class="cbt-btn" ${acaoDis} onclick="window.Combat._act({action:'flee',actor:'${actorEsc}'})">Fugir</button>`,
+      `<button class="cbt-btn" ${dis} onclick="window.Combat._free()">Ação Livre</button>`);
+    // No celular a grade tem 4 colunas: o "Encerrar Turno" ocupa o que sobra
+    // da última fileira, e nunca menos de duas colunas — numa só o rótulo
+    // quebrava em duas linhas.
+    const sobra = botoes.length % 4;
+    const vao = sobra === 0 ? 4 : (4 - sobra >= 2 ? 4 - sobra : 4);
+    btnEl.innerHTML = botoes.join('')
+      + `<button class="cbt-btn cbt-primary" style="--cbt-span:${vao}" ${dis} onclick="window.Combat._act({action:'end_turn',actor:'${actorEsc}'})">Encerrar Turno</button>`;
     acompanharAlturaDaBarra();
   }
+
+  // Marca as linhas dos combatentes: `alvos` (nome → 'ok'|'fora'|...) diz
+  // quem pode ser escolhido tocando a linha; `area` (nome → 'aliado'|'inimigo')
+  // pinta quem a magia em área vai atingir.
+  function marcarLinhas(alvos, area) {
+    document.querySelectorAll('#combat-overlay .cbt-card[data-nome]').forEach(el => {
+      const n = el.dataset.nome;
+      const estado = alvos[n];
+      el.classList.toggle('cbt-alvejavel', !!estado && estado !== 'fora' && estado !== 'sem_efeito');
+      el.classList.toggle('cbt-inalcancavel', estado === 'fora' || estado === 'sem_efeito');
+      el.classList.toggle('cbt-na-area', !!area[n]);
+      el.classList.toggle('cbt-na-area-aliado', area[n] === 'aliado');
+    });
+  }
+
+  // Abre um seletor (arma, alvo, habilidade, item, zona) no painel de ação.
+  // `folha`: no celular o painel vira uma folha alta e os botões de ação
+  // saem de cena — a lista de magias não cabia na barra e rolava por dentro
+  // de um espaço de três linhas.
+  function abrirSeletor(html, folha) {
+    const tgtEl = document.getElementById('cbt-targets');
+    tgtEl.innerHTML = html;
+    tgtEl.classList.remove('hidden');
+    tgtEl.scrollTop = 0;
+    document.getElementById('cbt-actionbar').classList.toggle('cbt-escolhendo', !!folha);
+    trazerParaVista(tgtEl);
+  }
+
+  const BOTAO_CANCELAR =
+    `<button class="cbt-btn cbt-cancel" onclick="window.Combat._cancel()">✕ Cancelar</button>`;
+
+  // Quem a habilidade costuma mirar. Cura e reforço vão num aliado (ou em
+  // si); dano e controle, num inimigo. A tela só ORDENA e sugere — quem
+  // decide se pode é o motor.
+  const MIRA_ALIADO = ['Cura', 'Reforço'];
 
   function showTargets(kind, opts) {
     const snap = _last;
     if (!snap) return;
     _pick = Object.assign({ kind }, opts || {});
-    const tgtEl = document.getElementById('cbt-targets');
     const cur = (snap.combatants || []).find(c => c.is_current);
-    const live = (snap.combatants || []).filter(c =>
-      !isOut(c.status) && c.name !== (cur && cur.name));
+    const h   = _pick.hab || null;
+    const apoio = !!(h && MIRA_ALIADO.includes(h.rotulo));
+    let live = (snap.combatants || []).filter(c =>
+      !isOut(c.status) && (apoio || c.name !== (cur && cur.name)));
+    // O lado que a habilidade costuma mirar vem primeiro.
+    const querAliado = apoio;
+    live = live.slice().sort((a, b) =>
+      (comOGrupo(b) === querAliado) - (comOGrupo(a) === querAliado));
     const titulo = kind === 'attack'
       ? `Alvo de ${esc(_pick.weapon || 'ataque')}:`
-      : (kind === 'ability' ? `Alvo de ${esc(_pick.ability || 'habilidade')}:` : 'Alvo:');
+      : (kind === 'ability' ? `Alvo de ${esc((h && h.nome_exibido) || _pick.ability || 'habilidade')}:` : 'Alvo:');
     // Alcance de cada alvo para a arma escolhida, calculado pelo motor. Sem
     // isto a tela oferecia o inimigo de outra zona à espada, o motor recusava
     // e o jogador ficava sem entender o que tinha acontecido.
     const alcance = kind === 'attack'
       ? ((snap.alcance || {})[_pick.weapon || 'Ataque desarmado'] || {})
       : {};
-    tgtEl.innerHTML =
+    const estados = {};
+    const html =
       `<div class="cbt-tgt-title">${titulo}</div>`
+      + (h && h.resumo ? `<div class="cbt-tgt-resumo">${esc(h.resumo)}</div>` : '')
+      + `<div class="cbt-tgt-dica">Toque no combatente ou escolha abaixo.</div>`
       + `<div class="cbt-picker-btns">`
       + live.map(c => {
           const estado = alcance[c.name];
+          estados[c.name] = estado || 'ok';
           const fora   = estado === 'fora';
           const nota   = fora ? ' <small>· fora de alcance</small>'
                        : (estado === 'desvantagem' ? ' <small>· desvantagem</small>' : '');
           const dica   = fora
             ? ` title="${esc(c.name)} está em ${esc(c.zona || 'outra zona')}: corpo-a-corpo só na mesma zona. Mova-se ou use uma arma à distância."`
             : '';
-          return `<button class="cbt-btn${fora ? ' cbt-fora' : ''}" ${fora ? 'disabled' : ''}${dica} `
-            + `onclick="window.Combat._target('${esc(c.name).replace(/'/g,"\\'")}')">${esc(c.name)}${nota}</button>`;
+          const quem = c.name === (cur && cur.name) ? ' (em si)' : '';
+          return `<button class="cbt-btn ${comOGrupo(c) ? 'cbt-alvo-aliado' : 'cbt-alvo-inimigo'}${fora ? ' cbt-fora' : ''}" ${fora ? 'disabled' : ''}${dica} `
+            + `onclick="window.Combat._target('${jsNome(c.name)}')">${esc(c.name)}${quem}`
+            + ` <small>${c.hp}/${c.hp_max}</small>${nota}</button>`;
         }).join('')
-      + `<button class="cbt-btn cbt-cancel" onclick="window.Combat._cancel()">✕ Cancelar</button>`
+      + BOTAO_CANCELAR
       + `</div>`;
-    tgtEl.classList.remove('hidden');
-    trazerParaVista(tgtEl);
+    abrirSeletor(html, false);
+    marcarLinhas(estados, {});
   }
 
   // No mobile o painel de ação é uma barra fixa que rola por dentro: se o
@@ -630,29 +795,131 @@
     }
   }
 
+  // ---- Cartões de habilidade ---------------------------------------
+  // Classe de cor por efeito: a cor diz de relance se a magia fere, cura ou
+  // controla — e o rótulo escrito diz o mesmo, para não depender só da cor.
+  const COR_DO_EFEITO = {
+    'Dano': 'dano', 'Cura': 'cura', 'Controle': 'controle', 'Reforço': 'reforco',
+    'Invocação': 'invocacao', 'Utilidade': 'util',
+  };
+
+  function travaDaHabilidade(h, cur, eco) {
+    if (h.usos_max != null && h.usos <= 0) return 'sem usos até o descanso';
+    if ((h.custo_mana || 0) > (cur.mp || 0)) return `mana insuficiente (${cur.mp || 0}/${h.custo_mana})`;
+    if (h.tipo_acao === 'bonus' ? eco.bonus_usada : eco.acao_usada)
+      return h.tipo_acao === 'bonus' ? 'ação bônus já usada' : 'ação já usada';
+    return '';
+  }
+
+  function cartaoDeHabilidade(h, i, cur, eco) {
+    const cor    = COR_DO_EFEITO[h.rotulo] || 'util';
+    const trava  = travaDaHabilidade(h, cur, eco);
+    const resumo = String(h.resumo || '');
+    // O resumo do motor começa pelo rótulo ("Dano 8d6 fogo · ..."); o rótulo
+    // já vai no selo colorido, então sai do texto.
+    const resto  = (h.rotulo && resumo.startsWith(h.rotulo))
+      ? resumo.slice(h.rotulo.length).trim() : resumo;
+    const custo = [
+      h.custo_mana ? `${h.custo_mana} mana` : '',
+      h.usos_max != null ? `${h.usos}/${h.usos_max} usos` : '',
+    ].filter(Boolean).join(' · ') || 'sem custo';
+    const fogoAmigo = h.alvos === 'todos'
+      ? `<span class="cbt-hab-aviso" title="Atinge todos na área, aliados inclusive">atinge aliados</span>` : '';
+    const ficha = [
+      h.alcance ? ['Alcance', h.alcance] : null,
+      h.area ? ['Área', h.area] : null,
+      h.salvaguarda ? ['Salvaguarda', h.salvaguarda] : null,
+      h.concentracao ? ['Duração', 'concentração'] : null,
+      h.reacao ? ['Uso', 'reação'] : null,
+    ].filter(Boolean).map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join('');
+    const nome = h.nome_exibido || h.nome;
+    return `<div class="cbt-hab cbt-ef-${cor}${trava ? ' cbt-hab-travada' : ''}">
+      <div class="cbt-hab-cabeca">
+      <button class="cbt-btn cbt-hab-usar" ${trava || _busy ? 'disabled' : ''}
+              onclick="window.Combat._usarHab(${i})">
+        <span class="cbt-hab-topo">
+          <span class="cbt-hab-nome">${esc(nome)}</span>
+          ${h.reacao ? '<em class="cbt-eco-tag eco-reacao" title="No jogo de mesa é uma reação, usada fora do seu turno">reação</em>' : ''}
+        </span>
+        <span class="cbt-hab-linha">
+          <span class="cbt-hab-efeito">${esc(h.rotulo || 'Utilidade')}</span>
+          <span class="cbt-hab-resumo">${esc(resto || h.dado || '')}</span>
+        </span>
+        <span class="cbt-hab-pe">
+          <span class="cbt-hab-custo">${esc(custo)}</span>${fogoAmigo}
+          ${trava ? `<span class="cbt-hab-trava">${esc(trava)}</span>` : ''}
+        </span>
+      </button>
+      <button class="cbt-hab-info" type="button" aria-expanded="false"
+              aria-controls="cbt-hab-desc-${i}" onclick="window.Combat._info(${i})">Detalhes</button>
+      </div>
+      <div id="cbt-hab-desc-${i}" class="cbt-hab-desc hidden">
+        ${ficha ? `<dl class="cbt-hab-ficha">${ficha}</dl>` : ''}
+        <p>${esc(h.descricao || 'Sem descrição na ficha.')}</p>
+        ${nome !== h.nome ? `<p class="cbt-hab-origem">Na ficha: ${esc(h.nome)}</p>` : ''}
+      </div>
+    </div>`;
+  }
+
+  function seletorDeHabilidades(cur) {
+    const eco = (_last || {}).turn_economy || {};
+    _habs = (cur && cur.habilidades) || [];
+    // Agrupadas pelo que gastam: o jogador procura "o que ainda posso fazer
+    // com a ação bônus", não a ordem em que a ficha listou.
+    const grupos = [['acao', 'Ação'], ['bonus', 'Ação bônus']];
+    const html = grupos.map(([slot, titulo]) => {
+      const itens = _habs
+        .map((h, i) => [h, i])
+        .filter(([h]) => (h.tipo_acao === 'bonus' ? 'bonus' : 'acao') === slot);
+      if (!itens.length) return '';
+      return `<div class="cbt-hab-grupo"><div class="cbt-hab-grupo-titulo">${titulo}</div>`
+        + `<div class="cbt-hab-lista">${itens.map(([h, i]) => cartaoDeHabilidade(h, i, cur, eco)).join('')}</div></div>`;
+    }).join('');
+    abrirSeletor(
+      `<div class="cbt-tgt-title cbt-folha-titulo"><span>Habilidade:</span>${BOTAO_CANCELAR}</div>` + html,
+      true);
+  }
+
+  function _info(i) {
+    const desc = document.getElementById(`cbt-hab-desc-${i}`);
+    if (!desc) return;
+    const abre = desc.classList.contains('hidden');
+    desc.classList.toggle('hidden', !abre);
+    const botao = desc.parentElement && desc.parentElement.querySelector('.cbt-hab-info');
+    if (botao) {
+      botao.setAttribute('aria-expanded', abre ? 'true' : 'false');
+      botao.textContent = abre ? 'Fechar' : 'Detalhes';
+    }
+    // A descrição abre abaixo do cartão: no fim da lista ela nasceria fora
+    // da folha, e o toque pareceria não fazer nada.
+    if (abre) {
+      try { desc.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
+      catch (_) { desc.scrollIntoView(false); }
+    }
+  }
+
   // ---- Ações expostas aos botões ----------------------------------
   function _sel(kind) {
     if (_busy) return;
     const cur = (_last.combatants || []).find(c => c.is_current);
-    const tgtEl = document.getElementById('cbt-targets');
     // Os dois painéis dividem o mesmo espaço sob os botões: escolher arma ou
     // alvo tira da tela o pedido de Ação Livre pela metade.
     _livreFechar();
+    _confirmar = null;
+    marcarLinhas({}, {});
 
     if (kind === 'attack') {
       const armas = (cur && cur.armas) || [];
       if (!armas.length) return showTargets('attack', { weapon: 'Ataque desarmado' });
-      tgtEl.innerHTML =
+      abrirSeletor(
         `<div class="cbt-tgt-title">Arma:</div>`
         + `<div class="cbt-picker-btns">`
         + armas.map(w =>
-            `<button class="cbt-btn" title="${esc(w.origem)}" onclick="window.Combat._selWeapon('${esc(w.nome).replace(/'/g,"\\'")}')">`
+            `<button class="cbt-btn" title="${esc(w.origem)}" onclick="window.Combat._selWeapon('${jsNome(w.nome)}')">`
             + `${esc(w.nome)}<small> · ${esc(w.origem)}</small></button>`
           ).join('')
-        + `<button class="cbt-btn cbt-cancel" onclick="window.Combat._cancel()">✕ Cancelar</button>`
-        + `</div>`;
-      tgtEl.classList.remove('hidden');
-      trazerParaVista(tgtEl);
+        + BOTAO_CANCELAR
+        + `</div>`, false);
       return;
     }
 
@@ -675,7 +942,7 @@
         if (window.showToast) window.showToast('Nenhuma zona ao alcance.');
         return;
       }
-      tgtEl.innerHTML =
+      abrirSeletor(
         `<div class="cbt-tgt-title">Mover para${aqui ? ' (de ' + esc(aqui) + ')' : ''}:</div>`
         + `<div class="cbt-picker-btns">`
         + opcoes.map(o => {
@@ -687,15 +954,13 @@
                         && comOGrupo(c) !== comOGrupo(cur))
               .map(c => c.name);
             const risco = ocupada.length ? ` <small>· ${esc(ocupada.join(', '))}</small>` : '';
-            return `<button class="cbt-btn" onclick="window.Combat._mover('${esc(o.z).replace(/'/g,"\\'")}',${dash})">`
+            return `<button class="cbt-btn" onclick="window.Combat._mover('${jsNome(o.z)}',${dash})">`
                  + `${esc(o.z)}${risco}`
                  + (dash ? ` <em class="cbt-eco-tag eco-acao">Disparada</em>` : '')
                  + `</button>`;
           }).join('')
-        + `<button class="cbt-btn cbt-cancel" onclick="window.Combat._cancel()">✕ Cancelar</button>`
-        + `</div>`;
-      tgtEl.classList.remove('hidden');
-      trazerParaVista(tgtEl);
+        + BOTAO_CANCELAR
+        + `</div>`, false);
       return;
     }
 
@@ -705,7 +970,7 @@
         if (window.showToast) window.showToast('Nenhum item utilizável no combate.');
         return;
       }
-      tgtEl.innerHTML =
+      abrirSeletor(
         `<div class="cbt-tgt-title">Item:</div>`
         + `<div class="cbt-picker-btns">`
         + itens.map(it => {
@@ -718,48 +983,21 @@
               ? `×${it.qtd}${it.dice ? ' · ' + esc(it.dice) : ''}`
               : `×${it.qtd} · efeito desconhecido`;
             return `<button class="cbt-btn${conhecido ? '' : ' cbt-fora cbt-item-desconhecido'}" ${trava} title="${esc(dica)}" `
-              + `onclick="window.Combat._selItem('${esc(it.nome).replace(/'/g,"\\'")}','${esc(it.kind)}')">`
+              + `onclick="window.Combat._selItem('${jsNome(it.nome)}','${esc(it.kind)}')">`
               + `${esc(it.nome)} <small>${nota}</small>`
               + ` <em class="cbt-eco-tag eco-${it.tipo_acao}">${tag(it.tipo_acao)}</em></button>`;
           }).join('')
-        + `<button class="cbt-btn cbt-cancel" onclick="window.Combat._cancel()">✕ Cancelar</button>`
-        + `</div>`;
-      tgtEl.classList.remove('hidden');
-      trazerParaVista(tgtEl);
+        + BOTAO_CANCELAR
+        + `</div>`, false);
       return;
     }
 
     // Habilidade: escolhe qual, depois alvo
-    const habs = (cur && cur.habilidades) || [];
-    if (!habs.length) {
+    if (!((cur && cur.habilidades) || []).length) {
       if (window.showToast) window.showToast('Nenhuma habilidade ativa disponível.');
       return;
     }
-    tgtEl.innerHTML =
-      `<div class="cbt-tgt-title">Habilidade:</div>`
-      + `<div class="cbt-picker-btns">`
-      + habs.map(h => {
-          const mode = h.target_mode || 'single';
-          const modeTag = mode === 'self' ? ' <small>· em si</small>'
-                        : (mode === 'pool' || mode === 'area' || mode === 'area_self')
-                          ? ' <small>· área</small>' : '';
-          // Usos por descanso: o contador aparece como a mana, e o botão
-          // morre no zero — recusar depois do clique é pior que não oferecer.
-          const temUsos = h.usos_max != null;
-          const gasto = temUsos && h.usos <= 0;
-          const usosTag = temUsos ? ` <small>· ${h.usos}/${h.usos_max}</small>` : '';
-          return `<button class="cbt-btn" ${gasto ? 'disabled' : dis(h.tipo_acao)} title="${esc(h.descricao)}" `
-            + `onclick="window.Combat._selHab('${esc(h.nome).replace(/'/g,"\\'")}','${mode}')">`
-            + `${esc(h.nome)}${h.custo_mana ? ` <small>(${h.custo_mana} mana)</small>` : ''}`
-            + usosTag
-            + `${h.dado ? ` <small>· ${esc(h.dado)}</small>` : ''}`
-            + `${modeTag}`
-            + ` <em class="cbt-eco-tag eco-${h.tipo_acao}">${tag(h.tipo_acao)}</em></button>`;
-        }).join('')
-      + `<button class="cbt-btn cbt-cancel" onclick="window.Combat._cancel()">✕ Cancelar</button>`
-      + `</div>`;
-    tgtEl.classList.remove('hidden');
-    trazerParaVista(tgtEl);
+    seletorDeHabilidades(cur);
   }
 
   function _selItem(name, kind) {
@@ -783,7 +1021,6 @@
     // zona ou na vizinha — aliado incluído (fogo amigo). Quem alcança quem
     // vem do motor (it.alvos); a tela só trava o que ele recusaria.
     _pick = { kind: 'item', item: name };
-    const tgtEl = document.getElementById('cbt-targets');
     const alvos = it.alvos || {};
     const nomes = Object.keys(alvos);
     const porNome = n => (_last.combatants || []).find(c => c.name === n) || {};
@@ -802,25 +1039,33 @@
             : (kind === 'heal' ? ` <small>${c.hp}/${c.hp_max}</small>` : '');
           return `<button class="cbt-btn${trava ? ' cbt-fora' : ''}" ${trava ? 'disabled' : ''}`
             + (dica ? ` title="${esc(dica)}"` : '')
-            + ` onclick="window.Combat._target('${esc(n).replace(/'/g,"\\'")}')">`
+            + ` onclick="window.Combat._target('${jsNome(n)}')">`
             + `${esc(n)}${n === cur.name ? ' (em si)' : ''}${extra}</button>`;
         }).join('')
       : (kind === 'heal'
-          ? `<button class="cbt-btn" onclick="window.Combat._target('${esc(cur.name).replace(/'/g,"\\'")}')">${esc(cur.name)} (em si)</button>`
+          ? `<button class="cbt-btn" onclick="window.Combat._target('${jsNome(cur.name)}')">${esc(cur.name)} (em si)</button>`
           : '<div class="cbt-empty">Ninguém ao alcance.</div>');
-    tgtEl.innerHTML =
+    abrirSeletor(
       `<div class="cbt-tgt-title">${kind === 'heal' ? 'Curar quem:' : `Alvo de ${esc(name)}:`}</div>`
+      + `<div class="cbt-tgt-dica">Toque no combatente ou escolha abaixo.</div>`
       + `<div class="cbt-picker-btns">${lista}`
-      + `<button class="cbt-btn cbt-cancel" onclick="window.Combat._cancel()">✕ Cancelar</button>`
-      + `</div>`;
-    tgtEl.classList.remove('hidden');
-    trazerParaVista(tgtEl);
+      + BOTAO_CANCELAR
+      + `</div>`, false);
+    marcarLinhas(nomes.length ? alvos : { [cur.name]: 'ok' }, {});
   }
   function _selWeapon(name) { showTargets('attack',  { weapon: name }); }
+
+  // Usar a habilidade pelo cartão (índice em _habs).
+  function _usarHab(i) {
+    const h = _habs[i];
+    if (h) _selHab(h.nome, h.target_mode || 'single');
+  }
+
   function _selHab(name, mode) {
     if (_busy) return;
     const cur = (_last && _last.combatants || []).find(c => c.is_current);
     if (!cur) return;
+    const h = (cur.habilidades || []).find(x => x.nome === name) || { nome: name };
     if (mode === 'self') {
       act({ action: 'ability', actor: cur.name, ability: name, target: cur.name });
       return;
@@ -828,13 +1073,14 @@
     // Pool e área-que-nasce-no-conjurador não escolhem alvo: o motor sabe
     // onde a magia cai (a zona de quem conjura, ou os inimigos do pool).
     if (mode === 'pool' || mode === 'area_self') {
-      act({ action: 'ability', actor: cur.name, ability: name, target: '' });
+      conferirArea(cur, h, '');
       return;
     }
     // Área posta à distância: o picker escolhe UMA criatura e a magia pega a
     // zona dela inteira — inclusive aliados que estejam lá.
-    showTargets('ability', { ability: name });
+    showTargets('ability', { ability: name, hab: h, mode });
   }
+
   function _target(name) {
     if (_busy || !_pick) return;
     const cur = (_last.combatants || []).find(c => c.is_current);
@@ -843,9 +1089,60 @@
       act({ action: 'attack', actor: cur.name, target: name, weapon: _pick.weapon || '' });
     else if (_pick.kind === 'item')
       act({ action: 'item', actor: cur.name, item: _pick.item, target: name });
+    else if (_pick.mode === 'area')
+      conferirArea(cur, _pick.hab || { nome: _pick.ability }, name);
     else
       act({ action: 'ability', actor: cur.name, ability: _pick.ability, target: name });
   }
+
+  // Antes de uma magia em área, pergunta ao motor quem ela vai atingir. Sem
+  // aliado no caminho, conjura direto — perguntar toda vez seria só atrito.
+  // Com aliado, mostra quem e pede confirmação: o fogo amigo é regra e
+  // continua, mas nunca mais sem aviso.
+  async function conferirArea(cur, h, alvo) {
+    const payload = { action: 'ability', actor: cur.name, ability: h.nome, target: alvo };
+    let p = null;
+    try {
+      p = await preverArea({ actor: cur.name, ability: h.nome, target: alvo });
+    } catch (_) { p = null; }
+    const aliados = (p && p.ok && p.aliados_atingidos) || [];
+    // Sem prévia (rede), a regra escrita da magia decide: "todos" pede
+    // confirmação, porque pode pegar aliado.
+    const semPrevia = !(p && p.ok);
+    if (!aliados.length && !(semPrevia && h.alvos === 'todos')) {
+      act(payload);
+      return;
+    }
+    _confirmar = payload;
+    const atingidos = (p && p.atingidos) || [];
+    const area = {};
+    atingidos.forEach(a => { area[a.nome] = a.aliado ? 'aliado' : 'inimigo'; });
+    const nome = esc(h.nome_exibido || h.nome);
+    const lista = atingidos.length
+      ? `<div class="cbt-area-lista">${atingidos.map(a =>
+          `<span class="cbt-area-alvo ${a.aliado ? 'aliado' : 'inimigo'}">${esc(a.nome)}${a.aliado ? ' <small>aliado</small>' : ''}</span>`
+        ).join('')}</div>`
+      : '';
+    const aviso = aliados.length
+      ? `Aviso: ${aliados.length === 1 ? 'um aliado está' : aliados.length + ' aliados estão'} na área (${esc(aliados.join(', '))}). Quem estiver lá é atingido.`
+      : 'Aviso: não foi possível prever a área. Esta magia atinge todos nela, aliados inclusive.';
+    abrirSeletor(
+      `<div class="cbt-tgt-title">${nome}${p && p.area ? ` <small>· ${esc(p.area)}${p.zona ? ' em ' + esc(p.zona) : ''}</small>` : ''}</div>`
+      + `<div class="cbt-area-aviso" role="alert">${aviso}</div>`
+      + lista
+      + `<div class="cbt-picker-btns">`
+      + `<button class="cbt-btn cbt-perigo" onclick="window.Combat._confirmarArea()">Conjurar mesmo assim</button>`
+      + BOTAO_CANCELAR
+      + `</div>`, false);
+    marcarLinhas({}, area);
+  }
+
+  function _confirmarArea() {
+    const p = _confirmar;
+    _confirmar = null;
+    if (p) act(p);
+  }
+
   function _continue() { close(true); }   // dispara recap + narração
   function _closeOnly() { close(false); } // apenas fecha
 
@@ -883,7 +1180,10 @@
     if (t) { t.classList.add('hidden'); t.innerHTML = ''; }
     const l = document.getElementById('cbt-livre');
     if (l && !l.classList.contains('hidden')) { l.classList.add('hidden'); l.innerHTML = ''; }
-    _pick = null;
+    const painel = document.getElementById('cbt-actionbar');
+    if (painel) painel.classList.remove('cbt-escolhendo');
+    _pick = null; _confirmar = null;
+    marcarLinhas({}, {});
     acompanharAlturaDaBarra();
   }
   // ---- Ação Livre, sem sair da luta -------------------------------
@@ -996,7 +1296,8 @@
   // ---- API pública -------------------------------------------------
   window.Combat = {
     sync,
-    _sel, _selHab, _selWeapon, _selItem, _target, _mover, _cancel, _free,
+    _sel, _selHab, _usarHab, _info, _selWeapon, _selItem, _target, _mover, _cancel, _free,
+    _confirmarArea,
     _livreEnviar, _livreFechar,
     _act: act,
     _continue, _closeOnly, _dismiss, _reopen,

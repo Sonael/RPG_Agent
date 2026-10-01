@@ -1813,101 +1813,6 @@ fieldset.ed-trava button { opacity: 0.62; cursor: not-allowed; }
 }
 .combat-mode-toggle .cm-opt:hover { color: var(--text-main); }
 
-/* ════════════════════════════════════════════════════════════════
-   TELA DE COMBATE — Estilo "Pergaminho Épico"
-   Classes prefixadas com cbt- para não colidir com o CSS global.
-   ════════════════════════════════════════════════════════════════ */
-#combat-overlay {
-  --cbt-bg: #f4ebd8;
-  --cbt-paper: #fffbf0;
-  --cbt-dark: #4a2511;
-  --cbt-red: #8b2315;
-  --cbt-gold: #b89947;
-  --cbt-text: #2c1a0e;
-  --cbt-muted: #6e5c4f;
-  --cbt-hp: #c93a28;
-  --cbt-mp: #3b74a8;
-  --cbt-green: #2e7d32;
-
-  position: fixed; inset: 0; z-index: 9000;
-  background: rgba(20,12,6,0.82); backdrop-filter: blur(4px);
-  display: flex; align-items: center; justify-content: center;
-  padding: var(--esp-5); box-sizing: border-box;
-  font-family: 'Lora', serif;
-  overflow-y: auto;
-}
-#combat-overlay.hidden { display: none; }
-body.combat-on { overflow: hidden; }
-
-/* Moldura / pergaminho */
-#cbt-frame {
-  width: 100%; max-width: 1100px;
-  /* Altura DEFINIDA — necessária para o flex distribuir o espaço entre
-     campo de batalha e painel inferior de forma estável. */
-  height: min(94vh, 900px);
-  background: var(--cbt-paper);
-  color: var(--cbt-text);
-  border: 2px solid var(--cbt-gold);
-  border-radius: 12px;
-  box-shadow: 0 15px 35px rgba(74,37,17,0.45), inset 0 0 40px rgba(184,153,71,0.1);
-  display: flex; flex-direction: column;
-  overflow: hidden;
-  position: relative;
-}
-
-/* Cabeçalho */
-.cbt-header {
-  text-align: center;
-  padding: var(--esp-5) var(--esp-5);
-  border-bottom: 2px solid var(--cbt-gold);
-  background: rgba(184,153,71,0.1);
-  flex-shrink: 0;
-  position: relative;
-}
-.cbt-close {
-  position: absolute; top: 12px; right: 14px;
-  width: 32px; height: 32px;
-  display: flex; align-items: center; justify-content: center;
-  background: var(--cbt-paper);
-  border: 1px solid var(--cbt-gold);
-  color: var(--cbt-acento, var(--cbt-red));
-  border-radius: 50%;
-  font-size: 0.95rem; font-weight: 700; line-height: 1;
-  cursor: pointer; transition: all .15s;
-}
-.cbt-close:hover {
-  background: var(--cbt-acento, var(--cbt-red)); color: var(--cbt-sobre, #fff); border-color: var(--cbt-acento, var(--cbt-red));
-}
-.cbt-title {
-  font-family: 'Playfair Display', serif;
-  color: var(--cbt-acento, var(--cbt-red));
-  font-size: 1.7rem; font-weight: 700;
-  margin: 0 0 var(--esp-3);
-}
-.cbt-title #cbt-round {
-  color: var(--cbt-muted); font-size: 1.1rem;
-  font-style: italic; font-family: 'Lora', serif; font-weight: 400;
-}
-.cbt-initiative {
-  display: flex; justify-content: center; align-items: center;
-  gap: var(--esp-2); flex-wrap: wrap; font-size: 0.9rem;
-}
-.cbt-ord {
-  padding: var(--esp-1) var(--esp-3);
-  background: var(--cbt-veu, rgba(255,255,255,0.55));
-  border: 1px solid var(--cbt-gold);
-  border-radius: 20px;
-  color: var(--cbt-muted);
-}
-.cbt-ord.on {
-  background: var(--cbt-acento, var(--cbt-red)); color: var(--cbt-sobre, #fff);
-  border-color: var(--cbt-acento, var(--cbt-red)); font-weight: 700;
-  box-shadow: 0 0 10px rgba(139,35,21,0.3);
-}
-.cbt-ord.cbt-ord-dead { opacity: 0.5; text-decoration: line-through; }
-.cbt-ord-sep { color: var(--cbt-gold-texto, var(--cbt-gold)); }
-
-/* Campo de batalha */
 /* =========================================================
    COMPONENTES — o que morava no style= do HTML
    =========================================================
@@ -2148,6 +2053,113 @@ body.combat-on { overflow: hidden; }
 .missao-clicavel { cursor: pointer; }
 .missao-clicavel:hover .missao-titulo { text-decoration: underline; text-underline-offset: 3px; }
 
+/* ════════════════════════════════════════════════════════════════
+   TELA DE COMBATE — Estilo "Pergaminho Épico"
+   Classes prefixadas com cbt- para não colidir com o CSS global.
+
+   Refeita pensando primeiro no celular. Antes cada combatente era um cartão
+   de ~150px, com o "Vs." entre as colunas: com quatro de cada lado o jogador
+   rolava a tela para ver quem estava de pé, e a lista de magias só mostrava
+   o nome. Agora cada combatente é uma linha de ~56px, a barra de ação fica
+   presa no rodapé e cada habilidade é um cartão que diz o que faz.
+   ════════════════════════════════════════════════════════════════ */
+#combat-overlay {
+  --cbt-bg: #f4ebd8;
+  --cbt-paper: #fffbf0;
+  --cbt-dark: #4a2511;
+  --cbt-red: #8b2315;
+  --cbt-gold: #b89947;
+  --cbt-text: #2c1a0e;
+  --cbt-muted: #6e5c4f;
+  --cbt-hp: #c93a28;
+  --cbt-mp: #3b74a8;
+  --cbt-green: #2e7d32;
+
+  position: fixed; inset: 0; z-index: 9000;
+  background: rgba(20,12,6,0.82); backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  padding: var(--esp-5); box-sizing: border-box;
+  font-family: 'Lora', serif;
+  overflow-y: auto;
+}
+#combat-overlay.hidden { display: none; }
+body.combat-on { overflow: hidden; }
+
+/* Moldura / pergaminho */
+#cbt-frame {
+  width: 100%; max-width: 1100px;
+  /* Altura DEFINIDA — necessária para o flex distribuir o espaço entre
+     campo de batalha e painel inferior de forma estável. */
+  height: min(94vh, 900px);
+  background: var(--cbt-paper);
+  color: var(--cbt-text);
+  border: 2px solid var(--cbt-gold);
+  border-radius: 12px;
+  box-shadow: 0 15px 35px rgba(74,37,17,0.45), inset 0 0 40px rgba(184,153,71,0.1);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Cabeçalho */
+.cbt-header {
+  text-align: center;
+  padding: var(--esp-3) var(--esp-12) var(--esp-3);
+  border-bottom: 2px solid var(--cbt-gold);
+  background: rgba(184,153,71,0.1);
+  flex-shrink: 0;
+  position: relative;
+}
+.cbt-close {
+  position: absolute; top: 10px; right: 12px;
+  width: 34px; height: 34px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--cbt-paper);
+  border: 1px solid var(--cbt-gold);
+  color: var(--cbt-acento, var(--cbt-red));
+  border-radius: 50%;
+  font-size: 0.95rem; font-weight: 700; line-height: 1;
+  cursor: pointer; transition: all .15s;
+}
+.cbt-close:hover {
+  background: var(--cbt-acento, var(--cbt-red)); color: var(--cbt-sobre, #fff); border-color: var(--cbt-acento, var(--cbt-red));
+}
+.cbt-title {
+  font-family: 'Playfair Display', serif;
+  color: var(--cbt-acento, var(--cbt-red));
+  font-size: 1.45rem; font-weight: 700;
+  margin: 0 0 var(--esp-1);
+}
+.cbt-title #cbt-round {
+  color: var(--cbt-muted); font-size: 1rem;
+  font-style: italic; font-family: 'Lora', serif; font-weight: 400;
+}
+/* "Agora: X · Próximo: Y" — o que o jogador precisa saber de relance. */
+.cbt-vez {
+  display: flex; justify-content: center; align-items: baseline; gap: var(--esp-2);
+  font-size: 0.86rem; color: var(--cbt-muted); margin-bottom: var(--esp-2);
+}
+.cbt-vez b { color: var(--cbt-acento, var(--cbt-red)); }
+.cbt-vez-sep { color: var(--cbt-gold-texto, var(--cbt-gold)); }
+.cbt-initiative {
+  display: flex; justify-content: center; align-items: center;
+  gap: var(--esp-1); flex-wrap: wrap; font-size: 0.8rem;
+}
+.cbt-ord {
+  padding: 1px var(--esp-3);
+  background: var(--cbt-veu, rgba(255,255,255,0.55));
+  border: 1px solid var(--cbt-gold);
+  border-radius: 20px;
+  color: var(--cbt-muted);
+}
+.cbt-ord.on {
+  background: var(--cbt-acento, var(--cbt-red)); color: var(--cbt-sobre, #fff);
+  border-color: var(--cbt-acento, var(--cbt-red)); font-weight: 700;
+  box-shadow: 0 0 10px rgba(139,35,21,0.3);
+}
+.cbt-ord.cbt-ord-dead { opacity: 0.5; text-decoration: line-through; }
+.cbt-ord-sep { color: var(--cbt-gold-texto, var(--cbt-gold)); }
+
 /* ── Faixa de zonas (onda 3) ────────────────────────────────────────────
    O campo é uma TRILHA, não um tabuleiro: as zonas ficam lado a lado na
    ordem em que set_battlefield() as recebeu, e a adjacência é visual —
@@ -2155,7 +2167,7 @@ body.combat-on { overflow: hidden; }
    zonas, porque a onda 3 é opcional. */
 .cbt-zonas {
   display: flex; align-items: stretch; gap: var(--esp-2);
-  padding: var(--esp-3) var(--esp-8) 0;
+  padding: var(--esp-3) var(--esp-6) 0;
   overflow-x: auto; -webkit-overflow-scrolling: touch;
   /* Item flex do #cbt-frame: sem travar o encolhimento, o mobile (onde o
      frame tem altura fixa e rola por dentro) espremia a faixa até sobrar só
@@ -2181,6 +2193,10 @@ body.combat-on { overflow: hidden; }
 }
 .cbt-zona-pins { display: flex; flex-wrap: wrap; gap: var(--esp-1); }
 .cbt-zona-vazia { font-size: 0.72rem; color: var(--cbt-muted); font-style: italic; }
+/* Contagem por lado: só no celular, no lugar dos nomes (ver @media). */
+.cbt-zona-conta { display: none; font-size: 0.68rem; line-height: 1.3; }
+.cbt-conta-aliado  { color: #204a72; font-weight: 700; }
+.cbt-conta-inimigo { color: #7a2318; font-weight: 700; }
 .cbt-pin {
   font-size: 0.72rem; padding: 2px var(--esp-2); border-radius: 999px;
   border: 1px solid transparent; white-space: nowrap;
@@ -2195,9 +2211,10 @@ body.combat-on { overflow: hidden; }
   font-size: 1.1rem; flex: 0 0 auto;
 }
 
+/* ── Campo de batalha: duas colunas de linhas ──────────────────────────── */
 .cbt-battlefield {
-  display: flex; gap: var(--esp-5); align-items: flex-start;
-  padding: var(--esp-6) var(--esp-8);
+  display: flex; gap: var(--esp-6); align-items: flex-start;
+  padding: var(--esp-4) var(--esp-6);
   /* flex-basis 0 → ocupa TODO o espaço restante do frame; rola por dentro. */
   flex: 1 1 0; min-height: 150px;
   overflow-y: auto;
@@ -2210,40 +2227,45 @@ body.combat-on { overflow: hidden; }
     linear-gradient(var(--cbt-paper) 30%, rgba(255,255,255,0)) top / 100% 26px no-repeat local,
     linear-gradient(rgba(255,255,255,0), var(--cbt-paper) 70%) bottom / 100% 26px no-repeat local,
     radial-gradient(farthest-side at 50% 0, rgba(74,37,17,.20), transparent) top / 100% 12px no-repeat scroll,
-    radial-gradient(farthest-side at 50% 100%, rgba(74,37,17,.20), transparent) bottom / 100% 12px no-repeat scroll,
-    radial-gradient(circle at center, var(--cbt-brilho, rgba(255,255,255,0.85)) 0%, transparent 100%);
+    radial-gradient(farthest-side at 50% 100%, rgba(74,37,17,.20), transparent) bottom / 100% 12px no-repeat scroll;
 }
+/* O grupo à esquerda e os inimigos à direita, como sempre foi no desktop. No
+   markup os inimigos vêm antes: no celular, que empilha, é quem você mira. */
+.cbt-lado { flex: 1; min-width: 0; }
+.cbt-lado-grupo   { order: 1; }
+.cbt-lado-inimigo { order: 2; }
+.cbt-lado-titulo {
+  font-family: 'Playfair Display', serif; font-size: 0.8rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .08em;
+  color: var(--cbt-muted); margin: 0 0 var(--esp-2);
+  display: flex; gap: var(--esp-2); align-items: baseline;
+}
+.cbt-lado-inimigo .cbt-lado-titulo { color: var(--cbt-nome-inimigo, #7a2f24); }
+.cbt-lado-titulo span { font-family: 'Lora', serif; font-weight: 400; letter-spacing: 0; text-transform: none; }
 .cbt-team {
-  flex: 1; display: flex; flex-direction: column; gap: var(--esp-4);
+  display: flex; flex-direction: column; gap: var(--esp-2);
   min-width: 0;
-}
-.cbt-vs {
-  font-family: 'Playfair Display', serif;
-  font-size: 2.4rem; font-weight: 900; font-style: italic;
-  color: var(--cbt-gold-texto, var(--cbt-gold));
-  text-shadow: 2px 2px 0 rgba(0,0,0,0.08);
-  flex-shrink: 0;
-  align-self: center;
 }
 .cbt-empty {
   color: var(--cbt-muted); font-style: italic;
-  text-align: center; padding: var(--esp-4);
+  text-align: center; padding: var(--esp-3);
   border: 1px dashed var(--cbt-gold); border-radius: 6px;
 }
 
-/* Card de combatente */
+/* Linha de combatente */
 .cbt-card {
   background: var(--cbt-card, #fff);
   border: 1px solid var(--cbt-borda, #dcd3c6);
   border-radius: 6px;
-  padding: var(--esp-4);
-  box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-  transition: transform .2s, box-shadow .2s;
+  padding: var(--esp-2) var(--esp-3);
+  display: flex; flex-direction: column; gap: 3px;
+  cursor: pointer;
+  transition: box-shadow .2s, background .2s, opacity .2s;
 }
+.cbt-card:focus-visible { outline: 2px solid var(--cbt-acento, var(--cbt-red)); outline-offset: 2px; }
 .cbt-card.cbt-cur {
   border-color: var(--cbt-acento, var(--cbt-red));
-  box-shadow: 0 0 0 2px var(--cbt-acento, var(--cbt-red)), 0 8px 15px rgba(139,35,21,0.15);
-  transform: scale(1.02);
+  box-shadow: 0 0 0 2px var(--cbt-acento, var(--cbt-red)), 0 6px 12px rgba(139,35,21,0.15);
 }
 /* Aliado x inimigo. Antes os dois eram cards brancos idênticos e o único
    diferenciador era de que lado do "Vs." estavam — o que some no mobile,
@@ -2263,43 +2285,57 @@ body.combat-on { overflow: hidden; }
 .cbt-card.cbt-asleep { opacity: 0.72; }
 
 .cbt-c-header {
-  display: flex; justify-content: space-between; align-items: center;
-  margin-bottom: var(--esp-1);
+  display: flex; align-items: center; gap: var(--esp-2); min-width: 0;
+}
+/* Posição na iniciativa: a ordem inteira continua legível sem a régua. */
+.cbt-ini {
+  flex-shrink: 0; min-width: 18px; height: 18px; line-height: 16px;
+  border-radius: 9px; text-align: center; font-size: 0.66rem; font-weight: 700;
+  color: var(--cbt-muted); border: 1px solid var(--cbt-gold);
+  background: var(--cbt-veu, rgba(255,255,255,0.55));
 }
 .cbt-name {
   font-family: 'Playfair Display', serif;
-  font-size: 1.15rem; font-weight: 700;
+  font-size: 1rem; font-weight: 700;
   color: var(--cbt-dark);
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.cbt-arrow { color: var(--cbt-acento, var(--cbt-red)); animation: cbt-pulse 1.5s infinite; }
+.cbt-arrow {
+  flex-shrink: 0;
+  font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+  padding: 1px 6px; border-radius: 8px;
+  background: var(--cbt-acento, var(--cbt-red)); color: var(--cbt-sobre, #fff);
+}
 /* NPC que luta do seu lado sem ser do grupo (memory.lado_no_combate): fica na
    sua coluna, com o selo dizendo que quem joga por ele é o motor. */
 .cbt-card.cbt-npc-aliado { border-left-style: dashed; }
 .cbt-selo-aliado {
-  margin-right: auto; margin-left: var(--esp-2);
-  font-size: 0.66rem; text-transform: uppercase; letter-spacing: .06em;
+  flex-shrink: 0;
+  font-size: 0.6rem; text-transform: uppercase; letter-spacing: .06em;
   padding: 1px 6px; border-radius: 8px;
   border: 1px solid var(--cbt-line, rgba(0,0,0,.15));
   color: var(--cbt-muted, #6b6257);
 }
-
-.cbt-meta {
-  display: flex; justify-content: space-between;
-  font-size: 0.82rem; color: var(--cbt-muted);
-  margin-bottom: var(--esp-3); gap: var(--esp-2);
+.cbt-ca { margin-left: auto; flex-shrink: 0; font-size: 0.78rem; font-weight: 700; color: var(--cbt-dark); white-space: nowrap; }
+/* A zona de cada um, na própria linha: no celular a faixa de zonas só conta. */
+.cbt-zona-tag {
+  display: none;
+  flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 0.66rem; color: var(--cbt-muted); font-style: italic;
 }
-.cbt-ca { font-weight: 700; color: var(--cbt-dark); white-space: nowrap; }
 
-.cbt-bars { display: flex; flex-direction: column; gap: var(--esp-2); }
+.cbt-bars { display: flex; flex-direction: column; gap: 2px; }
 .cbt-bar-row {
-  display: flex; align-items: center; gap: var(--esp-3);
-  font-size: 0.78rem; font-weight: 700;
+  display: flex; align-items: center; gap: var(--esp-2);
+  font-size: 0.74rem; font-weight: 700;
 }
-.cbt-bar-label { width: 26px; flex-shrink: 0; color: var(--cbt-muted); }
+.cbt-bar-label { width: 22px; flex-shrink: 0; color: var(--cbt-muted); font-size: 0.66rem; }
 .cbt-bar {
-  flex: 1; height: 8px;
+  flex: 1; height: 7px;
   background: var(--cbt-trilho, #e0d8cc); border-radius: 4px; overflow: hidden;
 }
+.cbt-bar-row-mp { font-size: 0.66rem; }
+.cbt-bar-row-mp .cbt-bar { height: 4px; }
 .cbt-bar-fill { height: 100%; border-radius: 4px; transition: width .3s, background .3s; }
 .cbt-bar-fill.hp { background: var(--cbt-hp); }
 .cbt-bar-fill.mp { background: var(--cbt-mp); }
@@ -2308,21 +2344,25 @@ body.combat-on { overflow: hidden; }
 .cbt-bar-fill.hp.cbt-hp-ok       { background: #3f7d44; }
 .cbt-bar-fill.hp.cbt-hp-atencao  { background: #c98a1e; }
 .cbt-bar-fill.hp.cbt-hp-baixo    { background: var(--cbt-hp); }
-.cbt-bar-num { width: 74px; text-align: right; flex-shrink: 0; color: var(--cbt-dark); }
+.cbt-bar-num { min-width: 56px; text-align: right; flex-shrink: 0; color: var(--cbt-dark); }
 /* PV temporários: azul, ao lado do número de HP, porque absorvem antes. */
 .cbt-temp {
   color: var(--cbt-mp); font-weight: 700;
   font-size: 0.82em; margin-left: 2px;
 }
+/* Detalhes: classe, zona, concentração e defesas. No desktop sempre à
+   vista; no celular abrem no toque da linha. */
+.cbt-detalhes { display: flex; flex-wrap: wrap; gap: var(--esp-1) var(--esp-2); align-items: center; }
+.cbt-meta { font-size: 0.72rem; color: var(--cbt-muted); }
 /* Concentração ativa — a magia que cai se o personagem levar dano. */
 .cbt-conc {
-  margin-top: var(--esp-2); font-size: 0.7rem; font-style: italic;
+  font-size: 0.68rem; font-style: italic;
   color: #5a4a7a; background: #efeaf7;
   border-left: 3px solid #8a72b8; border-radius: 0 4px 4px 0;
-  padding: var(--esp-1) var(--esp-2);
+  padding: 1px var(--esp-2);
 }
 /* Selos de defesa por tipo de dano. */
-.cbt-defs { display: flex; gap: var(--esp-1); margin-top: var(--esp-2); flex-wrap: wrap; }
+.cbt-defs { display: flex; gap: var(--esp-1); flex-wrap: wrap; }
 .cbt-def {
   font-size: 0.62rem; padding: 1px var(--esp-2); border-radius: 8px;
   font-weight: 700; text-transform: uppercase; letter-spacing: .3px;
@@ -2333,71 +2373,86 @@ body.combat-on { overflow: hidden; }
 .cbt-def-res { background: #e6efe6; border-color: #93b393; color: #2f4a2f; }
 .cbt-def-vul { background: #f6e2df; border-color: #cb8f86; color: #7a2f24; }
 
-.cbt-conds { display: flex; gap: var(--esp-1); margin-top: var(--esp-3); flex-wrap: wrap; }
+.cbt-conds { display: flex; gap: var(--esp-1); flex-wrap: wrap; }
 .cbt-cond {
-  font-size: 0.68rem; padding: 2px var(--esp-2);
+  font-size: 0.62rem; padding: 1px var(--esp-2);
   background: var(--cbt-realce, #f0e6d2); border: 1px solid var(--cbt-gold);
   border-radius: 10px; color: var(--cbt-dark);
   text-transform: uppercase; font-weight: 700;
 }
 .cbt-cond-out { background: #ccc; border-color: #aaa; }
+/* Efeito de item (resistência de poção, antitoxina): verde, para não ser lido
+   como condição ruim ao lado de Envenenado ou Queimando. */
+.cbt-cond.cbt-efeito { background: rgba(46,125,50,0.12); color: var(--cbt-green); border-color: rgba(46,125,50,0.35); }
 
-/* Painel inferior — altura natural, mas LIMITADA a 56% do frame para nunca
-   esmagar o campo de batalha. Quando o conteúdo passa disso, o painel de
-   ação rola por dentro. */
+/* Escolhendo alvo: quem pode ser escolhido ganha contorno tracejado e é
+   tocável; quem está fora de alcance esmaece. */
+.cbt-card.cbt-alvejavel {
+  outline: 2px dashed var(--cbt-acento, var(--cbt-red)); outline-offset: -1px;
+  cursor: crosshair;
+}
+.cbt-card.cbt-alvejavel:hover { background: var(--cbt-realce, #f0e6d2); }
+.cbt-card.cbt-inalcancavel { opacity: 0.5; cursor: not-allowed; }
+/* Quem a magia em área vai atingir. Aliado em vermelho: é o aviso. */
+.cbt-card.cbt-na-area { box-shadow: inset 0 0 0 2px #c98a1e; background: rgba(201,138,30,0.10); }
+.cbt-card.cbt-na-area-aliado { box-shadow: inset 0 0 0 2px var(--cbt-red); background: rgba(139,35,21,0.10); }
+
+/* Painel inferior — altura natural, mas LIMITADA para nunca esmagar o campo
+   de batalha. Quando o conteúdo passa disso, o painel de ação rola por dentro. */
 .cbt-lower {
   display: flex;
   border-top: 2px solid var(--cbt-gold);
   background: var(--cbt-painel, #fff);
   flex: 0 0 auto;
   min-height: 0;
-  /* 48% e não 56%: abrir o seletor de arma/alvo faz este painel crescer, e
-     o que encolhe em troca é a lista de combatentes — a informação mais
-     importante da tela. O painel rola por dentro (.cbt-action-panel). */
-  max-height: 48%;
+  /* Abrir o seletor faz este painel crescer, e o que encolhe em troca é a
+     lista de combatentes — a informação mais importante da tela. */
+  max-height: 50%;
   overflow: hidden;
 }
 .cbt-action-panel {
   flex: 2;
   /* Sem padding em cima: o título grudado encosta no topo do painel e o
      recuo fica dentro dele (ver .cbt-action-title). */
-  padding: 0 var(--esp-6) var(--esp-6);
+  padding: 0 var(--esp-6) var(--esp-5);
   border-right: 1px solid var(--cbt-borda, #dcd3c6);
   min-width: 0; min-height: 0;
   overflow-y: auto;
 }
-/* Abrir o seletor de arma/alvo faz o painel rolar por dentro, e o título
-   ("O que fará Stelar?") saía de vista cortado ao meio. Grudado no topo ele
-   continua dizendo de quem é o turno; a sombra só aparece com o painel rolado,
-   para os selos e botões serem lidos como "passando por baixo". */
+/* Abrir o seletor faz o painel rolar por dentro, e o título ("O que fará
+   Stelar?") saía de vista cortado ao meio. Grudado no topo ele continua
+   dizendo de quem é o turno; a sombra só aparece com o painel rolado, para os
+   selos e botões serem lidos como "passando por baixo". */
 .cbt-action-title {
   font-family: 'Playfair Display', serif;
-  font-size: 1.3rem; color: var(--cbt-dark);
+  font-size: 1.15rem; color: var(--cbt-dark);
   font-weight: 700;
   position: sticky; top: 0; z-index: 2;
   background: var(--cbt-painel, #fff);
   margin: 0 calc(-1 * var(--esp-6)) var(--esp-2);
-  padding: var(--esp-6) var(--esp-6) var(--esp-2);
+  padding: var(--esp-4) var(--esp-6) var(--esp-2);
   transition: box-shadow .15s ease;
 }
 .cbt-action-panel.cbt-rolado .cbt-action-title {
   box-shadow: 0 6px 6px -6px rgba(74,37,17,0.30);
 }
+/* O último acontecimento: no desktop o diário está ao lado e basta. */
+.cbt-ultimo { display: none; }
 /* Economia do turno: Ação, Bônus e Reação como selos legíveis.
    Antes eram dois "○" de 0.88rem sem legenda, governando o turno inteiro. */
 .cbt-economy {
   display: flex; gap: var(--esp-2); flex-wrap: wrap;
-  margin-bottom: var(--esp-5);
+  margin-bottom: var(--esp-3);
 }
 .cbt-slot {
-  display: inline-flex; align-items: center; gap: var(--esp-2);
-  font-size: 0.76rem; font-weight: 700;
+  display: inline-flex; align-items: center; gap: var(--esp-1);
+  font-size: 0.7rem; font-weight: 700;
   text-transform: uppercase; letter-spacing: .4px;
-  padding: var(--esp-1) var(--esp-3); border-radius: 12px;
+  padding: 1px var(--esp-3); border-radius: 12px;
   border: 1px solid; cursor: default;
 }
 .cbt-slot .cbt-pip {
-  width: 8px; height: 8px; border-radius: 50%;
+  width: 7px; height: 7px; border-radius: 50%;
   background: currentColor; flex-shrink: 0;
 }
 .cbt-slot.livre { color: #2f6b38; border-color: #9cc0a2; background: #edf5ee; }
@@ -2408,20 +2463,20 @@ body.combat-on { overflow: hidden; }
 .cbt-slot.gasto .cbt-pip { background: transparent; box-shadow: inset 0 0 0 1px currentColor; }
 .cbt-enemy-msg {
   font-family: 'Playfair Display', serif;
-  font-size: 1.15rem; font-style: italic; color: var(--cbt-red);
+  font-size: 1.1rem; font-style: italic; color: var(--cbt-red);
 }
 
 .cbt-btn-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: var(--esp-3);
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: var(--esp-2);
 }
 .cbt-btn {
   background: var(--cbt-bg);
   border: 1px solid var(--cbt-gold);
   color: var(--cbt-dark);
   font-family: 'Lora', serif; font-weight: 700;
-  font-size: 0.92rem; padding: var(--esp-3) var(--esp-3);
+  font-size: 0.9rem; padding: var(--esp-2) var(--esp-3);
   border-radius: 6px; cursor: pointer;
   transition: all .2s; text-align: left;
 }
@@ -2431,32 +2486,157 @@ body.combat-on { overflow: hidden; }
 }
 .cbt-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .cbt-btn small { color: var(--cbt-muted); font-style: italic; font-weight: 400; }
-.cbt-btn .cbt-eco-tag {
-  font-style: normal; font-size: 0.62rem; font-weight: 700;
+.cbt-btn .cbt-eco-tag, .cbt-eco-tag {
+  font-style: normal; font-size: 0.6rem; font-weight: 700;
   padding: 1px var(--esp-1); border-radius: 8px; margin-left: var(--esp-1);
-  text-transform: uppercase; vertical-align: middle;
+  text-transform: uppercase; vertical-align: middle; flex-shrink: 0;
 }
 .cbt-eco-tag.eco-acao  { background: rgba(139,35,21,0.12); color: var(--cbt-red); }
 .cbt-eco-tag.eco-bonus { background: rgba(46,125,50,0.14); color: var(--cbt-green); }
+.cbt-eco-tag.eco-reacao { background: rgba(59,116,168,0.14); color: var(--cbt-mp); }
 
 .cbt-btn.cbt-primary {
   background: var(--cbt-acento, var(--cbt-red)); color: var(--cbt-sobre, #fff);
   border-color: var(--cbt-acento, var(--cbt-red)); text-align: center;
-  grid-column: 1 / -1; margin-top: var(--esp-1);
+  grid-column: 1 / -1;
 }
 .cbt-btn.cbt-primary:hover:not(:disabled) { background: var(--cbt-red-escuro, #6b1a0f); }
+/* "Conjurar mesmo assim": a única confirmação que pode ferir o grupo. */
+.cbt-btn.cbt-perigo {
+  background: var(--cbt-red); color: #fff; border-color: var(--cbt-red); text-align: center;
+}
+.cbt-btn.cbt-perigo:hover:not(:disabled) { background: var(--cbt-red-escuro, #6b1a0f); }
 
 /* Picker (sub-painel de alvo/arma/habilidade) — cap próprio + scroll para
    não estourar quando há muitas magias/itens. */
 .cbt-picker {
-  margin-top: var(--esp-4); padding: var(--esp-4);
+  margin-top: var(--esp-3); padding: var(--esp-3);
   background: rgba(184,153,71,0.1);
   border: 1px dashed var(--cbt-gold);
   border-radius: 6px;
-  max-height: 38vh; overflow-y: auto;
+  max-height: 46vh; overflow-y: auto;
   /* scrollIntoView não pode enfiar o seletor debaixo do título grudado. */
   scroll-margin-top: var(--esp-16);
 }
+.cbt-picker.hidden { display: none; }
+.cbt-tgt-title {
+  font-size: 0.88rem; font-weight: 700;
+  color: var(--cbt-dark); margin-bottom: var(--esp-2);
+}
+.cbt-tgt-title small { font-weight: 400; color: var(--cbt-muted); }
+.cbt-tgt-resumo { font-size: 0.8rem; color: var(--cbt-text); margin-bottom: var(--esp-1); }
+.cbt-tgt-dica { font-size: 0.74rem; font-style: italic; color: var(--cbt-muted); margin-bottom: var(--esp-2); }
+.cbt-picker-btns { display: flex; gap: var(--esp-2); flex-wrap: wrap; }
+.cbt-picker-btns .cbt-btn { width: auto; text-align: center; }
+.cbt-btn.cbt-alvo-aliado  { border-left: 3px solid var(--cbt-mp); }
+.cbt-btn.cbt-alvo-inimigo { border-left: 3px solid var(--cbt-red); }
+.cbt-btn.cbt-cancel {
+  background: var(--cbt-cancelar, #eee); border-color: var(--cbt-cancelar-borda, #ccc); color: var(--cbt-muted);
+}
+.cbt-btn.cbt-cancel:hover:not(:disabled) {
+  background: var(--cbt-trilho, #e0d8cc); border-color: var(--cbt-muted);
+}
+.cbt-item-desconhecido small { font-style: italic; }
+/* Título da folha de habilidades: o Cancelar fica ao lado, sempre à mão. */
+.cbt-folha-titulo {
+  display: flex; justify-content: space-between; align-items: center; gap: var(--esp-2);
+}
+.cbt-folha-titulo .cbt-cancel { font-size: 0.8rem; padding: var(--esp-1) var(--esp-3); }
+
+/* ── Cartões de habilidade ─────────────────────────────────────────────
+   Cada um diz o que a habilidade faz sem precisar de mouse: efeito (com cor
+   e com palavra), dado, salvaguarda, área, quem atinge, custo e o que gasta.
+   A descrição inteira abre no "Detalhes" — antes ela só existia no `title`,
+   que o toque não mostra. */
+.cbt-hab-grupo + .cbt-hab-grupo { margin-top: var(--esp-3); }
+.cbt-hab-grupo-titulo {
+  font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em;
+  color: var(--cbt-muted); margin-bottom: var(--esp-1);
+}
+.cbt-hab-lista {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--esp-2);
+}
+.cbt-hab {
+  --ef: #6e5c4f;
+  position: relative;
+  background: var(--cbt-card, #fff);
+  border: 1px solid var(--cbt-borda, #dcd3c6);
+  border-left: 4px solid var(--ef);
+  border-radius: 6px;
+  display: flex; flex-direction: column;
+}
+.cbt-ef-dano      { --ef: #a3321f; }
+.cbt-ef-cura      { --ef: #2e7d32; }
+.cbt-ef-controle  { --ef: #6a4c9c; }
+.cbt-ef-reforco   { --ef: #2f6aa3; }
+.cbt-ef-invocacao { --ef: #8a6a1e; }
+.cbt-ef-util      { --ef: #6e5c4f; }
+.cbt-btn.cbt-hab-usar {
+  display: flex; flex-direction: column; gap: 3px;
+  width: 100%; background: transparent; border: none; border-radius: 6px;
+  padding: var(--esp-2) var(--esp-3);
+}
+.cbt-btn.cbt-hab-usar:hover:not(:disabled) { transform: none; background: var(--cbt-realce, #f0e6d2); }
+.cbt-btn.cbt-hab-usar:disabled { opacity: 0.6; }
+.cbt-hab-topo { display: flex; align-items: center; gap: var(--esp-1); min-width: 0; }
+.cbt-hab-nome { font-size: 0.95rem; font-weight: 700; color: var(--cbt-dark); }
+.cbt-hab-linha {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--esp-1) var(--esp-2);
+  font-size: 0.8rem; font-weight: 400; color: var(--cbt-text); line-height: 1.35;
+}
+.cbt-hab-efeito {
+  font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+  padding: 1px 6px; border-radius: 8px; color: #fff; background: var(--ef);
+}
+/* O rodapé do cartão abre espaço à direita para o "Detalhes": em cima ele
+   espremia o nome e o resumo, que é o que se lê. */
+.cbt-hab-pe {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--esp-1) var(--esp-2);
+  min-height: 30px; padding-right: 86px;
+  font-size: 0.72rem; font-weight: 400; color: var(--cbt-muted);
+}
+.cbt-hab-aviso { color: var(--cbt-red); font-weight: 700; }
+.cbt-hab-trava { color: var(--cbt-red); font-style: italic; }
+/* Preso ao rodapé do botão de usar, não do cartão: com a descrição aberta o
+   cartão cresce para baixo e o "Fechar" tem de ficar onde estava. */
+.cbt-hab-cabeca { position: relative; }
+.cbt-hab-info {
+  position: absolute; right: var(--esp-2); bottom: var(--esp-2);
+  min-height: 32px; padding: 0 var(--esp-3);
+  font-family: 'Lora', serif; font-size: 0.74rem; font-weight: 700;
+  color: var(--cbt-dark); background: var(--cbt-paper);
+  border: 1px solid var(--cbt-gold); border-radius: 16px; cursor: pointer;
+}
+.cbt-hab-info[aria-expanded="true"] { background: var(--cbt-realce, #f0e6d2); }
+.cbt-hab-desc {
+  padding: 0 var(--esp-3) var(--esp-3);
+  font-size: 0.82rem; line-height: 1.45; color: var(--cbt-text);
+}
+.cbt-hab-desc.hidden { display: none; }
+.cbt-hab-desc p { margin: var(--esp-1) 0 0; }
+.cbt-hab-ficha {
+  display: grid; grid-template-columns: auto 1fr; gap: 2px var(--esp-3);
+  margin: 0; font-size: 0.78rem;
+}
+.cbt-hab-ficha dt { font-weight: 700; color: var(--cbt-muted); }
+.cbt-hab-ficha dd { margin: 0; }
+.cbt-hab-origem { font-size: 0.72rem; font-style: italic; color: var(--cbt-muted); }
+
+/* ── Confirmação de área ──────────────────────────────────────────────── */
+.cbt-area-aviso {
+  margin-bottom: var(--esp-2); padding: var(--esp-2) var(--esp-3);
+  font-size: 0.85rem; font-weight: 700; color: var(--cbt-red);
+  background: rgba(139,35,21,0.08); border-left: 3px solid var(--cbt-red);
+  border-radius: 0 6px 6px 0;
+}
+.cbt-area-lista { display: flex; flex-wrap: wrap; gap: var(--esp-1); margin-bottom: var(--esp-3); }
+.cbt-area-alvo {
+  font-size: 0.76rem; padding: 2px var(--esp-2); border-radius: 10px;
+  border: 1px solid var(--cbt-borda, #dcd3c6); background: var(--cbt-card, #fff);
+}
+.cbt-area-alvo.aliado { border-color: var(--cbt-red); color: var(--cbt-red); font-weight: 700; }
+.cbt-area-alvo small { font-weight: 400; text-transform: uppercase; font-size: 0.62rem; }
 
 /* Ação Livre dentro da tela: pedido e arbitragem sem fechar o combate. */
 .cbt-livre-texto {
@@ -2474,40 +2654,23 @@ body.combat-on { overflow: hidden; }
 }
 .cbt-livre-resposta p:first-child { margin-top: 0; }
 .cbt-livre-resposta p:last-child { margin-bottom: 0; }
-.cbt-picker.hidden { display: none; }
-/* Efeito de item (resistência de poção, antitoxina): verde, para não ser lido
-   como condição ruim ao lado de Envenenado ou Queimando. */
-.cbt-cond.cbt-efeito { background: rgba(46,125,50,0.12); color: var(--cbt-green); border-color: rgba(46,125,50,0.35); }
-.cbt-item-desconhecido small { font-style: italic; }
-.cbt-tgt-title {
-  font-size: 0.88rem; font-weight: 700;
-  color: var(--cbt-dark); margin-bottom: var(--esp-3);
-}
-.cbt-picker-btns { display: flex; gap: var(--esp-2); flex-wrap: wrap; }
-.cbt-picker-btns .cbt-btn { width: auto; text-align: center; }
-.cbt-btn.cbt-cancel {
-  background: var(--cbt-cancelar, #eee); border-color: var(--cbt-cancelar-borda, #ccc); color: var(--cbt-muted);
-}
-.cbt-btn.cbt-cancel:hover:not(:disabled) {
-  background: var(--cbt-trilho, #e0d8cc); border-color: var(--cbt-muted);
-}
 
 /* Log */
 .cbt-log-panel {
-  flex: 1; padding: var(--esp-5) var(--esp-5);
+  flex: 1; padding: var(--esp-4) var(--esp-5);
   background: var(--cbt-diario, #faf6f0);
   display: flex; flex-direction: column;
   min-width: 0; min-height: 0;
 }
 .cbt-log-title {
   font-family: 'Playfair Display', serif;
-  font-size: 1.05rem; color: var(--cbt-dark); font-weight: 700;
+  font-size: 1rem; color: var(--cbt-dark); font-weight: 700;
   border-bottom: 1px solid var(--cbt-borda, #dcd3c6);
   padding-bottom: var(--esp-2); margin-bottom: var(--esp-3);
 }
 .cbt-log-content {
   flex: 1; max-height: 240px; overflow-y: auto;
-  font-size: 0.82rem; line-height: 1.5;
+  font-size: 0.8rem; line-height: 1.5;
   display: flex; flex-direction: column; gap: var(--esp-2);
   padding-right: var(--esp-2);
 }
@@ -2562,12 +2725,6 @@ body.combat-on { overflow: hidden; }
 .cbt-end-actions { display: flex; gap: var(--esp-3); justify-content: center; }
 .cbt-end-actions .cbt-btn { text-align: center; }
 
-@keyframes cbt-pulse {
-  0%   { opacity: 1;   transform: scale(1); }
-  50%  { opacity: 0.4; transform: scale(1.25); }
-  100% { opacity: 1;   transform: scale(1); }
-}
-
 /* Pílula flutuante para retomar o combate (fica fora de #combat-overlay,
    então usa cores literais — as variáveis --cbt-* são escopadas). */
 /* Pílulas de "voltar à tela" (combate, loja, nível, descanso) — todas no
@@ -2592,7 +2749,9 @@ body.combat-on { overflow: hidden; }
 #cbt-reopen:hover { background: #6b1a0f; transform: translateY(-2px); }
 #cbt-reopen.hidden { display: none; }
 
-/* Responsivo */
+/* ── Celular ────────────────────────────────────────────────────────────
+   Meta: quatro combatentes de cada lado à vista sem rolar, numa tela de
+   375x812, com a barra de ação inteira no rodapé. */
 @media (max-width: 760px) {
   #combat-overlay { padding: 0; align-items: stretch; }
   #cbt-frame {
@@ -2600,89 +2759,101 @@ body.combat-on { overflow: hidden; }
     /* QUEM ROLA É O FRAME, não o overlay: o painel de ação é `fixed`, mas
        o #combat-overlay tem `backdrop-filter`, que cria bloco de contenção
        para descendentes fixos. Se o overlay rolasse, a barra rolaria
-       junto e sairia da tela. Antes o frame ficava preso na altura da
-       viewport com o `overflow: hidden` da regra base, então 1300px de
-       conteúdo eram simplesmente cortados: nem os últimos cards do grupo
-       nem o diário tinham como ser alcançados. */
+       junto e sairia da tela. */
     height: var(--app-height, 100vh); min-height: 0;
     overflow: hidden auto;
     /* Respiro no fim: o conteúdo termina acima da barra fixa em vez de
        ficar preso atrás dela. A altura real da barra vem do combat.js
-       (ela muda quando um seletor abre); o 52vh é o teto dela, usado
-       enquanto o JS não mediu. */
-    padding-bottom: calc(var(--cbt-bar-h, 52vh) + var(--esp-4));
+       (ela muda quando um seletor abre); o 40vh é o palpite enquanto o JS
+       não mediu. */
+    padding-bottom: calc(var(--cbt-bar-h, 40vh) + var(--esp-3));
   }
-  /* No mobile, o campo de batalha e o diário fluem e a página rola — mas o
-     PAINEL DE AÇÃO fica fixo no rodapé.
-
-     Antes ele vinha depois da lista inteira de combatentes: numa tela de
-     812px o "Encerrar Turno" caía em 868px e, ao tocar "Atacar", o seletor
-     de arma abria em 924px — fora da tela. O jogador tocava e nada
-     acontecia à vista. Agora os controles estão sempre visíveis e o seletor
-     abre DENTRO da barra, que rola por dentro. */
-  .cbt-lower { max-height: none; overflow: visible; }
+  .cbt-header { text-align: left; padding: var(--esp-2) 52px var(--esp-2) var(--esp-3); }
+  .cbt-close { top: 8px; right: 8px; width: 36px; height: 36px; }
+  .cbt-title { font-size: 1.05rem; margin: 0; }
+  .cbt-title #cbt-round { font-size: 0.85rem; }
+  .cbt-vez { justify-content: flex-start; font-size: 0.8rem; margin: 0; flex-wrap: wrap; }
+  /* A régua inteira não cabe: o "Agora · Próximo" e o número em cada linha
+     dizem a mesma coisa em uma linha só. */
+  .cbt-initiative { display: none; }
+  .cbt-zonas { padding: var(--esp-2) var(--esp-3) 0; gap: var(--esp-1); }
+  .cbt-zona  { min-width: 96px; padding: var(--esp-1) var(--esp-2); }
+  .cbt-zona-nome { margin-bottom: 0; }
+  .cbt-zona-pins { display: none; }
+  .cbt-zona-conta { display: block; }
+  .cbt-zona-liga { font-size: 0.9rem; }
+  .cbt-battlefield {
+    flex-direction: column; padding: var(--esp-2) var(--esp-3); gap: var(--esp-2);
+    flex: none; overflow: visible; min-height: 0; background: none;
+  }
+  .cbt-lado { width: 100%; }
+  .cbt-lado-grupo   { order: 2; }
+  .cbt-lado-inimigo { order: 1; }
+  .cbt-lado-titulo { margin-bottom: var(--esp-1); font-size: 0.72rem; }
+  .cbt-team { gap: var(--esp-1); }
+  .cbt-card { padding: 3px var(--esp-2) 4px; gap: 1px; }
+  .cbt-name { font-size: 0.95rem; }
+  .cbt-zona-tag { display: inline; margin-left: auto; }
+  .cbt-zona-tag + .cbt-ca { margin-left: var(--esp-2); }
+  /* A mana vira um fio sob a vida: o número aparece com a linha aberta.
+     Com rótulo e número ela somava uma fileira a cada conjurador, e era o
+     que impedia quatro de cada lado de caberem na tela. */
+  .cbt-bar-row-mp { height: 3px; overflow: hidden; }
+  .cbt-bar-row-mp .cbt-bar-label,
+  .cbt-bar-row-mp .cbt-bar-num { visibility: hidden; height: 0; }
+  .cbt-bar-row-mp .cbt-bar { height: 3px; }
+  .cbt-card.cbt-aberto .cbt-bar-row-mp { height: auto; }
+  .cbt-card.cbt-aberto .cbt-bar-row-mp .cbt-bar-label,
+  .cbt-card.cbt-aberto .cbt-bar-row-mp .cbt-bar-num { visibility: visible; height: auto; }
+  .cbt-detalhes { display: none; }
+  .cbt-card.cbt-aberto .cbt-detalhes { display: flex; padding-top: 2px; }
+  .cbt-lower { flex-direction: column; max-height: none; overflow: visible; border-top: none; }
   .cbt-action-panel {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
-    max-height: 52vh; overflow-y: auto;
+    max-height: 46vh; overflow-y: auto;
     border-top: 2px solid var(--cbt-gold);
-    border-bottom: none;
+    border-right: none;
     box-shadow: 0 -8px 24px rgba(74,37,17,0.25);
-    padding-bottom: calc(var(--esp-5) + env(safe-area-inset-bottom));
-    /* Sem padding em cima: ele é o bloco de contenção do título grudado,
-       que por causa dele não conseguia encostar no topo e deixava uma
-       fresta de 22px por onde o conteúdo rolado aparecia. O recuo passou
-       para dentro do próprio título. */
-    padding-top: 0;
-    /* Sombra de rolagem no rodapé, como no .cbt-battlefield: quando o
-       seletor abre, a barra rola por dentro e corta a fileira de selos
-       (AÇÃO / BÔNUS / REAÇÃO) ao meio. Sem pista nenhuma isso parece
-       defeito de renderização em vez de conteúdo rolado. */
+    padding: 0 var(--esp-3) calc(var(--esp-3) + env(safe-area-inset-bottom));
+    /* Sombra de rolagem no rodapé: quando o seletor abre, a barra rola por
+       dentro; sem pista nenhuma isso parece defeito de renderização. */
     background:
       linear-gradient(transparent, var(--cbt-painel, #fff) 70%) bottom / 100% 24px no-repeat local,
       radial-gradient(farthest-side at 50% 100%, rgba(74,37,17,.18), transparent)
         bottom / 100% 10px no-repeat scroll,
       var(--cbt-painel, #fff);
   }
-  /* O título é a única coisa que diz de quem é o turno dentro da barra, e era
-     a primeira a sair de vista ao rolar. Grudado no topo ele vira cabeçalho:
-     os selos passam POR BAIXO dele, que é uma leitura óbvia de rolagem. */
+  /* Seletor aberto: os botões de ação saem de cena (o Cancelar está no
+     seletor) e, na folha de habilidades, a barra sobe até quase o topo. */
+  .cbt-action-panel:has(#cbt-targets:not(.hidden)) #cbt-buttons,
+  .cbt-action-panel:has(#cbt-targets:not(.hidden)) .cbt-economy { display: none; }
+  .cbt-action-panel.cbt-escolhendo { max-height: 80vh; }
   .cbt-action-title {
-    position: sticky; top: 0; z-index: 2;
-    background: var(--cbt-painel, #fff);
-    margin: 0 -24px 6px;
-    padding: var(--esp-5) var(--esp-6) var(--esp-2);
+    margin: 0 calc(-1 * var(--esp-3)) var(--esp-1);
+    padding: var(--esp-2) var(--esp-3) 2px;
+    font-size: 1rem;
     border-bottom: 1px solid var(--cbt-linha, #e6ded2);
-    /* A sombra é o que faz a fileira cortada logo abaixo ser lida como
-       "passando por baixo" e não como recorte. Só a linha do border não
-       bastava: os botões têm contorno próprio e se confundiam com ela. */
-    box-shadow: 0 6px 6px -6px rgba(74,37,17,0.30);
   }
-  .cbt-picker {
-    max-height: none;
-    /* scrollIntoView não pode enfiar o seletor debaixo do título grudado. */
-    scroll-margin-top: var(--esp-16);
+  .cbt-ultimo {
+    display: block; margin-bottom: var(--esp-2);
+    font-size: 0.74rem; font-style: italic; color: var(--cbt-muted);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
+  .cbt-ultimo:empty { display: none; }
+  .cbt-economy { gap: var(--esp-1); margin-bottom: var(--esp-2); }
+  .cbt-slot { font-size: 0.58rem; padding: 0 var(--esp-2); }
+  .cbt-btn-grid { grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .cbt-btn-grid .cbt-btn {
+    min-height: 44px; padding: var(--esp-1) 2px;
+    font-size: 0.76rem; line-height: 1.15; text-align: center;
+  }
+  .cbt-btn-grid .cbt-btn.cbt-primary { grid-column: span var(--cbt-span, 4); }
+  .cbt-picker { max-height: none; margin-top: var(--esp-2); padding: var(--esp-2); }
+  .cbt-picker-btns .cbt-btn { min-height: 40px; }
+  .cbt-hab-lista { grid-template-columns: 1fr; }
   /* O painel de fim precisa cobrir a barra fixa. */
   .cbt-end-overlay { z-index: 40; }
-  .cbt-title { font-size: 1.3rem; }
-  /* Régua de iniciativa: rola na horizontal em vez de quebrar em duas
-     linhas e deixar o último nome centralizado sozinho. */
-  .cbt-initiative {
-    flex-wrap: nowrap; overflow-x: auto; justify-content: flex-start;
-    padding-bottom: var(--esp-1); -webkit-overflow-scrolling: touch;
-  }
-  .cbt-initiative::-webkit-scrollbar { height: 0; }
-  .cbt-ord { flex-shrink: 0; }
-  .cbt-zonas { padding: var(--esp-3) var(--esp-4) 0; gap: var(--esp-1); }
-  .cbt-zona  { min-width: 108px; padding: var(--esp-2) var(--esp-2); }
-  .cbt-battlefield {
-    flex-direction: column; padding: var(--esp-4); gap: var(--esp-3);
-    flex: none; overflow: visible; min-height: 0;
-  }
-  #cbt-enemies { order: 1; width: 100%; }
-  .cbt-vs      { order: 2; font-size: 1.8rem; }
-  #cbt-party   { order: 3; width: 100%; }
-  .cbt-lower { flex-direction: column; }
+  .cbt-log-panel { padding: var(--esp-3); }
   .cbt-log-content { max-height: 200px; }
   .cbt-result-cols { flex-direction: column; }
   .cbt-result-title { font-size: 1.9rem; }

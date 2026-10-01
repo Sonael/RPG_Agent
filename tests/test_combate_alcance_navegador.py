@@ -107,18 +107,21 @@ def test_alvo_de_outra_zona_aparece_fora_de_alcance(abrir_jogo):
 
 def test_seletor_aberto_nao_corta_o_titulo_do_turno(abrir_jogo):
     """
-    O seletor de alvo não cabe no painel de ação e ele rola por dentro. O
-    título "O que fará Stelar?" saía de vista cortado ao meio; agora fica
-    grudado no topo do painel, inteiro e por cima dos botões.
+    O seletor não cabe no painel de ação e ele rola por dentro. O título
+    "O que fará Helena?" saía de vista cortado ao meio; agora fica grudado no
+    topo do painel, inteiro e por cima dos cartões.
+
+    Com as linhas compactas da tela nova, o seletor de alvo da espada cabe
+    sem rolar; quem rola é a folha de habilidades de uma conjuradora.
     """
     abrir, cap = abrir_jogo
-    pg, erros = abrir(copy.deepcopy(cap.COMBATE_ZONAS))
+    pg, erros = abrir(copy.deepcopy(cap.COMBATE_MAGIAS))
 
-    pg.evaluate("() => window.Combat._sel('attack')")
-    pg.wait_for_selector("#cbt-targets:not(.hidden)")
-    pg.locator("#cbt-targets .cbt-btn").first.click()
-    pg.wait_for_selector("#cbt-targets .cbt-fora")
-    pg.wait_for_timeout(600)          # o scrollIntoView é suave
+    pg.evaluate("() => window.Combat._sel('ability')")
+    pg.wait_for_selector("#cbt-targets .cbt-hab")
+    pg.evaluate("() => { const p = document.getElementById('cbt-actionbar');"
+                " p.scrollTop = p.scrollHeight; }")
+    pg.wait_for_timeout(300)
 
     medidas = pg.evaluate("""() => {
         const painel = document.getElementById('cbt-actionbar');
@@ -134,7 +137,7 @@ def test_seletor_aberto_nao_corta_o_titulo_do_turno(abrir_jogo):
     assert medidas["tituloBase"] <= medidas["painelBase"], medidas
     assert medidas["visivel"], f"o título ficou coberto ({medidas})"
     assert medidas["sombra"], medidas
-    assert "O que fará Stelar?" in pg.inner_text("#cbt-action-title")
+    assert "O que fará Helena?" in pg.inner_text("#cbt-action-title")
     assert not erros, erros[:3]
 
 

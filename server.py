@@ -3402,6 +3402,26 @@ def combat_action_route():
     return jsonify(res)
 
 
+@app.route("/api/combat/preview", methods=["POST"])
+@require_auth
+def combat_preview_route():
+    """
+    Quem a habilidade VAI atingir, sem gastar nada — para a tela pedir
+    confirmação antes de uma magia em área.
+
+    O fogo amigo é regra e continua. O que não pode é acontecer sem aviso: na
+    partida relatada, o jogador conjurou uma magia sem descrição visível e
+    atingiu os companheiros sem saber que eles estavam na área.
+    """
+    from rpg import tools_dnd
+    d = request.json or {}
+    return jsonify(tools_dnd.prever_area(
+        (d.get("actor") or "").strip(),
+        (d.get("ability") or "").strip(),
+        (d.get("target") or "").strip(),
+    ))
+
+
 @app.route("/api/levelup/state", methods=["GET"])
 @require_auth
 def levelup_state_route():

@@ -80,7 +80,9 @@ def _vida(nome):
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize("hab, esperado", [
-    (FOGO, "raio de 6 m"),            # "20-foot-radius sphere"
+    # Magia do SRD: a forma vem do COMPÊNDIO (rpg/compendio.py), que guarda a
+    # forma oficial ("esfera"), e não mais da leitura do texto ("raio").
+    (FOGO, "esfera de 6 m"),
     (MAOS, "cone de 4,5 m"),          # 15 pés
     (RAIO, ""),                       # ataque, não área
     ({"descricao": "cone de 4,5 m de fogo"}, "cone de 4,5 m"),
@@ -150,7 +152,7 @@ def test_a_bola_de_fogo_pega_os_dois_goblins(mesa):
     r = td.use_ability("Vex", "Fireball", target_name="Goblin A", end_turn=False)
     assert _vida("Goblin A") < 20, r
     assert _vida("Goblin B") < 20, "o segundo goblin saiu ileso da Bola de Fogo"
-    assert "Sacada" in r and "raio de 6 m" in r
+    assert "Sacada" in r and "esfera de 6 m" in r
 
 
 def test_cada_criatura_rola_a_propria_salvaguarda(mesa):

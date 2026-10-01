@@ -6,6 +6,10 @@ campanhas/
 *.json
 *.md
 !requirements.txt
+# O compêndio do SRD é código, não save: o jogo lê dele em tempo de jogo.
+!rpg/dados/*.json
+!scripts/srd_*.json
+!scripts/srd_bruto/*.json
 !README.md
 .DS_Store
 .claude/
