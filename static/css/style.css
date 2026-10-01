@@ -2627,6 +2627,16 @@ body.combat-on { overflow: hidden; }
 .cbt-modos .cbt-modo small { font-size: 0.74rem; }
 .cbt-hab-trava { color: var(--cbt-red); font-style: italic; }
 
+/* Conjurar com mais mana: os círculos no seletor de alvo. */
+.cbt-circulos { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
+.cbt-circulo {
+  display: inline-flex; align-items: baseline; gap: 4px; min-height: 32px; padding: 4px 10px;
+  border-radius: 999px; border: 1px dashed var(--cbt-mp); background: transparent;
+  color: var(--cbt-text); font: inherit; font-size: 0.82rem; cursor: pointer;
+}
+.cbt-circulo small { color: var(--cbt-muted); }
+.cbt-circulo.ativo { border-style: solid; background: rgba(59,116,168,0.16); font-weight: 600; }
+
 /* Reações que o motor usa sozinho no turno do inimigo: liga e desliga. */
 .cbt-reacoes {
   grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 6px;

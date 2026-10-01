@@ -178,6 +178,7 @@ def resolver(hab: dict, char: dict | None = None) -> dict:
     _, _ef = resolucao.efeito_de_magia(hab)
     if _ef:
         r["alvo_modo"] = {"aliado": "aliado", "aliados": "aliado", "si": "si",
+                          "inimigo_ataque": "inimigo",
                           "marca": "inimigo", "inimigos": "inimigo", "area": "inimigo"}.get(_ef["alvos"], "")
     if como["slot"]:
         r["acao"] = como["slot"]

@@ -323,7 +323,76 @@ EFEITOS_DE_MAGIA: dict[str, dict] = {
                      "texto": "um aliado fica Invisível (vantagem nos ataques dele)"},
     "Greater Invisibility": {"alvos": "aliado", "condicao": "Invisível",
                              "texto": "um aliado fica Invisível (vantagem nos ataques dele)"},
+    # ── Lote 3: magias de combate que eram narrativas ───────────────────────
+    "Shillelagh": {"alvos": "si", "efeito": {"arma_conjuracao": True},
+                   "texto": "a clava ou o bordão usa o seu atributo de conjuração no ataque e no dano, com dado d8"},
+    "True Strike": {"alvos": "marca", "efeito": {"vantagem_ataque": True, "usos": 1},
+                    "texto": "vantagem no seu primeiro ataque contra o alvo"},
+    "Magic Weapon": {"alvos": "aliado", "efeito": {"atk_bonus": 1, "dano_fixo": 1, "so_arma": True},
+                     "escala_bonus": {4: 2, 6: 3},
+                     "texto": "+1 no ataque e no dano com a arma de um aliado (+2 no 4º círculo, +3 no 6º)"},
+    "Branding Smite": {"alvos": "si", "efeito": {"golpe_dado": "2d6", "golpe_tipo": "radiant"},
+                       "escala_golpe": True,
+                       "texto": "o próximo acerto com arma soma 2d6 radiante (+1d6 por círculo acima do 2º)"},
+    "Sanctuary": {"alvos": "aliado", "efeito": {"santuario": "<cd>"},
+                  "texto": "quem quiser atacar o aliado faz salvaguarda de SAB; se falhar, perde o ataque. "
+                           "Acaba se o protegido atacar"},
+    "Mirror Image": {"alvos": "si", "efeito": {"imagens": 3},
+                     "texto": "três cópias: cada ataque pode acertar uma cópia (6+ com três, 8+ com duas, 11+ com uma)"},
+    "Blink": {"alvos": "si", "efeito": {"piscar": True},
+              "texto": "no fim de cada turno seu, d20 11+: você some para o Plano Etéreo até o seu próximo turno"},
+    "Protection from Evil and Good": {"alvos": "aliado", "efeito": {"desvantagem_de_extraplanares": True},
+                                      "texto": "aberrações, celestiais, elementais, fadas, infernais e "
+                                               "mortos-vivos atacam o aliado com desvantagem"},
+    "Warding Bond": {"alvos": "aliado", "efeito": {"ca": 1, "save_fixo": 1, "vinculo": "<conjurador>",
+                                                   "resistencias": ["acid", "bludgeoning", "cold", "fire",
+                                                                    "force", "lightning", "necrotic",
+                                                                    "piercing", "poison", "psychic",
+                                                                    "radiant", "slashing", "thunder"]},
+                     "texto": "o aliado ganha +1 de CA e nas salvaguardas e resistência a todo dano; "
+                              "você leva o mesmo dano que ele"},
+    "Beacon of Hope": {"alvos": "aliados", "max": 6,
+                       "efeito": {"vantagem_save_atributos": ["sabedoria"], "vantagem_morte": True,
+                                  "cura_maxima": True},
+                       "texto": "até 6 aliados: vantagem nas salvaguardas de SAB e nos testes contra a morte, "
+                                "e toda cura neles rola o máximo"},
+    "Protection from Poison": {"alvos": "aliado", "tira": ["envenenado"],
+                               "efeito": {"resistencias": ["poison"], "vantagem_save_contra": ["envenenado"]},
+                               "texto": "tira Envenenado, dá resistência a veneno e vantagem contra ficar envenenado"},
+    "Fly": {"alvos": "aliado", "efeito": {"movimento_por_turno": 1},
+            "texto": "o aliado voa: mais uma zona de movimento a cada turno"},
+    "Expeditious Retreat": {"alvos": "si", "efeito": {"movimento_por_turno": 1}, "movimento_agora": True,
+                            "texto": "Disparada agora e mais uma zona de movimento a cada turno"},
+    "Enlarge/Reduce": {"alvos": "aliado", "save_se_inimigo": "constituicao",
+                       "modos": {"aumentar": "Aumentar: +1d4 de dano nos ataques com arma",
+                                 "reduzir": "Reduzir: -1d4 de dano nos ataques com arma"},
+                       "efeito_por_modo": {"aumentar": {"dano_dado": "1d4", "so_arma": True},
+                                           "reduzir": {"dano_dado": "-1d4", "so_arma": True}},
+                       "texto": "aumenta (+1d4 de dano com arma) ou reduz (-1d4) uma criatura; "
+                                "inimigo faz salvaguarda de CON"},
+    "Ray of Enfeeblement": {"alvos": "inimigo_ataque",
+                            "condicao_magia": {"nome": "Enfraquecido", "salvaguarda_fim": "constituicao"},
+                            "texto": "ataque mágico à distância; se acertar, o alvo causa metade do dano com "
+                                     "armas de FOR e repete CON no fim de cada turno"},
+    "Lesser Restoration": {"alvos": "aliado", "tira_um": ["paralisado", "cego", "envenenado", "surdo"],
+                           "texto": "encerra Paralisado, Cego, Envenenado ou Surdo no aliado"},
+    "Greater Restoration": {"alvos": "aliado", "tira_um": ["petrificado", "enfeiticado", "amaldicoado", "exaustao"],
+                            "texto": "encerra Petrificado, Enfeitiçado ou Amaldiçoado, ou tira 1 nível de exaustão"},
+    "Remove Curse": {"alvos": "aliado", "tira": ["amaldicoado"],
+                     "texto": "encerra as maldições sobre o aliado"},
+    "Spare the Dying": {"alvos": "aliado", "estabilizar": True,
+                        "texto": "estabiliza um aliado a 0 PV (para de fazer testes contra a morte)"},
+    "Revivify": {"alvos": "aliado", "reviver": True,
+                 "texto": "traz de volta, com 1 PV, quem morreu há pouco (na mesma hora do relógio); "
+                          "gasta um diamante da mochila"},
+    "Misty Step": {"alvos": "si", "teleporte": True,
+                   "texto": "teleporta você para uma zona vizinha, sem ataque de oportunidade"},
 }
+
+# Quem a Proteção contra o Bem e o Mal protege.
+_EXTRAPLANARES = ("aberracao", "aberration", "celestial", "elemental", "fada", "fey", "feerico",
+                  "fiend", "infernal", "demon", "demonio", "devil", "diabo", "undead", "morto vivo",
+                  "zumbi", "esqueleto", "fantasma", "vampir")
 
 # Efeito que uma magia de DANO deixa no alvo atingido.
 RIDERS_DE_MAGIA: dict[str, dict] = {
@@ -546,12 +615,22 @@ def como_resolve(hab: dict, char: dict | None = None) -> dict:
         if ef:
             saida.update(tipo="efeito", texto="O motor aplica: " + ef["texto"]
                          + (", enquanto durar a concentração" if m.get("concentracao") else "") + ".")
+            modos = dict(ef.get("modos") or {})
+            if ef.get("teleporte") and char:
+                from rpg import tools_dnd as td
+                if td._zonas_ativas():
+                    modos = {z: f"{z}: zona vizinha" for z in _zonas_vizinhas(char)}
+            if not modos:
+                modos = circulos_da_magia(hab, char)
+            saida.update(modos=list(modos), modos_texto=modos)
             return saida
         efeito = m.get("efeito")
         if efeito in ("dano", "cura", "pool") and (m.get("dado") or efeito == "pool"):
             rider = RIDERS_DE_MAGIA.get(m["nome_srd"])
             if rider:
                 saida["texto"] = "Além do dano: " + rider["texto"] + "."
+            modos = circulos_da_magia(hab, char)
+            saida.update(modos=list(modos), modos_texto=modos)
             return saida
         cond = _condicao_da_magia(hab, m)
         textos = {norm(k): (k, v) for k, v in TEXTO_DA_CONDICAO.items()}
@@ -727,8 +806,37 @@ def validar(char: dict, hab: dict, alvo: str, modo: str) -> str:
                     f"Nada foi gasto.")
         return ""
     _, ef = efeito_de_magia(hab)
-    if ef and ef["alvos"] in ("marca", "inimigos", "area") and not _char(alvo):
+    if ef and ef["alvos"] in ("marca", "inimigos", "area", "inimigo_ataque") and not _char(alvo):
         return f"Aviso: escolha o alvo de {hab['nome']}. Nada foi gasto."
+    circulos = circulos_da_magia(hab, char)
+    if modo and modo.startswith("c") and modo[1:].isdigit() and modo not in circulos:
+        return f"Aviso: {hab['nome']} não pode ser conjurada nesse círculo agora. Nada foi gasto."
+    if ef:
+        nome_pt = m.get("nome") or hab.get("nome", "")
+        a = _char(alvo)
+        if ef.get("modos") and modo not in ef["modos"]:
+            return (f"Aviso: {nome_pt} pede uma escolha: " + "; ".join(ef["modos"].values())
+                    + ". Nada foi gasto.")
+        if ef.get("estabilizar"):
+            if not a or int((a.get("sheet") or {}).get("vida_atual", 0) or 0) > 0 \
+                    or (a.get("status") or "").lower() == "morto":
+                return f"Aviso: {nome_pt} só vale em quem está caído a 0 PV (e vivo). Nada foi gasto."
+        if ef.get("reviver"):
+            from rpg import tools_dnd as td
+            if not a or (a.get("status") or "").lower() != "morto":
+                return f"Aviso: {nome_pt} só vale em quem morreu. Nada foi gasto."
+            hora = (a.get("sheet") or {}).get("morreu_hora")
+            if hora is None or td._agora_em_horas() - int(hora) >= 1:
+                return (f"Aviso: {a['name']} morreu há tempo demais para {nome_pt} "
+                        f"(só vale logo depois da morte). Nada foi gasto.")
+            if not _diamante(char):
+                return (f"Aviso: {nome_pt} precisa de um diamante (300 po) na mochila de "
+                        f"{char['name']}. Nada foi gasto.")
+        if ef.get("teleporte"):
+            from rpg import tools_dnd as td
+            if td._zonas_ativas() and modo not in _zonas_vizinhas(char):
+                return (f"Aviso: escolha para qual zona vizinha {nome_pt} leva "
+                        f"({', '.join(_zonas_vizinhas(char)) or 'nenhuma'}). Nada foi gasto.")
     # A regra deixa abençoar quem quiser: a tela oferece os aliados primeiro,
     # e o motor não recusa o que o SRD permite.
     return ""
@@ -744,7 +852,7 @@ def executar(char: dict, hab: dict, alvo: str, modo: str) -> str:
         from rpg import encantos
         if encantos.do_encanto(m.get("nome_srd", "")):
             return encantos.conjurar(char, hab, alvo, m["nome_srd"], m.get("nome") or hab.get("nome", ""))
-        return aplicar_magia(char, hab, alvo)
+        return aplicar_magia(char, hab, alvo, modo)
     if info["tipo"] == "narrativa":
         teste = _teste_da_narrativa(char, m, alvo)
         return (f"\n   Sem regra no motor para {hab.get('nome', '')}: o Mestre narra o efeito.{teste}"
@@ -799,17 +907,27 @@ def _alvos_da_magia(char: dict, ef: dict, alvo_nome: str) -> list[dict]:
         if not alvo:
             return []
         return [c for c in _combatentes_vivos() if _perto(alvo, c)]
+    if tipo == "inimigo_ataque":
+        return [alvo] if alvo else []
     return []
 
 
-def aplicar_magia(char: dict, hab: dict, alvo_nome: str) -> str:
+def aplicar_magia(char: dict, hab: dict, alvo_nome: str, modo: str = "") -> str:
     from rpg import tools_dnd as td
     chave, ef = efeito_de_magia(hab)
     m = _magia_srd(hab) or {}
     nome_pt = m.get("nome") or hab.get("nome", "")
+    base = int(m.get("nivel", 1) or 1)
+    circ = int(modo[1:]) if (modo or "").startswith("c") and modo[1:].isdigit() else base
+    extra_circ = max(0, circ - base)
+    if ef.get("alvos") in ("aliados", "inimigos") and extra_circ and m.get("alvos_por_espaco"):
+        ef = dict(ef, max=int(ef.get("max", 1)) + extra_circ)
     alvos = _alvos_da_magia(char, ef, alvo_nome)
     if not alvos:
         return f"\n   Ninguém ao alcance de {nome_pt}."
+    especial = _magia_especial(char, hab, ef, alvos[0], modo, nome_pt)
+    if especial is not None:
+        return especial
     linhas = []
     cd = _cd(char)
     for a in alvos:
@@ -819,18 +937,39 @@ def aplicar_magia(char: dict, hab: dict, alvo_nome: str) -> str:
                 linhas.append(f"{a['name']}: {linha} — resistiu")
                 continue
             linhas.append(f"{a['name']}: {linha} — falhou")
+        if ef.get("save_se_inimigo") and not _mesmo_lado(char, a):
+            passou, linha = td._rolar_salvaguarda(a, ef["save_se_inimigo"], cd)
+            if passou:
+                linhas.append(f"{a['name']}: {linha} — resistiu")
+                continue
+            linhas.append(f"{a['name']}: {linha} — falhou")
         efeito = dict(ef.get("efeito") or {})
+        efeito.update((ef.get("efeito_por_modo") or {}).get(modo) or {})
+        for k, v in list(efeito.items()):
+            if v == "<cd>":
+                efeito[k] = cd
+            elif v == "<conjurador>":
+                efeito[k] = memory.char_key(char.get("name", ""))
+        if ef.get("escala_bonus"):
+            for minimo, bonus in sorted(ef["escala_bonus"].items()):
+                if circ >= minimo:
+                    efeito["atk_bonus"] = efeito["dano_fixo"] = bonus
+        if ef.get("escala_golpe") and extra_circ and efeito.get("golpe_dado"):
+            n, faces, _b = td._parse_dice(efeito["golpe_dado"])
+            efeito["golpe_dado"] = f"{n + extra_circ}d{faces}"
         if ef.get("armadura_arcana"):
             efeito["ca_minima"] = 13 + _mod(a, "destreza")
         if efeito:
             efeito["nome"] = nome_pt
             efeito["origem"] = char.get("name", "")
+            efeito["magia"] = hab.get("nome", "")
             if ef["alvos"] == "marca":
                 efeito["contra"] = memory.char_key(alvo_nome)
             if m.get("concentracao"):
                 efeito["concentracao_de"] = memory.char_key(char.get("name", ""))
-                efeito["magia"] = hab.get("nome", "")
             td.dar_efeito_de_combate(a, efeito)
+        if ef.get("movimento_agora"):
+            _eco()["movimento_extra"] = int(_eco().get("movimento_extra", 0) or 0) + 1
         if ef.get("pv_temp"):
             expr = ef["pv_temp"]
             if expr == "mod":
@@ -838,6 +977,8 @@ def aplicar_magia(char: dict, hab: dict, alvo_nome: str) -> str:
                 valor = max(1, _mod(char, attr))
             else:
                 valor, _ = td._rolar_expr(expr)
+            # Ajuda e Vida Falsa: +5 por círculo acima do base.
+            valor += 5 * extra_circ if chave in ("Aid", "False Life") else 0
             st = a.setdefault("sheet", {})
             st["vida_temp"] = max(int(st.get("vida_temp", 0) or 0), valor)
             linhas.append(f"{a['name']}: {st['vida_temp']} PV temporários")
@@ -856,6 +997,146 @@ def aplicar_magia(char: dict, hab: dict, alvo_nome: str) -> str:
             linhas.append(f"{a['name']}")
     return (f"\n   {nome_pt}: {ef['texto']}."
             + "".join(f"\n   • {l}" for l in linhas))
+
+
+def _diamante(char: dict) -> dict | None:
+    for it in (char or {}).get("inventario") or []:
+        if isinstance(it, dict) and any(p in norm(it.get("nome", "")) for p in ("diamante", "diamond")):
+            if int(it.get("qtd", 1) or 1) > 0:
+                return it
+    return None
+
+
+def _zonas_vizinhas(char: dict) -> list[str]:
+    from rpg import tools_dnd as td
+    zonas = td._zonas()
+    aqui = td._zona_de(char.get("name", ""))
+    if aqui not in zonas:
+        return []
+    i = zonas.index(aqui)
+    return [z for j, z in enumerate(zonas) if abs(j - i) == 1]
+
+
+def _magia_especial(char: dict, hab: dict, ef: dict, a: dict, modo: str, nome_pt: str) -> str | None:
+    """
+    As magias de efeito que não são um efeito de combate: restauração,
+    estabilizar, reviver, teleporte, raio que precisa acertar. None = segue o
+    caminho comum de aplicar_magia.
+    """
+    from rpg import encantos, tools_dnd as td
+    st = a.setdefault("sheet", {})
+    if ef.get("tira_um"):
+        for alvo_c in ef["tira_um"]:
+            if alvo_c == "exaustao" and int(st.get("exaustao", 0) or 0) > 0:
+                st["exaustao"] = int(st["exaustao"]) - 1
+                return f"\n   {nome_pt}: {a['name']} perde 1 nível de exaustão (agora {st['exaustao']})."
+            if alvo_c == "enfeiticado" and encantos.ativo(a):
+                return f"\n   {nome_pt}: {encantos.quebrar(a, nome_pt)}"
+            tiradas = _tirar_condicoes(a, (alvo_c,))
+            if tiradas:
+                return f"\n   {nome_pt}: {a['name']} se livra de {tiradas[0]}."
+        return f"\n   {nome_pt}: {a['name']} não tinha nada que a magia encerre."
+    if ef.get("estabilizar"):
+        a["status"] = "estabilizado"
+        st["death_saves_sucessos"] = st["death_saves_falhas"] = 0
+        return f"\n   {nome_pt}: {a['name']} está ESTABILIZADO (0 PV, não faz mais testes contra a morte)."
+    if ef.get("reviver"):
+        pedra = _diamante(char)
+        pedra["qtd"] = int(pedra.get("qtd", 1) or 1) - 1
+        if pedra["qtd"] <= 0:
+            char["inventario"] = [x for x in char.get("inventario") or [] if x is not pedra]
+        a["status"] = "vivo" if memory.is_party_member(a) else (a.get("lado") or "aliado")
+        st["vida_atual"] = 1
+        st["death_saves_sucessos"] = st["death_saves_falhas"] = 0
+        st.pop("morreu_hora", None)
+        return (f"\n   {nome_pt}: {a['name']} volta à vida com 1 PV. "
+                f"O diamante ({pedra.get('nome')}) virou pó.")
+    if ef.get("teleporte"):
+        if not td._zonas_ativas():
+            return (f"\n   {nome_pt}: sem zonas neste combate, o motor não tem para onde mover. "
+                    f"(Mestre: narre o teletransporte de até 9 m.)")
+        cs = memory.campaign.get("combat_state") or {}
+        de = td._zona_de(char.get("name", ""))
+        cs.setdefault("posicoes", {})[memory.char_key(char.get("name", ""))] = modo
+        return f"\n   {nome_pt}: {char['name']} some de {de} e aparece em {modo}, sem ataque de oportunidade."
+    if ef.get("alvos") == "inimigo_ataque":
+        acertou, _crit, linha = td._rolar_ataque_magico(char, a, hab)
+        if not acertou:
+            return linha
+        cfg = ef.get("condicao_magia") or {}
+        _tirar_condicoes(a, (cfg.get("nome", ""),))
+        cond = {"nome": cfg["nome"], "duracao": None, "por": char["name"], "magia": hab.get("nome", ""),
+                "concentracao_de": memory.char_key(char.get("name", ""))}
+        if cfg.get("salvaguarda_fim"):
+            cond["salvaguarda_fim"] = {"atributo": cfg["salvaguarda_fim"], "cd": _cd(char)}
+        st.setdefault("condicoes", []).append(cond)
+        return linha + f"\n   {nome_pt}: {a['name']} fica {cfg['nome'].upper()} — {ef['texto']}."
+    return None
+
+
+# ── Conjurar com mais mana ───────────────────────────────────────────────────
+_ESCALA_RE = re.compile(r"increases? by (\d+)d(\d+) for (each|every two) slot levels? above", re.I)
+
+
+def dado_no_circulo(hab: dict, formula: str, circulo: int) -> str:
+    """O dado da magia conjurada num círculo acima do dela (SRD: 'At Higher Levels')."""
+    from rpg import tools_dnd as td
+    m = _magia_srd(hab) or {}
+    base = int(m.get("nivel", 1) or 1)
+    if circulo <= base:
+        return formula
+    tabela = m.get("escala_espaco") or {}
+    if str(circulo) in tabela:
+        return tabela[str(circulo)]
+    achado = _ESCALA_RE.search(m.get("nivel_superior_en") or "")
+    if not achado or not formula:
+        return formula
+    n_extra, faces = int(achado.group(1)), int(achado.group(2))
+    passos = circulo - base
+    if achado.group(3).lower().startswith("every two"):
+        passos //= 2
+    n, f, bonus = td._parse_dice(formula)
+    if f != faces:
+        return formula
+    return f"{n + n_extra * passos}d{f}" + (f"+{bonus}" if bonus > 0 else (str(bonus) if bonus < 0 else ""))
+
+
+def _escala(m: dict) -> bool:
+    return bool(m.get("escala_espaco") or m.get("alvos_por_espaco")
+                or _ESCALA_RE.search(m.get("nivel_superior_en") or "")
+                or m.get("nome_srd") in ("Aid", "False Life", "Magic Weapon", "Branding Smite"))
+
+
+def circulos_da_magia(hab: dict, char: dict | None) -> dict:
+    """
+    id ("c3") → texto, quando a magia escala e o personagem alcança um círculo
+    acima do dela com a mana que tem. {} quando não há escolha a fazer.
+    """
+    from rpg import tools_dnd as td
+    m = _magia_srd(hab) or {}
+    base = int(m.get("nivel", 0) or 0)
+    if not char or base < 1 or not _escala(m):
+        return {}
+    s = char.get("sheet") or {}
+    teto = td._nivel_maximo_de_magia(s)
+    mana = int(s.get("mana_atual", 0) or 0)
+    if teto <= base:
+        return {}
+    saida = {}
+    formula = td.dado_efetivo(hab, char)
+    for c in range(base, teto + 1):
+        custo = int(hab.get("custo_mana", 0) or 0) if c == base else td.SPELL_MANA_COST[c]
+        if c > base and custo > mana:
+            break
+        dado = dado_no_circulo(hab, formula, c) if formula else ""
+        saida[f"c{c}"] = f"{c}º círculo: {custo} mana" + (f" · {dado}" if dado else "")
+    return saida if len(saida) > 1 else {}
+
+
+def circulo_do_modo(hab: dict, modo: str) -> int:
+    if (modo or "").startswith("c") and modo[1:].isdigit():
+        return int(modo[1:])
+    return 0
 
 
 def aplicar_rider(char: dict, hab: dict, alvo: dict) -> str:

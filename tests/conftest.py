@@ -176,6 +176,11 @@ def campanha():
     # Em série a ordem era estável e ninguém via; com os arquivos em paralelo,
     # a vizinhança mudou e o problema apareceu, intermitente.
     padroes = memory._defaults()
+    # Marcas internas de turno (`_sem_fechamento`, `_ultimo_turno`...) também
+    # vazavam: um arquivo deixava "_sem_fechamento" e o teste de pendências de
+    # outro, no mesmo processo, via a cobrança de um registro que não faltou.
+    for _k in [k for k in memory.campaign if str(k).startswith("_")]:
+        memory.campaign.pop(_k, None)
     memory.campaign["campaign_type"] = padroes["campaign_type"]
     memory.campaign["dnd_mode"] = padroes["dnd_mode"]
     memory.campaign["combat_state"] = {

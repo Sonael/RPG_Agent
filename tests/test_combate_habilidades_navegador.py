@@ -283,3 +283,33 @@ def test_magia_que_so_fere_hostis_nao_pede_confirmacao(celular):
     assert _vida(pg, "Stelar") == stelar
     assert "Radiância" in pg.inner_text("#cbt-log")
     assert not erros, erros[:3]
+
+
+# ---------------------------------------------------------------------------
+# 4. Conjurar com mais mana: o círculo no próprio seletor de alvo
+# ---------------------------------------------------------------------------
+
+def _mana(pg, nome):
+    return pg.evaluate("""async (n) => {
+      const s = await (await authFetch((window.API || '') + '/api/combat/state')).json();
+      return s.combatants.find(x => x.name === n).mp;
+    }""", nome)
+
+
+def test_circulo_escolhido_no_seletor_de_alvo(celular):
+    pg, erros = celular()
+    antes = _mana(pg, "Helena")
+    _escolher(pg, "Palavra Curativa")
+    pg.wait_for_selector("#cbt-targets .cbt-circulos")
+    # O círculo da magia vem marcado: um toque no alvo conjura como sempre.
+    assert "1º círculo" in pg.inner_text("#cbt-targets .cbt-circulo.ativo")
+    pg.click("#cbt-targets .cbt-circulo:has-text('2º círculo')")
+    assert "2º círculo" in pg.inner_text("#cbt-targets .cbt-circulo.ativo")
+    pg.click("#cbt-targets button:has-text('Natasha')")
+    pg.wait_for_function(
+        "(a) => [...document.querySelectorAll('#cbt-buttons button')]"
+        ".some(b => b.textContent.includes('Habilidade'))", arg=None, timeout=8000)
+    pg.wait_for_timeout(800)
+    assert _mana(pg, "Helena") == antes - 3
+    assert not erros, erros[:3]
+

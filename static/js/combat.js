@@ -635,9 +635,19 @@
       ? ((snap.alcance || {})[_pick.weapon || 'Ataque desarmado'] || {})
       : {};
     const estados = {};
+    const circulos = (h && (h.modos || []).length && h.modos.every(m => /^c\d+$/.test(m.id)))
+      ? h.modos : [];
+    const chips = circulos.length
+      ? `<div class="cbt-circulos" role="group" aria-label="Círculo">`
+        + circulos.map(m => `<button type="button" class="cbt-circulo${(_pick.modo || circulos[0].id) === m.id ? ' ativo' : ''}" `
+          + `data-modo="${esc(m.id)}" onclick="window.Combat._circulo('${jsNome(m.id)}')">`
+          + `${esc(m.texto.split(':')[0])}<small>${esc(m.texto.split(':').slice(1).join(':'))}</small></button>`).join('')
+        + `</div>`
+      : '';
     const html =
       `<div class="cbt-tgt-title">${titulo}</div>`
       + (h && h.resumo ? `<div class="cbt-tgt-resumo">${esc(h.resumo)}</div>` : '')
+      + chips
       + `<div class="cbt-tgt-dica">Toque no combatente ou escolha abaixo.</div>`
       + `<div class="cbt-picker-btns">`
       + live.map(c => {
@@ -1151,20 +1161,25 @@
       + `</div>`, false);
   }
 
+  // Troca o círculo marcado no seletor de alvo.
+  function _circulo(id) {
+    if (!_pick) return;
+    _pick.modo = id;
+    document.querySelectorAll('#cbt-targets .cbt-circulo').forEach(b =>
+      b.classList.toggle('ativo', b.dataset.modo === id));
+  }
+
   function _modo(id) {
     if (_busy || !_pick || _pick.kind !== 'modo') return;
     const cur = (_last.combatants || []).find(c => c.is_current);
     if (!cur) return;
     const h = _pick.hab || {};
-    // Aumentar/Reduzir: a escolha e depois o alvo. A escolha segue em `weapon`.
-    if (h.alvo_modo === 'inimigo' || h.alvo_modo === 'aliado') {
-      showTargets('ability', { ability: _pick.ability, hab: h, modo: id });
-      return;
-    }
-    act({ action: 'ability', actor: cur.name, ability: _pick.ability, target: '', weapon: id });
+    // A escolha (círculo, zona, aumentar/reduzir) e depois o alvo, pelo
+    // caminho de sempre. A escolha segue em `weapon`.
+    _selHab(_pick.ability, h.target_mode || 'single', id);
   }
 
-  function _selHab(name, mode) {
+  function _selHab(name, mode, modo) {
     if (_busy) return;
     const cur = (_last && _last.combatants || []).find(c => c.is_current);
     if (!cur) return;
@@ -1176,27 +1191,34 @@
       _free(h);
       return;
     }
-    if ((h.modos || []).length) {
+    // Só círculos (conjurar com mais mana) e a magia pede alvo: os círculos
+    // viram chips no seletor de alvo, com o base marcado — sem um toque a mais
+    // em toda conjuração.
+    const soCirculos = (h.modos || []).length > 0 && h.modos.every(m => /^c\d+$/.test(m.id));
+    const precisaAlvo = !(h.alvo_modo === 'nenhum' || h.alvo_modo === 'si' || mode === 'self'
+                          || mode === 'pool' || mode === 'area_self');
+    if ((h.modos || []).length && modo === undefined && !(soCirculos && precisaAlvo)) {
       seletorDeModos(cur, h);
       return;
     }
+    const w = modo || (soCirculos ? h.modos[0].id : '');
     if (h.alvo_modo === 'nenhum') {
-      act({ action: 'ability', actor: cur.name, ability: name, target: '' });
+      act({ action: 'ability', actor: cur.name, ability: name, target: '', weapon: w });
       return;
     }
     if (mode === 'self' || h.alvo_modo === 'si') {
-      act({ action: 'ability', actor: cur.name, ability: name, target: cur.name });
+      act({ action: 'ability', actor: cur.name, ability: name, target: cur.name, weapon: w });
       return;
     }
     // Pool e área-que-nasce-no-conjurador não escolhem alvo: o motor sabe
     // onde a magia cai (a zona de quem conjura, ou os inimigos do pool).
     if (mode === 'pool' || mode === 'area_self') {
-      conferirArea(cur, h, '');
+      conferirArea(cur, h, '', w);
       return;
     }
     // Área posta à distância: o picker escolhe UMA criatura e a magia pega a
     // zona dela inteira — inclusive aliados que estejam lá.
-    showTargets('ability', { ability: name, hab: h, mode });
+    showTargets('ability', { ability: name, hab: h, mode, modo: w });
   }
 
   function _target(name) {
@@ -1208,7 +1230,7 @@
     else if (_pick.kind === 'item')
       act({ action: 'item', actor: cur.name, item: _pick.item, target: name });
     else if (_pick.mode === 'area')
-      conferirArea(cur, _pick.hab || { nome: _pick.ability }, name);
+      conferirArea(cur, _pick.hab || { nome: _pick.ability }, name, _pick.modo || '');
     else
       act({ action: 'ability', actor: cur.name, ability: _pick.ability, target: name,
             weapon: _pick.modo || '' });
@@ -1218,8 +1240,9 @@
   // aliado no caminho, conjura direto — perguntar toda vez seria só atrito.
   // Com aliado, mostra quem e pede confirmação: o fogo amigo é regra e
   // continua, mas nunca mais sem aviso.
-  async function conferirArea(cur, h, alvo) {
-    const payload = { action: 'ability', actor: cur.name, ability: h.nome, target: alvo };
+  async function conferirArea(cur, h, alvo, modo) {
+    const payload = { action: 'ability', actor: cur.name, ability: h.nome, target: alvo,
+                      weapon: modo || '' };
     let p = null;
     try {
       p = await preverArea({ actor: cur.name, ability: h.nome, target: alvo });
@@ -1449,7 +1472,7 @@
   // ---- API pública -------------------------------------------------
   window.Combat = {
     sync,
-    _sel, _selHab, _usarHab, _modo, _info, _reacao, _selWeapon, _selItem, _target, _mover, _cancel, _free,
+    _sel, _selHab, _usarHab, _modo, _circulo, _info, _reacao, _selWeapon, _selItem, _target, _mover, _cancel, _free,
     _confirmarArea,
     _livreEnviar, _livreFechar,
     _act: act,

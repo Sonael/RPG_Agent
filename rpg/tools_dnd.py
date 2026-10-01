@@ -206,6 +206,7 @@ def _mark_at_zero_hp(target: dict, source_name: str = "") -> str:
         _log_combat_event("down", source_name, name, msg=f"{name} caiu inconsciente")
         return " CAIU INCONSCIENTE!"
     target["status"] = "morto"
+    (target.get("sheet") or {})["morreu_hora"] = _agora_em_horas()
     _log_combat_event("down", source_name, name, msg=f"{name} foi derrotado")
     return " DERROTADO!"
 
@@ -303,6 +304,16 @@ def _fim_do_turno(nome: str, token: int) -> list[str]:
     _expirar_efeitos(memory.char_key(nome or ""), "fim", token)
     _acabou_com_o_turno = [f"{x} acabou" for x in
                            _expirar_efeitos(memory.char_key(nome or ""), "fim", token, "condicoes")]
+    # Piscar: d20 no fim do turno; 11+ e ele some para o Plano Etéreo até o
+    # início do próximo turno dele.
+    if any(e.get("piscar") for e in _efeitos_de(ch)):
+        _d20_p = random.randint(1, 20)
+        if _d20_p >= 11:
+            ch.setdefault("sheet", {}).setdefault("condicoes", []).append(
+                {"nome": "Etéreo", "duracao": None, "ate_turno_de": memory.char_key(nome or "")})
+            _acabou_com_o_turno.append(f"{ch.get('name', nome)} pisca (d20={_d20_p}) e some para o Plano Etéreo")
+        else:
+            _acabou_com_o_turno.append(f"{ch.get('name', nome)} não pisca desta vez (d20={_d20_p})")
     s = ch.get("sheet") or {}
     _limpar_condicoes(ch)
     conds = s.get("condicoes")
@@ -2439,6 +2450,11 @@ def _rolar_salvaguarda(alvo: dict, atributo: str, cd: int,
     if atributo == "destreza" and conds & {"contido", "imobilizado"}:
         desvantagem = True
     notas_extra = []
+    for e in _efeitos(s):
+        if _norm_txt(atributo) in {_norm_txt(x) for x in e.get("vantagem_save_atributos") or []}:
+            vantagem = True
+            notas_extra.append(f"vantagem: {e.get('nome', 'efeito')}")
+            break
     if contra:
         for e in _efeitos(s):
             if _norm_txt(contra) in {_norm_txt(x) for x in e.get("vantagem_save_contra") or []}:
@@ -3141,6 +3157,10 @@ CONDITION_EFFECTS: dict[str, dict] = {
     "confuso":     {},
     # Banimento: some da luta enquanto durar a concentração.
     "banido":      {"no_actions": True, "untargetable": True},
+    # Piscar: no Plano Etéreo até o início do próximo turno — ninguém alcança.
+    "etéreo":      {"untargetable": True},
+    # Raio do Enfraquecimento: metade do dano com armas de FOR.
+    "enfraquecido": {"metade_dano_for": True},
     "transformado":{},
 }
 
@@ -3624,6 +3644,19 @@ def _apply_damage(target: dict, amount: int = 0, damage_type: str = "",
         from rpg import criaturas
         notas.append(criaturas.quando_a_fera_cai(target, max(0, dano - hp_antes)))
         hp_depois = int(sheet.get("vida_atual", 0) or 0)
+
+    # Vínculo Protetor: quem conjurou leva o mesmo dano (sem resistência).
+    if dano > 0:
+        for _e in _efeitos(sheet):
+            _guarda = memory.campaign.get("characters", {}).get(_e.get("vinculo") or "")
+            if _guarda and _guarda is not target and (_guarda.get("sheet") or {}).get("vida_atual", 0):
+                _gs = _guarda["sheet"]
+                _antes_g = int(_gs.get("vida_atual", 0) or 0)
+                _gs["vida_atual"] = max(0, _antes_g - dano)
+                notas.append(f"Vínculo Protetor: {_guarda.get('name')} leva {dano} "
+                             f"({_antes_g} → {_gs['vida_atual']})")
+                if _gs["vida_atual"] == 0:
+                    notas.append(_mark_at_zero_hp(_guarda, "Vínculo Protetor").strip())
 
     # O enfeitiçado ferido por quem o enfeitiçou (ou pelo lado dele): o
     # encanto quebra. É a regra do Enfeitiçar Pessoa.
@@ -6386,6 +6419,26 @@ def attack_roll(
     if _fora:
         return f"Erro: {target['name']} está {_fora} e ninguém o alcança agora."
 
+    _notas_santuario = []
+    _meu_sant = [e for e in _efeitos_de(attacker) if e.get("santuario")]
+    if _meu_sant and memory.luta_com_o_grupo(attacker) != memory.luta_com_o_grupo(target):
+        attacker["sheet"]["efeitos"] = [e for e in attacker["sheet"].get("efeitos") or []
+                                        if not e.get("santuario")]
+        _notas_santuario.append(f"{attacker['name']} ataca e perde o Santuário")
+    _sant = next((e for e in _efeitos_de(target) if e.get("santuario")), None)
+    if _sant and memory.luta_com_o_grupo(attacker) != memory.luta_com_o_grupo(target):
+        _passou_s, _linha_s = _rolar_salvaguarda(attacker, "sabedoria", int(_sant["santuario"]))
+        if not _passou_s:
+            _msg_s = (f"{attacker['name']} tenta atacar {target['name']}, mas o Santuário o detém "
+                      f"({_linha_s}): perde o ataque.")
+            _log_combat_event("attack_miss", attacker["name"], target["name"], msg=_msg_s)
+            _marcar_que_atacou(attacker)
+            if end_turn:
+                _msg_s += _auto_advance_turn(attacker_name)
+            memory.save_campaign()
+            return _msg_s
+        _notas_santuario.append(f"Santuário de {target['name']}: {_linha_s} — passa")
+
     # ALCANCE: quando o campo tem zonas, corpo-a-corpo exige a mesma zona e
     # tiro longo (ou com inimigo colado) sai com desvantagem. Vem antes de
     # qualquer dado — recusar depois de rolar já teria mudado o estado.
@@ -6462,6 +6515,15 @@ def attack_roll(
             attack_attribute, mod = _ma_attr, _ma_mod
         if damage_dice_count * damage_dice_sides < _ma_die or "desarmad" in _norm_txt(weapon):
             damage_dice_count, damage_dice_sides = 1, _ma_die
+
+    if (any(e.get("arma_conjuracao") for e in _efeitos(sa))
+            and any(k in _norm_txt(weapon) for k in ("clava", "club", "bordao", "cajado", "quarterstaff"))):
+        _attr_c = _atributo_de_conjuracao(sa) or "sabedoria"
+        _mod_c = _modifier(int(sa.get(_attr_c, 10) or 10))
+        if _mod_c > mod:
+            attack_attribute, mod = _attr_c, _mod_c
+        if damage_dice_count * damage_dice_sides < 8:
+            damage_dice_count, damage_dice_sides = 1, 8
 
     # Tipo de dano do golpe — o que decide se o alvo resiste, é imune ou
     # vulnerável. '' quando não dá para saber (dano sem tipo, sem modificador).
@@ -6572,6 +6634,7 @@ def attack_roll(
     if _mods["desvantagem"]:
         disadvantage = True
     cond_notes.extend(_mods["notas"])
+    cond_notes.extend(_notas_santuario)
 
     # ── A arma existe? Tem munição? É mágica? Carrega algo? ─────────────────
     _mag = _bonus_magico_da_arma(attacker, weapon)
@@ -6617,11 +6680,27 @@ def attack_roll(
     _ca_antes_da_reacao = target_ca
     _linhas_reacao = []
     _erra_por_reacao = False
-    if not _sorte and not falha_critica and (critico or attack_total >= target_ca):
+    _imgs = next((e for e in _efeitos(st) if int(e.get("imagens", 0) or 0) > 0), None)
+    if _imgs and not falha_critica and memory.luta_com_o_grupo(attacker) != memory.luta_com_o_grupo(target):
+        _n_img = int(_imgs["imagens"])
+        _d20_img = random.randint(1, 20)
+        if _d20_img >= {3: 6, 2: 8}.get(_n_img, 11):
+            _ca_img = 10 + _modifier(int(st.get("destreza", 10) or 10))
+            if attack_total >= _ca_img or critico:
+                _imgs["imagens"] = _n_img - 1
+                if _imgs["imagens"] <= 0:
+                    st["efeitos"] = [e for e in st.get("efeitos") or [] if e is not _imgs]
+                _linhas_reacao.append(f"Imagem Espelhada (d20={_d20_img}): o golpe acerta uma cópia, "
+                                      f"que some (restam {_imgs['imagens']}).")
+            else:
+                _linhas_reacao.append(f"Imagem Espelhada (d20={_d20_img}): o golpe vai numa cópia e erra.")
+            _erra_por_reacao = True
+    if (not _erra_por_reacao and not _sorte and not falha_critica
+            and (critico or attack_total >= target_ca)):
         _erra_por_reacao, _linhas_reacao = _reacoes.ao_ser_atingido(
             attacker, target, attack_total, target_ca, critico)
-        if _erra_por_reacao:
-            critico = False
+    if _erra_por_reacao:
+        critico = False
     _acerta = (critico or attack_total >= target_ca or bool(_sorte)) and not _erra_por_reacao
     if critico and crit_min < 20 and not force_crit and d20 < 20:
         style_note = (style_note + " · " if style_note else "") + \
@@ -6689,6 +6768,10 @@ def attack_roll(
         # espada +1 soma +1 no ataque E no dano, que é o que faz dela uma
         # espada +1 — antes ela era uma espada com nome comprido.
         dmg_arma = max(1, sum(rolls) + mod + _hab_bonus + extra_dmg + _mag)
+        _enfraq = _condicao_com(attacker, "metade_dano_for")
+        if _enfraq and attack_attribute.lower() == "forca":
+            dmg_arma = max(1, dmg_arma // 2)
+            result += f"   {attacker['name']} está {_enfraq}: metade do dano da arma.\n"
         dmg    = dmg_arma + gd_total
         detail = " + ".join(str(r) for r in rolls)
         bonus_str = f" +{_hab_bonus}" if _hab_bonus > 0 else (f" {_hab_bonus}" if _hab_bonus < 0 else "")
@@ -6747,7 +6830,11 @@ def attack_roll(
 
         # Efeitos de quem ataca: Marca do Caçador, Favor Divino, Fúria.
         for _x in _dano_de_efeitos(attacker, target, _corpo_for, critico):
-            _componentes.append((_x["valor"], _x["tipo"] or dmg_type))
+            if _x["valor"] < 0:
+                _v0, _t0 = _componentes[0]
+                _componentes[0] = (max(1, _v0 + _x["valor"]), _t0)
+            else:
+                _componentes.append((_x["valor"], _x["tipo"] or dmg_type))
             result += f"   {_x['texto']}\n"
 
         # Golpe Divino Aprimorado (paladino 11): 1d8 radiante em todo acerto
@@ -7022,6 +7109,17 @@ def use_ability(
     s     = char["sheet"]
     custo = hab.get("custo_mana", 0)
 
+    # ── Conjurar com mais mana (círculo acima do da magia) ────────────────
+    _circulo = _resolucao.circulo_do_modo(hab, modo)
+    if _circulo:
+        _opcoes = _resolucao.circulos_da_magia(hab, char)
+        if f"c{_circulo}" not in _opcoes:
+            return (f"Aviso: {hab['nome']} não pode ser conjurada no {_circulo}º círculo agora "
+                    f"(círculo acima do que o nível alcança, ou mana insuficiente). Nada foi gasto.")
+        _base_c = int((_resolucao._magia_srd(hab) or {}).get("nivel", 1) or 1)
+        if _circulo > _base_c:
+            custo = SPELL_MANA_COST[_circulo]
+
     # ── RECARGA 5–6 ────────────────────────────────────────────────────────
     # O poder de recarga gasto não pode ser usado de novo até o d6 devolvê-lo
     # no início do turno (_rolar_recargas). Antes, só o braço da IA de NPC
@@ -7160,8 +7258,15 @@ def use_ability(
     # tirava 1d6 de vida dele.
     _efeito = efeito_do_dado(hab)
     _formula = dado_efetivo(hab, char)
+    if _circulo:
+        _formula = _resolucao.dado_no_circulo(hab, _formula, _circulo)
     if _formula:
         n_dice, sides, bonus = _parse_dice(_formula)
+        # Curar Ferimentos, Palavra Curativa: o SRD soma o modificador de
+        # conjuração. O compêndio marcava (soma_mod) e o motor ignorava.
+        if _efeito == "cura" and (_resolucao._magia_srd(hab) or {}).get("soma_mod"):
+            _attr_cura = _atributo_de_conjuracao(s) or "sabedoria"
+            bonus += max(0, _modifier(int(s.get(_attr_cura, 10) or 10)))
         rolls      = [random.randint(1, sides) for _ in range(n_dice)]
         total_dano = sum(rolls) + bonus
     else:
@@ -7444,7 +7549,12 @@ def use_ability(
             if _efeito in ("bonus", "nenhum", "condicao") and ctrl_effect is None:
                 result += f"\n   {target['name']}: sem mudança na vida."
 
-            elif _is_healing_ability(hab):
+            # O compêndio também decide: Curar Ferimentos com a descrição vazia
+            # na ficha caía no ramo de dano e FERIA o aliado.
+            elif _efeito == "cura" or _is_healing_ability(hab):
+                if sides and any(e.get("cura_maxima") for e in _efeitos(st)):
+                    total_dano = n_dice * sides + bonus
+                    result += f"\n   Sinal de Esperança: a cura rola o máximo ({total_dano})."
                 st["vida_atual"] = min(_hp_max_efetivo(st), st["vida_atual"] + total_dano)
                 result += f"\n   {target['name']}: {hp_antes} → {st['vida_atual']}/{st['vida_max']}"
                 if hp_antes == 0:
@@ -7957,6 +8067,12 @@ def roll_death_save(char_name: str, player_roll: int = 0) -> str:
         roll = player_roll
     else:
         roll = random.randint(1, 20)
+    # Sinal de Esperança: vantagem — o motor rola o segundo d20.
+    _nota_esperanca = ""
+    if any(e.get("vantagem_morte") for e in _efeitos(s)):
+        _segundo = random.randint(1, 20)
+        _nota_esperanca = f" (Sinal de Esperança: vantagem, segundo d20 = {_segundo})"
+        roll = max(roll, _segundo)
 
     # Natural 20: milagre — recupera 1 pv
     if roll == 20:
@@ -7966,7 +8082,7 @@ def roll_death_save(char_name: str, player_roll: int = 0) -> str:
         char["status"]            = "vivo"
         memory.save_campaign()
         return (
-            f"CRÍTICO NATURAL! {char['name']} se recupera milagrosamente!\n"
+            f"CRÍTICO NATURAL! {char['name']} se recupera milagrosamente!{_nota_esperanca}\n"
             f"   d20={roll} → Recupera 1 ponto de vida e estabiliza.\n"
             f"   Vida: 1/{s['vida_max']}"
         )
@@ -7984,7 +8100,7 @@ def roll_death_save(char_name: str, player_roll: int = 0) -> str:
         s["death_saves_sucessos"] = min(3, s.get("death_saves_sucessos", 0) + 1)
         sucessos = s["death_saves_sucessos"]
         result = (
-            f"Teste de Morte bem-sucedido! ({char['name']})\n"
+            f"Teste de Morte bem-sucedido! ({char['name']}){_nota_esperanca}\n"
             f"   d20={roll} ≥ 10 → 1 sucesso.\n"
             f"   Sucessos: {sucessos}/3 | Falhas: {s.get('death_saves_falhas', 0)}/3"
         )
@@ -8012,6 +8128,7 @@ def roll_death_save(char_name: str, player_roll: int = 0) -> str:
         s["death_saves_sucessos"] = 0
         s["death_saves_falhas"]   = 0
         char["status"]            = "morto"
+        s["morreu_hora"]          = _agora_em_horas()
         result += f"\n   {char['name']} MORREU. Narre a cena de forma dramática e definitiva."
         _log_combat_event("death", char["name"], "",
                           msg=f"{char['name']} morreu (d20={roll})", d20=roll)
@@ -14675,6 +14792,13 @@ def _reset_turn_economy(cs: dict) -> None:
     cs["turn_economy"] = {"acao_usada": False, "bonus_usada": False,
                           "movimento_usado": False}
     _inicio_de_turno(cs)
+    _ordem = cs.get("initiative_order") or []
+    _i = cs.get("current_turn_index", 0)
+    if isinstance(_i, int) and 0 <= _i < len(_ordem):
+        _quem = memory.campaign.get("characters", {}).get(memory.char_key(_ordem[_i]))
+        _extra = sum(int(e.get("movimento_por_turno", 0) or 0) for e in _efeitos_de(_quem))
+        if _extra:
+            cs["turn_economy"]["movimento_extra"] = _extra
 
 
 def _inicio_de_turno(cs: dict) -> None:
@@ -14687,8 +14811,9 @@ def _inicio_de_turno(cs: dict) -> None:
     if not ch:
         return
     # A Esquiva, o Ataque Imprudente e o Raio Guia duram "até o seu próximo
-    # turno": acabam aqui, quando ele começa.
+    # turno": acabam aqui, quando ele começa. O Etéreo do Piscar também.
     _expirar_efeitos(memory.char_key(order[idx]), "inicio")
+    _expirar_efeitos(memory.char_key(order[idx]), "inicio", qual="condicoes")
     _rolar_recargas(ch)
     _repor_lendarias(ch)
     cs["_lendarias_msg"] = _gastar_lendarias_dos_chefes(order[idx])
@@ -15165,7 +15290,7 @@ def _ca_efetiva(char: dict) -> int:
     return max(ca, minima)
 
 
-def _mods_de_ataque(atacante: dict, alvo: dict, corpo_for: bool) -> dict:
+def _mods_de_ataque(atacante: dict, alvo: dict, corpo_for: bool, com_arma: bool = True) -> dict:
     """
     O que os efeitos fazem com UM ataque de `atacante` em `alvo`:
     {vantagem, desvantagem, bonus, notas, gastar}. `gastar` são os efeitos de
@@ -15175,6 +15300,8 @@ def _mods_de_ataque(atacante: dict, alvo: dict, corpo_for: bool) -> dict:
     sa = (atacante or {}).get("sheet") or {}
     for e in _efeitos(sa):
         nome = e.get("nome", "efeito")
+        if e.get("so_arma") and not com_arma:
+            continue
         if e.get("atk_dado"):
             v, txt = _rolar_expr(e["atk_dado"])
             r["bonus"] += v
@@ -15215,6 +15342,11 @@ def _mods_de_ataque(atacante: dict, alvo: dict, corpo_for: bool) -> dict:
         if e.get("desvantagem_contra_mim"):
             r["desvantagem"] = True
             r["notas"].append(f"{nome} em {alvo.get('name', '')}: desvantagem")
+        if e.get("desvantagem_de_extraplanares"):
+            from rpg import resolucao
+            if resolucao._e_do_tipo(atacante or {}, resolucao._EXTRAPLANARES):
+                r["desvantagem"] = True
+                r["notas"].append(f"{nome} em {alvo.get('name', '')}: desvantagem")
     return r
 
 
@@ -15229,11 +15361,15 @@ def _dano_de_efeitos(atacante: dict, alvo: dict, corpo_for: bool, critico: bool)
     for e in _efeitos(sa):
         nome = e.get("nome", "efeito")
         if e.get("dano_dado") and (not e.get("contra") or e["contra"] == alvo_chave):
-            n, faces, bonus = _parse_dice(str(e["dano_dado"]))
+            sinal = -1 if str(e["dano_dado"]).strip().startswith("-") else 1
+            n, faces, bonus = _parse_dice(str(e["dano_dado"]).strip().lstrip("+-"))
             rolls = [random.randint(1, faces) for _ in range(n * (2 if critico else 1))]
-            valor = sum(rolls) + bonus
+            valor = sinal * (sum(rolls) + bonus)
             saida.append({"valor": valor, "tipo": e.get("dano_tipo", ""),
-                          "texto": f"{nome}: [{' + '.join(map(str, rolls))}] = {valor}"})
+                          "texto": f"{nome}: [{' + '.join(map(str, rolls))}] = {valor:+d}"})
+        if e.get("dano_fixo"):
+            saida.append({"valor": int(e["dano_fixo"]), "tipo": "",
+                          "texto": f"{nome}: {int(e['dano_fixo']):+d}"})
         if e.get("dano_fixo_for") and corpo_for:
             valor = int(e["dano_fixo_for"])
             saida.append({"valor": valor, "tipo": "", "texto": f"{nome}: +{valor}"})
@@ -15250,6 +15386,9 @@ def _bonus_de_salvaguarda(alvo: dict) -> tuple[int, str]:
             total += v
             notas.append(f"{e.get('nome', 'efeito')} {txt}")
             _gastar_efeito(s, e)
+        if e.get("save_fixo"):
+            total += int(e["save_fixo"])
+            notas.append(f"{e.get('nome', 'efeito')} {int(e['save_fixo']):+d}")
     return total, ("; ".join(notas))
 
 
@@ -15480,7 +15619,7 @@ def _rolar_ataque_magico(char: dict, alvo: dict, hab: dict) -> tuple[bool, bool,
         mod = max(_modifier(int(s.get(a, 10) or 10)) for a in ("inteligencia", "sabedoria", "carisma"))
     vantagem = _has_condition_effect(char, "attack_advantage") or _has_condition_effect(alvo, "defense_disadvantage")
     desvantagem = _has_condition_effect(char, "attack_disadvantage")
-    mods = _mods_de_ataque(char, alvo, False)
+    mods = _mods_de_ataque(char, alvo, False, com_arma=False)
     vantagem = vantagem or mods["vantagem"]
     desvantagem = desvantagem or mods["desvantagem"]
     d20, log = _roll_d20_with_adv(vantagem, desvantagem)
