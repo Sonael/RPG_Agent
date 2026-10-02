@@ -400,9 +400,10 @@ def test_tres_modos_por_reacao(emboscada):
     assert reacoes.modo_da_reacao(_ch("Mira"), "escudo arcano") == "auto"
 
 
-def test_recurso_e_lampejo_nao_perguntam(emboscada):
-    assert "indomavel" not in reacoes.PODEM_PERGUNTAR and "lampejos" not in reacoes.PODEM_PERGUNTAR
-    assert reacoes.alternar("Mira", "indomavel", True, "perguntar").startswith("Erro:")
+def test_recurso_e_lampejo_tambem_perguntam(emboscada):
+    # Indomável, Alma do Diamante e Lampejos gastam recurso contado: também perguntam.
+    assert {"indomavel", "alma do diamante", "lampejos"} <= reacoes.PODEM_PERGUNTAR
+    assert not reacoes.alternar("Mira", "indomavel", True, "perguntar").startswith("Erro:")
 
 
 def test_o_turno_do_inimigo_para_e_nada_acontece(emboscada):

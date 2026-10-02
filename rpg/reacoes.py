@@ -122,9 +122,9 @@ REACOES: dict[str, dict] = {
 
 _POR_SRD = {cfg["srd"]: chave for chave, cfg in REACOES.items() if cfg.get("srd")}
 
-# Reações que podem perguntar: as que são escolha de verdade. Os Lampejos e os
-# recursos que refazem salvaguarda continuam no liga/desliga.
-PODEM_PERGUNTAR = frozenset(k for k, cfg in REACOES.items() if not cfg.get("recurso") and k != "lampejos")
+# Todas podem perguntar: inclusive o Indomável, a Alma do Diamante e os
+# Lampejos, que gastam um recurso contado.
+PODEM_PERGUNTAR = frozenset(REACOES)
 
 
 class PerguntaDeReacao(BaseException):
@@ -622,6 +622,9 @@ def lampejo_no_ataque(atacante: dict, alvo: dict, d20: int, total: int, ca: int)
             return d20, ""
     else:
         return d20, ""
+    if not _confirmar(adivinho, "lampejos", f"{atacante['name']} rolou {d20} contra {alvo['name']}. "
+                                            f"{adivinho['name']} troca o dado por um Lampejo ({v})?"):
+        return d20, ""
     guardados.remove(v)
     return v, f"{adivinho['name']} usa um Lampejo de Adivinhação: o d20 de {atacante['name']} vira {v}."
 
@@ -636,6 +639,9 @@ def lampejo_na_salvaguarda(alvo: dict, mod: int, cd: int) -> tuple[bool, str]:
     guardados = _lampejos(adivinho)
     v = max(guardados)
     if v + mod < cd:
+        return False, ""
+    if not _confirmar(adivinho, "lampejos", f"{alvo['name']} falhou a salvaguarda (CD {cd}). {adivinho['name']} "
+                                            f"troca o dado por um Lampejo ({v})?"):
         return False, ""
     guardados.remove(v)
     return True, f"{adivinho['name']} usa um Lampejo de Adivinhação: o d20 vira {v} ({v}{mod:+d} = {v + mod} vs CD {cd})"

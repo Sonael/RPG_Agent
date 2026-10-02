@@ -240,6 +240,8 @@ def test_campanha_com_ficha_mantem_o_motor_mesmo_sem_a_flag(campanha, conjunto):
     campanha["dnd_mode"] = False
     campanha["campaign_type"] = "fantasia"
     campanha["characters"]["heroína"] = criar_ficha("Heroína", grupo=True)
+    # Modo narrado explícito: o conjunto completo é o dele (a fixture zera o modo).
+    campanha["combat_mode"] = "narrado"
 
     disponiveis = nomes(entregues(conjunto))
     assert "attack_roll" in disponiveis
@@ -258,6 +260,8 @@ def test_campanha_sem_ficha_nenhuma_filtra(campanha, conjunto):
 def test_campaign_type_dnd_basta_mesmo_sem_a_flag(campanha, conjunto):
     campanha["dnd_mode"] = False
     campanha["campaign_type"] = "dnd"
+    # Modo narrado explícito: o conjunto completo é o dele (a fixture zera o modo).
+    campanha["combat_mode"] = "narrado"
     assert len(entregues(conjunto)) == FORA_DO_ROMANCE
 
 

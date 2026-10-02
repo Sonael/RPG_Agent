@@ -337,3 +337,41 @@ def test_preparar_magia_pelo_menu(tela):
     log = " | ".join(e.get("msg", "") for e in _motor(pg)["log"])
     assert "prepara Raio Guia" in log, log[-300:]
     assert not erros, erros[:3]
+
+
+# ---------------------------------------------------------------------------
+# Dardos no mesmo alvo; encerrar a luta
+# ---------------------------------------------------------------------------
+
+def test_misseis_magicos_dois_dardos_no_mesmo_alvo(tela):
+    abrir, cap = tela
+    estado = copy.deepcopy(cap.COMBATE_MAGIAS)
+    estado["characters"]["helena"]["habilidades"].append(
+        {"nome": "Magic Missile", "dado": "", "custo_mana": 2, "descricao": "", "nivel_magia": 1})
+    pg, erros = abrir(estado, "O que fará Helena")
+    _escolher(pg, "Mísseis Mágicos")
+    pg.wait_for_selector("#cbt-targets .cbt-tgt-title:has-text('até 3 alvos')")
+    pg.click("#cbt-targets button.cbt-btn:has-text('Cultista')")
+    pg.click("#cbt-targets button.cbt-btn:has-text('Cultista')")
+    assert "×2" in pg.inner_text("#cbt-targets button.cbt-btn:has-text('Cultista')")
+    pg.click("#cbt-targets button:has-text('Desfazer o último')")
+    pg.click("#cbt-targets button.cbt-btn:has-text('Cultista')")
+    pg.click("#cbt-targets button.cbt-btn:has-text('Acólito')")
+    assert "3/3 dardos" in pg.inner_text("#cbt-targets button:has-text('Confirmar')")
+    pg.click("#cbt-targets button:has-text('Confirmar')")
+    pg.wait_for_function("() => !document.querySelector('#cbt-targets:not(.hidden) .cbt-tgt-title')", timeout=8000)
+    log = " | ".join(e.get("msg", "") for e in _motor(pg)["log"])
+    assert "Magic Missile em Cultista, Cultista, Acólito" in log, log[-300:]
+    assert not erros, erros[:3]
+
+
+def test_encerrar_a_luta_pelo_menu(tela):
+    abrir, cap = tela
+    pg, erros = abrir(copy.deepcopy(cap.COMBATE_MAGIAS), "O que fará Helena")
+    pg.click("#cbt-buttons button:has-text('Manobras')")
+    pg.click("#cbt-targets button:has-text('Encerrar a luta')")
+    assert "o Mestre decide" in pg.inner_text("#cbt-targets")
+    pg.click("#cbt-targets button.cbt-perigo:has-text('Encerrar')")
+    pg.wait_for_selector("#cbt-end-overlay:not(.hidden)", timeout=8000)
+    assert "Luta encerrada" in pg.inner_text("#cbt-end-overlay .cbt-result-title")
+    assert not erros, erros[:3]

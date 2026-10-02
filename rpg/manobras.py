@@ -117,6 +117,9 @@ def pedir_rendicao(ator: str, alvo: str, modo: str = "") -> str:
             tipo in ("constructo", "morto-vivo") and int(s_b.get("inteligencia", 10) or 10) <= 6):
         return (f"Aviso: {b['name']} não tem como entender um pedido de rendição — luta até cair "
                 f"(ou foge). A Ação não foi gasta.")
+    if (b.get("sheet") or {}).get("recusa_rendicao"):
+        return (f"{a['name']} pede a rendição de {b['name']}, que recusa: viu o que fizeram com quem largou "
+                f"as armas. Continua lutando.")
     pou = td.poupado(b)
     if pou == "dominado":
         b["status"] = "rendido"

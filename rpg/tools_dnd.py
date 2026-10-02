@@ -2595,13 +2595,18 @@ def _rolar_salvaguarda(alvo: dict, atributo: str, cd: int,
     # Indomável (guerreiro) e Alma do Diamante (monge, 1 ki): refaz a
     # salvaguarda que falhou. O motor usa sozinho, se o jogador não desligou.
     if (_tem_habilidade(alvo, "indomavel", "indomitable") and reacao_automatica(alvo, "indomavel")
-            and (usos_restantes(alvo, "Indomável") or 0) > 0):
+            and (usos_restantes(alvo, "Indomável") or 0) > 0
+            and _reacoes_s._confirmar(alvo, "indomavel", f"{alvo.get('name')} falhou ({linha}). Usar Indomável "
+                                                         f"e rolar de novo ({usos_restantes(alvo, 'Indomável')} "
+                                                         f"uso(s))?")):
         _gastar_uso(alvo, "Indomável")
         passou2, linha2 = _rolar()
         return passou2, f"{linha}; Indomável, de novo: {linha2}"
     if (_tem_habilidade(alvo, "alma do diamante", "diamond soul")
             and reacao_automatica(alvo, "alma do diamante")
-            and (usos_restantes(alvo, "Ki") or 0) > 0):
+            and (usos_restantes(alvo, "Ki") or 0) > 0
+            and _reacoes_s._confirmar(alvo, "alma do diamante", f"{alvo.get('name')} falhou ({linha}). Gastar 1 "
+                                                                f"ki (Alma do Diamante) e rolar de novo?")):
         _gastar_uso(alvo, "Ki")
         passou2, linha2 = _rolar()
         return passou2, f"{linha}; Alma do Diamante (1 ki), de novo: {linha2}"
@@ -2877,7 +2882,30 @@ def _alvos_sem_zonas(char_name: str, hab: dict, target_name: str) -> list[dict]:
                 and memory.luta_com_o_grupo(alvo) == memory.luta_com_o_grupo(conjurador)):
             continue
         pegos.append(alvo)
+        # A área que pega todos pega também quem está colado no alvo (trocou
+        # golpes com ele nesta rodada ou na anterior): a Bola de Fogo no orc
+        # que luta com o guerreiro queima o guerreiro.
+        if not so_adversarios:
+            for colado in _colados(alvo):
+                if colado not in pegos and memory.char_key(colado.get("name", "")) != eu:
+                    pegos.append(colado)
     return pegos[:max_alvos_da_area(hab)]
+
+
+def _colados(alvo: dict) -> list[dict]:
+    """Quem trocou golpes corpo a corpo com `alvo` nesta rodada ou na anterior (e está de pé)."""
+    cs = memory.campaign.get("combat_state") or {}
+    rodada = int(cs.get("round", 1) or 1)
+    chave = memory.char_key(alvo.get("name", ""))
+    saida = []
+    for a, b, r in cs.get("engajados") or []:
+        if int(r) < rodada - 1 or chave not in (a, b):
+            continue
+        outro = memory.campaign["characters"].get(b if a == chave else a)
+        if (outro and (outro.get("status") or "").lower() not in OUT_OF_COMBAT_STATUSES
+                and int((outro.get("sheet") or {}).get("vida_atual", 0) or 0) > 0):
+            saida.append(outro)
+    return saida
 
 
 def prever_area(char_name: str, ability_name: str, target_name: str = "") -> dict:
@@ -7165,6 +7193,20 @@ def attack_roll(
     _fora = _condicao_com(target, "untargetable")
     if _fora:
         return f"Erro: {target['name']} está {_fora} e ninguém o alcança agora."
+    # Atacar quem se rendeu: ele volta a lutar, e os outros inimigos não se
+    # rendem mais (viram o que acontece com quem larga as armas).
+    _nota_rendido = ""
+    if ((target.get("status") or "").lower() == "rendido"
+            and memory.luta_com_o_grupo(attacker) != memory.luta_com_o_grupo(target)):
+        target["status"] = "inimigo" if memory.lado_no_combate(target) == "inimigo" else "vivo"
+        for _nm_r in (memory.campaign.get("combat_state") or {}).get("initiative_order") or []:
+            _c_r = memory.campaign["characters"].get(memory.char_key(_nm_r))
+            if _c_r and memory.luta_com_o_grupo(_c_r) == memory.luta_com_o_grupo(target):
+                _c_r.setdefault("sheet", {})["recusa_rendicao"] = True
+        _log_combat_event("atacou_rendido", attacker["name"], target["name"],
+                          msg=f"{attacker['name']} ataca {target['name']}, que tinha se rendido")
+        _nota_rendido = (f"   {target['name']} tinha se rendido: volta a lutar, e nenhum dos seus aliados se "
+                         f"rende mais. (Mestre: quem viu vai contar.)\n")
     _cob_nivel, _cob_bonus = _cobertura_contra(attacker, target,
                                                any(r in (weapon or "").lower() for r in RANGED_WEAPONS))
     if _cob_nivel == "total":
@@ -7412,6 +7454,15 @@ def attack_roll(
         disadvantage = True
     cond_notes.extend(_mods["notas"])
     cond_notes.extend(_notas_santuario)
+    # Quem troca golpes de perto fica "colado" (sem zonas, é o que diz quem
+    # está ao lado de quem para a área).
+    _cs_eng = memory.campaign.get("combat_state") or {}
+    if (_cs_eng.get("is_active") and not any(r in (weapon or "").lower() for r in RANGED_WEAPONS)
+            and memory.luta_com_o_grupo(attacker) != memory.luta_com_o_grupo(target)):
+        _par = sorted([memory.char_key(attacker["name"]), memory.char_key(target["name"])])
+        _eng = [e for e in _cs_eng.get("engajados") or [] if e[:2] != _par]
+        _eng.append(_par + [int(_cs_eng.get("round", 1) or 1)])
+        _cs_eng["engajados"] = _eng
     from rpg import tracos as _tracos_a
     _matilha = _tracos_a.matilha(attacker, target)
     if _matilha:
@@ -7533,7 +7584,7 @@ def attack_roll(
         style_note = (style_note + " · " if style_note else "") + \
                      f"Crítico ampliado ({crit_min}-20)"
 
-    result = f"{attacker['name']} ataca {target['name']} com {weapon}!\n"
+    result = f"{attacker['name']} ataca {target['name']} com {weapon}!\n" + _nota_rendido
     if cond_notes:
         result += "   " + "\n   ".join(cond_notes) + "\n"
     if style_note:
@@ -8504,6 +8555,11 @@ def use_ability(
             if _imune_a_condicao(_a_m, _cond_m):
                 result += f"\n   {_a_m['name']} é imune a {_cond_m.capitalize()}."
                 continue
+            if _save_m and _pedir_dado_do_jogador(_a_m, _motor_rola):
+                _registrar_salvaguarda_pendente(_a_m, _save_m, _cd_m, char, hab, dano=0, metade=False,
+                                                condicao=_condicao_de_magia(char, hab, _cond_m, s))
+                result += f"\n   {_a_m['name']}: espera o dado do jogador (salvaguarda de {_save_m} CD {_cd_m})."
+                continue
             if _save_m:
                 _passou_m, _linha_m = _rolar_salvaguarda(
                     _a_m, _save_m, _cd_m, desvantagem=_desv_primeira or _sub.coroa_contra(_a_m, hab),
@@ -8557,6 +8613,13 @@ def use_ability(
                 _passou, _linha_save = True, "Magia Cuidadosa: passa"
                 _dano_nele = total_dano // 2 if _metade_se_passar(hab) else 0
                 _linha_save = f" ({_linha_save} — {'metade' if _dano_nele else 'nada'})"
+            elif _save_area and _pedir_dado_do_jogador(_alvo, _motor_rola):
+                _registrar_salvaguarda_pendente(_alvo, _save_area, _cd_area, char, hab, dano=total_dano,
+                                                tipo=_tipo_area, metade=_metade_se_passar(hab),
+                                                condicao=hab.get("condicao_se_falhar") or "")
+                result += (f"\n   {_alvo['name']}: espera o dado do jogador (salvaguarda de "
+                           f"{_save_area} CD {_cd_area}).")
+                continue
             elif _save_area:
                 _passou, _linha_save = _rolar_salvaguarda(_alvo, _save_area, _cd_area,
                                                           desvantagem=_desv_primeira or _sub.coroa_contra(_alvo, hab))
@@ -8664,6 +8727,17 @@ def use_ability(
 
             # ── MODO INTERATIVO: saving throw → PAUSA, não aplica efeito ──────
             if saving_throw_stat and saving_throw_dc > 0:
+                # O que a falha traz fica guardado para resolve_saving_throw:
+                # a condição (Imobilizar Pessoa, o Redemoinho que derruba) e se
+                # quem passa leva metade ou nada.
+                _registrar_salvaguarda_pendente(
+                    target, saving_throw_stat, saving_throw_dc, char, hab,
+                    dano=0 if ctrl_effect is not None else total_dano,
+                    tipo=(_norm_damage_type(hab.get("tipo_dano", "") or "")
+                          or _damage_type_from_text(hab.get("descricao", ""))),
+                    metade=_metade_se_passar(hab),
+                    condicao=(_condicao_de_magia(char, hab, ctrl_effect["condition"], s)
+                              if ctrl_effect is not None else (hab.get("condicao_se_falhar") or "")))
                 memory.save_campaign()
                 if ctrl_effect is not None:
                     cond_nome = ctrl_effect["condition"]
@@ -8676,7 +8750,9 @@ def use_ability(
                         f"   Atributo: {saving_throw_stat.capitalize()} | CD: {saving_throw_dc}\n"
                         f"   Efeito (falha): **{efeito_falha}** | Efeito (sucesso): **{efeito_sucesso}**\n"
                         f"\nMestre: Role {saving_throw_stat.capitalize()} CD {saving_throw_dc}!\n"
-                        f"   Se falhar: use apply_condition('{target['name']}', '{cond_nome}')."
+                        f"   Com o dado do jogador: resolve_saving_throw('{target['name']}', "
+                        f"'{saving_throw_stat}', {saving_throw_dc}, <total>, 0) — o motor aplica {cond_nome} "
+                        f"se falhar."
                     )
                 else:
                     return (
@@ -8684,9 +8760,13 @@ def use_ability(
                         f"\n\n**AGUARDANDO TESTE DE RESISTÊNCIA**\n"
                         f"   Alvo: {target['name']}\n"
                         f"   Atributo: {saving_throw_stat.capitalize()} | CD: {saving_throw_dc}\n"
-                        f"   Dano (falha): **{total_dano}** | Dano reduzido (sucesso): **{total_dano // 2}**\n"
+                        f"   Dano (falha): **{total_dano}** | Sucesso: "
+                        f"**{total_dano // 2 if _metade_se_passar(hab) else 0}**\n"
                         f"\nMestre: Role {saving_throw_stat.capitalize()} CD {saving_throw_dc}!\n"
-                        f"   Após resultado, use modify_hp para aplicar o dano correto."
+                        f"   Com o dado do jogador: resolve_saving_throw('{target['name']}', "
+                        f"'{saving_throw_stat}', {saving_throw_dc}, <total>, {total_dano}) — o motor aplica o "
+                        f"dano certo" + (f" e {hab['condicao_se_falhar']} se falhar"
+                                         if hab.get("condicao_se_falhar") else "") + "."
                     )
 
             # ── MODO AUTOMÁTICO: aplica efeito imediatamente ─────────────────
@@ -8779,6 +8859,17 @@ def use_ability(
         rolls=list(rolls), total=total_dano,
     )
     memory.save_campaign()
+    # Salvaguardas do grupo esperando o dado do jogador (modo narrado): o
+    # turno espera por elas.
+    _esperam = [p for p in (memory.campaign.get("combat_state") or {}).get("salvaguardas_pendentes") or []
+                if memory.char_key(p.get("por", "")) == memory.char_key(char["name"])]
+    if _esperam:
+        result += ("\n\n**AGUARDANDO TESTES DE RESISTÊNCIA**"
+                   + "".join(f"\n   {p['alvo']}: {p['atributo'].capitalize()} CD {p['cd']}" for p in _esperam)
+                   + "\nMestre: peça o dado de cada um e chame resolve_saving_throw(alvo, atributo, cd, total, "
+                     "dano) — o motor aplica o dano certo e a condição; o turno passa no último.")
+        memory.save_campaign()
+        return result
     if end_turn:
         result += _auto_advance_turn(char_name)
     else:
@@ -13507,6 +13598,25 @@ def recruit_character(npc_name: str, role: str = "aliado") -> str:
 # Macro-tool: Resolução de Saving Throw Interativo
 # ---------------------------------------------------------------------------
 
+def _registrar_salvaguarda_pendente(alvo: dict, atributo: str, cd: int, por: dict, hab: dict, *,
+                                    dano: int = 0, tipo: str = "", metade: bool = True, condicao=None) -> None:
+    cs = memory.campaign.setdefault("combat_state", {})
+    cs.setdefault("salvaguardas_pendentes", []).append({
+        "alvo": alvo.get("name", ""), "atributo": atributo, "cd": int(cd), "por": por.get("name", ""),
+        "magia": hab.get("nome", ""), "dano": int(dano or 0), "tipo": tipo, "metade": bool(metade),
+        "condicao": condicao or ""})
+
+
+def _pedir_dado_do_jogador(alvo: dict, motor_rola: bool = False) -> bool:
+    """
+    A salvaguarda deste alvo espera o dado do jogador? No modo narrado, o
+    personagem do grupo rola o próprio dado também na magia de área e de
+    vários alvos (na tela tática, o motor rola e mostra cada dado).
+    """
+    return (not motor_rola and memory.is_party_member(alvo)
+            and memory.campaign.get("combat_mode") == "narrado")
+
+
 def resolve_saving_throw(
     target_name: str,
     attribute: str,
@@ -13538,15 +13648,31 @@ def resolve_saving_throw(
     if not char:
         return err
 
+    # O que a magia deixou guardado para esta salvaguarda (a condição, se
+    # quem passa leva metade ou nada) manda sobre o que o Mestre informou.
+    cs_sv = memory.campaign.get("combat_state") or {}
+    pend = next((p for p in cs_sv.get("salvaguardas_pendentes") or []
+                 if memory.char_key(p.get("alvo", "")) == memory.char_key(char["name"])), None)
+    metade = True
+    condicao = None
+    if pend:
+        cs_sv["salvaguardas_pendentes"].remove(pend)
+        attribute = pend.get("atributo") or attribute
+        dc = int(pend.get("cd") or dc)
+        damage_if_fail = int(pend.get("dano", damage_if_fail) or 0) if "dano" in pend else damage_if_fail
+        damage_type = pend.get("tipo") or damage_type
+        metade = bool(pend.get("metade", True))
+        condicao = pend.get("condicao") or None
+
     s          = char["sheet"]
     attr_key   = attribute.lower()
     mod        = _modifier(s.get(attr_key, 10))
     passou     = player_roll >= dc
-    dano_real  = damage_if_fail // 2 if passou else damage_if_fail
+    dano_real  = (damage_if_fail // 2 if metade else 0) if passou else damage_if_fail
 
     sign       = "+" if mod >= 0 else ""
     resultado  = "PASSOU" if passou else "FALHOU"
-    reducao    = " (metade do dano)" if passou else " (dano completo)"
+    reducao    = ((" (metade do dano)" if metade else " (nenhum dano)") if passou else " (dano completo)")
 
     result = (
         f"Saving Throw — {char['name']} ({attribute.capitalize()} CD {dc})\n"
@@ -13566,6 +13692,28 @@ def resolve_saving_throw(
         result += _mark_at_zero_hp(char)
     elif pct <= 0.25:
         result += " Estado crítico!"
+    # A condição que a falha traz (Paralisado do Imobilizar Pessoa, Caído do Redemoinho).
+    if condicao and not passou and hp_depois > 0:
+        from rpg import tracos as _tracos_sv
+        if isinstance(condicao, dict):
+            if _imune_a_condicao(char, condicao.get("nome", "")):
+                result += f"\n   {char['name']} é imune a {condicao.get('nome')}."
+            else:
+                s.setdefault("condicoes", []).append(dict(condicao))
+                result += f"\n   {char['name']}: **{str(condicao.get('nome', '')).upper()}**"
+                _acaba = _como_a_condicao_acaba(condicao)
+                if _acaba:
+                    result += f"\n   {_acaba}"
+        else:
+            por_sv = memory.campaign["characters"].get(memory.char_key((pend or {}).get("por", ""))) or {"name": ""}
+            result += "\n   " + _tracos_sv._por_condicao(por_sv, char, str(condicao))
+
+    # Ainda há salvaguardas da mesma magia esperando o dado: o turno espera.
+    faltam = [p.get("alvo") for p in cs_sv.get("salvaguardas_pendentes") or []]
+    if faltam:
+        memory.save_campaign()
+        return result + (f"\n   Ainda esperam o dado: {', '.join(faltam)} — resolve_saving_throw de "
+                         f"cada um antes do próximo turno.")
 
     # O save ocorre durante o turno do CONJURADOR (use_ability pausou sem
     # avançar). O ponteiro ainda aponta para ele → avança a partir do atual.
@@ -15346,6 +15494,7 @@ NPC_STRATEGIES = {
     "aleatório":  "Escolhe alvo e ação aleatoriamente.",
     "suporte":    "Cura aliados com HP < 50% se possível; senão ataca.",
     "atirador":   "Recua da zona se estiver no corpo-a-corpo; depois atira no mais fraco.",
+    "capturar":   "Quer o alvo vivo: golpes corpo a corpo nocauteiam (estável) em vez de matar.",
 }
 
 
@@ -15361,6 +15510,7 @@ def set_npc_strategy(npc_name: str, strategy: str) -> str:
     • aleatório  — escolhe alvo aleatoriamente
     • suporte    — cura aliados com HP < 50%; senão ataca
     • atirador   — recua da zona se estiver trancado no corpo-a-corpo, depois atira
+    • capturar   — quer o alvo vivo: o corpo a corpo que derruba nocauteia
 
     Todas usam o poder de RECARGA (set_recharge_ability) assim que ele estiver
     carregado — é a jogada mais forte que a criatura tem.
@@ -16172,6 +16322,7 @@ def _executar_turno_npc(npc_name: str = "") -> str:
             attack_attribute = _atributo(golpe_atual),
             is_proficient    = True,
             end_turn         = ultimo,
+            nao_letal        = (strategy == "capturar"),
             _skip_turn_check = True,
         )
         if not ultimo:
@@ -17511,6 +17662,8 @@ def _combatant_snapshot(name: str) -> dict | None:
             # Vários alvos: por círculo (Imobilizar Pessoa, Mísseis Mágicos) e,
             # sem zonas, pelo tamanho da área (Bola de Fogo: 4).
             "alvos_por_modo": _resolucao_snap.alvos_por_modo(h, ch),
+            # Mísseis Mágicos, Raio Ardente: cada toque no alvo é um dardo.
+            "projeteis": bool(_resolucao_snap.projeteis(h)),
             "max_alvos": (max_alvos_da_area(h) if r["area"] and not _zonas_ativas() else 1),
             # Usos por descanso (Surto de Ação, Fúria…). None quando a
             # habilidade é livre — a tela não desenha contador nesse caso.
@@ -17736,7 +17889,8 @@ def combat_action(action: str, actor: str = "", target: str = "",
         return {"ok": False, "message": _aviso_de_pergunta_pendente(), "snapshot": combat_snapshot()}
     # A ação do jogador também pode chamar uma reação que pergunta: o
     # Oportunista do monge quando o guerreiro acerta, o Golpe Mágico.
-    if (a not in ("reagir", "end", "enemy", "auto", "death_save", "nao_letal", "cover", "light", "dismount")
+    if (a not in ("reagir", "end", "enemy", "auto", "death_save", "nao_letal", "cover", "light", "dismount",
+                  "flee_all")
             and _rea_ca._respostas is None and _rea_ca.alguem_pergunta()):
         return _com_perguntas({"fn": "combat_action",
                                "kw": {"action": action, "actor": actor, "target": target, "weapon": weapon,
@@ -17779,7 +17933,20 @@ def combat_action(action: str, actor: str = "", target: str = "",
         msg = roll_death_save(actor)
 
     elif a == "end":
+        # Encerrar pela tela com inimigos ainda lutando: o Mestre decide como
+        # (trégua, fuga, rendição) — sem a vitória automática.
+        _ainda = [n for n in cs.get("initiative_order") or []
+                  if (lambda c: c and not memory.luta_com_o_grupo(c) and not poupado(c)
+                      and (c.get("status") or "").lower() not in DEFEATED_STATUSES)(
+                      memory.campaign["characters"].get(memory.char_key(n)))]
+        if _ainda and cs.get("is_active"):
+            cs["result"] = {"outcome": "interrompido", "title": "Luta encerrada",
+                            "sobreviventes": [], "caidos": [], "poupados": [],
+                            "de_pe": _ainda}
         msg = end_combat()
+
+    elif a == "flee_all":
+        msg = _fugir_em_grupo()
 
     else:
         # Daqui pra baixo: ações DE JOGADOR. Aplicam a economia 5e (Ação,
@@ -18359,6 +18526,40 @@ def combat_action(action: str, actor: str = "", target: str = "",
     return {"ok": True, "message": msg, "snapshot": combat_snapshot()}
 
 
+def _fugir_em_grupo() -> str:
+    """
+    O grupo inteiro foge: cada um provoca os ataques de oportunidade de quem
+    está colado nele (como a Fuga de um só), e a luta acaba como FUGA — sem XP
+    nem saque. Quem cair no caminho fica para trás.
+    """
+    cs = memory.campaign.get("combat_state") or {}
+    linhas, fugiram, ficaram = [], [], []
+    for nm in list(cs.get("initiative_order") or []):
+        ch = memory.campaign["characters"].get(memory.char_key(nm))
+        if (not ch or not memory.luta_com_o_grupo(ch)
+                or (ch.get("status") or "").lower() in DEFEATED_STATUSES):
+            continue
+        ops = _provoke_opportunity_attacks(ch["name"], "fugir")
+        if ops:
+            linhas.append(ops.strip())
+        if (ch.get("status") or "").lower() in DEFEATED_STATUSES or int((ch.get("sheet") or {}).get("vida_atual", 0) or 0) <= 0:
+            ficaram.append(ch["name"])
+        else:
+            fugiram.append(ch["name"])
+    _log_combat_event("flee", "", "", msg=f"O grupo foge: {', '.join(fugiram) or 'ninguém'}")
+    cs["result"] = {"outcome": "fuga", "title": "Fuga",
+                    "sobreviventes": [{"name": n, "is_party": True, "status": "fugiu",
+                                       "hp": int((memory.campaign["characters"][memory.char_key(n)].get("sheet") or {}).get("vida_atual", 0) or 0),
+                                       "hp_max": int((memory.campaign["characters"][memory.char_key(n)].get("sheet") or {}).get("vida_max", 0) or 0)}
+                                      for n in fugiram],
+                    "caidos": [{"name": n, "is_party": True, "status": "ficou para trás", "hp": 0, "hp_max": 0}
+                               for n in ficaram], "poupados": []}
+    fim = end_combat()
+    return ("O grupo foge da luta!" + ("".join(f"\n   {l}" for l in linhas))
+            + (f"\n   Fugiram: {', '.join(fugiram)}." if fugiram else "")
+            + (f"\n   Ficaram para trás: {', '.join(ficaram)}." if ficaram else "") + "\n" + fim)
+
+
 def combat_recap_payload() -> str:
     """
     Texto compacto do combate (do log estruturado) para a LLM narrar a luta
@@ -18381,7 +18582,20 @@ def combat_recap_payload() -> str:
         finais.append(f"{c.get('name')} [{lado}]: {c.get('status')} "
                       f"({c.get('hp')}/{c.get('hp_max')} HP)")
 
-    if str(desfecho).lower() == "derrota":
+    if str(desfecho).lower() == "fuga":
+        instrucao = (
+            "Desfecho: FUGA. O grupo largou a luta e escapou (quem caiu no caminho ficou para trás). "
+            "NÃO gere saque e NÃO conceda XP. Narre a fuga com base no log, e o que os inimigos fazem: "
+            "perseguem, desistem, levam os caídos. Siga a história."
+        )
+    elif str(desfecho).lower() == "interrompido":
+        instrucao = (
+            "Desfecho: LUTA ENCERRADA PELO JOGADOR, com inimigos ainda de pé ("
+            + ", ".join(res.get("de_pe") or []) + "). Decida o que isso foi — trégua, rendição, "
+            "fuga, intervenção — de acordo com a cena e o log, e narre. XP e saque só se a cena justificar "
+            "(inimigo que se rendeu e entregou o que tinha, por exemplo). Siga a história."
+        )
+    elif str(desfecho).lower() == "derrota":
         instrucao = (
             "Desfecho: DERROTA. Narre a queda do grupo de forma cinematográfica "
             "e contínua, com base no log abaixo. NÃO gere saque e NÃO conceda "

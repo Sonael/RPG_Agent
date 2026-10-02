@@ -1045,6 +1045,8 @@ Para definir estratégia de um NPC (opcional; padrão = agressivo):
   quem não tem visão no escuro não vê (ataca com desvantagem, é atacado com
   vantagem). Componentes caros (diamante, pérola...) precisam estar na
   mochila: a recusa diz qual — narre a falta, não invente o item.
+• O inimigo que quer o grupo VIVO: set_npc_strategy(nome, "capturar") — o
+  corpo a corpo dele nocauteia em vez de matar.
 • NINGUÉM É OBRIGADO A MATAR: inimigo que se rende → set_combat_side(nome,
   "rendido"). Só restando inimigos rendidos, enfeitiçados ou dominados pelo
   grupo, encerre com end_combat() (é vitória: XP normal, sem saque deles). O

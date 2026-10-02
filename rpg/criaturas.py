@@ -121,9 +121,10 @@ FICHAS: dict[str, dict] = {
                         "poderes": [{"nome": "Redemoinho", "dado": "3d8+2", "tipo_dano": "bludgeoning",
                                      "salvaguarda": "forca", "cd": 13, "metade": True,
                                      "condicao_se_falhar": "Caído", "recarga": 4,
-                                     "descricao": "Recarga 4–6. O redemoinho pega uma criatura: salvaguarda "
-                                                  "de Força CD 13; falha: 3d8+2 de dano de concussão, "
-                                                  "arremessada e Caída; sucesso: metade."}],
+                                     "descricao": "Recarga 4–6. O redemoinho varre as criaturas hostis num "
+                                                  "cubo de 3 m ao seu redor: salvaguarda de Força CD 13; "
+                                                  "falha: 3d8+2 de dano de concussão, arremessada e Caída; "
+                                                  "sucesso: metade."}],
                         "resistencias": ["lightning", "thunder"],
                         "resistencias_nao_magicas": ["bludgeoning", "piercing", "slashing"],
                         "imunidades": ["poison"]},
@@ -149,9 +150,10 @@ FICHAS: dict[str, dict] = {
                           "poderes": [{"nome": "Engolfar", "dado": "2d8+4", "tipo_dano": "bludgeoning",
                                        "salvaguarda": "forca", "cd": 15, "metade": False,
                                        "condicao_se_falhar": "Contido", "recarga": 4,
-                                       "descricao": "Recarga 4–6. O elemental engolfa uma criatura: "
-                                                    "salvaguarda de Força CD 15; falha: 2d8+4 de dano de "
-                                                    "concussão e fica Contida dentro dele."}],
+                                       "descricao": "Recarga 4–6. O elemental engolfa as criaturas hostis "
+                                                    "num cubo de 3 m ao seu redor: salvaguarda de Força CD 15; "
+                                                    "falha: 2d8+4 de dano de concussão e fica Contida dentro "
+                                                    "dele."}],
                           "resistencias": ["acid"],
                           "resistencias_nao_magicas": ["bludgeoning", "piercing", "slashing"],
                           "imunidades": ["poison"]},

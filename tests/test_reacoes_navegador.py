@@ -4,8 +4,8 @@ test_reacoes_navegador.py
 As reações (Escudo Arcano, Indomável...) acontecem no turno do inimigo. A
 tela de combate mostra quais o personagem tem e, num toque cada, troca o
 modo: automática (o motor usa) → pergunta (o turno para e o jogador decide) →
-desligada. O Indomável é recurso: só liga e desliga. Aqui se prova que a
-linha aparece, que o toque muda o modo no motor e que o botão mostra o novo.
+desligada — o Indomável também. Aqui se prova que a linha aparece, que o
+toque muda o modo no motor e que o botão mostra o novo.
 
 Depende do Playwright, que não está em requirements-dev.txt. Sem ele o arquivo
 é pulado:
@@ -104,8 +104,8 @@ def test_tocar_troca_o_modo_no_motor_e_na_tela(pagina):
     assert _estado_no_motor(pg)["escudo arcano"] == "auto"
 
 
-def test_recurso_nao_tem_o_modo_pergunta(pagina):
+def test_recurso_tambem_pergunta(pagina):
     pg, _ = pagina
     pg.click(".cbt-reacao-chip:has-text('Indomável')")
-    pg.wait_for_selector(".cbt-reacao-chip.desligada:has-text('Indomável')", timeout=5000)
-    assert _estado_no_motor(pg)["indomavel"] == "desligada"
+    pg.wait_for_selector(".cbt-reacao-chip.pergunta:has-text('Indomável')", timeout=5000)
+    assert _estado_no_motor(pg)["indomavel"] == "perguntar"

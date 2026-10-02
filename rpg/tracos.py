@@ -132,6 +132,12 @@ def _ancestralidade_feerica(ch: dict) -> bool:
         ch, "ancestralidade feerica", "fey ancestry")
 
 
+def _e_elfo(ch: dict) -> bool:
+    """Elfo de verdade (a paralisia do carniçal poupa "o elfo"; o meio-elfo, não). O Sono poupa os dois."""
+    raca = _norm(str((ch.get("sheet") or {}).get("raca") or ""))
+    return bool(re.search(r"\belf|\belfo|drow", raca)) and "meio" not in raca and "half" not in raca
+
+
 def recusa_de_tipo(hab: dict, alvo: dict | None) -> str:
     """
     Por que esta magia não afeta este alvo ('' quando afeta, ou quando a
@@ -276,7 +282,7 @@ def _rider(atacante: dict, alvo: dict, cfg: dict, critico: bool) -> list[str]:
     from rpg import tools_dnd as td
     if cfg.get("exceto_tipos") and tipo_de_criatura(alvo) in cfg["exceto_tipos"]:
         return []
-    if cfg.get("exceto_elfos") and _ancestralidade_feerica(alvo):
+    if cfg.get("exceto_elfos") and _e_elfo(alvo):
         return [f"{alvo['name']} é elfo: a paralisia do carniçal não o pega."]
     cd = int(cfg.get("cd", 10))
     passou, linha = td._rolar_salvaguarda(alvo, cfg.get("salvaguarda", "constituicao"), cd,

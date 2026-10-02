@@ -726,6 +726,8 @@
     const maxN = kind === 'ability' ? maxAlvos(h, _pick.modo || (circulos[0] ? circulos[0].id : '')) : 1;
     _pick.max = maxN;
     _pick.sel = (_pick.sel || []).filter(n => live.some(c => c.name === n)).slice(0, maxN);
+    const dardos = !!(h && h.projeteis);
+    const quantos = (n) => (_pick.sel || []).filter(x => x === n).length;
     const sel = maxN > 1 ? _pick.sel : [];
     const html =
       `<div class="cbt-tgt-title">${titulo}${maxN > 1 ? ` <small>· até ${maxN} alvos</small>` : ''}</div>`
@@ -746,20 +748,29 @@
             : '';
           const quem = c.name === (cur && cur.name) ? ' (em si)' : '';
           const marcado = sel.includes(c.name);
+          const vezes = dardos ? quantos(c.name) : 0;
+          const nVezes = vezes > 1 ? ` <small>×${vezes}</small>` : '';
           return `<button class="cbt-btn ${comOGrupo(c) ? 'cbt-alvo-aliado' : 'cbt-alvo-inimigo'}${fora ? ' cbt-fora' : ''}${marcado ? ' cbt-selecionado' : ''}" ${fora ? 'disabled' : ''}${dica} `
-            + (maxN > 1 ? `aria-pressed="${marcado ? 'true' : 'false'}" ` : '')
-            + `onclick="window.Combat._target('${jsNome(c.name)}')">${esc(c.name)}${quem}`
+            + (maxN > 1 ? `aria-pressed="${marcado ? 'true' : 'false'}" data-vezes="${vezes}" ` : '')
+            + `onclick="window.Combat._target('${jsNome(c.name)}')">${esc(c.name)}${quem}${nVezes}`
             + ` <small>${c.hp}/${c.hp_max}</small>${nota}</button>`;
         }).join('')
       + (_pick.permiteNenhum
           ? `<button class="cbt-btn" onclick="window.Combat._target('')">O primeiro que chegar</button>` : '')
+      + (maxN > 1 && dardos && sel.length
+          ? `<button class="cbt-btn" onclick="window.Combat._desfazerAlvo()">Desfazer o último</button>` : '')
       + (maxN > 1
           ? `<button class="cbt-btn cbt-primary" ${sel.length ? '' : 'disabled'} onclick="window.Combat._confirmarAlvos()">`
-            + `Confirmar (${sel.length}/${maxN})</button>` : '')
+            + `Confirmar (${sel.length}/${maxN}${dardos ? ' dardos' : ''})</button>` : '')
       + BOTAO_CANCELAR
       + `</div>`;
     abrirSeletor(html, false);
     marcarLinhas(estados, {});
+  }
+
+  function _desfazerAlvo() {
+    if (!_pick || !(_pick.sel || []).length) return;
+    showTargets('ability', Object.assign({}, _pick, { sel: _pick.sel.slice(0, -1) }));
   }
 
   function _confirmarAlvos() {
@@ -869,6 +880,7 @@
     tgtEl.classList.add('hidden'); tgtEl.innerHTML = '';
 
     const isWin = res.outcome === 'vitoria';
+    const titulos = { fuga: 'Fuga', interrompido: 'Luta encerrada' };
     const lista = (arr, fallen) => (arr || []).map(c =>
       `<li><span>${esc(c.name)}</span>`
       + `<span>${fallen ? esc(c.status) : (c.hp + '/' + c.hp_max)}</span></li>`
@@ -878,7 +890,7 @@
     ov.innerHTML = `
       <div class="cbt-end-modal">
         <h2 class="cbt-result-title ${isWin ? 'win' : 'lose'}">
-          ${isWin ? CRISTA_VITORIA : CRISTA_DERROTA}${esc(res.title || (isWin ? 'Vitória!' : 'Fim do combate'))}
+          ${isWin ? CRISTA_VITORIA : CRISTA_DERROTA}${esc(res.title || titulos[res.outcome] || (isWin ? 'Vitória!' : 'Fim do combate'))}
         </h2>
         <div class="cbt-result-cols">
           <div class="cbt-end-col">
@@ -1292,6 +1304,8 @@
     ['surrender:persuadir', 'Pedir rendição (Persuasão)', 'Persuasão contra a Sabedoria dele; enfeitiçado por vocês, com vantagem'],
     ['escape', 'Escapar', 'Atletismo ou Acrobacia contra o Atletismo de quem agarra'],
     ['flee', 'Fugir', 'sair do combate; quem está perto ganha ataque de oportunidade'],
+    ['flee_all', 'Fugir em grupo', 'o grupo inteiro larga a luta: cada um provoca ataques de oportunidade; sem XP nem saque'],
+    ['end', 'Encerrar a luta', 'acaba o combate agora; o Mestre decide e narra como (trégua, rendição, fuga)'],
   ];
 
   function _manobras() {
@@ -1342,6 +1356,17 @@
     const [acao, modo] = id.split(':');
     const rotulo = (MANOBRAS.find(m => m[0] === id) || [id, id])[1];
     if (id === 'ready:magia') { _prepararMagia(cur); return; }
+    if (acao === 'flee_all' || acao === 'end') {
+      const rotuloC = acao === 'end' ? 'Encerrar a luta agora?' : 'O grupo inteiro foge?';
+      const dica = acao === 'end'
+        ? 'Os inimigos ainda de pé não contam como derrotados: o Mestre decide como a luta termina.'
+        : 'Cada um provoca os ataques de oportunidade de quem está colado nele. Sem XP nem saque.';
+      abrirSeletor(`<div class="cbt-tgt-title">${rotuloC}</div><div class="cbt-tgt-dica">${dica}</div>`
+        + `<div class="cbt-picker-btns"><button class="cbt-btn cbt-perigo" `
+        + `onclick="window.Combat._act({action:'${acao}',actor:'${jsNome(cur.name)}'})">`
+        + `${acao === 'end' ? 'Encerrar' : 'Fugir'}</button>${BOTAO_CANCELAR}</div>`, false);
+      return;
+    }
     if (acao === 'hide' || acao === 'escape' || acao === 'defend' || acao === 'flee' || acao === 'cover'
         || acao === 'light' || acao === 'dismount') {
       act({ action: acao, actor: cur.name });
@@ -1433,7 +1458,10 @@
     if (_pick.kind === 'ability' && (_pick.max || 1) > 1 && name) {
       const sel = (_pick.sel || []).slice();
       const i = sel.indexOf(name);
-      if (i >= 0) sel.splice(i, 1);
+      // Dardos (Mísseis Mágicos): cada toque é um dardo, o mesmo alvo pode
+      // levar vários; "Desfazer" tira o último.
+      if (_pick.hab && _pick.hab.projeteis) { if (sel.length < _pick.max) sel.push(name); }
+      else if (i >= 0) sel.splice(i, 1);
       else if (sel.length < _pick.max) sel.push(name);
       showTargets('ability', Object.assign({}, _pick, { sel }));
       return;
@@ -1687,7 +1715,7 @@
   // ---- API pública -------------------------------------------------
   window.Combat = {
     sync,
-    _sel, _selHab, _usarHab, _modo, _circulo, _info, _reacao, _manobras, _manobra, _selWeapon, _selItem, _target, _confirmarAlvos, _naoLetal, _prepararMagiaEm, _mover, _cancel, _free,
+    _sel, _selHab, _usarHab, _modo, _circulo, _info, _reacao, _manobras, _manobra, _selWeapon, _selItem, _target, _confirmarAlvos, _desfazerAlvo, _naoLetal, _prepararMagiaEm, _mover, _cancel, _free,
     _confirmarArea,
     _livreEnviar, _livreFechar,
     _act: act,

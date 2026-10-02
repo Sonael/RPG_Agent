@@ -183,6 +183,9 @@ def campanha():
         memory.campaign.pop(_k, None)
     memory.campaign["campaign_type"] = padroes["campaign_type"]
     memory.campaign["dnd_mode"] = padroes["dnd_mode"]
+    # O modo de combate também: um teste no modo narrado deixava o seguinte
+    # esperando o dado do jogador onde a tela tática rola sozinha.
+    memory.campaign.pop("combat_mode", None)
     memory.campaign["combat_state"] = {
         "is_active": False, "initiative_order": [], "current_turn_index": 0,
         "round": 1, "turn_resolved": False, "npc_strategies": {},
