@@ -236,14 +236,17 @@ def test_condicao_so_pega_quem_falha(mesa):
     assert resistiu, "ninguém resistiu em 30 tentativas"
 
 
-def test_alvo_do_grupo_e_quem_rola(mesa):
-    """Contra personagem do jogador o dado é dele: o motor PARA e pede."""
+def test_alvo_do_grupo_o_motor_rola(mesa):
+    """
+    O combate é na tela tática, e ela mostra cada dado: a salvaguarda do
+    personagem do grupo é rolada pelo motor. A pausa esperando o dado do
+    jogador ficava parada — a tela não tinha como resolvê-la.
+    """
     _habilidades("Sonael", _hab("Fireball", custo=6))
     antes = _vida("Helena")
     saida = td.use_ability("Sonael", "Fireball", "Helena", end_turn=False)
-    assert _vida("Helena") == antes
-    assert "AGUARDANDO TESTE DE RESISTÊNCIA" in saida
-    assert "Destreza" in saida
+    assert "AGUARDANDO TESTE DE RESISTÊNCIA" not in saida
+    assert "salvaguarda de DES" in saida and _vida("Helena") < antes, saida
 
 
 def test_o_mestre_que_pede_o_teste_continua_mandando(mesa):

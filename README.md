@@ -559,7 +559,7 @@ memory.load_campaign() / memory.save_campaign()
   "name":                 str,
   "campaign_type":        "fantasia" | "dark_fantasy" | ...,   # gênero
   "dnd_mode":             bool,                             # regras
-  "combat_mode":          "tela" | "narrado",   # default: "tela"
+  "combat_mode":          "tela",              # o único modo de combate
   "protagonist":          str,
   "characters":           {char_key: {...}},
   "locations":            {loc_key:  {...}},
@@ -1417,31 +1417,24 @@ e no combate**; derrotá-la ainda exige dano. Por isso `dormindo` entra em
 (encerra a luta). Sofrer dano acorda a criatura (regra 5e); `end_combat()` e
 `roll_initiative()` acordam/normalizam para o status nunca vazar entre lutas.
 
-### Dois modos de combate
+### O combate é só na tela tática
 
-A escolha persiste por campanha (`combat_mode` em `memory.campaign`):
+`combat_mode` é sempre `"tela"` (`memory.PADRAO_COMBATE`): a luta abre a
+[tela tática](#tela-de-combate-tática-jrpg). A IA monta a cena, chama
+`roll_initiative` e **para**. O combate inteiro é resolvido por chamadas
+determinísticas a `/api/combat/*` (sem LLM no meio). No fim, o servidor monta
+um log estruturado e a IA é chamada **uma vez** para narrar a luta inteira e
+gerar o saque.
 
-- **`"tela"`** (default — `memory.PADRAO_COMBATE`), abre a
-  [tela tática](#tela-de-combate-tática-jrpg). A IA monta a cena, chama
-  `roll_initiative` e **para**. O combate inteiro é resolvido por chamadas
-  determinísticas a `/api/combat/*` (sem LLM no meio). No fim, o servidor
-  monta um log estruturado e a IA é chamada **uma vez** para narrar a luta
-  inteira + gerar saque.
-- **`"narrado"`**, a IA narra cada turno no chat. Validador pós-resposta
-  detecta mecânica narrada sem ferramenta e corrige.
-
-O default era `"narrado"` desde antes de a tela tática existir. Hoje é ela
-quem rola o dado, conta o dano, gasta munição, cobra alcance e move na zona —
-e o modo narrado pede à IA que faça tudo isso de cabeça, que é onde ela erra.
-
-**A virada alcança campanha que já existe**, uma vez: toda campanha tinha
-`"narrado"` gravado no documento (o default antigo era escrito na criação), e
-mudar a constante sozinha não as tocaria. `normalizar_campanha` troca o valor
-e deixa a marca `_padrao_combate_migrado`; depois dela a escolha é do jogador
-e fica — quem puser `"narrado"` na engrenagem continua narrado.
-
-Toggle do modo: engrenagem → "Esta campanha" → "Narrado pela IA" / "Tela
-tática".
+Existia um modo `"narrado"`, em que a IA narrava cada turno no chat e aplicava
+as regras de cabeça — justamente onde ela erra. Ele foi aposentado: as
+ferramentas de turno (`attack_roll`, `use_ability`, `next_turn`,
+`execute_npc_turn`, `move_combatant`, `legendary_action`, `responder_reacao`)
+saíram do conjunto do Mestre, `normalizar_campanha` grava `"tela"` em toda
+campanha ao carregar (inclusive as antigas com `"narrado"`), a importação
+chega na tela, e `POST /api/combat/mode` só aceita `"tela"`. A salvaguarda do
+personagem do grupo é rolada pelo motor, como na área: a pausa esperando o
+dado do jogador ficava parada, porque a tela não tinha como resolvê-la.
 
 ### A mesma luta não recomeça
 
@@ -1537,7 +1530,6 @@ atenção (nível pendente ou caído), missões ativas e personagens fora do gru
 | Antes, na barra | Agora |
 |---|---|
 | Uso do modelo, Status do sistema | engrenagem, seção "Esta campanha" |
-| Modo de combate | engrenagem, seção "Esta campanha" |
 | Menu Principal, Sair do Sistema | engrenagem, seção "Esta campanha" |
 | Resumo (e "editar" do estado) | página "Até aqui" do diário |
 | Observações | editor da campanha, no menu |
@@ -1596,7 +1588,7 @@ a lado, sem sobrepor e sem cortar), cada um abrindo a sua tela; uma linha por
 herói com a vida do motor e as marcas; o nome abrindo a ficha e o selo abrindo
 o aviso de nível; carga pesada como marca; a missão principal e o bloco sumindo
 sem missão ativa; os seis atalhos abrindo as telas; os contadores; os avisos só
-quando há algum; a engrenagem com o modo de combate funcionando; que nada da
+quando há algum; a engrenagem com a seção da campanha; que nada da
 barra antiga ficou na página e que a barra não precisa de rolagem nem corta
 rótulo; recolher e lembrar depois de recarregar; a campanha sem regras; e, no
 celular, a faixa, a barra de baixo, o "Mais" com a gaveta e o toque na faixa.

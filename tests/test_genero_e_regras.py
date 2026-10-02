@@ -307,15 +307,12 @@ def test_a_tela_de_missoes_usa_o_nome_do_genero_nos_botoes():
     assert "Criar ${uma()}" in js and "Nova ${uma()}" in js
 
 
-def test_o_modo_de_combate_so_aparece_onde_ha_regras():
+def test_a_engrenagem_nao_tem_modo_de_combate():
     """
-    "Tela tática" na engrenagem de uma campanha de romance era um botão que o
-    jogador não tinha como usar. A visibilidade é decidida no render, e não na
-    montagem: o painel é montado no início da sessão, antes de o gênero ter
-    chegado.
+    O combate é só na tela tática: a seção "Modo de combate" da engrenagem
+    (que o romance escondia, por não ter regras) saiu de vez.
     """
     from pathlib import Path
     js = (Path(__file__).resolve().parents[1] / "static" / "js" / "barra.js"
           ).read_text(encoding="utf-8")
-    assert "settings-combate" in js
-    assert "q('settings-combate')?.classList.toggle('hidden', !ehDnd())" in js
+    assert "settings-combate" not in js and "Modo de combate" not in js

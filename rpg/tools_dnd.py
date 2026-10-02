@@ -8555,11 +8555,6 @@ def use_ability(
             if _imune_a_condicao(_a_m, _cond_m):
                 result += f"\n   {_a_m['name']} é imune a {_cond_m.capitalize()}."
                 continue
-            if _save_m and _pedir_dado_do_jogador(_a_m, _motor_rola):
-                _registrar_salvaguarda_pendente(_a_m, _save_m, _cd_m, char, hab, dano=0, metade=False,
-                                                condicao=_condicao_de_magia(char, hab, _cond_m, s))
-                result += f"\n   {_a_m['name']}: espera o dado do jogador (salvaguarda de {_save_m} CD {_cd_m})."
-                continue
             if _save_m:
                 _passou_m, _linha_m = _rolar_salvaguarda(
                     _a_m, _save_m, _cd_m, desvantagem=_desv_primeira or _sub.coroa_contra(_a_m, hab),
@@ -8613,13 +8608,6 @@ def use_ability(
                 _passou, _linha_save = True, "Magia Cuidadosa: passa"
                 _dano_nele = total_dano // 2 if _metade_se_passar(hab) else 0
                 _linha_save = f" ({_linha_save} — {'metade' if _dano_nele else 'nada'})"
-            elif _save_area and _pedir_dado_do_jogador(_alvo, _motor_rola):
-                _registrar_salvaguarda_pendente(_alvo, _save_area, _cd_area, char, hab, dano=total_dano,
-                                                tipo=_tipo_area, metade=_metade_se_passar(hab),
-                                                condicao=hab.get("condicao_se_falhar") or "")
-                result += (f"\n   {_alvo['name']}: espera o dado do jogador (salvaguarda de "
-                           f"{_save_area} CD {_cd_area}).")
-                continue
             elif _save_area:
                 _passou, _linha_save = _rolar_salvaguarda(_alvo, _save_area, _cd_area,
                                                           desvantagem=_desv_primeira or _sub.coroa_contra(_alvo, hab))
@@ -8689,41 +8677,38 @@ def use_ability(
                 _conj = _conjuracao(s) or {}
                 # O poder do monstro diz a própria CD (Redemoinho: 13).
                 _cd = int(hab.get("cd") or 0) or int(_conj.get("cd") or (8 + int(s.get("proficiencia", 2) or 2)))
-                if memory.is_party_member(target) and not _motor_rola:
-                    # Personagem do jogador: o dado é dele. Cai na pausa
-                    # abaixo, com o teste e a CD que o SRD manda. (A ação de
-                    # covil não é turno de ninguém: o motor rola.)
-                    saving_throw_stat, saving_throw_dc = _save_auto, _cd
+                # O motor rola também a do personagem do grupo: o combate é na
+                # tela tática, e ela mostra cada dado. (A pausa esperando o dado
+                # do jogador ficava parada: a tela não tinha como resolvê-la.)
+                _passou, _linha = _rolar_salvaguarda(
+                    target, _save_auto, _cd,
+                    desvantagem=_desv_primeira or _sub.coroa_contra(target, hab),
+                    contra=(ctrl_effect or {}).get("condition", ""))
+                _desv_primeira = False
+                _falhou_cond = not _passou
+                result += f"\n   {target['name']}: {_linha}"
+                if ctrl_effect is not None:
+                    if _passou:
+                        result += f" — resistiu, {ctrl_effect['condition']} não pega."
+                        memory.save_campaign()
+                        return result + (_auto_advance_turn(char_name) if end_turn else "")
                 else:
-                    _passou, _linha = _rolar_salvaguarda(
-                        target, _save_auto, _cd,
-                        desvantagem=_desv_primeira or _sub.coroa_contra(target, hab),
-                        contra=(ctrl_effect or {}).get("condition", ""))
-                    _desv_primeira = False
-                    _falhou_cond = not _passou
-                    result += f"\n   {target['name']}: {_linha}"
-                    if ctrl_effect is not None:
-                        if _passou:
-                            result += f" — resistiu, {ctrl_effect['condition']} não pega."
-                            memory.save_campaign()
-                            return result + (_auto_advance_turn(char_name) if end_turn else "")
-                    else:
-                        # Chama Sagrada, Zombaria Viciosa: quem passa não leva
-                        # NADA. O motor dava metade a toda magia de teste.
-                        _metade = _metade_se_passar(hab)
-                        if _passou:
-                            total_dano = total_dano // 2 if _metade else 0
-                        result += ((f" — passou: metade do dano ({total_dano})" if _metade
-                                    else " — passou: nenhum dano")
-                                   if _passou else f" — falhou: dano cheio ({total_dano})")
-                        if _passou and not _metade:
-                            _log_combat_event(
-                                "ability", char["name"], target["name"],
-                                msg=(f"{char['name']} usou {hab['nome']} em {target['name']} "
-                                     f"• {target['name']} passou na salvaguarda"),
-                                ability=hab["nome"])
-                            memory.save_campaign()
-                            return result + (_auto_advance_turn(char_name) if end_turn else "")
+                    # Chama Sagrada, Zombaria Viciosa: quem passa não leva
+                    # NADA. O motor dava metade a toda magia de teste.
+                    _metade = _metade_se_passar(hab)
+                    if _passou:
+                        total_dano = total_dano // 2 if _metade else 0
+                    result += ((f" — passou: metade do dano ({total_dano})" if _metade
+                                else " — passou: nenhum dano")
+                               if _passou else f" — falhou: dano cheio ({total_dano})")
+                    if _passou and not _metade:
+                        _log_combat_event(
+                            "ability", char["name"], target["name"],
+                            msg=(f"{char['name']} usou {hab['nome']} em {target['name']} "
+                                 f"• {target['name']} passou na salvaguarda"),
+                            ability=hab["nome"])
+                        memory.save_campaign()
+                        return result + (_auto_advance_turn(char_name) if end_turn else "")
 
             # ── MODO INTERATIVO: saving throw → PAUSA, não aplica efeito ──────
             if saving_throw_stat and saving_throw_dc > 0:
@@ -8859,17 +8844,6 @@ def use_ability(
         rolls=list(rolls), total=total_dano,
     )
     memory.save_campaign()
-    # Salvaguardas do grupo esperando o dado do jogador (modo narrado): o
-    # turno espera por elas.
-    _esperam = [p for p in (memory.campaign.get("combat_state") or {}).get("salvaguardas_pendentes") or []
-                if memory.char_key(p.get("por", "")) == memory.char_key(char["name"])]
-    if _esperam:
-        result += ("\n\n**AGUARDANDO TESTES DE RESISTÊNCIA**"
-                   + "".join(f"\n   {p['alvo']}: {p['atributo'].capitalize()} CD {p['cd']}" for p in _esperam)
-                   + "\nMestre: peça o dado de cada um e chame resolve_saving_throw(alvo, atributo, cd, total, "
-                     "dano) — o motor aplica o dano certo e a condição; o turno passa no último.")
-        memory.save_campaign()
-        return result
     if end_turn:
         result += _auto_advance_turn(char_name)
     else:
@@ -13607,16 +13581,6 @@ def _registrar_salvaguarda_pendente(alvo: dict, atributo: str, cd: int, por: dic
         "condicao": condicao or ""})
 
 
-def _pedir_dado_do_jogador(alvo: dict, motor_rola: bool = False) -> bool:
-    """
-    A salvaguarda deste alvo espera o dado do jogador? No modo narrado, o
-    personagem do grupo rola o próprio dado também na magia de área e de
-    vários alvos (na tela tática, o motor rola e mostra cada dado).
-    """
-    return (not motor_rola and memory.is_party_member(alvo)
-            and memory.campaign.get("combat_mode") == "narrado")
-
-
 def resolve_saving_throw(
     target_name: str,
     attribute: str,
@@ -17802,7 +17766,7 @@ def combat_snapshot() -> dict:
             combatants.append(snap)
     current = order[idx] if order else ""
     return {
-        "combat_mode": camp.get("combat_mode", memory.PADRAO_COMBATE),
+        "combat_mode": "tela",          # o único modo de combate
         "is_active":   bool(cs.get("is_active")),
         "round":       int(cs.get("round", 1) or 1),
         "turn_index":  idx,
@@ -18630,6 +18594,10 @@ def combat_recap_payload() -> str:
 
 
 DND_TOOLS = [
+    # O combate é jogado só na tela tática: as ferramentas de turno
+    # (attack_roll, use_ability, next_turn, execute_npc_turn, move_combatant,
+    # legendary_action, responder_reacao) não são do Mestre. A tela as chama
+    # por combat_action; o Mestre abre a luta e narra o fim.
     suggest_encounter,
     learn_spell,
     roll_dice,
@@ -18641,9 +18609,7 @@ DND_TOOLS = [
     grant_temp_hp,
     make_skill_check,
     social_check,
-    attack_roll,
     learn_ability,
-    use_ability,
     equip_item,
     unequip_item,
     apply_condition,
@@ -18668,7 +18634,6 @@ DND_TOOLS = [
     set_stat,
     # Sistema de Iniciativa (v3)
     roll_initiative,
-    next_turn,
     end_combat,
     # Recrutamento de NPC
     recruit_character,
@@ -18676,17 +18641,13 @@ DND_TOOLS = [
     spawn_monster,
     # NPC strategy system
     set_npc_strategy,
-    execute_npc_turn,
-    responder_reacao,
     # Onda 3 — posicionamento por zonas
     set_battlefield,
     set_combat_side,
     describe_battlefield,
-    move_combatant,
     # Onda 3 — chefes: recarga e ações lendárias
     set_recharge_ability,
     set_legendary_actions,
-    legendary_action,
     set_legendary_resistance,
     set_lair_actions,
     set_cover,

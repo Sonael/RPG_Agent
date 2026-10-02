@@ -25,7 +25,6 @@
   let _open      = false;   // overlay visível
   let _busy      = false;   // requisição em voo (trava de clique duplo)
   let _ending    = false;   // recap em andamento (evita disparo duplo)
-  let _mode      = 'tela';   // ver memory.PADRAO_COMBATE
   let _autoTimer = null;
   let _autoGuard = 0;       // teto de segurança p/ turnos de IA encadeados
   let _pick      = null;    // {kind:'attack'|'ability'|'item', ...}
@@ -831,16 +830,7 @@
 
   async function refresh(snap) {
     _last = snap;
-    _mode = snap.combat_mode || 'tela';
-    updateModeUI();
     const pill = _pill();
-
-    if (snap.combat_mode !== 'tela') {
-      if (_open) close(false);
-      if (pill) pill.classList.add('hidden');
-      _userClosed = false;
-      return;
-    }
 
     if (snap.is_active) {
       // Reabre sozinho — exceto se o usuário fechou a tela de propósito.
@@ -1538,7 +1528,7 @@
     clearTimeout(_autoTimer);
     close(false);
     const pill = _pill();
-    if (pill && _last && _last.is_active && _last.combat_mode === 'tela') {
+    if (pill && _last && _last.is_active) {
       pill.classList.remove('hidden');
     }
   }
@@ -1682,35 +1672,6 @@
       ta.focus();
     }
   }
-
-  // ---- Toggle de modo (sidebar) -----------------------------------
-  function updateModeUI() {
-    document.querySelectorAll('#combat-mode-toggle .cm-opt').forEach(b =>
-      b.classList.toggle('active', b.dataset.mode === _mode));
-    const hint = document.getElementById('combat-mode-hint');
-    if (hint) hint.textContent = _mode === 'tela'
-      ? 'As lutas abrem a tela tática; a IA narra o resultado no fim (padrão).'
-      : 'A IA narra cada turno da luta no chat.';
-  }
-
-  window.setCombatMode = async function (mode) {
-    try {
-      const r = await api('/api/combat/mode', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode }),
-      });
-      if (r && r.ok) {
-        _mode = r.mode;
-        updateModeUI();
-        if (window.showToast)
-          window.showToast(mode === 'tela' ? 'Combate: tela tática' : 'Combate: narrado pela IA');
-        sync();
-      }
-    } catch (_) {
-      if (window.showToast) window.showToast('Não foi possível mudar o modo.');
-    }
-  };
 
   // ---- API pública -------------------------------------------------
   window.Combat = {

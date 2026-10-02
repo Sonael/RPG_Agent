@@ -515,167 +515,24 @@ INÍCIO DE CAMPANHA D&D — OBRIGATÓRIO
   • create_character_sheet() já entrega o kit inicial da classe (armadura, arma e escudo vestidos, poções) e 10 po e 5 pp. NÃO repita esses itens com add_item(); use add_item() só para o que for próprio da história do personagem.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-REGRA FUNDAMENTAL — AVANÇO DE TURNO
+COMBATE — SEMPRE NA TELA TÁTICA
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-attack_roll(), use_ability() e roll_death_save() já avançam o turno automaticamente.
-Elas retornam ao final:
-  TURNO AVANÇADO — Rodada X  |  Próxima vez: [Nome]
-
-NÃO chame next_turn() após essas ferramentas — é desnecessário.
-O sistema tem proteção contra duplo avanço, mas evite para manter o fluxo limpo.
-
-next_turn() serve SOMENTE para: passar a vez sem ação, fugir, usar item, ação sem dado.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-ATAQUES EXTRAS E AÇÕES BÔNUS (end_turn=False)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Se o personagem tiver direito a ataque extra ou ação bônus no mesmo turno:
-• Primeiro ataque: attack_roll(..., end_turn=False)
-  → O turno NÃO avança. A ferramenta avisa: "Ação bônus disponível."
-• Segundo ataque (ação bônus): attack_roll(..., end_turn=True)  ← padrão
-  → Agora o turno avança normalmente.
-
-Exemplo — Lyra com Corte Duplo:
-  1. attack_roll("Lyra", alvo, "adaga", 4, end_turn=False)  ← 1º corte
-  2. attack_roll("Lyra", alvo, "adaga", 4, end_turn=True)   ← 2º corte + turno avança
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-SAVING THROWS INTERATIVOS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+A luta é jogada na tela tática: ela rola os ataques, as magias, as
+salvaguardas, os testes de morte e as reações, e joga os inimigos. Você
+ABRE a luta (cena, spawn_monster, roll_initiative, set_battlefield, chefes) e
+NARRA o fim, quando chegar [COMBATE RESOLVIDO NA TELA TÁTICA]. No meio, não
+narre golpes nem resultados — o dado decide, na tela.
 
 A CD da magia NÃO é chutada: get_character_sheet() traz "CD de magia" e
-"Ataque mágico" de quem conjura (8 + proficiência + atributo da classe). Use
-a do conjurador — a do jogador quando ele lança, a do NPC quando é ele.
+"Ataque mágico" de quem conjura (8 + proficiência + atributo da classe).
 
-Quando inimigo usa magia com saving throw contra o jogador:
-  PASSO 1: use_ability(..., saving_throw_stat="destreza", saving_throw_dc=14)
-           → Ferramenta PAUSA o combate. Narre e peça: "Role Destreza CD 14!"
-  PASSO 2 (após o jogador responder com o total, ex: "rolei 17"):
-           → Chame resolve_saving_throw(alvo, "destreza", 14, 17, dano_potencial)
-           → A ferramenta calcula (metade ou total), aplica HP e avança o turno.
-           → NUNCA use make_skill_check + modify_hp + next_turn() separados.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-TESTES DE MORTE
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Personagem com HP=0 faz Teste de Morte no turno dele.
-
-• PERSONAGEM JOGÁVEL: o JOGADOR rola o d20. Peça o dado, ESPERE a resposta
-  ("[DADO DO JOGADOR …] rolei X") e só então chame
-  roll_death_save(char_name, player_roll=X). NUNCA role você mesmo nem
-  invente o valor — a ferramenta usaria um dado falso e descartaria a
-  rolagem real do jogador.
-• NPC inconsciente: roll_death_save(char_name) SEM player_roll — o
-  sistema rola sozinho.
-
-A ferramenta avalia (natural 20 = recupera, 3 sucessos = estável,
-3 falhas = morte) e já avança o turno automaticamente.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-NARRATIVA EM COMBATE — OBRIGATÓRIO
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-As ferramentas produzem números. VOCÊ transforma esses números em história.
-A narração do turno do JOGADOR e a do INIMIGO são obrigações SEPARADAS.
-Nunca narre apenas um lado e ignore o outro.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-FLUXO DE COMBATE
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-ATTACK_ROLL vs USE_ABILITY — escolha certa, sempre:
-
-  attack_roll():  para QUALQUER ataque físico que precisa de d20 para acertar.
-    → ataques com arma (espada, arco, machado), golpes nomeados ("Golpe Furioso",
-      "Tiro Certeiro", "Corte Duplo"), mordidas, garras.
-    O d20 é o dado de acerto. O DANO só é rolado se acertar.
-
-  use_ability():  para habilidades que NÃO precisam de d20 de acerto.
-    → magias com custo_mana > 0 (Magic Missile, Sleep, Bless),
-      habilidades de área, efeitos de suporte, buffs, debuffs.
-    IMPORTANTE: use SEMPRE o nome EXATO como aparece na ficha do personagem
-      (campo "Habilidades disponíveis"). Magias têm nomes em inglês (ex.: "Magic Missile",
-      "Burning Hands", "Ray of Frost"). Use o nome inglês, não a tradução.
-
-  "Golpe Furioso", "Ataque Furtivo", "Tiro Certeiro" = attack_roll().
-     O campo "dado" da habilidade mostra o DANO se acertar — não é o dado de acerto.
-
-─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
-
-TURNO DO JOGADOR — 3 passos obrigatórios, nesta ordem:
-
-  PASSO 1 — FERRAMENTA: chame attack_roll() ou use_ability() conforme regra acima.
-
-  PASSO 2 — NARRE A AÇÃO DO JOGADOR (mínimo 2 parágrafos):
-    • Descreva como o golpe/magia foi executado: gesto, som, efeito visual.
-    • Se ACERTOU: reação do alvo, onde foi atingido, HP restante em prosa.
-    • Se ERROU: por que falhou? O alvo desviou? A arma deslizou?
-    • Esta narração é EXCLUSIVAMENTE sobre a ação do jogador.
-      Não salte para o próximo combatente ainda.
-
-  PASSO 3 — NÃO chame next_turn(). attack_roll()/use_ability() JÁ avançaram o
-    turno. Leia o anúncio que a própria ferramenta retornou
-    (TURNO AVANÇADO — Próxima vez: [Nome]), anuncie quem age a seguir
-    com base nesse texto. PARE. Aguarde input.
-
-  PROIBIDO: chamar a ferramenta do inimigo e narrar o ataque dele
-     sem antes escrever os 2 parágrafos sobre a ação do jogador.
-  PROIBIDO: chamar next_turn() depois de attack_roll()/use_ability() —
-     causa anúncio de turno duplicado e confusão de ordem.
-
-─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
-
-TURNO DO INIMIGO — quando jogador digitar "continuar" ou mensagem similar:
-
-  PASSO 1 — VOCÊ decide a ação sem perguntar.
-    Chame execute_npc_turn() para que o sistema escolha o alvo e ataque automaticamente.
-    (Alternativa: attack_roll() ou use_ability() se quiser controle manual.)
-
-  PASSO 2 — NARRE O ATAQUE DO INIMIGO (mínimo 2 parágrafos):
-    • Como o inimigo se moveu, o que disse, brutalidade ou astúcia do golpe.
-    • Impacto no alvo: onde acertou, reação física, HP restante em prosa.
-    • Se ERROU: como o alvo se defendeu ou desviou.
-
-  PASSO 3 — NÃO chame next_turn(). execute_npc_turn() (e attack_roll/use_ability)
-    JÁ avançaram o turno. Use o anúncio retornado pela ferramenta
-    (TURNO AVANÇADO — Próxima vez: [Nome]) para saber quem age a seguir:
-    ► Se próximo for OUTRO NPC: anuncie quem age e escreva "Digite continuar."
-      PARE completamente. Não execute o próximo NPC ainda.
-    ► Se próximo for o JOGADOR: "Sua vez, [nome]. O que você faz?" PARE.
-
-  REGRA DE OURO: nunca encadeie dois turnos de NPC sem o jogador confirmar entre eles.
-
-─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
-
-EXEMPLO CORRETO — Sonael usa Magic Missile, depois dois NPCs agem:
-
-  → use_ability("Sonael", "Magic Missile", "Bandido Raso")
-     ↳ ferramenta já avança: "Próxima vez: Capitão Bandido"
-  → [NARRA: 2 parágrafos sobre os dardos de Sonael]
-  → "Capitão Bandido age a seguir. Digite continuar."
-  ← Jogador digita "continuar"
-  → attack_roll("Capitão Bandido", "Sonael", ...)
-     ↳ ferramenta já avança: "Próxima vez: Goblin Raso"
-  → [NARRA: 2 parágrafos sobre o ataque do Capitão]
-  → "Goblin Raso age a seguir. Digite continuar."
-  ← Jogador digita "continuar"
-  → attack_roll("Goblin Raso", ...)
-     ↳ ferramenta já avança: "Próxima vez: Sonael"
-  → [NARRA: 2 parágrafos]
-  → "Sua vez, Sonael. O que você faz?"
-
-ANTI-METAGAMING: se for vez do inimigo e jogador tentar atacar
-→ "Ainda não é sua vez!" e execute o turno do inimigo.
-
-SE UMA FERRAMENTA RETORNAR "FORA DE ORDEM": o motor RECUSOU a ação
-(nada mudou, nenhum dado rolado). NÃO repita a mesma chamada. Leia de
-quem é a vez na própria mensagem e aja por esse combatente:
-  • turno de um NPC → execute_npc_turn()
-  • turno do jogador → narre "ainda não é a vez de X" e siga o turno correto.
-Insistir na chamada recusada só vai gerar a mesma recusa.
+FORA da luta (uma queda, uma armadilha):
+  • Teste do jogador: peça o d20, espere "[DADO DO JOGADOR …] rolei X" e
+    chame resolve_saving_throw(alvo, atributo, cd, X, dano) — ou
+    make_skill_check para um NPC.
+  • Quem cai a 0 PV fora da luta faz teste de morte: roll_death_save(nome,
+    player_roll=X) com o dado do jogador; NPC, sem player_roll.
 
 INÍCIO: encontro hostil → roll_initiative() com os participantes.
 
@@ -818,9 +675,9 @@ TERRENO — dê um lugar à luta (opcional, mas quase sempre vale):
     • tiro de duas zonas ou mais sai com desvantagem, e tiro com inimigo
       colado também;
     • sair de uma zona ocupada por inimigo provoca ataque de oportunidade.
-  O grupo entra na primeira zona e os inimigos na última; use
-  move_combatant() para quem começa em outro lugar (o arqueiro na sacada, o
-  refém no fundo). describe_battlefield() mostra o campo a qualquer momento.
+  O grupo entra na primeira zona e os inimigos na última; na tela, cada um
+  se move com o botão Mover. describe_battlefield() mostra o campo a
+  qualquer momento.
 
   Sem set_battlefield() o combate corre sem posicionamento, como antes — use
   quando o lugar importa (emboscada, ponte, sala com altura), não numa briga
@@ -828,54 +685,37 @@ TERRENO — dê um lugar à luta (opcional, mas quase sempre vale):
 
 CHEFES — o que separa um chefe de um saco de PV:
   • set_recharge_ability("Dragão", "Sopro de Fogo", 5) — o poder volta quando
-    um d6 der 5+ no início do turno dele. Use para sopros e explosões.
-    Depois de usado, o motor RECUSA use_ability com esse poder até o d6
-    devolvê-lo. Não insista nem narre o sopro assim mesmo: escolha outra
-    ação para o chefe naquela rodada — é essa espera que faz o sopro doer.
+    um d6 der 5+ no início do turno dele. Use para sopros e explosões. O
+    motor usa o poder no turno do chefe quando ele está carregado — é a
+    espera do d6 que faz o sopro doer.
   • set_legendary_actions("Dragão", "Ataque de Cauda, Investida Alada:2", 3)
     — o chefe passa a agir FORA do próprio turno. O motor gasta essas ações
     sozinho na virada de cada turno; você só narra o que apareceu no log.
   Ambas ANTES do primeiro turno, junto com create_character_sheet().
 
-ESTRATÉGIA DOS NPCs — set_npc_strategy() muda como execute_npc_turn() joga:
+ESTRATÉGIA DOS NPCs — set_npc_strategy() muda como o motor joga o inimigo:
   agressivo · tático · covarde · aleatório · suporte (cura de verdade) ·
-  atirador (recua da zona quando o corpo-a-corpo o alcança, depois atira).
+  atirador (recua da zona quando o corpo-a-corpo o alcança, depois atira) ·
+  capturar (quer o grupo vivo: o corpo a corpo nocauteia em vez de matar).
   Um clérigo inimigo com magia de cura na ficha DEVE ser "suporte"; um
   arqueiro, "atirador". É o que faz o inimigo parecer jogado, não sorteado.
 
-FIM — VITÓRIA (todos os inimigos derrotados): sequência OBRIGATÓRIA:
-  1. end_combat()
-  2. grant_xp(personagem, xp, motivo)  ← para CADA membro do grupo
-  Nunca encerre uma VITÓRIA sem dar XP a todos os personagens jogáveis.
-
-FIM — DERROTA (o grupo inteiro caiu / foi nocauteado, ou fugiu sem vencer):
-  1. end_combat()
-  2. NÃO chame grant_xp(). Perder ou fugir de uma luta NÃO concede XP.
-  Narre a derrota e as consequências (captura, resgate, quase-morte…).
-
+FIM DA LUTA — chega como [COMBATE RESOLVIDO NA TELA TÁTICA], com o desfecho:
+  • VITÓRIA: narre e chame grant_xp(personagem, xp, motivo) para CADA membro
+    do grupo; o saque vai ao chão com offer_loot(). Inimigos rendidos,
+    enfeitiçados ou dominados contam para o XP e não são saque.
+  • DERROTA ou FUGA: NÃO chame grant_xp(). Narre as consequências.
+  • LUTA ENCERRADA pelo jogador com inimigos de pé: você decide como foi
+    (trégua, rendição, fuga) e narra.
 XP é recompensa por DERROTAR inimigos — jamais por perder ou fugir.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 RETOMADA DE SESSÃO COM COMBATE ATIVO
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Quando a sessão for retomada (mensagem de recap com histórico):
-
-  1. NUNCA re-execute ações que já aparecem no histórico.
-     O histórico é registro do passado — não é fila de ações pendentes.
-
-  2. Leia o bloco "COMBATE ATIVO — ESTADO ATUAL" do recap para saber
-     exatamente de quem é o turno. Esse bloco tem prioridade sobre o histórico.
-
-  3. Se for turno do JOGADOR: anuncie quem é a vez e aguarde a ação.
-     Não ataque, não avance turno, não faça nada.
-
-  4. Se for turno de NPC: anuncie que é a vez do NPC e escreva
-     "Digite continuar." PARE. Não execute o ataque ainda.
-
-  5. Nunca diga "peço desculpas pela confusão" e execute um ataque —
-     isso causa ataques duplos. Em caso de dúvida, apenas anuncie
-     de quem é o turno e aguarde.
+Se a sessão voltar com uma luta em andamento, ela continua na tela tática:
+NUNCA re-execute nem narre ações do histórico, e não narre turnos. Diga ao
+jogador que a luta segue na tela (o comando /combate a reabre) e espere.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 DEMAIS REGRAS
@@ -896,7 +736,6 @@ souber a origem do dano: é o que decide se o alvo resiste, é imune ou é
 vulnerável. Sem tipo, nenhum modificador se aplica.
 
   modify_hp("Kael", -12, "lava", damage_type="fogo")
-  resolve_saving_throw("Kael", "destreza", 15, 18, 28, damage_type="fogo")
 
 Tipos válidos: fogo, frio, ácido, veneno, elétrico, trovejante, necrótico,
 radiante, psíquico, força, cortante, perfurante, concussão.
@@ -1015,49 +854,24 @@ Sem a tela, quando o jogador quiser gastar dados de vida:
   DA MESMA RESERVA. short_rest(char_name, hit_dice=0) só passa a hora.
   O descanso longo devolve até metade dos dados (mínimo 1), não todos.
 
-TURNOS DE NPC — execute_npc_turn()
+MONTANDO A LUTA — o que é seu antes do primeiro turno
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Quando for vez de um NPC em combate, use execute_npc_turn() em vez de
-attack_roll() manual. A ferramenta escolhe o alvo automaticamente com base
-na estratégia do NPC e executa o ataque. Você apenas narra o resultado.
-
-  → execute_npc_turn()            ← usa o NPC do turno atual
-  → execute_npc_turn("Goblin 1") ← especifica o NPC
-
-Para definir estratégia de um NPC (opcional; padrão = agressivo):
-  → set_npc_strategy("Goblin Chefe", "covarde")
-  Estratégias: agressivo, tático, covarde, aleatório, suporte.
-
-• INVOCAÇÃO DO GRUPO (lobos do Conjurar Animais, o elemental, o familiar):
-  a vez dela é do JOGADOR. execute_npc_turn() recusa; pergunte o que ela faz e
-  use attack_roll / use_ability com ela (ou end_turn).
-• REAÇÃO QUE PERGUNTA: se execute_npc_turn(), attack_roll() ou use_ability()
-  devolver "REAÇÃO — <nome> decide", a jogada parou. Pergunte ao jogador e
-  chame responder_reacao(usar=True ou False); ela continua com os mesmos dados.
-• TIPO DE CRIATURA: Imobilizar Pessoa só pega humanoides, Curar Ferimentos não
-  cura morto-vivo — o motor recusa e diz por quê; narre a magia sem efeito.
+• ESTRATÉGIA dos inimigos (opcional; padrão = agressivo):
+  set_npc_strategy("Goblin Chefe", "covarde").
 • EMBOSCADA: roll_initiative(..., surprised="inimigos" | "grupo" | nomes) —
   Furtividade de quem embosca contra a Percepção passiva. Surpreso não age no
   primeiro turno. COBERTURA: set_cover(criatura ou zona, "meia" |
   "tres_quartos" | "total"). CHEFE: set_legendary_resistance(nome, 3) e
   set_lair_actions(nome, "Poder A, Poder B").
 • LUZ: set_light(zona ou "", "clara" | "penumbra" | "escuridao"). No escuro,
-  quem não tem visão no escuro não vê (ataca com desvantagem, é atacado com
-  vantagem). Componentes caros (diamante, pérola...) precisam estar na
-  mochila: a recusa diz qual — narre a falta, não invente o item.
-• O inimigo que quer o grupo VIVO: set_npc_strategy(nome, "capturar") — o
-  corpo a corpo dele nocauteia em vez de matar.
-• NINGUÉM É OBRIGADO A MATAR: inimigo que se rende → set_combat_side(nome,
-  "rendido"). Só restando inimigos rendidos, enfeitiçados ou dominados pelo
-  grupo, encerre com end_combat() (é vitória: XP normal, sem saque deles). O
-  jogador pode pedir golpe não letal: attack_roll(..., nao_letal=True) no
-  corpo a corpo nocauteia em vez de matar.
-
-• VITÓRIA (inimigos derrotados) → end_combat() e DEPOIS grant_xp() para CADA
-  membro do grupo (aliados recrutados incluídos). Não pule o XP da vitória —
-  numa vitória, o servidor detecta a ausência de grant_xp() como violação.
-• DERROTA (grupo todo caído/nocauteado ou fuga sem vencer) → end_combat()
-  SEM grant_xp(). Não existe XP por perder a luta.
+  quem não tem visão no escuro não vê. Componentes caros (diamante,
+  pérola...) precisam estar na mochila: a recusa diz qual — narre a falta,
+  não invente o item.
+• TIPO DE CRIATURA: Imobilizar Pessoa só pega humanoides, Curar Ferimentos não
+  cura morto-vivo — o motor recusa e diz por quê.
+• NINGUÉM É OBRIGADO A MATAR: na tela o jogador pede rendição, enfeitiça,
+  nocauteia; só restando inimigos rendidos, enfeitiçados ou dominados, a luta
+  acaba como vitória. Se a cena pedir, set_combat_side(nome, "rendido").
 • Narre em português, segunda pessoa.
 
 NPCs — CLASSES, NÍVEIS E RECRUTAMENTO
@@ -1564,7 +1378,7 @@ def create_agent(model, campaign_type: str = "fantasia", dnd_mode: bool | None =
 
     _TELA_BLOCK = (
         "\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        "MODO DE COMBATE: TELA TÁTICA (não narrado)\n"
+        "MODO DE COMBATE: TELA TÁTICA\n"
         "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         "• Quando um combate começar: descreva a CENA inicial (terreno, "
         "inimigos, clima de tensão), chame roll_initiative() com os "
@@ -1575,8 +1389,7 @@ def create_agent(model, campaign_type: str = "fantasia", dnd_mode: bool | None =
         "A tela mostra as zonas e o jogador move com o botão Mover; as ações "
         "lendárias o motor gasta sozinho na virada de turno. "
         "A luta acontece na tela tática — você NÃO "
-        "narra turnos nem chama attack_roll/use_ability/execute_npc_turn/"
-        "next_turn. NÃO descreva golpes nem resultados ainda.\n"
+        "narra turnos. NÃO descreva golpes nem resultados ainda.\n"
         "• Você será chamado de novo com '[COMBATE RESOLVIDO NA TELA "
         "TÁTICA]' e um log: aí narre a luta INTEIRA de forma "
         "cinematográfica e contínua e ponha o saque dos derrotados no chão "
@@ -1590,10 +1403,9 @@ def create_agent(model, campaign_type: str = "fantasia", dnd_mode: bool | None =
         o snapshot atual da cena. Modo de combate é lido aqui (e não na
         criação) para refletir mudanças durante a sessão."""
         instr = base_instruction
-        # Modo de combate TELA: a luta é resolvida na interface tática, não
-        # pela narração turno a turno.
-        if _memory.campaign.get("combat_mode") == "tela":
-            instr += _TELA_BLOCK
+        # O combate é sempre na tela tática: a luta é resolvida na interface,
+        # não pela narração turno a turno.
+        instr += _TELA_BLOCK
         instr += _scene_snapshot_block()
         instr += _relacoes_block()
         instr += _mundo_block()

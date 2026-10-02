@@ -42,15 +42,25 @@ def _parecidas(nome: str, nomes: list[str]) -> list[str]:
     return difflib.get_close_matches(nome, nomes, n=4, cutoff=0.55)
 
 
+# As ferramentas do antigo combate narrado: o Mestre não as tem mais (a tela
+# tática joga a luta). Se ele tentar uma, a recusa explica onde a luta está.
+_FERRAMENTAS_DE_TURNO = frozenset({
+    "attack_roll", "use_ability", "next_turn", "execute_npc_turn", "responder_reacao",
+    "move_combatant", "legendary_action",
+})
+
+
 def mensagem_de_ferramenta_inexistente(nome: str) -> str:
     from rpg import memory
-    from rpg.toolsets import FERRAMENTAS_SO_DO_MODO_DND, FERRAMENTAS_SO_DO_MODO_NARRADO
+    from rpg.toolsets import FERRAMENTAS_SO_DO_MODO_DND, FERRAMENTAS_SO_FORA_DE_COMBATE
 
     camp = memory.campaign
     # Tudo aqui é conversa com o mestre. Vai dentro de [[llm]]…[[/llm]], que o
     # servidor tira do que chega à tela: o jogador não precisa ler o nome da
     # ferramenta que a IA tentou usar e não podia (server.py, tool_result).
-    if nome in FERRAMENTAS_SO_DO_MODO_NARRADO and camp.get("combat_mode") == "tela":
+    if nome in _FERRAMENTAS_DE_TURNO or (
+            nome in FERRAMENTAS_SO_FORA_DE_COMBATE
+            and (camp.get("combat_state") or {}).get("is_active")):
         return (f"[[llm]]Erro: {nome} não está disponível agora: o combate é resolvido na "
                 f"tela tática, e o jogador age por lá. Não tente de novo; espere "
                 f"[COMBATE RESOLVIDO NA TELA TÁTICA] para narrar.[[/llm]]")

@@ -10,15 +10,13 @@ chamadas manda ~33 mil tokens só de definição.
 
 São dois filtros, com motivações diferentes.
 
-1. MODO DE COMBATE "TELA" — motivo é CORREÇÃO, não custo.
-   A luta é resolvida pela interface tática via combat_action(), e a
-   instrução do sistema PROÍBE a LLM de chamar attack_roll, use_ability,
-   next_turn, execute_npc_turn e roll_death_save. Proibir por prompt é uma
-   esperança; retirar a ferramenta do conjunto é uma garantia — o mesmo
-   princípio já aplicado ao snapshot de cena ("tirou a decisão do LLM →
-   virou garantia de código"). Sem isso, uma LLM que resolvesse chamar
-   attack_roll no meio de um combate da tela produziria turno duplicado: o
-   motor avançaria por fora da economia que a tela controla.
+1. O COMBATE É DA TELA — motivo é CORREÇÃO, não custo.
+   A luta é resolvida pela interface tática via combat_action(). As
+   ferramentas de turno (attack_roll, use_ability, next_turn,
+   execute_npc_turn...) nem estão mais no conjunto (tools_dnd.DND_TOOLS), e
+   roll_death_save / resolve_saving_throw saem enquanto a luta dura: a tela
+   rola os testes de morte e as salvaguardas. Proibir por prompt é uma
+   esperança; retirar a ferramenta do conjunto é uma garantia.
 
 2. CAMPANHA NÃO-D&D — motivo é custo, e é o maior dos dois.
    Fantasia, romance, horror, mistério, scifi e faroeste não têm regras: a
@@ -52,21 +50,14 @@ from google.adk.tools.function_tool import FunctionTool
 _DEBUG = os.environ.get("RPG_DEBUG", "0").strip().lower() in ("1", "true", "yes", "on")
 
 
-# Ferramentas que a LLM não deve tocar quando o combate é resolvido na tela
-# tática. A tela chama o mesmo motor por dentro, via combat_action().
-FERRAMENTAS_SO_DO_MODO_NARRADO = frozenset({
-    "attack_roll",
-    "use_ability",
-    "next_turn",
-    "execute_npc_turn",
-    "responder_reacao",
+# O combate é jogado só na tela tática. As ferramentas de turno (attack_roll,
+# use_ability, next_turn, execute_npc_turn...) saíram do Mestre; estas duas
+# ficam para FORA da luta (a queda que derruba alguém, a armadilha com
+# salvaguarda) e saem durante ela, quando a tela rola os testes de morte e as
+# salvaguardas.
+FERRAMENTAS_SO_FORA_DE_COMBATE = frozenset({
     "roll_death_save",
     "resolve_saving_throw",
-    # Onda 3: movimento e ação lendária são mecânica de DENTRO da luta. A tela
-    # move pelo intent "move" do combat_action, e os chefes gastam as ações
-    # lendárias sozinhos na virada de turno (_gastar_lendarias_dos_chefes).
-    "move_combatant",
-    "legendary_action",
 })
 
 
@@ -121,8 +112,7 @@ GENEROS_DA_FANTASIA = ("fantasia", "dark_fantasy")
 #   • end_combat fica SEMPRE: é o escape de uma luta que não fechou direito,
 #     e é justamente quando o estado está torto que ela precisa existir.
 FERRAMENTAS_SO_EM_COMBATE = frozenset({
-    "next_turn", "execute_npc_turn", "responder_reacao", "move_combatant", "set_cover", "set_light",
-    "legendary_action", "describe_battlefield", "get_combat_status",
+    "set_cover", "set_light", "describe_battlefield", "get_combat_status",
 })
 
 # Comprar e vender pedem uma loja aberta; open_shop e list_shop ficam sempre,
@@ -182,7 +172,7 @@ def _campanha_usa_dnd(camp) -> bool:
             return True
     return False
 
-# Deliberadamente NÃO removidas no modo tela:
+# Deliberadamente mantidas (o combate é da tela, a montagem da luta é do Mestre):
 #   • roll_initiative — a LLM ainda abre o combate com ela; é o gatilho que
 #     faz a tela assumir.
 #   • end_combat      — barata (204 chars) e serve de escape se a tela não
@@ -221,7 +211,6 @@ class FerramentasDoTurno(BaseToolset):
 
         try:
             camp = memory.campaign
-            modo = (camp.get("combat_mode") or memory.PADRAO_COMBATE)
             usa_dnd = _campanha_usa_dnd(camp)
             romance = (camp.get("campaign_type") or "") == "romance"
             # "dnd" é a fantasia com regras de antes da separação.
@@ -232,12 +221,11 @@ class FerramentasDoTurno(BaseToolset):
             # Falha de forma segura: sem contexto de campanha, entrega tudo.
             return list(self._todas)
 
-        # Os dois filtros se compõem: uma campanha D&D no modo tela perde só
-        # as ferramentas de turno; uma campanha de romance perde o motor D&D
-        # inteiro (e nunca chega a estar no modo tela).
+        # Os filtros se compõem: uma campanha de romance perde o motor D&D
+        # inteiro; a de D&D, em luta, perde o que a tela tática resolve.
         excluir = set()
-        if modo == "tela":
-            excluir |= FERRAMENTAS_SO_DO_MODO_NARRADO
+        if em_combate:
+            excluir |= FERRAMENTAS_SO_FORA_DE_COMBATE
         if not usa_dnd:
             excluir |= FERRAMENTAS_SO_DO_MODO_DND
         if not romance:
@@ -253,21 +241,21 @@ class FerramentasDoTurno(BaseToolset):
             excluir |= FERRAMENTAS_SO_COM_LOJA
 
         if not excluir:
-            self._log(modo, usa_dnd, em_combate, com_loja, self._todas)
+            self._log(usa_dnd, em_combate, com_loja, self._todas)
             return list(self._todas)
 
         entregues = [t for t in self._todas if t.name not in excluir]
-        self._log(modo, usa_dnd, em_combate, com_loja, entregues)
+        self._log(usa_dnd, em_combate, com_loja, entregues)
         return entregues
 
     _ultimo_log = None
 
-    def _log(self, modo: str, usa_dnd: bool, em_combate: bool, com_loja: bool,
+    def _log(self, usa_dnd: bool, em_combate: bool, com_loja: bool,
              entregues: list) -> None:
         """Mostra o conjunto no terminal quando ele MUDA (não a cada turno)."""
         if not _DEBUG:
             return
-        chave = (modo, usa_dnd, em_combate, com_loja, len(entregues))
+        chave = (usa_dnd, em_combate, com_loja, len(entregues))
         if chave == FerramentasDoTurno._ultimo_log:
             return
         FerramentasDoTurno._ultimo_log = chave
@@ -275,14 +263,12 @@ class FerramentasDoTurno(BaseToolset):
         motivos = []
         if not usa_dnd:
             motivos.append("campanha não-D&D")
-        if modo == "tela":
-            motivos.append("combate na tela")
         if not em_combate:
             motivos.append("fora de combate")
         if not com_loja:
             motivos.append("sem loja por perto")
         extra = f" (−{removidas}: {', '.join(motivos)})" if removidas else ""
-        print(f"  [FERRAMENTAS] modo={modo} dnd={usa_dnd} → "
+        print(f"  [FERRAMENTAS] dnd={usa_dnd} → "
               f"{len(entregues)}/{len(self._todas)} entregues{extra}", flush=True)
 
     async def close(self) -> None:

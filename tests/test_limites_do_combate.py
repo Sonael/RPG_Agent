@@ -102,57 +102,41 @@ def bruxa(campanha, povoar):
     return memory.campaign
 
 
-def test_condicao_da_magia_aplicada_com_o_dado_do_jogador(bruxa):
-    r = td.use_ability("Bruxa", "Hold Person", "Brann", end_turn=True, _skip_turn_check=True)
-    assert "AGUARDANDO TESTE DE RESISTÊNCIA" in r and "resolve_saving_throw('Brann'" in r, r
-    pend = memory.campaign["combat_state"]["salvaguardas_pendentes"][0]
-    cd = pend["cd"]
-    r = td.resolve_saving_throw("Brann", "sabedoria", cd, cd - 5, 0)
-    assert "PARALISADO" in r and "Paralisado" in _conds("Brann"), r
-    c = next(c for c in _ch("Brann")["sheet"]["condicoes"] if c.get("nome") == "Paralisado")
-    assert c["salvaguarda_fim"]["cd"] == cd
-    assert not memory.campaign["combat_state"]["salvaguardas_pendentes"]
+def test_condicao_no_personagem_do_grupo_o_motor_rola(bruxa, monkeypatch):
+    """O combate é na tela: a salvaguarda do grupo é rolada na hora, e a condição pega."""
+    _falha(monkeypatch)
+    r = td.use_ability("Bruxa", "Hold Person", "Brann", end_turn=False, _skip_turn_check=True)
+    assert "AGUARDANDO" not in r and "Paralisado" in _conds("Brann"), r
 
 
-def test_quem_passa_nao_leva_a_condicao(bruxa):
-    td.use_ability("Bruxa", "Hold Person", "Brann", end_turn=True, _skip_turn_check=True)
-    cd = memory.campaign["combat_state"]["salvaguardas_pendentes"][0]["cd"]
-    td.resolve_saving_throw("Brann", "sabedoria", cd, cd + 5, 0)
+def test_quem_passa_nao_leva_a_condicao(bruxa, monkeypatch):
+    monkeypatch.setattr(td, "_rolar_salvaguarda", lambda *a, **k: (True, "salvaguarda: passou"))
+    td.use_ability("Bruxa", "Hold Person", "Brann", end_turn=False, _skip_turn_check=True)
     assert "Paralisado" not in _conds("Brann")
 
 
-def test_truque_sem_metade_nao_fere_quem_passa(bruxa):
-    r = td.use_ability("Bruxa", "Sacred Flame", "Brann", end_turn=True, _skip_turn_check=True)
-    assert "Sucesso: **0**" in r, r
-    pend = memory.campaign["combat_state"]["salvaguardas_pendentes"][0]
-    r = td.resolve_saving_throw("Brann", "destreza", pend["cd"], 30, 99)
-    assert "(nenhum dano)" in r and _ch("Brann")["sheet"]["vida_atual"] == 40, r
+def test_truque_sem_metade_nao_fere_quem_passa(bruxa, monkeypatch):
+    monkeypatch.setattr(td, "_rolar_salvaguarda", lambda *a, **k: (True, "salvaguarda: passou"))
+    r = td.use_ability("Bruxa", "Sacred Flame", "Brann", end_turn=False, _skip_turn_check=True)
+    assert "passou: nenhum dano" in r and _ch("Brann")["sheet"]["vida_atual"] == 40, r
 
 
-def test_narrado_area_espera_o_dado_do_grupo(bruxa, monkeypatch):
-    memory.campaign["combat_mode"] = "narrado"
-    r = td.use_ability("Bruxa", "Fireball", "Brann, Orc", end_turn=True, _skip_turn_check=True)
-    assert "Brann: espera o dado do jogador" in r and "AGUARDANDO TESTES DE RESISTÊNCIA" in r, r
-    assert _ch("Brann")["sheet"]["vida_atual"] == 40 and _ch("Orc")["sheet"]["vida_atual"] < 60
-    assert td._combat_current_actor() == "Bruxa"                  # o turno espera
-    pend = memory.campaign["combat_state"]["salvaguardas_pendentes"][0]
-    r = td.resolve_saving_throw("Brann", "destreza", pend["cd"], 1, 0)
-    assert _ch("Brann")["sheet"]["vida_atual"] == 40 - pend["dano"], r
-    assert td._combat_current_actor() != "Bruxa"
+def test_teste_pedido_pelo_mestre_aplica_a_condicao_no_dado_do_jogador(bruxa):
+    """
+    Fora da luta, o Mestre ainda pede o dado (a armadilha, a magia de um NPC
+    na cena): resolve_saving_throw aplica a condição que a falha traz.
+    """
+    r = td.use_ability("Bruxa", "Hold Person", "Brann", saving_throw_stat="sabedoria",
+                       saving_throw_dc=13, end_turn=False, _skip_turn_check=True)
+    assert "AGUARDANDO TESTE DE RESISTÊNCIA" in r and "resolve_saving_throw('Brann'" in r, r
+    r = td.resolve_saving_throw("Brann", "sabedoria", 13, 5, 0)
+    assert "PARALISADO" in r and "Paralisado" in _conds("Brann"), r
+    c = next(c for c in _ch("Brann")["sheet"]["condicoes"] if c.get("nome") == "Paralisado")
+    assert c["salvaguarda_fim"]
 
 
-def test_dois_dados_do_grupo_o_turno_passa_no_ultimo(bruxa):
-    memory.campaign["combat_mode"] = "narrado"
-    td.use_ability("Bruxa", "Fireball", "Brann, Lia", end_turn=True, _skip_turn_check=True)
-    pend = memory.campaign["combat_state"]["salvaguardas_pendentes"]
-    assert [p["alvo"] for p in pend] == ["Brann", "Lia"]
-    r = td.resolve_saving_throw("Brann", "destreza", pend[0]["cd"], 30, 0)
-    assert "Ainda esperam o dado: Lia" in r and td._combat_current_actor() == "Bruxa", r
-    td.resolve_saving_throw("Lia", "destreza", pend[0]["cd"], 30, 0)
-    assert td._combat_current_actor() != "Bruxa"
-
-
-def test_na_tela_o_motor_rola(bruxa):
+def test_area_rola_a_salvaguarda_do_grupo(bruxa):
+    memory.campaign["combat_mode"] = "narrado"           # gravado numa campanha antiga: não muda nada
     r = td.use_ability("Bruxa", "Fireball", "Brann, Orc", end_turn=False, _skip_turn_check=True)
     assert "espera o dado" not in r and _ch("Brann")["sheet"]["vida_atual"] < 40, r
 

@@ -463,9 +463,9 @@
     try { s = await (await (W.authFetch || fetch)(`${W.API || ''}/api/combat/state`)).json(); }
     catch (_) { nota('Erro: não foi possível ler o combate agora.'); return; }
     if (!s || !s.is_active) { nota('Nota: nenhum combate em andamento.'); return; }
-    if (s.combat_mode === 'tela' && W.Combat && W.Combat._reopen) { W.Combat._reopen(); return; }
-    // Combate narrado: a ordem no chat. O "(já agiu)" de antes era só a
-    // posição na lista, e marcava quem tinha caído antes de agir.
+    if (W.Combat && W.Combat._reopen) { W.Combat._reopen(); return; }
+    // Sem a tela carregada (não deveria acontecer): a ordem no chat. O "(já
+    // agiu)" de antes era só a posição na lista, e marcava quem tinha caído.
     const fora = new Set((s.combatants || [])
       .filter(x => ['morto', 'inconsciente', 'estabilizado', 'fugiu', 'exilado'].includes((x.status || '').toLowerCase()))
       .map(x => x.name));

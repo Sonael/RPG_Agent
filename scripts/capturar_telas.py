@@ -953,16 +953,6 @@ COMBATE_ENCERRADO["combat_state"].update({
     },
 })
 
-# Combate narrado: não abre a tela tática, mas acende a régua de turnos.
-COMBATE_NARRADO = {
-    "combat_mode": "narrado",
-    "combat_state": {
-        "is_active": True,
-        "initiative_order": ["Stelar", "Victoria", "Helena", "Natasha"],
-        "current_turn_index": 1,
-        "round": 2,
-    },
-}
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -1445,8 +1435,6 @@ TELAS = [
      "exigir": "#heroi-overlay:not(.hidden) .hro-atributo"},
 
     # ── Combate ──────────────────────────────────────────────────────
-    {"nome": "combate-regua-de-turnos", "pagina": "/game.html",
-     "estado": COMBATE_NARRADO},
     {"nome": "combate-tela-tatica", "pagina": "/game.html",
      "estado": COMBATE_ATIVO, "espera": 700, "exigir": "#combat-overlay:not(.hidden)"},
     {"nome": "combate-escolher-alvo", "pagina": "/game.html",

@@ -6,11 +6,11 @@ O QUE ESTES TESTES TRANCAM
 ──────────────────────────
 Dois filtros, com motivações diferentes:
 
-• Modo "tela" — correção. A luta é resolvida pela interface via
-  combat_action(); a instrução já proibia a LLM de chamar
-  attack_roll/use_ability/next_turn/execute_npc_turn/roll_death_save ali, mas
-  proibição por prompt é esperança. Aqui a ferramenta some do conjunto, e o
-  turno duplicado deixa de ser possível em vez de ser desencorajado.
+• O combate é da tela tática — correção. A luta é resolvida pela interface
+  via combat_action(); as ferramentas de turno (attack_roll, use_ability,
+  next_turn, execute_npc_turn...) nem existem no conjunto do Mestre, e
+  roll_death_save / resolve_saving_throw saem enquanto a luta dura. O turno
+  duplicado deixa de ser possível em vez de ser desencorajado.
 
 • Campanha não-D&D — custo. Romance e horror não têm regras; carregavam 39
   ferramentas que nunca chamam.
@@ -28,7 +28,7 @@ from rpg.tools import ALL_TOOLS
 from rpg.tools_dnd import DND_TOOLS
 from rpg.toolsets import (
     FerramentasDoTurno,
-    FERRAMENTAS_SO_DO_MODO_NARRADO,
+    FERRAMENTAS_SO_FORA_DE_COMBATE,
     FERRAMENTAS_SO_DO_MODO_DND,
     FERRAMENTAS_SO_DO_ROMANCE,
     FERRAMENTAS_SO_DA_FANTASIA,
@@ -42,7 +42,7 @@ N_ROMANCE = len(FERRAMENTAS_SO_DO_ROMANCE)
 N_FANTASIA = len(FERRAMENTAS_SO_DA_FANTASIA)
 
 
-def esperado(genero: str, dnd: bool = True, tela: bool = False,
+def esperado(genero: str, dnd: bool = True,
              em_combate: bool = False, com_loja: bool = False) -> int:
     """
     Quantas ferramentas uma campanha recebe: o total menos o que não é dela.
@@ -57,11 +57,11 @@ def esperado(genero: str, dnd: bool = True, tela: bool = False,
         n -= N_ROMANCE
     if genero not in ("fantasia", "dark_fantasy"):
         n -= N_FANTASIA
-    if tela:
-        n -= len(FERRAMENTAS_SO_DO_MODO_NARRADO)
-    if not em_combate:
-        n -= len(FERRAMENTAS_SO_EM_COMBATE - (FERRAMENTAS_SO_DO_MODO_NARRADO if tela else frozenset())
-                 - (FERRAMENTAS_SO_DO_MODO_DND if not dnd else frozenset()))
+    sem_dnd = FERRAMENTAS_SO_DO_MODO_DND if not dnd else frozenset()
+    if em_combate:
+        n -= len(FERRAMENTAS_SO_FORA_DE_COMBATE - sem_dnd)
+    else:
+        n -= len(FERRAMENTAS_SO_EM_COMBATE - sem_dnd)
     if not com_loja:
         n -= len(FERRAMENTAS_SO_COM_LOJA - (FERRAMENTAS_SO_DO_MODO_DND if not dnd else frozenset()))
     return n
@@ -86,10 +86,9 @@ def conjunto():
 
 @pytest.fixture
 def dnd(campanha):
-    """Campanha D&D em modo narrado — o cenário de conjunto completo."""
+    """Campanha D&D, fora da luta."""
     campanha["dnd_mode"] = True
     campanha["campaign_type"] = "dnd"
-    campanha["combat_mode"] = "narrado"
     return campanha
 
 
@@ -98,51 +97,34 @@ def romance(campanha):
     """Campanha sem regras: nenhuma ferramenta do motor D&D faz sentido."""
     campanha["dnd_mode"] = False
     campanha["campaign_type"] = "romance"
-    campanha["combat_mode"] = "narrado"
     return campanha
 
 
 # ---------------------------------------------------------------------------
-# Campanha D&D, modo narrado: nada é retirado
+# O combate é da tela tática: as ferramentas de turno não são do Mestre
 # ---------------------------------------------------------------------------
 
-def test_dnd_narrado_entrega_todas(dnd, conjunto):
+_DE_TURNO = ("attack_roll", "use_ability", "next_turn", "execute_npc_turn", "responder_reacao",
+             "move_combatant", "legendary_action")
+
+
+def test_dnd_fora_da_luta_entrega_o_conjunto(dnd, conjunto):
     assert len(entregues(conjunto)) == FORA_DO_ROMANCE
 
 
-def test_campo_de_modo_ausente_usa_o_padrao_do_jogo(dnd, conjunto):
-    """
-    Campanha sem combat_mode cai em memory.PADRAO_COMBATE, que hoje é a TELA
-    TÁTICA — e a tela retira da LLM as ferramentas de turno, senão o combate
-    acontece duas vezes. O padrão era "narrado" de quando a tela não existia.
-    """
-    from rpg import memory
-
-    assert memory.PADRAO_COMBATE == "tela"
-    dnd.pop("combat_mode", None)
-    assert len(entregues(conjunto)) == esperado("fantasia", tela=True)
-    assert not (nomes(entregues(conjunto)) & FERRAMENTAS_SO_DO_MODO_NARRADO)
-
-
-# ---------------------------------------------------------------------------
-# Modo tela: some o que a instrução já proibia
-# ---------------------------------------------------------------------------
-
-def test_modo_tela_retira_as_ferramentas_de_turno(dnd, conjunto):
-    dnd["combat_mode"] = "tela"
-    disponiveis = nomes(entregues(conjunto))
-
-    assert not (disponiveis & FERRAMENTAS_SO_DO_MODO_NARRADO), (
-        "a tela tática resolve o combate pelo motor; a LLM não pode ter "
-        "estas ferramentas ou produz turno duplicado"
-    )
-    assert len(disponiveis) == esperado("fantasia", tela=True)
-
-
-@pytest.mark.parametrize("ferramenta", sorted(FERRAMENTAS_SO_DO_MODO_NARRADO))
-def test_cada_ferramenta_proibida_some(dnd, conjunto, ferramenta):
-    dnd["combat_mode"] = "tela"
+@pytest.mark.parametrize("ferramenta", _DE_TURNO)
+def test_ferramenta_de_turno_nao_existe_para_o_mestre(dnd, conjunto, ferramenta):
+    """A tela as chama por combat_action; com o Mestre, o turno sairia duplicado."""
+    assert ferramenta not in {f.__name__ for f in ALL_TOOLS}
+    dnd["combat_state"] = {"is_active": True, "initiative_order": ["Alden", "Goblin"]}
     assert ferramenta not in nomes(entregues(conjunto))
+
+
+def test_o_modo_gravado_nao_muda_o_conjunto(dnd, conjunto):
+    """Campanha antiga com "narrado" gravado: só existe a tela, o conjunto é o mesmo."""
+    antes = nomes(entregues(conjunto))
+    dnd["combat_mode"] = "narrado"
+    assert nomes(entregues(conjunto)) == antes
 
 
 @pytest.mark.parametrize("ferramenta", [
@@ -156,9 +138,16 @@ def test_cada_ferramenta_proibida_some(dnd, conjunto, ferramenta):
     "grant_xp",
     "add_item",
 ])
-def test_ferramentas_que_devem_sobreviver_ao_modo_tela(dnd, conjunto, ferramenta):
-    dnd["combat_mode"] = "tela"
+def test_ferramentas_que_continuam_com_o_mestre(dnd, conjunto, ferramenta):
     assert ferramenta in nomes(entregues(conjunto))
+
+
+@pytest.mark.parametrize("ferramenta", sorted(FERRAMENTAS_SO_FORA_DE_COMBATE))
+def test_teste_de_morte_e_salvaguarda_so_fora_da_luta(dnd, conjunto, ferramenta):
+    """Na luta, a tela rola; fora dela (a queda, a armadilha), o Mestre."""
+    assert ferramenta in nomes(entregues(conjunto))
+    dnd["combat_state"] = {"is_active": True, "initiative_order": ["Alden", "Goblin"]}
+    assert ferramenta not in nomes(entregues(conjunto))
 
 
 # ---------------------------------------------------------------------------
@@ -176,7 +165,6 @@ def test_campanha_sem_regras_perde_o_motor_dnd(romance, conjunto):
 def test_todos_os_estilos_sem_regras_filtram(campanha, conjunto, estilo):
     campanha["dnd_mode"] = False
     campanha["campaign_type"] = estilo
-    campanha["combat_mode"] = "narrado"
     assert len(entregues(conjunto)) == esperado(estilo, dnd=False)
 
 
@@ -240,11 +228,9 @@ def test_campanha_com_ficha_mantem_o_motor_mesmo_sem_a_flag(campanha, conjunto):
     campanha["dnd_mode"] = False
     campanha["campaign_type"] = "fantasia"
     campanha["characters"]["heroína"] = criar_ficha("Heroína", grupo=True)
-    # Modo narrado explícito: o conjunto completo é o dele (a fixture zera o modo).
-    campanha["combat_mode"] = "narrado"
 
     disponiveis = nomes(entregues(conjunto))
-    assert "attack_roll" in disponiveis
+    assert "roll_initiative" in disponiveis
     assert len(disponiveis) == FORA_DO_ROMANCE
 
 
@@ -260,8 +246,6 @@ def test_campanha_sem_ficha_nenhuma_filtra(campanha, conjunto):
 def test_campaign_type_dnd_basta_mesmo_sem_a_flag(campanha, conjunto):
     campanha["dnd_mode"] = False
     campanha["campaign_type"] = "dnd"
-    # Modo narrado explícito: o conjunto completo é o dele (a fixture zera o modo).
-    campanha["combat_mode"] = "narrado"
     assert len(entregues(conjunto)) == FORA_DO_ROMANCE
 
 
@@ -270,15 +254,15 @@ def test_campaign_type_dnd_basta_mesmo_sem_a_flag(campanha, conjunto):
 # ---------------------------------------------------------------------------
 
 def test_filtros_se_compoem(dnd, conjunto):
-    """D&D + tela retira só as de turno; não-D&D + tela retiraria os dois."""
-    dnd["combat_mode"] = "tela"
-    so_tela = len(entregues(conjunto))
-
+    """D&D em luta perde só os testes da tela; o romance perde o motor inteiro."""
+    fora = len(entregues(conjunto))
+    dnd["combat_state"] = {"is_active": True, "initiative_order": ["Alden"]}
+    em_luta = len(entregues(conjunto))
+    dnd["combat_state"] = {"is_active": False}
     dnd["dnd_mode"] = False
     dnd["campaign_type"] = "romance"
-    ambos = len(entregues(conjunto))
-
-    assert ambos < so_tela < FORA_DO_ROMANCE
+    romance = len(entregues(conjunto))
+    assert romance < fora and em_luta == esperado("fantasia", em_combate=True)
 
 
 # ---------------------------------------------------------------------------
@@ -294,19 +278,6 @@ def test_mesmos_objetos_entre_turnos(dnd, conjunto):
     primeira = entregues(conjunto)
     segunda = entregues(conjunto)
     assert all(a is b for a, b in zip(primeira, segunda))
-
-
-def test_conjunto_muda_quando_o_modo_muda(dnd, conjunto):
-    antes = len(entregues(conjunto))
-    dnd["combat_mode"] = "tela"
-    assert len(entregues(conjunto)) < antes
-
-
-def test_voltar_para_narrado_devolve_as_ferramentas(dnd, conjunto):
-    dnd["combat_mode"] = "tela"
-    entregues(conjunto)
-    dnd["combat_mode"] = "narrado"
-    assert len(entregues(conjunto)) == FORA_DO_ROMANCE
 
 
 # ---------------------------------------------------------------------------
@@ -412,7 +383,10 @@ def test_a_fase_muda_o_conjunto_e_volta(dnd, conjunto):
     assert fora == nomes(entregues(conjunto))
     dnd["combat_state"] = {"is_active": True, "initiative_order": ["Alden"]}
     dentro = nomes(entregues(conjunto))
-    assert dentro > fora
+    # Na luta entram as de luta (set_cover, describe_battlefield...) e saem os
+    # testes que a tela rola (roll_death_save, resolve_saving_throw).
+    assert dentro - fora == FERRAMENTAS_SO_EM_COMBATE & nomes(conjunto._todas)
+    assert fora - dentro == FERRAMENTAS_SO_FORA_DE_COMBATE
     dnd["combat_state"] = {"is_active": False, "initiative_order": []}
     assert nomes(entregues(conjunto)) == fora
 

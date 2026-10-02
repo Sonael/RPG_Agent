@@ -452,18 +452,21 @@ def _verify_agent_response(
             and _HP_CHANGE_RE.search(text)):
         violations.append(
             "Modificou HP narrativamente (ex: '15 → 9', 'perdeu 6 PV') "
-            "sem chamar modify_hp() ou attack_roll(). "
+            "sem chamar modify_hp(). "
             "NUNCA escreva variações de HP — deixe a ferramenta calcular."
         )
 
-    # 3. Resultado de ataque sem attack_roll (só durante combate ativo)
-    # Fora de combate, "acertou" pode descrever ações não-mecânicas (ex: abrir fechadura).
+    # 3. Resultado de ataque com a luta em andamento (só durante combate ativo).
+    # O combate é jogado na tela tática: o Mestre não narra golpe antes de
+    # [COMBATE RESOLVIDO NA TELA TÁTICA]. Fora de combate, "acertou" pode
+    # descrever ações não-mecânicas (ex: abrir fechadura).
     if (combat_was_active
             and not _ATCK_TOOLS.intersection(tools_called)
             and _ATTACK_RESULT_RE.search(text)):
         violations.append(
-            "Narrou resultado de ataque ('acertou', 'errou o golpe') "
-            "sem chamar attack_roll(). O dado decide — não a narrativa."
+            "Narrou resultado de ataque ('acertou', 'errou o golpe') com a luta em andamento. "
+            "O combate é jogado na tela tática: não narre golpes até chegar "
+            "[COMBATE RESOLVIDO NA TELA TÁTICA]. O dado decide — não a narrativa."
         )
 
     # 3b. Teste narrado e nunca rolado; e teste devolvido ao jogador.
@@ -491,7 +494,7 @@ def _verify_agent_response(
     if (not _MANA_TOOLS.intersection(tools_called)
             and _MANA_CHANGE_RE.search(text)):
         violations.append(
-            "Modificou mana narrativamente sem chamar use_ability() ou modify_mana()."
+            "Modificou mana narrativamente sem chamar modify_mana()."
         )
 
     # 5. Magia/habilidade narrada como aprendida sem learn_spell() ou learn_ability()
@@ -1085,10 +1088,9 @@ def _payload_de_campanha(name: str, dados: dict, personagens: dict) -> dict:
         # fantasia com as regras ligadas (memory.regras_e_genero).
         "campaign_type":        memory.regras_e_genero(dados.get("campaign_type"), dados.get("dnd_mode"))[0],
         "dnd_mode":             memory.regras_e_genero(dados.get("campaign_type"), dados.get("dnd_mode"))[1],
-        # Preferência de como o combate é jogado ("narrado" ou "tela"). Não
-        # estava aqui: quem importava uma campanha do modo tela caía no
-        # narrado sem entender por quê.
-        "combat_mode":          dados.get("combat_mode", memory.PADRAO_COMBATE),
+        # O combate é sempre na tela tática: a campanha exportada no antigo
+        # modo narrado chega na tela.
+        "combat_mode":          memory.PADRAO_COMBATE,
         "_padrao_combate_migrado": dados.get("_padrao_combate_migrado", True),
         "protagonist":          dados.get("protagonist", ""),
         "chapter":              dados.get("chapter", 1),
@@ -3758,8 +3760,9 @@ def combat_mode_route():
     if request.method == "GET":
         return jsonify({"mode": memory.campaign.get("combat_mode", memory.PADRAO_COMBATE)})
     mode = ((request.json or {}).get("mode") or "").strip().lower()
-    if mode not in ("narrado", "tela"):
-        return jsonify({"ok": False, "error": "mode inválido"}), 400
+    # Só existe a tela tática: o modo narrado foi aposentado.
+    if mode != "tela":
+        return jsonify({"ok": False, "error": "o combate é sempre na tela tática"}), 400
     memory.campaign["combat_mode"] = mode
     memory.save_campaign()
     return jsonify({"ok": True, "mode": mode})

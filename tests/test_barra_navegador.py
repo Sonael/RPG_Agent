@@ -262,13 +262,10 @@ def test_engrenagem_tem_o_que_saiu_da_barra(abrir):
     pg.evaluate("() => toggleSettingsPanel()")
     pg.wait_for_selector("#settings-panel.open #settings-campanha", timeout=5000)
     secao = pg.inner_text("#settings-campanha")
-    assert "Modo de combate" in secao and "Uso do modelo" in secao and "Requisições" in secao
+    assert "Uso do modelo" in secao and "Requisições" in secao
+    # O combate é só na tela tática: não há modo a escolher.
+    assert "Modo de combate" not in secao and pg.locator("#combat-mode-toggle").count() == 0
     assert pg.is_visible("#settings-menu-principal") and pg.is_visible("#settings-sair")
-    pg.click("#combat-mode-toggle .cm-opt[data-mode='tela']")
-    pg.wait_for_selector("#combat-mode-toggle .cm-opt.active[data-mode='tela']", timeout=5000)
-    assert "tela tática" in pg.inner_text("#combat-mode-hint")
-    pg.click("#combat-mode-toggle .cm-opt[data-mode='narrado']")
-    pg.wait_for_selector("#combat-mode-toggle .cm-opt.active[data-mode='narrado']", timeout=5000)
     assert not erros, erros[:3]
 
 

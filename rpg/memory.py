@@ -183,15 +183,13 @@ campaign = _CampaignProxy()
 # hora desde o primeiro turno; o mestre move daí com advance_time().
 RELOGIO_INICIAL = {"dia": 1, "hora": 8}
 
-# Como o combate é jogado quando ninguém escolheu: a TELA TÁTICA.
+# Como o combate é jogado: só na TELA TÁTICA.
 #
 # Era "narrado" desde o começo, de quando a tela tática não existia. Hoje ela é
-# quem rola o dado, conta o dano, gasta munição, cobra alcance e move na zona —
-# e o modo narrado pede à IA que faça tudo isso de cabeça, que é justamente
-# onde ela erra. Quem preferir a narração continua a um clique na engrenagem.
-#
-# Um lugar só, de propósito: o padrão estava escrito em cinco arquivos
-# diferentes, e mudá-lo significava achar os cinco.
+# quem rola o dado, conta o dano, gasta munição, cobra alcance, move na zona e
+# pergunta as reações — e o modo narrado pedia à IA que fizesse tudo isso de
+# cabeça, que é justamente onde ela erra. O modo narrado deixou de existir: o
+# Mestre abre a luta e narra o fim, e a tela joga o meio.
 PADRAO_COMBATE = "tela"
 
 
@@ -242,7 +240,7 @@ def _defaults() -> dict:
         # que ela mais importa.
         "_relacao_turno":       {},
         # "tela"    = combate resolvido na tela tática; a IA só emoldura (padrão).
-        # "narrado" = a IA narra turno a turno no chat.
+        # Sempre "tela": o modo narrado deixou de existir.
         "combat_mode":          PADRAO_COMBATE,
         # A troca do padrão já foi aplicada a esta campanha. Ver
         # normalizar_campanha: sem a marca, uma campanha que o jogador pôs em
@@ -343,21 +341,10 @@ def _migrate_combat_state() -> None:
     for key, val in defaults.items():
         if key not in cs:
             cs[key] = val
-    # O modo de combate, e a troca do padrão para a tela tática.
-    #
-    # Mudar PADRAO_COMBATE sozinho não alcançaria nenhuma campanha que já
-    # existe: todas têm "narrado" GRAVADO, porque o padrão antigo era escrito
-    # no documento na criação. Elas ficariam narradas para sempre, e quem
-    # pediu a troca não veria diferença nenhuma no próprio jogo.
-    #
-    # A marca faz a virada acontecer UMA vez por campanha. Depois dela, a
-    # escolha é do jogador e fica: quem puser "narrado" na engrenagem continua
-    # narrado no carregamento seguinte.
-    if "combat_mode" not in campaign:
-        campaign["combat_mode"] = PADRAO_COMBATE
-    elif (not campaign.get("_padrao_combate_migrado")
-            and campaign.get("combat_mode") == "narrado"):
-        campaign["combat_mode"] = PADRAO_COMBATE
+    # O combate é sempre na tela tática: a campanha gravada com "narrado"
+    # (o padrão antigo, ou a escolha que a engrenagem permitia) volta para a
+    # tela ao carregar.
+    campaign["combat_mode"] = PADRAO_COMBATE
     campaign["_padrao_combate_migrado"] = True
 
 

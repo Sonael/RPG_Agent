@@ -1436,23 +1436,16 @@ const _GUIDE_HTML = `
               <code>/rolar d20 vantagem</code></li>
           </ul>
 
-          <h4 class="guide-h4">O combate: dois modos</h4>
+          <h4 class="guide-h4">O combate: a tela tática</h4>
           <p>
             O combate acontece por <b>turnos</b>, seguindo uma ordem de
-            iniciativa. Você escolhe como quer vivê-lo (na engrenagem →
-            <b>Esta campanha</b> → <b>Modo de combate</b>):
+            iniciativa, numa tela dedicada (o "Pergaminho Épico") com cards de
+            Vida/Mana e os botões <b>Atacar, Habilidade, Item, Mover,
+            Manobras</b> e <b>Encerrar Turno</b>. Quem rola o dado, conta o
+            dano, gasta a munição e cobra o alcance é o motor; os inimigos agem
+            sozinhos. No fim da luta, o Mestre narra a batalha inteira de uma
+            vez. O comando <code>/combate</code> reabre a tela.
           </p>
-          <ul>
-            <li><b>Tela tática</b> (padrão) — abre uma tela dedicada (o
-              "Pergaminho Épico") com cards de Vida/Mana e botões:
-              <b>Atacar, Habilidade, Item, Mover, Defender, Fugir</b> e
-              <b>Encerrar Turno</b>. Quem rola o dado, conta o dano, gasta a
-              munição e cobra o alcance é o motor. Os inimigos agem sozinhos.
-              No fim da luta, o Mestre narra a batalha inteira de uma vez.</li>
-            <li><b>Narrado pela IA</b> — o Mestre descreve cada turno no
-              próprio chat, como o resto da história. As mesmas regras valem,
-              mas quem as aplica é ele, de cabeça.</li>
-          </ul>
 
           <h4 class="guide-h4">Onde cada um está</h4>
           <p>
