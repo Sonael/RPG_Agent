@@ -137,8 +137,9 @@ class PerguntaDeReacao(BaseException):
         self.quem, self.chave, self.texto = quem, chave, texto
 
 
-# Durante o turno do inimigo (tools_dnd._turno_com_perguntas): as respostas já
-# dadas, em ordem. None fora dele — aí a reação em "perguntar" age como "auto".
+# Durante uma jogada que pode perguntar (tools_dnd._com_perguntas: o turno do
+# inimigo, a ação do jogador na tela, attack_roll e use_ability do Mestre): as
+# respostas já dadas, em ordem. None fora dela — aí "perguntar" age como "auto".
 _respostas: list | None = None
 _indice = 0
 
@@ -553,7 +554,9 @@ def depois_do_ataque(atacante: dict, alvo: dict, acertou: bool, a_distancia: boo
             m = resolucao._magia_srd(h) if isinstance(h, dict) else None
             if m and int(m.get("nivel", 0) or 0) == 0 and m.get("efeito") == "dano":
                 truques.append((td._media_da_formula(td.dado_efetivo(h, atacante)), h))
-        if truques:
+        if truques and _confirmar(atacante, "golpe magico",
+                                  f"{atacante['name']} acertou {alvo['name']}. Usar Golpe Mágico (conjura "
+                                  f"{max(truques, key=lambda x: x[0])[1]['nome']} no alvo, como reação)?"):
             _, h = max(truques, key=lambda x: x[0])
             td._consume_reaction(atacante)
             saida = td.use_ability(atacante["name"], h["nome"], alvo["name"], end_turn=False,

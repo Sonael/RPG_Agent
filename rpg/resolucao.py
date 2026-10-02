@@ -1946,6 +1946,11 @@ ESCALA_DE_INVOCACAO = {
     "Animate Objects": {"objetos": True},
     "Create Undead": {"mais_um": True},
     "Conjure Elemental": {"extras": {6: {"perseguidor invisivel:1": "Perseguidor Invisível (ND 6)"}}},
+    # ND +1 por círculo acima do 6º: as feras do SRD de ND 7 e 8.
+    "Conjure Fey": {"extras": {7: {"gorila gigante:1": "Espírito em forma de gorila gigante (ND 7)"},
+                               8: {"tiranossauro:1": "Espírito em forma de tiranossauro (ND 8)"}}},
+    # No 9º círculo, um celestial de ND 5.
+    "Conjure Celestial": {"extras": {9: {"unicornio:1": "Unicórnio (ND 5)"}}},
 }
 
 

@@ -2474,6 +2474,10 @@ def _rolar_salvaguarda(alvo: dict, atributo: str, cd: int,
     if atributo == "destreza" and conds & {"contido", "imobilizado"}:
         desvantagem = True
     notas_extra = []
+    from rpg import tracos as _tracos_s
+    if _tracos_s.contra_magia(alvo):
+        vantagem = True
+        notas_extra.append("vantagem: Resistência à Magia")
     from rpg import reacoes as _reacoes_s
     mod, _nota_proj = _reacoes_s.bonus_projetado(alvo, atributo, mod)
     if _nota_proj:
@@ -2546,6 +2550,9 @@ def _imune_a_condicao(char: dict | None, condicao: str) -> bool:
     if not char:
         return False
     c = _norm_txt(condicao)
+    # A criatura: o elemental não é agarrado, o zumbi não é envenenado.
+    if c in {_norm_txt(x) for x in (char.get("sheet") or {}).get("imunidades_condicao") or []}:
+        return True
     for hab, conds in _IMUNIDADES_DE_CLASSE.items():
         if c in conds and _tem_habilidade(char, hab):
             return True
@@ -2878,6 +2885,8 @@ _USOS_POR_DESCANSO = {
     "indomavel":           ("longo", lambda n, s: 3 if n >= 17 else (2 if n >= 13 else 1)),
     "bandeira de aviso":   ("longo", lambda n, s: max(1, _mod_da_ficha(s, "sabedoria"))),
     "eu ilusorio":         ("curto", lambda n, s: 1),
+    # O unicórnio do Conjurar Celestial: três curas por invocação.
+    "toque curativo":      ("longo", lambda n, s: 3),
     # Mestre de Batalha: 4 dados por descanso curto, 5 no 7º, 6 no 15º.
     "dados de superioridade": ("curto", lambda n, s: 6 if n >= 15 else (5 if n >= 7 else 4)),
     "mestre sobrenatural": ("longo", lambda n, s: 1),
@@ -3682,7 +3691,7 @@ def _concentration_save(char: dict, dano: int) -> str:
 
 def _apply_damage(target: dict, amount: int = 0, damage_type: str = "",
                   source_name: str = "", arma_magica: bool = False,
-                  components: list | None = None) -> dict:
+                  components: list | None = None, critico: bool = False) -> dict:
     """
     Aplica dano a um alvo na ordem do 5e e devolve o que aconteceu.
 
@@ -3765,6 +3774,16 @@ def _apply_damage(target: dict, amount: int = 0, damage_type: str = "",
             sheet["efeitos"] = [x for x in sheet.get("efeitos") or [] if x is not _guarda_m]
             notas.append(f"{_guarda_m.get('nome', 'Proteção contra a Morte')}: {target.get('name')} fica com 1 PV "
                          f"(a magia acaba)")
+
+    # Fortitude Morta-Viva (zumbi): CON contra 5 + dano, e fica com 1 PV.
+    if hp_depois == 0 and hp_antes > 0 and not sheet.get("_forma_selvagem"):
+        from rpg import tracos as _tracos_d
+        _tipos_d = {_norm_damage_type(t) for v, t in components if t and int(v or 0) > 0}
+        _fort = _tracos_d.fortitude_morta_viva(target, dano, _tipos_d, critico)
+        if _fort:
+            notas.append(_fort)
+            if _fort.endswith("1 PV"):
+                sheet["vida_atual"] = hp_depois = 1
 
     if hp_depois == 0 and sheet.get("_forma_selvagem"):
         from rpg import criaturas
@@ -6579,6 +6598,52 @@ def _gastar_municao(char: dict, weapon: str) -> tuple[str, str]:
     return "", ""
 
 
+def _jogada_que_pergunta(fn):
+    """
+    attack_roll e use_ability chamados de fora: podem parar numa reação em
+    "perguntar" (como o turno do inimigo). E a magia em curso liga a
+    Resistência à Magia nas salvaguardas que ela provoca.
+    """
+    import functools
+
+    @functools.wraps(fn)
+    def envolto(*args, **kwargs):
+        from rpg import tracos as _tr
+        nome = fn.__name__
+        if _pode_perguntar_agora(kwargs):
+            pendente = _aviso_de_pergunta_pendente()
+            if pendente:
+                return pendente
+            params = list(__import__("inspect").signature(fn).parameters)
+            kw = dict(zip(params, args))
+            kw.update(kwargs)
+            return _com_perguntas({"fn": nome, "kw": kw}, [], None)
+        magia = nome == "use_ability" and _tr_e_magia(args, kwargs)
+        if magia:
+            _tr._magias_em_curso += 1
+        try:
+            return fn(*args, **kwargs)
+        finally:
+            if magia:
+                _tr._magias_em_curso -= 1
+    return envolto
+
+
+def _tr_e_magia(args, kwargs) -> bool:
+    """A habilidade do use_ability é magia do SRD (a Resistência à Magia vale contra ela)."""
+    from rpg import resolucao as _r
+    nome_ator = kwargs.get("char_name", args[0] if args else "")
+    nome_hab = kwargs.get("ability_name", args[1] if len(args) > 1 else "")
+    ch = memory.campaign.get("characters", {}).get(memory.char_key(nome_ator or "")) or {}
+    hab = next((h for h in ch.get("habilidades") or [] if isinstance(h, dict)
+                and _norm_txt(h.get("nome", "")) == _norm_txt(nome_hab or "")), None)
+    if hab is None:
+        en = _SPELL_PT_TO_EN.get((nome_hab or "").lower())
+        hab = {"nome": en or nome_hab or ""}
+    return bool(_r._magia_srd(hab))
+
+
+@_jogada_que_pergunta
 def attack_roll(
     attacker_name: str,
     target_name: str,
@@ -6889,6 +6954,11 @@ def attack_roll(
         disadvantage = True
     cond_notes.extend(_mods["notas"])
     cond_notes.extend(_notas_santuario)
+    from rpg import tracos as _tracos_a
+    _matilha = _tracos_a.matilha(attacker, target)
+    if _matilha:
+        advantage = True
+        cond_notes.append(_matilha)
     # Escuridão, Névoa: quem ataca não vê o alvo (desvantagem) e o alvo não
     # vê quem ataca (vantagem) — as duas se anulam, como manda o SRD.
     _cego_por = _zona_obscurecida(attacker_name) or _zona_obscurecida(target_name)
@@ -7137,7 +7207,9 @@ def attack_roll(
 
         _res = _apply_damage(target, components=_componentes,
                              source_name=attacker["name"],
-                             arma_magica=_bypasses_material_resistance(weapon))
+                             arma_magica=(_bypasses_material_resistance(weapon)
+                                          or _tracos_a.armas_magicas(attacker)),
+                             critico=bool(critico))
         hp_antes  = _res["hp_antes"]
         hp_depois = _res["hp_depois"]
         dmg       = _res["dano"]
@@ -7176,6 +7248,12 @@ def attack_roll(
                 result += f" — **{_cond}**!"
                 _log_combat_event("condition", attacker["name"], target["name"],
                                   msg=f"{target['name']} ficou {_cond} por {weapon}")
+
+        # O que o golpe natural carrega (veneno, derrubar, agarrar, fogo) e a
+        # Forma de Fogo de quem foi tocado (rpg/tracos.py).
+        for _l in _tracos_a.depois_do_acerto(attacker, target, weapon, bool(critico), is_ranged):
+            result += f"\n   {_l}"
+        hp_depois = int(st.get("vida_atual", 0) or 0)
 
         if hp_depois > 0:
             for _nome_g, _cfg_g in _g_conds:
@@ -7294,6 +7372,7 @@ def learn_ability(
     )
 
 
+@_jogada_que_pergunta
 def use_ability(
     char_name: str,
     ability_name: str,
@@ -7419,6 +7498,27 @@ def use_ability(
             if _nao_ve:
                 return (f"Erro: {hab['nome']} exige ver o alvo, e o {_nao_ve} não deixa "
                         f"{char['name']} ver {_alvo_z}. Nada foi gasto.")
+
+    # ── Tipo de criatura (Imobilizar Pessoa: só humanoides) ───────────────
+    # A regra existia só no Enfeitiçar Pessoa: Imobilizar Pessoa paralisava o
+    # lobo, e Curar Ferimentos curava o zumbi. Recusa ANTES de gastar; com
+    # vários alvos, o que não serve fica de fora.
+    from rpg import tracos as _tracos
+    _nota_tipo = ""
+    _nomes_t = [n.strip() for n in (target_name or "").split(",") if n.strip()]
+    if _resolucao._magia_srd(hab) and _nomes_t and not (_get_control_effect(hab) or {}).get("pool"):
+        _recusas_t, _ficam_t = [], []
+        for _n_t in _nomes_t:
+            _rec_t = _tracos.recusa_de_tipo(hab, memory.campaign["characters"].get(memory.char_key(_n_t)))
+            if _rec_t:
+                _recusas_t.append(_rec_t)
+            else:
+                _ficam_t.append(_n_t)
+        if _recusas_t and not _ficam_t:
+            return f"Aviso: {_recusas_t[0]}. Nada foi gasto."
+        if _recusas_t:
+            target_name = ", ".join(_ficam_t)
+            _nota_tipo = "".join(f"\n   {r} — fica de fora." for r in _recusas_t)
 
     # ── Alcance da habilidade ─────────────────────────────────────────────
     # Cone e toque nascem no conjurador: só pegam quem está na zona dele. Só
@@ -7590,7 +7690,7 @@ def use_ability(
             result += _auto_advance_turn(char_name)
         memory.save_campaign()
         return result
-    _nota_contra = (f"\n   {_contra}" if _contra else "") + _nota_meta
+    _nota_contra = (f"\n   {_contra}" if _contra else "") + _nota_meta + _nota_tipo
     if _resolucao._magia_srd(hab) and not _sem_custo:
         for _tipo_m in ("distante", "estendida"):
             if _sub.consumir_metamagia(char, _tipo_m):
@@ -7783,6 +7883,7 @@ def use_ability(
             tchar = memory.campaign["characters"].get(key) \
                     or memory.campaign["characters"].get(raw)
             if (tchar and tchar.get("sheet")
+                    and not _tracos.recusa_de_tipo(hab, tchar)
                     and memory.char_key(tchar.get("name", "")) != caster_key
                     and (tchar.get("status") or "").lower()
                         not in ("morto", "inconsciente", "fugiu", "dormindo")):
@@ -7919,6 +8020,7 @@ def use_ability(
         _save_area = salvaguarda_da_habilidade(hab)
         _conj = _conjuracao(s) or {}
         _cd_area = int(saving_throw_dc
+                       or hab.get("cd")
                        or _conj.get("cd")
                        or (8 + int(s.get("proficiencia", 2) or 2)))
         _tipo_area = (_norm_damage_type(hab.get("tipo_dano", "") or "")
@@ -7931,6 +8033,7 @@ def use_ability(
         for _alvo in _alvos_area:
             _dano_nele = total_dano
             _linha_save = ""
+            _passou = True
             _globo_a = _protegido_pelo_globo(char["name"], _alvo.get("name", ""),
                                              _circulo or int((_resolucao._magia_srd(hab) or {}).get("nivel", 0) or 0))
             if _globo_a:
@@ -7951,6 +8054,8 @@ def use_ability(
             _res = _apply_damage(_alvo, _dano_nele, _tipo_area,
                                  source_name=char["name"], arma_magica=True)
             _st_alvo = _alvo["sheet"]
+            if _save_area and not _passou and hab.get("condicao_se_falhar") and _st_alvo["vida_atual"] > 0:
+                result += "\n   " + _tracos._por_condicao(char, _alvo, hab["condicao_se_falhar"])
             result += _fmt_notas(_res["notas"])
             result += (f"\n   {_alvo['name']}: {_res['hp_antes']} → "
                        f"{_st_alvo['vida_atual']}/{_st_alvo['vida_max']}"
@@ -8001,10 +8106,12 @@ def use_ability(
             # Contra personagem do JOGADOR continua sendo ele quem rola: a
             # pausa abaixo pede o dado, e a bandeja abre sozinha.
             _save_auto = salvaguarda_da_habilidade(hab)
+            _falhou_cond = False
             if (_save_auto and not saving_throw_stat
                     and (_efeito == "dano" or ctrl_effect is not None)):
                 _conj = _conjuracao(s) or {}
-                _cd = int(_conj.get("cd") or (8 + int(s.get("proficiencia", 2) or 2)))
+                # O poder do monstro diz a própria CD (Redemoinho: 13).
+                _cd = int(hab.get("cd") or 0) or int(_conj.get("cd") or (8 + int(s.get("proficiencia", 2) or 2)))
                 if memory.is_party_member(target):
                     # Personagem do jogador: o dado é dele. Cai na pausa
                     # abaixo, com o teste e a CD que o SRD manda.
@@ -8015,6 +8122,7 @@ def use_ability(
                         desvantagem=_desv_primeira or _sub.coroa_contra(target, hab),
                         contra=(ctrl_effect or {}).get("condition", ""))
                     _desv_primeira = False
+                    _falhou_cond = not _passou
                     result += f"\n   {target['name']}: {_linha}"
                     if ctrl_effect is not None:
                         if _passou:
@@ -8118,6 +8226,9 @@ def use_ability(
                 hp_antes = _res["hp_antes"]
                 result += _fmt_notas(_res["notas"])
                 result += f"\n   {target['name']}: {hp_antes} → {st['vida_atual']}/{st['vida_max']}"
+                # O poder que derruba ou agarra quem falhou (Redemoinho, Engolfar).
+                if _falhou_cond and hab.get("condicao_se_falhar") and st["vida_atual"] > 0:
+                    result += "\n   " + _tracos._por_condicao(char, target, hab["condicao_se_falhar"])
                 if st["vida_atual"] == 0:
                     result += _mark_at_zero_hp(target, char["name"])
                 else:
@@ -14356,8 +14467,10 @@ def _extract_monster_attacks(monster: dict) -> dict:
         # "Hit: 14 (2d8 + 5) slashing damage" → slashing.
         tipo = _norm_damage_type(action.get("damage_type") or "") \
                or _damage_type_from_text(desc)
+        from rpg import tracos as _tracos_m
         ataques.append({"nome": aname.lower(), "dado": dado, "tipo": tipo,
-                        "ranged": bool(is_ranged and not is_melee)})
+                        "ranged": bool(is_ranged and not is_melee),
+                        **_tracos_m.efeitos_do_texto(desc)})
 
     def _primeiro(*testes):
         """Primeiro ataque que satisfaz algum dos testes, em ordem de preferência."""
@@ -14555,6 +14668,10 @@ def spawn_monster(
             "death_saves_sucessos": 0,
             "death_saves_falhas":   0,
             "cr":                   cr_label,
+            # O tipo (Imobilizar Pessoa: só humanoides) e o que não o afeta.
+            "tipo":                 monster_type,
+            "imunidades_condicao":  __import__("rpg.tracos", fromlist=["x"]).imunidades_de_condicao(
+                                        m.get("condition_immunities")),
         }
 
         # Extrai habilidades especiais (special abilities) do Open5e
@@ -15004,7 +15121,8 @@ def execute_npc_turn(npc_name: str = "", _forcar: bool = False) -> str:
                 f"{_pend.get('texto')} Pergunte e chame responder_reacao(usar=True ou False).")
     from rpg import reacoes as _rea
     if _rea._respostas is None and _rea.alguem_pergunta():
-        return _turno_com_perguntas(npc_name, _forcar, [], None)
+        return _com_perguntas({"fn": "execute_npc_turn", "kw": {"npc_name": npc_name, "_forcar": _forcar}},
+                              [], None)
     token = cs.get("turn_token", 0)
     vez   = _combat_current_actor()
     from rpg import criaturas as _cri_t
@@ -15031,17 +15149,19 @@ def execute_npc_turn(npc_name: str = "", _forcar: bool = False) -> str:
     return saida
 
 
-def _turno_com_perguntas(npc_name: str, forcar: bool, respostas: list, rng) -> str:
+def _com_perguntas(chamada: dict, respostas: list, rng):
     """
-    O turno do inimigo que pode parar para o jogador decidir uma reação
-    (rpg/reacoes.py, modo "perguntar"). Guarda a campanha e o sorteio; se a
-    pergunta chega, desfaz o turno inteiro e grava a pergunta pendente. A
-    resposta (responder_reacao) roda o turno de novo com o mesmo sorteio — os
-    mesmos dados, até a mesma pergunta, que agora tem resposta.
+    Uma jogada que pode parar para o jogador decidir uma reação (rpg/reacoes.py,
+    modo "perguntar"): o turno do inimigo, a ação do jogador na tela, o
+    attack_roll ou o use_ability do Mestre. Guarda a campanha e o sorteio; se a
+    pergunta chega, desfaz a jogada inteira e grava a pergunta pendente com a
+    jogada. A resposta (responder_reacao) roda a jogada de novo com o mesmo
+    sorteio — os mesmos dados, até a mesma pergunta, que agora tem resposta.
     """
     import copy
     from rpg import reacoes as _rea
     vez = _combat_current_actor()
+    token = (memory.campaign.get("combat_state") or {}).get("turn_token", 0)
     copia = copy.deepcopy(memory.campaign.copy())
     if rng is None:
         rng = random.getstate()
@@ -15049,21 +15169,42 @@ def _turno_com_perguntas(npc_name: str, forcar: bool, respostas: list, rng) -> s
         random.setstate(rng)
     _rea._respostas, _rea._indice = list(respostas), 0
     try:
-        return execute_npc_turn(npc_name, _forcar=forcar)
+        if chamada["fn"] not in ("execute_npc_turn", "combat_action", "attack_roll", "use_ability"):
+            raise ValueError(f"jogada desconhecida: {chamada['fn']}")
+        return globals()[chamada["fn"]](**chamada["kw"])
     except _rea.PerguntaDeReacao as p:
         memory.campaign.clear()
         memory.campaign.update(copia)
         cs = memory.campaign.get("combat_state") or {}
-        cs["reacao_pendente"] = {"npc": vez, "quem": p.quem, "chave": p.chave, "texto": p.texto,
-                                 "nome": _rea.REACOES.get(p.chave, {}).get("nome", p.chave),
-                                 "respostas": list(respostas), "forcar": bool(forcar),
+        cs["reacao_pendente"] = {"npc": vez, "token": token, "quem": p.quem, "chave": p.chave,
+                                 "texto": p.texto, "nome": _rea.REACOES.get(p.chave, {}).get("nome", p.chave),
+                                 "respostas": list(respostas), "chamada": chamada,
                                  "rng": [rng[0], list(rng[1]), rng[2]]}
         memory.save_campaign()
-        return (f"**REAÇÃO — {p.quem} decide**\n   {p.texto}\n"
-                f"   O turno de {vez} está parado. Pergunte ao jogador e chame "
-                f"responder_reacao(usar=True ou False).")
+        texto = (f"**REAÇÃO — {p.quem} decide**\n   {p.texto}\n"
+                 f"   A jogada de {vez} está parada. Pergunte ao jogador e chame "
+                 f"responder_reacao(usar=True ou False).")
+        if chamada["fn"] == "combat_action":
+            return {"ok": True, "message": texto, "snapshot": combat_snapshot()}
+        return texto
     finally:
         _rea._respostas, _rea._indice = None, 0
+
+
+def _pode_perguntar_agora(kw: dict) -> bool:
+    """attack_roll / use_ability chamados de fora (o Mestre), em combate, com alguém em 'perguntar'."""
+    from rpg import reacoes as _rea
+    return (_rea._respostas is None and not kw.get("_skip_turn_check")
+            and bool((memory.campaign.get("combat_state") or {}).get("is_active"))
+            and _rea.alguem_pergunta())
+
+
+def _aviso_de_pergunta_pendente() -> str:
+    pend = (memory.campaign.get("combat_state") or {}).get("reacao_pendente")
+    if not pend:
+        return ""
+    return (f"Aviso: a jogada de {pend.get('npc')} está parada esperando o jogador decidir: "
+            f"{pend.get('texto')} Pergunte e chame responder_reacao(usar=True ou False). Nada foi feito.")
 
 
 def responder_reacao(usar: bool) -> str:
@@ -15082,14 +15223,20 @@ def responder_reacao(usar: bool) -> str:
         return "Aviso: nenhuma reação esperando decisão."
     cs.pop("reacao_pendente", None)
     if (not cs.get("is_active")
-            or memory.char_key(_combat_current_actor()) != memory.char_key(pend.get("npc", ""))):
+            or memory.char_key(_combat_current_actor()) != memory.char_key(pend.get("npc", ""))
+            or ("token" in pend and cs.get("turn_token", 0) != pend["token"])):
         memory.save_campaign()
         return "Aviso: o turno mudou e a pergunta caducou. Nada foi feito."
     estado = pend.get("rng") or []
     rng = (estado[0], tuple(estado[1]), estado[2]) if len(estado) == 3 else None
     respostas = list(pend.get("respostas") or []) + [bool(usar)]
+    chamada = pend.get("chamada") or {"fn": "execute_npc_turn",
+                                      "kw": {"npc_name": pend.get("npc", ""), "_forcar": bool(pend.get("forcar"))}}
     decisao = (f"{pend.get('quem')}: {'usa' if usar else 'não usa'} {pend.get('nome', pend.get('chave'))}.\n")
-    return decisao + _turno_com_perguntas(pend.get("npc", ""), bool(pend.get("forcar")), respostas, rng)
+    saida = _com_perguntas(chamada, respostas, rng)
+    if isinstance(saida, dict):
+        saida = saida.get("message", "")
+    return decisao + saida
 
 
 def _turno_confuso(npc: dict, npc_name: str) -> str:
@@ -16525,6 +16672,8 @@ def _metade_se_passar(hab: dict) -> bool:
     m = resolucao._magia_srd(hab)
     if m is not None and m.get("salvaguarda"):
         return bool(m.get("metade_se_passar"))
+    if "metade" in (hab or {}):                  # o poder do monstro diz
+        return bool(hab["metade"])
     return True
 
 
@@ -16610,8 +16759,11 @@ def _queimar_no_inicio_do_turno(ch: dict) -> list[str]:
                for c in conds):
         return []
     nome = ch.get("name", "")
-    dano = random.randint(1, 4)
-    res = _apply_damage(ch, dano, "fire", source_name="fogo alquímico")
+    _fogo = next((c for c in conds if isinstance(c, dict)
+                  and _norm_txt(c.get("nome", "")) == "queimando"), {}) or {}
+    _n_f, _faces_f, _b_f = _parse_dice(_fogo.get("dado") or "1d4")
+    dano = sum(random.randint(1, _faces_f) for _ in range(_n_f)) + _b_f
+    res = _apply_damage(ch, dano, "fire", source_name=_fogo.get("por") or "fogo alquímico")
     linha = (f"{nome} queima: {dano} de fogo"
              f"{' (' + '; '.join(res['notas']) + ')' if res['notas'] else ''} "
              f"• HP {res['hp_antes']}→{res['hp_depois']}")
@@ -16952,6 +17104,18 @@ def combat_action(action: str, actor: str = "", target: str = "",
 
     msg = ""
     a = (action or "").lower().strip()
+
+    # Uma reação em "perguntar" parou a jogada: só a resposta segue.
+    from rpg import reacoes as _rea_ca
+    if a not in ("reagir", "end", "enemy") and cs.get("reacao_pendente"):
+        return {"ok": False, "message": _aviso_de_pergunta_pendente(), "snapshot": combat_snapshot()}
+    # A ação do jogador também pode chamar uma reação que pergunta: o
+    # Oportunista do monge quando o guerreiro acerta, o Golpe Mágico.
+    if (a not in ("reagir", "end", "enemy", "auto", "death_save")
+            and _rea_ca._respostas is None and _rea_ca.alguem_pergunta()):
+        return _com_perguntas({"fn": "combat_action",
+                               "kw": {"action": action, "actor": actor, "target": target, "weapon": weapon,
+                                      "ability": ability, "item": item}}, [], None)
 
     # Helper local: tenta marcar slot ("acao"|"bonus") na economia do turno.
     # Retorna mensagem de erro (string) ou None se ok.

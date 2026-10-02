@@ -102,6 +102,15 @@ def agarrar(ator: str, alvo: str) -> str:
             f"solta se {a['name']} sair da zona ou cair, ou se {b['name']} escapar).")
 
 
+def _soltar_contido(ch: dict, nome_de_quem: str) -> None:
+    """A mordida que agarra também prende (Contido): solta junto com a pegada."""
+    conds = ((ch or {}).get("sheet") or {}).get("condicoes")
+    if isinstance(conds, list):
+        ch["sheet"]["condicoes"] = [c for c in conds if not (
+            isinstance(c, dict) and c.get("da_pegada")
+            and memory.char_key(c.get("por", "")) == memory.char_key(nome_de_quem))]
+
+
 def escapar(ator: str) -> str:
     a = _ch(ator)
     pegada = next((c for c in (a.get("sheet") or {}).get("condicoes") or []
@@ -111,12 +120,22 @@ def escapar(ator: str) -> str:
     quem = _ch(pegada.get("por", ""))
     if not quem:
         a["sheet"]["condicoes"].remove(pegada)
+        _soltar_contido(a, pegada.get("por", ""))
         return f"{a['name']} se solta."
     atl, _ = _pericia(a, "atletismo", "forca")
     acr, _ = _pericia(a, "acrobacia", "destreza")
+    # A pegada da criatura tem CD fixa (a mordida do crocodilo: CD 12).
+    if pegada.get("escapa_cd"):
+        cd = int(pegada["escapa_cd"])
+        if max(atl, acr) >= cd:
+            a["sheet"]["condicoes"].remove(pegada)
+            _soltar_contido(a, pegada.get("por", ""))
+            return f"{a['name']} escapa de {quem['name']}: {max(atl, acr)} contra CD {cd} — livre."
+        return f"{a['name']} tenta escapar de {quem['name']}: {max(atl, acr)} contra CD {cd} — continua agarrado."
     contra, _ = _pericia(quem, "atletismo", "forca")
     if max(atl, acr) > contra:
         a["sheet"]["condicoes"].remove(pegada)
+        _soltar_contido(a, pegada.get("por", ""))
         return (f"{a['name']} escapa de {quem['name']}: {max(atl, acr)} contra Atletismo {contra} — livre.")
     return f"{a['name']} tenta escapar de {quem['name']}: {max(atl, acr)} contra Atletismo {contra} — continua agarrado."
 
@@ -132,6 +151,7 @@ def soltar_quem_agarrou(nome: str) -> list[str]:
                                          and memory.char_key(c.get("por", "")) == memory.char_key(nome))]
         if len(ficam) != len(conds):
             ch["sheet"]["condicoes"] = ficam
+            _soltar_contido(ch, nome)
             linhas.append(f"{ch.get('name')} fica livre de {nome}")
     return linhas
 

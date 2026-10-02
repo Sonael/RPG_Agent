@@ -187,6 +187,30 @@ def test_responder_continua_o_turno(tela):
     assert not erros, erros[:3]
 
 
+def test_pergunta_na_jogada_do_jogador(tela):
+    """O ataque de Helena parou no Oportunista de Stelar; Não usar refaz o ataque sem ele."""
+    abrir, cap = tela
+    estado = copy.deepcopy(cap.COMBATE_MAGIAS)
+    estado["characters"]["stelar"]["habilidades"] = [
+        {"nome": "Oportunista", "custo_mana": 0, "dado": "", "descricao": ""}]
+    estado["characters"]["stelar"]["sheet"]["reacoes_perguntar"] = ["oportunista"]
+    sorteio = random.Random(3).getstate()
+    estado["combat_state"]["reacao_pendente"] = {
+        "npc": "Helena", "quem": "Stelar", "chave": "oportunista", "nome": "Oportunista",
+        "texto": "Helena acertou Victoria. Stelar ataca Victoria (Oportunista)?", "respostas": [],
+        "chamada": {"fn": "combat_action", "kw": {"action": "attack", "actor": "Helena",
+                                                    "target": "Victoria", "weapon": "", "ability": "",
+                                                    "item": ""}},
+        "rng": [sorteio[0], list(sorteio[1]), sorteio[2]]}
+    pg, erros = abrir(estado, "Reação de Stelar")
+    assert "Oportunista" in pg.inner_text("#cbt-prompt")
+    pg.click("#cbt-buttons button:has-text('Não usar')")
+    pg.wait_for_function(
+        "() => !document.getElementById('cbt-action-title').textContent.includes('Reação de')", timeout=8000)
+    assert _motor(pg)["reacao_pendente"] is None
+    assert not erros, erros[:3]
+
+
 # ---------------------------------------------------------------------------
 # A invocação do grupo
 # ---------------------------------------------------------------------------

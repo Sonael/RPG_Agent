@@ -1031,9 +1031,11 @@ Para definir estratégia de um NPC (opcional; padrão = agressivo):
 • INVOCAÇÃO DO GRUPO (lobos do Conjurar Animais, o elemental, o familiar):
   a vez dela é do JOGADOR. execute_npc_turn() recusa; pergunte o que ela faz e
   use attack_roll / use_ability com ela (ou end_turn).
-• REAÇÃO QUE PERGUNTA: se execute_npc_turn() devolver "REAÇÃO — <nome>
-  decide", o turno do inimigo parou. Pergunte ao jogador e chame
-  responder_reacao(usar=True ou False); o turno continua com os mesmos dados.
+• REAÇÃO QUE PERGUNTA: se execute_npc_turn(), attack_roll() ou use_ability()
+  devolver "REAÇÃO — <nome> decide", a jogada parou. Pergunte ao jogador e
+  chame responder_reacao(usar=True ou False); ela continua com os mesmos dados.
+• TIPO DE CRIATURA: Imobilizar Pessoa só pega humanoides, Curar Ferimentos não
+  cura morto-vivo — o motor recusa e diz por quê; narre a magia sem efeito.
 
 • VITÓRIA (inimigos derrotados) → end_combat() e DEPOIS grant_xp() para CADA
   membro do grupo (aliados recrutados incluídos). Não pule o XP da vitória —
