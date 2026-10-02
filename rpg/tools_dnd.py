@@ -157,6 +157,8 @@ _SPELL_PT_TO_EN: dict[str, str] = {
 # QUANDO O COMBATE ACABA e para classificar caídos × sobreviventes.
 DEFEATED_STATUSES = {
     "morto", "inconsciente", "estabilizado", "fugiu", "exilado",
+    # Largou as armas (Pedir rendição): fora da luta, vivo, não é saque.
+    "rendido",
 }
 # Status que fazem o combatente PULAR A VEZ na ordem de turno. Inclui
 # "dormindo" (Sleep): a criatura está incapacitada (não age), mas continua
@@ -192,17 +194,27 @@ def _log_combat_event(etype: str, actor: str = "", target: str = "",
         del log[:-_MAX_COMBAT_LOG]
 
 
-def _mark_at_zero_hp(target: dict, source_name: str = "") -> str:
+def _mark_at_zero_hp(target: dict, source_name: str = "", nocaute: bool = False) -> str:
     """
     Resolve um alvo que chegou a 0 HP aplicando a regra de D&D 5e:
       • Jogador / aliado do grupo → cai INCONSCIENTE (depois faz testes de morte).
       • Monstro / NPC comum        → MORRE na hora (sem teste de morte).
+      • Nocaute (golpe corpo a corpo não letal) → cai inconsciente e ESTÁVEL,
+        qualquer um; o NPC acorda com 1 PV depois de 1d4 horas do relógio.
     Define o status, registra o evento de combate e devolve o sufixo de texto
     a ser anexado ao resultado da ferramenta.
     """
     name = target.get("name", "")
     from rpg import manobras as _manobras
     _manobras.soltar_quem_agarrou(name)
+    if nocaute:
+        target["status"] = "estabilizado"
+        s_n = target.setdefault("sheet", {})
+        s_n["death_saves_sucessos"] = s_n["death_saves_falhas"] = 0
+        if not memory.is_party_member(target):
+            s_n["acorda_hora"] = _agora_em_horas() + random.randint(1, 4)
+        _log_combat_event("down", source_name, name, msg=f"{name} foi nocauteado (estável)")
+        return " NOCAUTEADO! (estável — não morre)"
     if memory.is_party_member(target):
         target["status"] = "inconsciente"
         _log_combat_event("down", source_name, name, msg=f"{name} caiu inconsciente")
@@ -211,6 +223,29 @@ def _mark_at_zero_hp(target: dict, source_name: str = "") -> str:
     (target.get("sheet") or {})["morreu_hora"] = _agora_em_horas()
     _log_combat_event("down", source_name, name, msg=f"{name} foi derrotado")
     return " DERROTADO!"
+
+
+def poupado(ch: dict | None) -> str:
+    """
+    O inimigo que está fora da luta sem ter caído: "rendido", ou
+    "enfeitiçado"/"dominado" por alguém do lado do grupo. '' quando não.
+    Só eles sobrando, a luta acaba — ninguém é obrigado a matar quem já não
+    luta contra o grupo.
+    """
+    if not ch or memory.luta_com_o_grupo(ch):
+        return ""
+    if (ch.get("status") or "").lower() == "rendido":
+        return "rendido"
+    if (ch.get("status") or "").lower() in DEFEATED_STATUSES:
+        return ""
+    from rpg import encantos
+    e = encantos.ativo(ch)
+    if not e:
+        return ""
+    por = memory.campaign.get("characters", {}).get(memory.char_key(e.get("por_nome", "")))
+    if por and memory.luta_com_o_grupo(por):
+        return "dominado" if e.get("tipo") == "dominado" else "enfeitiçado"
+    return ""
 
 
 def _is_out_of_combat(name: str) -> bool:
@@ -4152,15 +4187,25 @@ def set_combat_side(name: str, side: str) -> str:
 
     Args:
         name: Nome do personagem.
-        side: "aliado", "inimigo" ou "grupo".
+        side: "aliado", "inimigo", "grupo" ou "rendido" (larga as armas e sai
+              da luta, vivo — não precisa morrer para a luta acabar).
     """
     lado = (side or "").strip().lower()
     apelidos = {"aliada": "aliado", "amigo": "aliado", "amiga": "aliado",
                 "inimiga": "inimigo", "hostil": "inimigo",
                 "party": "grupo", "jogador": "grupo"}
     lado = apelidos.get(lado, lado)
+    if lado in ("rendido", "rendida", "rende", "rendicao"):
+        char_r, err_r = _get_char(name)
+        if not char_r:
+            return err_r
+        char_r["status"] = "rendido"
+        _log_combat_event("surrender", char_r.get("name", name), "", msg=f"{char_r.get('name', name)} se rende")
+        memory.save_campaign()
+        return (f"{char_r.get('name', name)} se rende: larga as armas e sai da luta, vivo. Se só restarem "
+                f"inimigos rendidos, enfeitiçados ou dominados, encerre com end_combat().")
     if lado not in memory.LADOS:
-        return ('Erro: lado inválido. Use "aliado", "inimigo" ou "grupo".')
+        return ('Erro: lado inválido. Use "aliado", "inimigo", "grupo" ou "rendido".')
 
     char, err = _get_char(name)
     if not char:
@@ -6655,6 +6700,7 @@ def attack_roll(
     advantage: bool = False,
     disadvantage: bool = False,
     end_turn: bool = True,
+    nao_letal: bool = False,
     _skip_turn_check: bool = False,
 ) -> str:
     """
@@ -7277,7 +7323,10 @@ def attack_roll(
 
         _was_asleep = (target.get("status", "") or "").lower() == "dormindo"
         if hp_depois == 0:
-            result += _mark_at_zero_hp(target, attacker["name"])
+            # Golpe não letal: só corpo a corpo, e só quando este golpe derrubou.
+            _nocaute = bool((nao_letal or sa.get("nao_letal")) and not is_ranged and not matched_hab
+                            and hp_antes > 0)
+            result += _mark_at_zero_hp(target, attacker["name"], nocaute=_nocaute)
         elif _was_asleep:
             # 5e: uma criatura dormindo (Sleep) acorda ao sofrer dano.
             _wake_sleeper(target)
@@ -11558,6 +11607,17 @@ def advance_time(hours: int, reason: str = "") -> str:
     acabaram = encantos.expirar()
     # Animar Mortos dura 24 horas: o morto-vivo some quando o relógio chega lá.
     acabaram += criaturas.limpar()
+    # Nocaute: depois de 1d4 horas, o NPC estável acorda com 1 PV.
+    for _ch_n in (memory.campaign.get("characters") or {}).values():
+        _s_n = (_ch_n or {}).get("sheet") if isinstance(_ch_n, dict) else None
+        if (not _s_n or _s_n.get("acorda_hora") is None
+                or (_ch_n.get("status") or "").lower() != "estabilizado"):
+            continue
+        if _agora_em_horas() >= int(_s_n["acorda_hora"]):
+            _s_n.pop("acorda_hora", None)
+            _s_n["vida_atual"] = max(1, int(_s_n.get("vida_atual", 0) or 0))
+            _ch_n["status"] = "inimigo" if memory.lado_no_combate(_ch_n) == "inimigo" else "vivo"
+            acabaram.append(f"{_ch_n.get('name')} acorda do nocaute com 1 PV")
     # Bom Fruto: a magia acaba em 24 horas, e as frutas viram frutas comuns.
     for _ch_f in (memory.campaign.get("characters") or {}).values():
         _inv_f = (_ch_f or {}).get("inventario")
@@ -15394,7 +15454,7 @@ def _executar_turno_npc(npc_name: str = "") -> str:
 
     # Monta lista de alvos válidos: o lado oposto ao do NPC, vivo e em pé. Um
     # aliado (o mercador que você escolta) mira nos inimigos, não no grupo.
-    OUT = ("morto", "estabilizado", "inconsciente", "fugiu", "exilado")
+    OUT = ("morto", "estabilizado", "inconsciente", "fugiu", "exilado", "rendido")
     meu_lado = memory.luta_com_o_grupo(npc)
     # Só quem está NA luta: a lista varria a campanha inteira e o motor
     # chegou a mandar um aliado atacar um NPC que estava noutra cidade.
@@ -15428,7 +15488,8 @@ def _executar_turno_npc(npc_name: str = "") -> str:
             return (f"{npc_name} está {'Dominado' if e_enc['tipo'] == 'dominado' else 'Enfeitiçado'} "
                     f"por {e_enc['por_nome']} e não ataca ninguém do lado dele."
                     + _auto_advance_turn(npc_name))
-        return f"{npc_name} não encontra alvos válidos. Verifique se o combate deve encerrar com end_combat()."
+        return (f"{npc_name} não encontra alvos válidos. Verifique se o combate deve encerrar com "
+                f"end_combat() — inimigos enfeitiçados, dominados ou rendidos não precisam morrer.")
 
     # Golpes do turno. O Ataque Múltiplo do urso-coruja é "um com o bico e um
     # com as garras" — então alternamos entre os ataques do stat block em vez
@@ -16952,6 +17013,10 @@ def _combatant_snapshot(name: str) -> dict | None:
         "invocacao_de": ((memory.campaign["characters"].get((ch.get("invocacao") or {}).get("por", "")) or {})
                          .get("name", "") if isinstance(ch.get("invocacao"), dict) else ""),
         "controlada": __import__("rpg.criaturas", fromlist=["x"]).controlada_pelo_jogador(ch),
+        # Golpe não letal ligado: o corpo a corpo que derruba nocauteia.
+        "nao_letal": bool(s.get("nao_letal")),
+        # Rendido, ou enfeitiçado/dominado pelo grupo: não precisa morrer.
+        "poupado": poupado(ch),
         # "grupo" | "aliado" | "inimigo": a tela pinta o aliado do seu lado,
         # mas quem o joga é o motor (is_party continua sendo só o grupo).
         "lado":       memory.lado_no_combate(ch),
@@ -17111,7 +17176,7 @@ def combat_action(action: str, actor: str = "", target: str = "",
         return {"ok": False, "message": _aviso_de_pergunta_pendente(), "snapshot": combat_snapshot()}
     # A ação do jogador também pode chamar uma reação que pergunta: o
     # Oportunista do monge quando o guerreiro acerta, o Golpe Mágico.
-    if (a not in ("reagir", "end", "enemy", "auto", "death_save")
+    if (a not in ("reagir", "end", "enemy", "auto", "death_save", "nao_letal")
             and _rea_ca._respostas is None and _rea_ca.alguem_pergunta()):
         return _com_perguntas({"fn": "combat_action",
                                "kw": {"action": action, "actor": actor, "target": target, "weapon": weapon,
@@ -17533,7 +17598,18 @@ def combat_action(action: str, actor: str = "", target: str = "",
             msg = (f"{actor} esquiva-se (Dodge): ataques contra {actor} têm desvantagem "
                    f"até o próximo turno.")
 
-        elif a in ("help", "hide", "grapple", "escape", "shove", "ready"):
+        elif a == "nao_letal":
+            # Golpe não letal: liga ou desliga, sem gastar nada do turno.
+            _ch_nl = memory.campaign["characters"].get(memory.char_key(actor)) or {}
+            _s_nl = _ch_nl.setdefault("sheet", {})
+            _s_nl["nao_letal"] = _norm_txt(weapon or "") in ("sim", "true", "1", "ligar")
+            memory.save_campaign()
+            return {"ok": True,
+                    "message": (f"{actor}: golpes corpo a corpo que derrubam passam a NOCAUTEAR (estável, não morre)."
+                                if _s_nl["nao_letal"] else f"{actor}: golpes voltam a ser letais."),
+                    "snapshot": combat_snapshot()}
+
+        elif a in ("help", "hide", "grapple", "escape", "shove", "ready", "surrender"):
             # Ajudar, Esconder-se, Agarrar, Escapar, Empurrar, Preparar: todas
             # gastam a Ação (rpg/manobras.py).
             from rpg import manobras as _manobras
@@ -17551,6 +17627,8 @@ def combat_action(action: str, actor: str = "", target: str = "",
                 msg = _manobras.escapar(actor)
             elif a == "shove":
                 msg = _manobras.empurrar(actor, alvo_m, (weapon or "").strip())
+            elif a == "surrender":
+                msg = _manobras.pedir_rendicao(actor, alvo_m, (weapon or "").strip())
             else:
                 msg = _manobras.preparar(actor, alvo_m)
             if msg.startswith(("Erro:", "Aviso:")):
@@ -17619,13 +17697,15 @@ def combat_action(action: str, actor: str = "", target: str = "",
                 party_alive = party_alive or (not out)
             else:
                 enemy_seen = True
-                enemy_alive = enemy_alive or (not out)
+                # Enfeitiçado ou dominado pelo grupo, ou rendido: não luta
+                # mais contra vocês, e não é preciso matá-lo para a luta acabar.
+                enemy_alive = enemy_alive or (not out and not poupado(ch))
         if (enemy_seen and not enemy_alive) or (party_seen and not party_alive):
             party_win = enemy_seen and not enemy_alive
             quem = "inimigos" if party_win else "o grupo"
             # Captura o RESULTADO antes de end_combat() limpar a ordem,
             # para a tela mostrar um painel de fim (sem fechar bruscamente).
-            sobrev, caidos = [], []
+            sobrev, caidos, poupados = [], [], []
             for nm in order:
                 snp = _combatant_snapshot(nm)
                 if not snp:
@@ -17634,7 +17714,10 @@ def combat_action(action: str, actor: str = "", target: str = "",
                          "lado": snp["lado"],
                          "hp": snp["hp"], "hp_max": snp["hp_max"],
                          "status": snp["status"]}
-                if snp["status"].lower() in DEFEATED_STATUSES:
+                _pou = poupado(memory.campaign["characters"].get(memory.char_key(nm)))
+                if _pou:
+                    poupados.append(dict(linha, status=_pou))
+                elif snp["status"].lower() in DEFEATED_STATUSES:
                     caidos.append(linha)
                 else:
                     sobrev.append(linha)
@@ -17643,6 +17726,7 @@ def combat_action(action: str, actor: str = "", target: str = "",
                 "title":        "Vitória!" if party_win else "Derrota…",
                 "sobreviventes": sobrev,
                 "caidos":        caidos,
+                "poupados":      poupados,
             }
             _log_combat_event("side_wiped", msg=f"Combate decidido — {quem} fora de ação")
             msg += "\n" + end_combat()
@@ -17670,7 +17754,7 @@ def combat_recap_payload() -> str:
     res = cs.get("result") or {}
     desfecho = res.get("outcome", "fim")
     finais = []
-    for c in (res.get("sobreviventes", []) + res.get("caidos", [])):
+    for c in (res.get("sobreviventes", []) + res.get("caidos", []) + res.get("poupados", [])):
         lado = c.get("lado") or ("grupo" if c.get("is_party") else "inimigo")
         finais.append(f"{c.get('name')} [{lado}]: {c.get('status')} "
                       f"({c.get('hp')}/{c.get('hp_max')} HP)")
@@ -17691,6 +17775,12 @@ def combat_recap_payload() -> str:
             "add_item/modify_currency para o saque. Conceda XP a cada membro do "
             "grupo com grant_xp(). Depois siga a história."
         )
+        if res.get("poupados"):
+            instrucao += (
+                " POUPADOS (" + ", ".join(f"{c.get('name')}: {c.get('status')}" for c in res["poupados"])
+                + "): estão vivos, não são saque e contam para o XP da vitória. Narre a rendição (ou o "
+                "encanto) e o que eles fazem agora — prisioneiros, informantes, fuga."
+            )
     payload = (
         "[COMBATE RESOLVIDO NA TELA TÁTICA]\n"
         + instrucao + "\n\n"

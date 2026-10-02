@@ -81,6 +81,85 @@ def ajudar(ator: str, alvo: str) -> str:
             f"{b['name']} tem vantagem (até o próximo turno de {a['name']}).")
 
 
+def pedir_rendicao(ator: str, alvo: str, modo: str = "") -> str:
+    """
+    Pedir rendição (gasta a Ação): Intimidação ou Persuasão de quem pede
+    contra a Sabedoria do inimigo. Rendido, ele larga as armas e sai da luta,
+    vivo — e só com inimigos rendidos, enfeitiçados ou dominados sobrando, a
+    luta acaba.
+
+    • Dominado por alguém do grupo: rende-se sem teste.
+    • Enfeitiçado por alguém do grupo: quem pede tem vantagem (o encantado
+      trata o grupo como amigo).
+    • O inimigo inteiro (mais da metade da vida) e com o lado dele ainda em
+      número tem vantagem: ainda acha que vence. Ferido (metade ou menos), ele
+      rola com desvantagem.
+    • Sem mente para entender (INT 3 ou menos; constructo ou morto-vivo sem
+      vontade própria) não se rende.
+    """
+    td = _td()
+    a, b = _ch(ator), _ch(alvo)
+    if not a or not b or not b.get("sheet"):
+        return "Erro: escolha quem deve se render."
+    if memory.luta_com_o_grupo(a) == memory.luta_com_o_grupo(b):
+        return f"Erro: {b['name']} não luta contra {a['name']}."
+    if (b.get("status") or "").lower() in td.OUT_OF_COMBAT_STATUSES:
+        return f"Erro: {b['name']} já está fora da luta."
+    if td._zonas_ativas() and (td._distancia(ator, alvo) or 0) > 1:
+        return f"Erro: {b['name']} está longe demais para ouvir — chegue a uma zona vizinha."
+    calado = td._zona_silenciada(ator) or td._zona_silenciada(alvo)
+    if calado:
+        return f"Erro: o {calado} engole a voz: ninguém ouve o pedido."
+    s_b = b["sheet"]
+    from rpg import tracos
+    tipo = tracos.tipo_de_criatura(b)
+    if int(s_b.get("inteligencia", 10) or 10) <= 3 or (
+            tipo in ("constructo", "morto-vivo") and int(s_b.get("inteligencia", 10) or 10) <= 6):
+        return (f"Aviso: {b['name']} não tem como entender um pedido de rendição — luta até cair "
+                f"(ou foge). A Ação não foi gasta.")
+    pou = td.poupado(b)
+    if pou == "dominado":
+        b["status"] = "rendido"
+        _td()._log_combat_event("surrender", b["name"], a["name"], msg=f"{b['name']} se rende a {a['name']}")
+        return f"{a['name']} manda {b['name']} largar as armas, e o dominado obedece: **RENDIDO**."
+    pericia, atributo = (("persuasao", "carisma") if (modo or "").startswith("persu")
+                         else ("intimidacao", "carisma"))
+    rotulo = "Persuasão" if pericia == "persuasao" else "Intimidação"
+    vant_a = pou == "enfeiticado" or pou == "enfeitiçado"
+    s_a = a.get("sheet") or {}
+    bonus_a = td._modifier(int(s_a.get(atributo, 10) or 10))
+    if td._proficiente_na_pericia(s_a, pericia):
+        bonus_a += int(s_a.get("proficiencia", 2) or 2)
+    d_a = [random.randint(1, 20) for _ in range(2 if vant_a else 1)]
+    total_a = max(d_a) + bonus_a
+    # O lado do inimigo ainda em número? Ele inteiro acha que vence.
+    cs = memory.campaign.get("combat_state") or {}
+    de_pe = lambda c: (c and (c.get("status") or "").lower() not in td.OUT_OF_COMBAT_STATUSES  # noqa: E731
+                       and int((c.get("sheet") or {}).get("vida_atual", 0) or 0) > 0 and not td.poupado(c))
+    lados = [memory.campaign["characters"].get(memory.char_key(n)) for n in cs.get("initiative_order") or []]
+    deles = sum(1 for c in lados if de_pe(c) and memory.luta_com_o_grupo(c) == memory.luta_com_o_grupo(b))
+    nossos = sum(1 for c in lados if de_pe(c) and memory.luta_com_o_grupo(c) == memory.luta_com_o_grupo(a))
+    vida, vida_max = int(s_b.get("vida_atual", 0) or 0), max(1, int(s_b.get("vida_max", 1) or 1))
+    ferido = vida * 2 <= vida_max
+    vant_b = (not ferido) and deles >= nossos
+    desv_b = ferido
+    mod_b = td._modifier(int(s_b.get("sabedoria", 10) or 10))
+    d_b = [random.randint(1, 20) for _ in range(2 if (vant_b != desv_b) else 1)]
+    d20_b = (max(d_b) if vant_b and not desv_b else min(d_b) if desv_b and not vant_b else d_b[0])
+    total_b = d20_b + mod_b
+    nota_b = ("vantagem: inteiro e em número" if vant_b and not desv_b
+              else "desvantagem: ferido" if desv_b and not vant_b else "")
+    linha = (f"{rotulo} de {a['name']} {total_a}" + (" (vantagem: enfeitiçado)" if vant_a else "")
+             + f" contra Sabedoria de {b['name']} {total_b}" + (f" ({nota_b})" if nota_b else ""))
+    if total_a > total_b:
+        b["status"] = "rendido"
+        s_b["concentracao"] = None
+        soltar_quem_agarrou(b["name"])
+        _td()._log_combat_event("surrender", b["name"], a["name"], msg=f"{b['name']} se rende a {a['name']}")
+        return f"{a['name']} pede a rendição de {b['name']}: {linha} — {b['name']} larga as armas: **RENDIDO**."
+    return f"{a['name']} pede a rendição de {b['name']}: {linha} — {b['name']} recusa e continua lutando."
+
+
 def esconder(ator: str) -> str:
     from rpg import resolucao
     a = _ch(ator)

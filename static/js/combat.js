@@ -34,7 +34,7 @@
   let _confirmar = null;    // ação em área esperando o "conjurar mesmo assim"
   const _abertos = new Set();   // linhas de combatente com os detalhes abertos
 
-  const OUT = ['morto', 'inconsciente', 'estabilizado', 'fugiu', 'exilado'];
+  const OUT = ['morto', 'inconsciente', 'estabilizado', 'fugiu', 'exilado', 'rendido'];
   const esc = (s) => (window.escapeHtml ? window.escapeHtml(s) : String(s == null ? '' : s));
   const isOut = (st) => OUT.includes((st || '').toLowerCase());
   // Nome dentro de onclick='...': o esc não escapa o apóstrofo.
@@ -595,6 +595,33 @@
       + `</div>`;
   }
 
+  // Golpe não letal: o corpo a corpo que derruba o inimigo nocauteia (fica
+  // estável, vivo) em vez de matar. Liga e desliga sem gastar o turno. Mora
+  // no seletor de arma do Atacar, que é onde a escolha importa — na barra,
+  // uma linha a mais escondia o último combatente no celular.
+  async function _naoLetal(ator, valor) {
+    if (_busy) return;
+    try {
+      const res = await doAction({ action: 'nao_letal', actor: ator, weapon: valor });
+      if (res && res.message && window.showToast) window.showToast(res.message);
+      if (res && res.snapshot) await refresh(res.snapshot);
+      _sel('attack');
+    } catch (_) {
+      if (window.showToast) window.showToast('Falha de conexão no combate.');
+    }
+  }
+
+  function linhaNaoLetal(cur) {
+    if (!cur) return '';
+    const on = !!cur.nao_letal;
+    return `<div class="cbt-reacoes" role="group" aria-label="Golpe não letal">`
+      + `<button type="button" class="cbt-reacao-chip cbt-nao-letal ${on ? 'ligada' : 'desligada'}" `
+      + `aria-pressed="${on ? 'true' : 'false'}" ${_busy ? 'disabled' : ''} `
+      + `title="Golpe corpo a corpo que derruba: ${on ? 'nocauteia (estável, não morre)' : 'mata o inimigo'}" `
+      + `onclick="window.Combat._naoLetal('${jsNome(cur.name)}','${on ? 'nao' : 'sim'}')">`
+      + `Golpe não letal<small>${on ? 'nocauteia' : 'desligado'}</small></button></div>`;
+  }
+
   async function _reacao(ator, chave, modo) {
     if (_busy) return;
     // Compatível com quem chama com booleano (ligada / desligada).
@@ -862,6 +889,10 @@
             <h3>Caídos</h3>
             <ul class="cbt-end-list">${lista(res.caidos, true)}</ul>
           </div>
+          ${(res.poupados || []).length ? `<div class="cbt-end-col cbt-end-col-poupados">
+            <h3>Poupados</h3>
+            <ul class="cbt-end-list">${lista(res.poupados, true)}</ul>
+          </div>` : ''}
         </div>
         <div class="cbt-end-actions">
           <button class="cbt-btn" onclick="window.Combat._closeOnly()">Apenas fechar</button>
@@ -1073,6 +1104,7 @@
       if (!armas.length) return showTargets('attack', { weapon: 'Ataque desarmado' });
       abrirSeletor(
         `<div class="cbt-tgt-title">Arma:</div>`
+        + linhaNaoLetal(cur)
         + `<div class="cbt-picker-btns">`
         + armas.map(w =>
             `<button class="cbt-btn" title="${esc(w.origem)}" onclick="window.Combat._selWeapon('${jsNome(w.nome)}')">`
@@ -1250,6 +1282,8 @@
     ['shove:derrubar', 'Derrubar', 'Atletismo contra Atletismo ou Acrobacia: o alvo fica Caído'],
     ['shove:afastar', 'Empurrar', 'Atletismo contra Atletismo ou Acrobacia: o alvo vai para a zona vizinha'],
     ['ready', 'Preparar ataque', 'ataca quando o alvo for agir, ou o primeiro inimigo que chegar (usa a reação)'],
+    ['surrender:intimidar', 'Pedir rendição (Intimidação)', 'Intimidação contra a Sabedoria dele: rendido, larga as armas e sai da luta, vivo'],
+    ['surrender:persuadir', 'Pedir rendição (Persuasão)', 'Persuasão contra a Sabedoria dele; enfeitiçado por vocês, com vantagem'],
     ['escape', 'Escapar', 'Atletismo ou Acrobacia contra o Atletismo de quem agarra'],
     ['flee', 'Fugir', 'sair do combate; quem está perto ganha ataque de oportunidade'],
   ];
@@ -1623,7 +1657,7 @@
   // ---- API pública -------------------------------------------------
   window.Combat = {
     sync,
-    _sel, _selHab, _usarHab, _modo, _circulo, _info, _reacao, _manobras, _manobra, _selWeapon, _selItem, _target, _confirmarAlvos, _mover, _cancel, _free,
+    _sel, _selHab, _usarHab, _modo, _circulo, _info, _reacao, _manobras, _manobra, _selWeapon, _selItem, _target, _confirmarAlvos, _naoLetal, _mover, _cancel, _free,
     _confirmarArea,
     _livreEnviar, _livreFechar,
     _act: act,

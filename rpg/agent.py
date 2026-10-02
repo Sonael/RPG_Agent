@@ -1036,6 +1036,11 @@ Para definir estratégia de um NPC (opcional; padrão = agressivo):
   chame responder_reacao(usar=True ou False); ela continua com os mesmos dados.
 • TIPO DE CRIATURA: Imobilizar Pessoa só pega humanoides, Curar Ferimentos não
   cura morto-vivo — o motor recusa e diz por quê; narre a magia sem efeito.
+• NINGUÉM É OBRIGADO A MATAR: inimigo que se rende → set_combat_side(nome,
+  "rendido"). Só restando inimigos rendidos, enfeitiçados ou dominados pelo
+  grupo, encerre com end_combat() (é vitória: XP normal, sem saque deles). O
+  jogador pode pedir golpe não letal: attack_roll(..., nao_letal=True) no
+  corpo a corpo nocauteia em vez de matar.
 
 • VITÓRIA (inimigos derrotados) → end_combat() e DEPOIS grant_xp() para CADA
   membro do grupo (aliados recrutados incluídos). Não pule o XP da vitória —

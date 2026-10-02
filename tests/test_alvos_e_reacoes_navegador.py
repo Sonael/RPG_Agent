@@ -251,3 +251,53 @@ def test_motor_joga_passa_a_vez(tela):
         timeout=8000)
     assert any("Lobo de Helena" in (e.get("actor") or e.get("msg") or "") for e in _motor(pg)["log"])
     assert not erros, erros[:3]
+
+
+# ---------------------------------------------------------------------------
+# Ninguém é obrigado a matar
+# ---------------------------------------------------------------------------
+
+def test_golpe_nao_letal_liga_na_tela(tela):
+    abrir, cap = tela
+    pg, erros = abrir(copy.deepcopy(cap.COMBATE_MAGIAS), "O que fará Helena")
+    assert pg.locator("#cbt-actionbar #cbt-buttons .cbt-nao-letal").count() == 0   # a barra não cresce
+    pg.click("#cbt-buttons button:has-text('Atacar')")
+    chip = pg.locator("#cbt-targets .cbt-nao-letal")
+    assert "desligado" in chip.inner_text()
+    chip.click()
+    pg.wait_for_selector("#cbt-targets .cbt-nao-letal.ligada", timeout=5000)
+    helena = next(c for c in _motor(pg)["combatants"] if c["name"] == "Helena")
+    assert helena["nao_letal"] is True
+    assert pg.is_enabled("#cbt-buttons button:has-text('Atacar')"), "ligar gastou a Ação"
+    assert not erros, erros[:3]
+
+
+def test_pedir_rendicao_pelo_menu(tela):
+    abrir, cap = tela
+    pg, erros = abrir(copy.deepcopy(cap.COMBATE_MAGIAS), "O que fará Helena")
+    pg.click("#cbt-buttons button:has-text('Manobras')")
+    pg.click("#cbt-targets button:has-text('Pedir rendição (Intimidação)')")
+    pg.click("#cbt-targets button.cbt-btn:has-text('Acólito')")
+    pg.wait_for_function("() => !document.querySelector('#cbt-targets:not(.hidden) .cbt-tgt-title')", timeout=8000)
+    log = " | ".join(e.get("msg", "") for e in _motor(pg)["log"])
+    assert "Helena pede a rendição de Acólito" in log, log[-300:]
+    assert not erros, erros[:3]
+
+
+def test_inimigo_enfeiticado_que_sobra_vai_para_poupados(tela):
+    abrir, cap = tela
+    estado = copy.deepcopy(cap.COMBATE_MAGIAS)
+    for nome in ("victoria", "lobo sombrio", "acólito"):
+        estado["characters"].setdefault(nome, {}).setdefault("sheet", {})["vida_atual"] = 0
+        estado["characters"][nome]["status"] = "morto"
+    estado["encantos"] = [{"alvo": "cultista", "alvo_nome": "Cultista", "por": "helena",
+                          "por_nome": "Helena", "magia": "Enfeitiçar Pessoa",
+                          "magia_srd": "Charm Person", "magia_ficha": "Charm Person",
+                          "tipo": "enfeitiçado", "percebe": True, "atitude_antes": 0, "ate_hora": 999999}]
+    pg, erros = abrir(estado, "O que fará Helena")
+    pg.click("#cbt-buttons button:has-text('Encerrar Turno')")
+    pg.wait_for_selector("#cbt-end-overlay:not(.hidden) .cbt-end-col-poupados", timeout=8000)
+    texto = pg.inner_text("#cbt-end-overlay .cbt-end-col-poupados")
+    assert "Cultista" in texto and "enfeitiçado" in texto, texto
+    assert "Cultista" not in pg.inner_text("#cbt-end-overlay .cbt-end-col-foe")
+    assert not erros, erros[:3]

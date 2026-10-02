@@ -203,6 +203,8 @@ def campanha():
     # teste seguinte.
     memory.campaign["events"] = []
     memory.campaign.pop("negocios", None)
+    # Encantos também: o orc enfeitiçado num teste chegava enfeitiçado no seguinte.
+    memory.campaign.pop("encantos", None)
     memory.campaign.pop("relogio", None)
     memory.campaign.pop("descanso_proposto", None)
     memory.campaign.pop("descansos_oferecidos", None)

@@ -2660,6 +2660,7 @@ body.combat-on { overflow: hidden; }
 .cbt-reacao-chip.desligada { border-style: dashed; background: transparent; opacity: 0.75; }
 .cbt-reacao-chip.desligada small { color: var(--cbt-muted); }
 .cbt-reacao-chip.pergunta { border-style: dotted; }
+.cbt-end-col-poupados h3 { color: var(--cbt-gold, #d4a24c); }
 .cbt-reacao-chip.pergunta small { color: var(--cbt-gold, #d4a24c); }
 .cbt-reacao-pergunta { display: block; font-weight: 600; line-height: 1.4; }
 .cbt-btn.cbt-selecionado { outline: 2px solid var(--cbt-gold, #d4a24c); outline-offset: -2px; font-weight: 700; }

@@ -77,10 +77,12 @@ def test_enfeiticado_nao_ataca_quem_o_enfeiticou(luta, monkeypatch):
 
 
 def test_sem_outro_alvo_o_enfeiticado_passa_a_vez(campanha, povoar, monkeypatch):
+    # Um segundo inimigo segura a luta: só com o orc enfeitiçado sobrando, ela
+    # acabaria (inimigo poupado não precisa morrer).
     povoar(criar_ficha("Kaelen", grupo=True, classe="clérigo", sabedoria=16,
                        habilidades=[_hab("Charm Person")]),
-           criar_ficha("Orc", vida=40, raca="orc"))
-    iniciar_combate(["Kaelen", "Orc"])
+           criar_ficha("Orc", vida=40, raca="orc"), criar_ficha("Goblin", vida=10, raca="goblin"))
+    iniciar_combate(["Kaelen", "Orc", "Goblin"])
     _falha(monkeypatch)
     td.combat_action("ability", actor="Kaelen", ability="Charm Person", target="Orc")
     monkeypatch.undo()
@@ -96,6 +98,9 @@ def test_o_motor_recusa_o_ataque_do_enfeiticado(luta, monkeypatch):
 
 
 def test_o_encanto_quebra_quando_o_grupo_fere(luta, monkeypatch):
+    # Com outro inimigo de pé, a luta continua depois do encanto.
+    memory.campaign["characters"]["goblin"] = criar_ficha("Goblin", vida=10, raca="goblin")
+    memory.campaign["combat_state"]["initiative_order"].append("Goblin")
     _falha(monkeypatch)
     td.combat_action("ability", actor="Kaelen", ability="Charm Person", target="Orc")
     monkeypatch.undo()
