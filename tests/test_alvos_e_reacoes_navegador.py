@@ -301,3 +301,21 @@ def test_inimigo_enfeiticado_que_sobra_vai_para_poupados(tela):
     assert "Cultista" in texto and "enfeitiçado" in texto, texto
     assert "Cultista" not in pg.inner_text("#cbt-end-overlay .cbt-end-col-foe")
     assert not erros, erros[:3]
+
+
+# ---------------------------------------------------------------------------
+# Cobertura
+# ---------------------------------------------------------------------------
+
+def test_buscar_cobertura_aparece_no_cartao(tela):
+    abrir, cap = tela
+    pg, erros = abrir(copy.deepcopy(cap.COMBATE_MAGIAS), "O que fará Helena")
+    pg.click("#cbt-buttons button:has-text('Manobras')")
+    assert pg.locator("#cbt-targets button:has-text('Ataque com a outra mão')").count() == 0
+    pg.click("#cbt-targets button:has-text('Buscar cobertura')")
+    pg.wait_for_function(
+        "() => { const c = [...document.querySelectorAll('.cbt-card')].find(e => e.dataset.nome === 'Helena');"
+        " return c && /cobertura/i.test(c.textContent); }", timeout=8000)
+    helena = next(c for c in _motor(pg)["combatants"] if c["name"] == "Helena")
+    assert helena["cobertura"] == "meia"
+    assert not erros, erros[:3]

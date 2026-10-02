@@ -1036,6 +1036,11 @@ Para definir estratégia de um NPC (opcional; padrão = agressivo):
   chame responder_reacao(usar=True ou False); ela continua com os mesmos dados.
 • TIPO DE CRIATURA: Imobilizar Pessoa só pega humanoides, Curar Ferimentos não
   cura morto-vivo — o motor recusa e diz por quê; narre a magia sem efeito.
+• EMBOSCADA: roll_initiative(..., surprised="inimigos" | "grupo" | nomes) —
+  Furtividade de quem embosca contra a Percepção passiva. Surpreso não age no
+  primeiro turno. COBERTURA: set_cover(criatura ou zona, "meia" |
+  "tres_quartos" | "total"). CHEFE: set_legendary_resistance(nome, 3) e
+  set_lair_actions(nome, "Poder A, Poder B").
 • NINGUÉM É OBRIGADO A MATAR: inimigo que se rende → set_combat_side(nome,
   "rendido"). Só restando inimigos rendidos, enfeitiçados ou dominados pelo
   grupo, encerre com end_combat() (é vitória: XP normal, sem saque deles). O

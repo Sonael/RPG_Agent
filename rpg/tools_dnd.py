@@ -490,6 +490,11 @@ def _auto_advance_turn(actor_name: str = "") -> str:
     skipped = []
     # O turno de quem agiu termina aqui: as condições dele descontam um turno.
     fim_msgs = _fim_do_turno(order[idx], cs.get("turn_token", 0)) if 0 <= idx < len(order) else []
+    # Quem já teve um turno (o Assassinato tem vantagem contra quem ainda não).
+    if 0 <= idx < len(order):
+        _ag = cs.setdefault("agiram", [])
+        if memory.char_key(order[idx]) not in _ag:
+            _ag.append(memory.char_key(order[idx]))
 
     for _ in range(len(order) + 1):
         idx += 1
@@ -2217,6 +2222,33 @@ FINESSE_WEAPONS = {
     "sabre", "espada de duelo",
     "dagger", "shortsword", "short sword", "scimitar", "whip",
 }
+# Armas leves (SRD): as que permitem o ataque da outra mão como ação bônus.
+LIGHT_WEAPONS = {
+    "adaga", "espada curta", "cimitarra", "machadinha", "martelo leve", "foice curta", "clava",
+    "dagger", "shortsword", "short sword", "scimitar", "handaxe", "light hammer", "sickle", "club",
+}
+
+
+def _arma_da_outra_mao(ch: dict, ja_usada: str) -> str:
+    """A outra arma leve: a secundária equipada, outra do inventário, ou a mesma se houver duas."""
+    eq = ((ch.get("sheet") or {}).get("equipamentos") or {})
+    candidatas = [eq.get("arma_secundaria") or ""] + [
+        (i.get("nome") or "") for i in (ch.get("inventario") or []) if isinstance(i, dict)]
+    for c in candidatas:
+        if c and _arma_leve(c) and _norm_txt(c) != _norm_txt(ja_usada):
+            return c
+    for i in ch.get("inventario") or []:
+        if (isinstance(i, dict) and _norm_txt(i.get("nome", "")) == _norm_txt(ja_usada)
+                and int(i.get("qtd", 1) or 1) >= 2):
+            return i["nome"]
+    return ""
+
+
+def _arma_leve(nome: str) -> bool:
+    n = _norm_txt(nome or "")
+    return any(_norm_txt(w) in n for w in LIGHT_WEAPONS) and not any(r in n for r in RANGED_WEAPONS)
+
+
 HEALING_KEYWORDS = {
     "cura", "cura ferimentos", "curar", "restaura", "restaurar",
     "palavra curativa", "imposição de mãos", "healing", "heal",
@@ -2509,6 +2541,11 @@ def _rolar_salvaguarda(alvo: dict, atributo: str, cd: int,
     if atributo == "destreza" and conds & {"contido", "imobilizado"}:
         desvantagem = True
     notas_extra = []
+    # Cobertura: +2 (meia) ou +5 (três quartos) nas salvaguardas de DES.
+    _cob_sv = _cobertura_de(alvo)
+    if atributo == "destreza" and _COBERTURA.get(_cob_sv):
+        mod += _COBERTURA[_cob_sv]
+        notas_extra.append(f"{_COBERTURA_NOME[_cob_sv]}: +{_COBERTURA[_cob_sv]}")
     from rpg import tracos as _tracos_s
     if _tracos_s.contra_magia(alvo):
         vantagem = True
@@ -2563,6 +2600,14 @@ def _rolar_salvaguarda(alvo: dict, atributo: str, cd: int,
         _gastar_uso(alvo, "Ki")
         passou2, linha2 = _rolar()
         return passou2, f"{linha}; Alma do Diamante (1 ki), de novo: {linha2}"
+    # Resistência Lendária: o chefe troca a falha por sucesso, enquanto houver uso.
+    _rl = s.get("resistencia_lendaria") if isinstance(s.get("resistencia_lendaria"), dict) else None
+    if _rl and int(_rl.get("restantes", 0) or 0) > 0 and not memory.is_party_member(alvo):
+        _rl["restantes"] = int(_rl["restantes"]) - 1
+        _log_combat_event("legendary_resistance", alvo.get("name", ""), "",
+                          msg=f"{alvo.get('name')} usa Resistência Lendária")
+        return True, (f"{linha}; Resistência Lendária: a falha vira SUCESSO "
+                      f"(restam {_rl['restantes']}/{_rl.get('max', 3)})")
     return passou, linha
 
 
@@ -3273,6 +3318,8 @@ CONDITION_EFFECTS: dict[str, dict] = {
     "enfeitiçado": {},
     "dominado":    {},
     "agarrado":    {"no_movement": True},
+    # Emboscada: no primeiro turno não age, não se move e não reage.
+    "surpreso":    {"no_actions": True, "no_movement": True},
     "incapacitado":{"attack_disadvantage": True, "no_actions": True},
     "petrificado": {"attack_disadvantage": True, "defense_disadvantage": True, "auto_crit": True,
                     "no_actions": True, "no_movement": True},
@@ -3997,6 +4044,9 @@ def _zona_silenciada(nome: str) -> str:
 
 def _por_zona(char_name: str, zona: str) -> None:
     cs = memory.campaign.setdefault("combat_state", {})
+    if cs.get("posicoes", {}).get(memory.char_key(char_name)) != zona:
+        # Sair do lugar é sair de trás da cobertura.
+        (cs.get("cobertura") or {}).pop(memory.char_key(char_name), None)
     cs.setdefault("posicoes", {})[memory.char_key(char_name)] = zona
 
 
@@ -4287,6 +4337,7 @@ def move_combatant(name: str, zone: str, dash: bool = False,
         zone: Zona de destino.
         dash: True para usar a ação de Disparada e mover duas zonas.
     """
+
     cs = memory.campaign.get("combat_state", {})
     if not cs.get("is_active"):
         return "Nenhum combate ativo."
@@ -4515,6 +4566,99 @@ def set_legendary_actions(name: str, options: str, count: int = 3) -> str:
             f"combatente; o contador volta ao cheio no turno dela.")
 
 
+def set_legendary_resistance(name: str, uses: int = 3) -> str:
+    """
+    Resistência Lendária: o chefe pode transformar uma salvaguarda que falhou
+    em sucesso, `uses` vezes por dia (3 no SRD). O motor usa sozinho, na
+    salvaguarda que o chefe falhar. uses=0 tira.
+    """
+    ch, err = _get_char(name)
+    if not ch:
+        return err
+    n = max(0, int(uses or 0))
+    s = ch.setdefault("sheet", {})
+    if not n:
+        s.pop("resistencia_lendaria", None)
+        memory.save_campaign()
+        return f"{ch['name']} não tem mais Resistência Lendária."
+    s["resistencia_lendaria"] = {"max": n, "restantes": n}
+    memory.save_campaign()
+    return (f"{ch['name']}: Resistência Lendária {n}/dia — ao falhar numa salvaguarda, o motor a "
+            f"transforma em sucesso enquanto houver uso.")
+
+
+def set_lair_actions(name: str, actions: str) -> str:
+    """
+    Ações de covil: no início de cada rodada (contagem 20), o chefe no próprio
+    covil usa UMA destas habilidades, nunca a mesma duas rodadas seguidas. O
+    motor escolhe e resolve sozinho, num alvo do grupo.
+
+    Args:
+        name:    O chefe.
+        actions: Nomes das habilidades da ficha dele, separados por vírgula
+                 (crie antes com dado, salvaguarda e descrição, como um poder).
+    """
+    ch, err = _get_char(name)
+    if not ch:
+        return err
+    nomes = [a.strip() for a in (actions or "").split(",") if a.strip()]
+    habs = {_norm_txt(h.get("nome", "")): h.get("nome") for h in ch.get("habilidades") or []
+            if isinstance(h, dict)}
+    faltam = [n for n in nomes if _norm_txt(n) not in habs]
+    if faltam:
+        return (f"Erro: {ch['name']} não tem estas habilidades: {', '.join(faltam)}. Crie-as na ficha "
+                f"antes (nome, dado, salvaguarda e descrição).")
+    s = ch.setdefault("sheet", {})
+    if not nomes:
+        s.pop("acoes_de_covil", None)
+        memory.save_campaign()
+        return f"{ch['name']} não tem mais ações de covil."
+    s["acoes_de_covil"] = [habs[_norm_txt(n)] for n in nomes]
+    memory.save_campaign()
+    return (f"{ch['name']}: ações de covil {', '.join(s['acoes_de_covil'])} — uma por rodada, no início "
+            f"dela, nunca a mesma duas vezes seguidas.")
+
+
+def _acoes_de_covil(cs: dict, idx: int = 0) -> list[str]:
+    """
+    No começo de cada rodada (contagem 20), cada chefe com covil usa uma ação
+    — não a mesma da rodada anterior. Só na virada: a luta montada no meio de
+    uma rodada espera a próxima.
+    """
+    rodada = int(cs.get("round", 1) or 1)
+    if cs.get("_covil_rodada") == rodada:
+        return []
+    primeira_vez = cs.get("_covil_rodada") is None
+    cs["_covil_rodada"] = rodada
+    if primeira_vez and idx != 0:
+        return []
+    linhas = []
+    for nm in list(cs.get("initiative_order") or []):
+        ch = memory.campaign["characters"].get(memory.char_key(nm))
+        s = (ch or {}).get("sheet") or {}
+        acoes = s.get("acoes_de_covil") or []
+        if (not acoes or (ch.get("status") or "").lower() in OUT_OF_COMBAT_STATUSES
+                or int(s.get("vida_atual", 0) or 0) <= 0 or _impedido_de_agir(ch)):
+            continue
+        opcoes = [a for a in acoes if a != s.get("_covil_ultima")] or acoes
+        acao = random.choice(opcoes)
+        lado = memory.luta_com_o_grupo(ch)
+        alvos = [memory.campaign["characters"].get(memory.char_key(n)) for n in cs.get("initiative_order") or []]
+        alvos = [c for c in alvos if c and memory.luta_com_o_grupo(c) != lado
+                 and (c.get("status") or "").lower() not in OUT_OF_COMBAT_STATUSES
+                 and int((c.get("sheet") or {}).get("vida_atual", 0) or 0) > 0]
+        if not alvos:
+            continue
+        alvo = random.choice(alvos)
+        s["_covil_ultima"] = acao
+        saida = use_ability(ch["name"], acao, alvo["name"], end_turn=False, _skip_turn_check=True,
+                            _motor_rola=True)
+        linhas.append(f"AÇÃO DE COVIL (rodada {rodada}) — {ch['name']}: {acao}\n"
+                      + saida.replace(_BONUS_ACTION_HINT, "").replace(
+                          "\n   Ação bônus disponível — próxima habilidade/ataque neste turno.", ""))
+    return linhas
+
+
 def legendary_action(boss_name: str, option: str, target_name: str = "") -> str:
     """
     Gasta uma ação lendária do chefe, ao final do turno de outro combatente.
@@ -4620,8 +4764,96 @@ def legendary_action(boss_name: str, option: str, target_name: str = "") -> str:
 # guardarmos o número da rodada em que foi gasta.
 # ===========================================================================
 
+# Cobertura (SRD): meia +2 de CA e nas salvaguardas de DES; três quartos +5;
+# total, ninguém mira. Com zonas, vale contra quem ataca de outra zona; sem
+# zonas, contra ataque à distância. Acaba quando a criatura se move.
+_COBERTURA = {"meia": 2, "tres_quartos": 5, "total": 0}
+_COBERTURA_NOME = {"meia": "meia cobertura", "tres_quartos": "três quartos de cobertura",
+                   "total": "cobertura total"}
+_COBERTURA_APELIDO = {"meia": "meia", "half": "meia", "1/2": "meia", "metade": "meia",
+                      "tres quartos": "tres_quartos", "tres_quartos": "tres_quartos", "3/4": "tres_quartos",
+                      "three-quarters": "tres_quartos", "three quarters": "tres_quartos",
+                      "total": "total", "nenhuma": "", "none": "", "sem": "", "": ""}
+
+
+def _cobertura_de(ch: dict | None) -> str:
+    cs = memory.campaign.get("combat_state") or {}
+    return (cs.get("cobertura") or {}).get(memory.char_key((ch or {}).get("name", "")), "")
+
+
+def _cobertura_contra(atacante: dict, alvo: dict, a_distancia: bool) -> tuple[str, int]:
+    """(nível, bônus de CA) da cobertura do alvo contra este ataque; ("", 0) quando não vale."""
+    nivel = _cobertura_de(alvo)
+    if not nivel:
+        return "", 0
+    if _zonas_ativas():
+        if _zona_de(atacante.get("name", "")) == _zona_de(alvo.get("name", "")) and not a_distancia:
+            return "", 0
+    elif not a_distancia:
+        return "", 0
+    return nivel, _COBERTURA[nivel]
+
+
+def set_cover(name: str, level: str = "meia") -> str:
+    """
+    Cobertura: o que protege uma criatura dos ataques de longe (SRD).
+
+      • meia          +2 de CA e nas salvaguardas de DES (mureta, árvore, outra criatura)
+      • tres_quartos  +5 (seteira, tronco grosso)
+      • total         ninguém mira nela diretamente (muralha, porta fechada)
+      • nenhuma       tira a cobertura
+
+    `name` é uma criatura OU uma zona do campo de batalha. Na zona, diz que
+    cobertura há ali: quem usa a manobra "Buscar cobertura" nela recebe esse
+    nível. Com zonas, a cobertura vale contra quem ataca de outra zona; sem
+    zonas, contra ataque à distância. Acaba quando a criatura se move.
+    """
+    nivel = _COBERTURA_APELIDO.get(_norm_txt(level or "").replace("ê", "e"), None)
+    if nivel is None:
+        return 'Erro: nível de cobertura: "meia", "tres_quartos", "total" ou "nenhuma".'
+    cs = memory.campaign.setdefault("combat_state", {})
+    if name in _zonas() or _norm_txt(name) in {_norm_txt(z) for z in _zonas()}:
+        zona = next(z for z in _zonas() if _norm_txt(z) == _norm_txt(name))
+        if nivel:
+            cs.setdefault("cobertura_zona", {})[zona] = nivel
+        else:
+            (cs.get("cobertura_zona") or {}).pop(zona, None)
+        memory.save_campaign()
+        return (f"{zona}: " + (f"{_COBERTURA_NOME[nivel]} para quem se proteger ali." if nivel
+                               else "sem cobertura."))
+    ch, err = _get_char(name)
+    if not ch:
+        return err
+    if nivel:
+        cs.setdefault("cobertura", {})[memory.char_key(ch["name"])] = nivel
+    else:
+        (cs.get("cobertura") or {}).pop(memory.char_key(ch["name"]), None)
+    memory.save_campaign()
+    return (f"{ch['name']}: " + (f"{_COBERTURA_NOME[nivel]}"
+                                 + (f" (+{_COBERTURA[nivel]} de CA e nas salvaguardas de DES)" if _COBERTURA[nivel]
+                                    else " (nenhum ataque o alcança)") if nivel else "sem cobertura."))
+
+
+def _buscar_cobertura(ator: str) -> str:
+    """A manobra: protege-se atrás do que houver (o nível que o Mestre deu à zona, ou meia)."""
+    ch = memory.campaign["characters"].get(memory.char_key(ator))
+    if not ch:
+        return f"Erro: '{ator}' não encontrado."
+    cs = memory.campaign.setdefault("combat_state", {})
+    zona = _zona_de(ch["name"])
+    nivel = (cs.get("cobertura_zona") or {}).get(zona, "meia") if zona else "meia"
+    cs.setdefault("cobertura", {})[memory.char_key(ch["name"])] = nivel
+    return (f"{ch['name']} se protege atrás do que há{' em ' + zona if zona else ''}: {_COBERTURA_NOME[nivel]}"
+            + (f" (+{_COBERTURA[nivel]} de CA e nas salvaguardas de DES contra quem está longe)."
+               if _COBERTURA[nivel] else " — nenhum ataque de longe o alcança."))
+
+
 def _reaction_available(char: dict) -> bool:
     sheet = char.get("sheet") or {}
+    # Surpreso não reage até o fim do primeiro turno dele.
+    if any(_norm_txt(c.get("nome", "") if isinstance(c, dict) else str(c)) == "surpreso"
+           for c in sheet.get("condicoes") or []):
+        return False
     cs    = memory.campaign.get("combat_state", {}) or {}
     rodada_atual = int(cs.get("round", 1) or 1)
     usada = sheet.get("reacao_rodada")
@@ -6701,6 +6933,7 @@ def attack_roll(
     disadvantage: bool = False,
     end_turn: bool = True,
     nao_letal: bool = False,
+    _mao_inabil: bool = False,
     _skip_turn_check: bool = False,
 ) -> str:
     """
@@ -6763,6 +6996,11 @@ def attack_roll(
     _fora = _condicao_com(target, "untargetable")
     if _fora:
         return f"Erro: {target['name']} está {_fora} e ninguém o alcança agora."
+    _cob_nivel, _cob_bonus = _cobertura_contra(attacker, target,
+                                               any(r in (weapon or "").lower() for r in RANGED_WEAPONS))
+    if _cob_nivel == "total":
+        return (f"Erro: {target['name']} está atrás de cobertura total: nenhum ataque o alcança daqui. "
+                f"Mude de posição ou espere ele sair. Nada foi gasto.")
 
     _no_ar = _condicao_com(target, "fora_do_corpo_a_corpo") or _condicao_com(attacker, "fora_do_corpo_a_corpo")
     if _no_ar and not any(r in (weapon or "").lower() for r in RANGED_WEAPONS) \
@@ -6946,10 +7184,15 @@ def attack_roll(
     elif style == "Grande Arma" and not is_ranged and is_2h_wpn:
         style_reroll_low = True
         style_note       = "Estilo: Grande Arma → re-rola 1s/2s no dado"
-    # "Combate com Duas Armas" → o bônus se aplica APENAS no ataque off-hand;
-    # como esse fluxo é orquestrado pela LLM com 2 chamadas separadas, ela já
-    # informa quando é o off-hand passando attack_attribute manualmente. Por
-    # enquanto deixamos como instrução narrativa.
+    # Ataque com a outra mão (ação bônus, arma leve): o dano não soma o
+    # modificador positivo, a menos que o estilo seja Combate com Duas Armas.
+    _mod_dano = mod
+    if _mao_inabil and mod > 0:
+        if style == "Combate com Duas Armas":
+            style_note = (style_note + " · " if style_note else "") + \
+                "Estilo: Combate com Duas Armas → a outra mão soma o modificador"
+        else:
+            _mod_dano = 0
 
     # Inimigo Favorecido: +2 dano contra criatura cujo tipo de monstro
     # bate com o tipo escolhido. Usa o campo sheet["tipo"] (preenchido por
@@ -7005,6 +7248,13 @@ def attack_roll(
     if _matilha:
         advantage = True
         cond_notes.append(_matilha)
+    # Assassinato: vantagem contra quem ainda não teve um turno no combate.
+    _cs_at = memory.campaign.get("combat_state") or {}
+    _assassino = _tem_habilidade(attacker, "assassinato", "assassinate")
+    if (_assassino and _cs_at.get("is_active")
+            and memory.char_key(target.get("name", "")) not in (_cs_at.get("agiram") or [])):
+        advantage = True
+        cond_notes.append(f"Assassinato: {target['name']} ainda não agiu — vantagem")
     # Escuridão, Névoa: quem ataca não vê o alvo (desvantagem) e o alvo não
     # vê quem ataca (vantagem) — as duas se anulam, como manda o SRD.
     _cego_por = _zona_obscurecida(attacker_name) or _zona_obscurecida(target_name)
@@ -7031,7 +7281,9 @@ def attack_roll(
     d20, roll_log = _roll_d20_with_adv(advantage, disadvantage)
     attack_total  = d20 + mod + prof + style_atk_bonus + _mag + _mods["bonus"]
     # CA com os efeitos do alvo (Escudo da Fé, Pele de Árvore).
-    target_ca     = _ca_efetiva(target)
+    target_ca     = _ca_efetiva(target) + _cob_bonus
+    if _cob_bonus:
+        cond_notes.append(f"{target['name']} tem {_COBERTURA_NOME[_cob_nivel]}: +{_cob_bonus} de CA")
     # Uso único (Guiar Ataque, o Raio Guia que marcou o alvo) acaba neste golpe.
     for _sh_e, _e in _mods["gastar"]:
         _gastar_efeito(_sh_e, _e)
@@ -7094,6 +7346,11 @@ def attack_roll(
             attacker, target, attack_total, target_ca, critico)
     if _erra_por_reacao:
         critico = False
+    # Assassinato: todo acerto contra quem está Surpreso é crítico.
+    if (_assassino and not critico and not falha_critica and not _erra_por_reacao
+            and (attack_total >= target_ca or _sorte) and _surpreso(target)):
+        critico = True
+        cond_notes.append(f"Assassinato: {target['name']} está Surpreso — o acerto é crítico")
     _acerta = (critico or attack_total >= target_ca or bool(_sorte)) and not _erra_por_reacao
     if critico and crit_min < 20 and not force_crit and d20 < 20:
         style_note = (style_note + " · " if style_note else "") + \
@@ -7160,7 +7417,7 @@ def attack_roll(
         # componente separado logo abaixo). O bônus mágico entra aqui: uma
         # espada +1 soma +1 no ataque E no dano, que é o que faz dela uma
         # espada +1 — antes ela era uma espada com nome comprido.
-        dmg_arma = max(1, sum(rolls) + mod + _hab_bonus + extra_dmg + _mag)
+        dmg_arma = max(1, sum(rolls) + _mod_dano + _hab_bonus + extra_dmg + _mag)
         _enfraq = _condicao_com(attacker, "metade_dano_for")
         if _enfraq and attack_attribute.lower() == "forca":
             dmg_arma = max(1, dmg_arma // 2)
@@ -7184,7 +7441,8 @@ def attack_roll(
                        f"[{' + '.join(str(r) for r in gd_rolls)}] = {gd_total} "
                        f"dano {gd_tipo}\n")
         _tipo_str = f" ({dmg_type})" if dmg_type else ""
-        result += f"   Dano{_tipo_str}: [{detail}] +{mod}(mod){bonus_str} = **{dmg}**\n"
+        result += (f"   Dano{_tipo_str}: [{detail}] +{_mod_dano}(mod"
+                   + (", outra mão" if _mao_inabil else "") + f"){bonus_str} = **{dmg}**\n")
 
         # Caminho único de dano: tipo → resistência → PV temporários → PV.
         # O Golpe Divino entra como componente próprio porque seu tipo é
@@ -7246,6 +7504,16 @@ def attack_roll(
         _componentes.extend(_g_comps)
         for _l in _g_linhas:
             result += f"   {_l}\n"
+        # Golpe da Morte (assassino 17): acerto em quem está Surpreso pede CON
+        # (CD 8 + DES + proficiência); falhou, o dano dobra.
+        if _tem_habilidade(attacker, "golpe da morte", "death strike") and _surpreso(target):
+            _cd_gm = 8 + _modifier(int(sa.get("destreza", 10) or 10)) + int(sa.get("proficiencia", 2) or 2)
+            _passou_gm, _linha_gm = _rolar_salvaguarda(target, "constituicao", _cd_gm)
+            if _passou_gm:
+                result += f"   Golpe da Morte: {_linha_gm} — resiste.\n"
+            else:
+                _componentes = [(int(v or 0) * 2, t) for v, t in _componentes]
+                result += f"   Golpe da Morte: {_linha_gm} — o dano DOBRA.\n"
         _componentes, _linhas_reducao = _reacoes.reduzir_dano(attacker, target, _componentes,
                                                               is_ranged, not matched_hab)
         for _l in _linhas_reducao:
@@ -7432,6 +7700,7 @@ def use_ability(
     _skip_turn_check: bool = False,
     modo: str = "",
     _ritual: bool = False,
+    _motor_rola: bool = False,
     _sem_custo: bool = False,
 ) -> str:
     """
@@ -8161,9 +8430,10 @@ def use_ability(
                 _conj = _conjuracao(s) or {}
                 # O poder do monstro diz a própria CD (Redemoinho: 13).
                 _cd = int(hab.get("cd") or 0) or int(_conj.get("cd") or (8 + int(s.get("proficiencia", 2) or 2)))
-                if memory.is_party_member(target):
+                if memory.is_party_member(target) and not _motor_rola:
                     # Personagem do jogador: o dado é dele. Cai na pausa
-                    # abaixo, com o teste e a CD que o SRD manda.
+                    # abaixo, com o teste e a CD que o SRD manda. (A ação de
+                    # covil não é turno de ninguém: o motor rola.)
                     saving_throw_stat, saving_throw_dc = _save_auto, _cd
                 else:
                     _passou, _linha = _rolar_salvaguarda(
@@ -11607,6 +11877,12 @@ def advance_time(hours: int, reason: str = "") -> str:
     acabaram = encantos.expirar()
     # Animar Mortos dura 24 horas: o morto-vivo some quando o relógio chega lá.
     acabaram += criaturas.limpar()
+    # Resistência Lendária é "por dia": o dia que vira devolve os usos.
+    if total >= 24:
+        for _ch_rl in (memory.campaign.get("characters") or {}).values():
+            _rl_d = ((_ch_rl or {}).get("sheet") or {}).get("resistencia_lendaria") if isinstance(_ch_rl, dict) else None
+            if isinstance(_rl_d, dict):
+                _rl_d["restantes"] = int(_rl_d.get("max", 3) or 3)
     # Nocaute: depois de 1d4 horas, o NPC estável acorda com 1 PV.
     for _ch_n in (memory.campaign.get("characters") or {}).values():
         _s_n = (_ch_n or {}).get("sheet") if isinstance(_ch_n, dict) else None
@@ -12584,7 +12860,43 @@ def _entrar_no_combate_em_andamento(names: list[str], cs: dict) -> str:
     return "\n".join(linhas)
 
 
-def roll_initiative(characters_names: str, allies: str = "") -> str:
+def _surpreso(ch: dict | None) -> bool:
+    return any(_norm_txt(c.get("nome", "") if isinstance(c, dict) else str(c)) == "surpreso"
+               for c in ((ch or {}).get("sheet") or {}).get("condicoes") or [])
+
+
+def _marcar_surpresos(nomes: list[str], surpresos: str) -> list[str]:
+    """
+    Quem foi pego de surpresa: Surpreso até o fim do primeiro turno dele (não
+    age, não se move, não reage). `surpresos` é "inimigos", "grupo" ou nomes
+    separados por vírgula. O talento Alerta impede.
+    """
+    alvo = _norm_txt(surpresos or "")
+    if not alvo:
+        return []
+    escolhidos = []
+    for nome in nomes:
+        ch = memory.campaign["characters"].get(memory.char_key(nome))
+        if not ch:
+            continue
+        do_grupo = memory.luta_com_o_grupo(ch)
+        if alvo in ("inimigos", "inimigo", "enemies") and do_grupo:
+            continue
+        if alvo in ("grupo", "party", "aliados") and not do_grupo:
+            continue
+        if alvo not in ("inimigos", "inimigo", "enemies", "grupo", "party", "aliados") and \
+                memory.char_key(nome) not in {memory.char_key(n.strip()) for n in surpresos.split(",")}:
+            continue
+        if _tem_habilidade(ch, "alerta", "alert"):
+            continue
+        conds = ch.setdefault("sheet", {}).setdefault("condicoes", [])
+        if not _surpreso(ch):
+            conds.append({"nome": "Surpreso", "duracao": None, "ate_fim_turno_de": memory.char_key(nome)})
+        escolhidos.append(ch.get("name", nome))
+    return escolhidos
+
+
+def roll_initiative(characters_names: str, allies: str = "", surprised: str = "") -> str:
     """
     Rola iniciativa para todos os participantes do combate (aliados e inimigos).
     Ordena do maior para o menor resultado e salva no combat_state.
@@ -12610,6 +12922,11 @@ def roll_initiative(characters_names: str, allies: str = "") -> str:
         allies:           NPCs que lutam AO LADO do grupo, separados por vírgula.
                           Ex: allies="Pip" numa escolta. Eles não entram no
                           grupo: sem XP, sem nível e sem saque.
+        surprised:        Quem foi pego de surpresa (emboscada): "inimigos",
+                          "grupo" ou nomes separados por vírgula. Surpreso não
+                          age, não se move e não reage no primeiro turno. Decida
+                          pela Furtividade de quem embosca contra a Percepção
+                          passiva de quem é emboscado. O talento Alerta impede.
     """
     names = (
         characters_names if isinstance(characters_names, list)
@@ -12680,6 +12997,9 @@ def roll_initiative(characters_names: str, allies: str = "") -> str:
     cs["turn_token"]         = cs.get("turn_token", 0) + 1
     cs["log"]                = []     # log limpo a cada combate
     cs["result"]             = None   # resultado do combate anterior limpo
+    cs["agiram"]             = []     # quem já teve um turno (Assassinato)
+    cs["cobertura"]          = {}
+    _surpresos = _marcar_surpresos([r["name"] for r in results], surprised)
     _log_combat_event("combat_start", msg="Combate iniciado",
                       order=[r["name"] for r in results])
     # A economia do turno também é do combate anterior: sem isto o primeiro
@@ -12696,6 +13016,9 @@ def roll_initiative(characters_names: str, allies: str = "") -> str:
         marker = " ◀ PRIMEIRO" if i == 0 else ""
         lines.append(f"  {i + 1}. {r['name']}: {r['log']}{marker}")
     lines.append(f"\nRodada 1 — vez de: **{results[0]['name']}**")
+    if _surpresos:
+        lines.append(f"Surpresos (não agem, não se movem e não reagem no primeiro turno): "
+                     f"{', '.join(_surpresos)}")
 
     # Quem entrou de cada lado, em voz alta: o erro de lado é invisível até
     # alguém atacar quem não devia, e aqui ele aparece antes do primeiro turno.
@@ -14734,6 +15057,12 @@ def spawn_monster(
                                         m.get("condition_immunities")),
         }
 
+        # Resistência Lendária do bloco ("Legendary Resistance (3/Day)").
+        for _sa_rl in (m.get("special_abilities") or []):
+            _m_rl = re.search(r"legendary resistance\s*\((\d+)/day\)", (_sa_rl.get("name") or "").lower())
+            if _m_rl:
+                sheet["resistencia_lendaria"] = {"max": int(_m_rl.group(1)), "restantes": int(_m_rl.group(1))}
+
         # Extrai habilidades especiais (special abilities) do Open5e
         habilidades = []
         # O mago do Open5e trazia "Spellcasting" como texto cortado em 200
@@ -15901,7 +16230,9 @@ def _inicio_de_turno(cs: dict) -> None:
     _manobras.expirar_preparadas(order[idx])
     _rolar_recargas(ch)
     _repor_lendarias(ch)
-    cs["_lendarias_msg"] = _gastar_lendarias_dos_chefes(order[idx])
+    # Ações de covil: na virada de rodada (contagem 20), antes de quem começa.
+    _covil = _acoes_de_covil(cs, idx) if cs.get("is_active") else []
+    cs["_lendarias_msg"] = _covil + _gastar_lendarias_dos_chefes(order[idx])
     queimou = _queimar_no_inicio_do_turno(ch)
     if queimou:
         cs["_lendarias_msg"] = list(cs.get("_lendarias_msg") or []) + queimou
@@ -16750,6 +17081,7 @@ def _rolar_ataque_magico(char: dict, alvo: dict, hab: dict) -> tuple[bool, bool,
         mod = max(_modifier(int(s.get(a, 10) or 10)) for a in ("inteligencia", "sabedoria", "carisma"))
     vantagem = ((_has_condition_effect(char, "attack_advantage") and not (_invisivel(char) and _ve_invisivel(alvo)))
                 or _has_condition_effect(alvo, "defense_disadvantage"))
+    _cob_n, _cob_b = _cobertura_contra(char, alvo, True)
     desvantagem = (_has_condition_effect(char, "attack_disadvantage")
                    or (_invisivel(alvo) and not _ve_invisivel(char)))
     mods = _mods_de_ataque(char, alvo, False, com_arma=False)
@@ -16761,7 +17093,9 @@ def _rolar_ataque_magico(char: dict, alvo: dict, hab: dict) -> tuple[bool, bool,
         mods["notas"].append(f"{_cego_por}: vantagem e desvantagem se anulam")
     d20, log = _roll_d20_with_adv(vantagem, desvantagem)
     total = d20 + prof + mod + mods["bonus"]
-    ca = _ca_efetiva(alvo)
+    ca = _ca_efetiva(alvo) + _cob_b
+    if _cob_b:
+        mods["notas"].append(f"{alvo.get('name')} tem {_COBERTURA_NOME[_cob_n]}: +{_cob_b} de CA")
     for sh, e in mods["gastar"]:
         _gastar_efeito(sh, e)
     critico = d20 == 20
@@ -16917,6 +17251,9 @@ def _combatant_snapshot(name: str) -> dict | None:
         if key and key not in _seen_cond:        # dedup por nome
             _seen_cond.add(key)
             conds.append(nm)
+    # Cobertura aparece com as condições: é o que muda a CA contra quem atira.
+    if _cobertura_de(ch):
+        conds.append(_COBERTURA_NOME[_cobertura_de(ch)].capitalize())
     habs = []        # só ATIVAS (viram botão)
     passivas = []    # exibição informativa
     # O botão de cada habilidade sai do MODELO ÚNICO (rpg/habilidade.py), que
@@ -17015,6 +17352,9 @@ def _combatant_snapshot(name: str) -> dict | None:
         "controlada": __import__("rpg.criaturas", fromlist=["x"]).controlada_pelo_jogador(ch),
         # Golpe não letal ligado: o corpo a corpo que derruba nocauteia.
         "nao_letal": bool(s.get("nao_letal")),
+        "cobertura": _cobertura_de(ch),
+        # Pode atacar com a outra mão: tem outra arma leve além da principal.
+        "outra_mao": bool(_arma_da_outra_mao(ch, ((s.get("equipamentos") or {}).get("arma_principal") or ""))),
         # Rendido, ou enfeitiçado/dominado pelo grupo: não precisa morrer.
         "poupado": poupado(ch),
         # "grupo" | "aliado" | "inimigo": a tela pinta o aliado do seu lado,
@@ -17176,7 +17516,7 @@ def combat_action(action: str, actor: str = "", target: str = "",
         return {"ok": False, "message": _aviso_de_pergunta_pendente(), "snapshot": combat_snapshot()}
     # A ação do jogador também pode chamar uma reação que pergunta: o
     # Oportunista do monge quando o guerreiro acerta, o Golpe Mágico.
-    if (a not in ("reagir", "end", "enemy", "auto", "death_save", "nao_letal")
+    if (a not in ("reagir", "end", "enemy", "auto", "death_save", "nao_letal", "cover")
             and _rea_ca._respostas is None and _rea_ca.alguem_pergunta()):
         return _com_perguntas({"fn": "combat_action",
                                "kw": {"action": action, "actor": actor, "target": target, "weapon": weapon,
@@ -17282,6 +17622,8 @@ def combat_action(action: str, actor: str = "", target: str = "",
                                     f"uma arma à distância. A Ação não foi gasta."),
                         "snapshot": combat_snapshot()}
             msg = attack_roll(actor, target, weapon, 6, end_turn=False)
+            if not msg.startswith(("Erro:", "Aviso:")) and _arma_leve(weapon):
+                eco["ataque_leve"] = weapon
             if msg.startswith(("Erro:", "Aviso:")):
                 _devolver_ataque()
                 return {"ok": False, "message": msg + "\nA Ação não foi gasta.",
@@ -17598,6 +17940,42 @@ def combat_action(action: str, actor: str = "", target: str = "",
             msg = (f"{actor} esquiva-se (Dodge): ataques contra {actor} têm desvantagem "
                    f"até o próximo turno.")
 
+        elif a == "offhand":
+            # Duas armas: depois do Atacar com arma leve, a ação bônus ataca
+            # com a outra arma leve (sem somar o modificador positivo no dano).
+            if not eco.get("ataque_leve"):
+                return {"ok": False, "message": (f"Erro: o ataque da outra mão vem depois de atacar com uma "
+                                                 f"arma leve (adaga, espada curta, cimitarra...) neste turno."),
+                        "snapshot": combat_snapshot()}
+            _ch_oh = memory.campaign["characters"].get(memory.char_key(actor)) or {}
+            _outra = (weapon or "").strip() or _arma_da_outra_mao(_ch_oh, eco["ataque_leve"])
+            if not _outra or not _arma_leve(_outra):
+                return {"ok": False, "message": (f"Erro: {actor} não tem outra arma leve de corpo a corpo "
+                                                 f"para a outra mão."), "snapshot": combat_snapshot()}
+            if not target:
+                return {"ok": False, "message": "Erro: escolha o alvo do ataque da outra mão.",
+                        "snapshot": combat_snapshot()}
+            err = _use_slot(eco, "bonus")
+            if err:
+                return {"ok": False, "message": err, "snapshot": combat_snapshot()}
+            msg = attack_roll(actor, target, _outra, 6, end_turn=False, _mao_inabil=True)
+            if msg.startswith(("Erro:", "Aviso:")):
+                eco["bonus_usada"] = False
+                return {"ok": False, "message": msg, "snapshot": combat_snapshot()}
+            eco["ataque_leve"] = ""
+            msg = "Ataque com a outra mão (ação bônus):\n" + msg
+
+        elif a == "cover":
+            # Buscar cobertura: gasta o movimento, não a Ação.
+            if eco.get("movimento_usado") and int(eco.get("movimento_extra", 0) or 0) <= 0:
+                return {"ok": False, "message": f"Erro: {actor} já usou o movimento neste turno.",
+                        "snapshot": combat_snapshot()}
+            msg = _buscar_cobertura(actor)
+            if msg.startswith("Erro:"):
+                return {"ok": False, "message": msg, "snapshot": combat_snapshot()}
+            eco["movimento_usado"] = True
+            _log_combat_event("cover", actor, "", msg=msg)
+
         elif a == "nao_letal":
             # Golpe não letal: liga ou desliga, sem gastar nada do turno.
             _ch_nl = memory.campaign["characters"].get(memory.char_key(actor)) or {}
@@ -17851,6 +18229,9 @@ DND_TOOLS = [
     set_recharge_ability,
     set_legendary_actions,
     legendary_action,
+    set_legendary_resistance,
+    set_lair_actions,
+    set_cover,
     # Onda 4 — relógio, exaustão, carga e loja
     advance_time,
     get_world_time,

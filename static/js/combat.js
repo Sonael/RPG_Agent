@@ -1282,6 +1282,8 @@
     ['shove:derrubar', 'Derrubar', 'Atletismo contra Atletismo ou Acrobacia: o alvo fica Caído'],
     ['shove:afastar', 'Empurrar', 'Atletismo contra Atletismo ou Acrobacia: o alvo vai para a zona vizinha'],
     ['ready', 'Preparar ataque', 'ataca quando o alvo for agir, ou o primeiro inimigo que chegar (usa a reação)'],
+    ['cover', 'Buscar cobertura', 'atrás do que houver: +2 de CA (ou +5) contra quem ataca de longe; usa o movimento'],
+    ['offhand', 'Ataque com a outra mão', 'depois de atacar com arma leve: a outra arma leve ataca (ação bônus)'],
     ['surrender:intimidar', 'Pedir rendição (Intimidação)', 'Intimidação contra a Sabedoria dele: rendido, larga as armas e sai da luta, vivo'],
     ['surrender:persuadir', 'Pedir rendição (Persuasão)', 'Persuasão contra a Sabedoria dele; enfeitiçado por vocês, com vantagem'],
     ['escape', 'Escapar', 'Atletismo ou Acrobacia contra o Atletismo de quem agarra'],
@@ -1295,8 +1297,10 @@
     _livreFechar();
     const agarrado = (cur.condicoes || []).some(c => /agarrad/i.test(String(c)));
     const temZonas = ((_last || {}).zonas || []).length > 1;
+    const eco = (_last || {}).turn_economy || {};
     const lista = MANOBRAS.filter(([id]) =>
-      (id !== 'escape' || agarrado) && (id !== 'shove:afastar' || temZonas));
+      (id !== 'escape' || agarrado) && (id !== 'shove:afastar' || temZonas)
+      && (id !== 'offhand' || (eco.ataque_leve && !eco.bonus_usada && cur.outra_mao)));
     abrirSeletor(
       `<div class="cbt-tgt-title">Manobras <small>· gastam a Ação</small></div>`
       + `<div class="cbt-picker-btns cbt-modos">`
@@ -1313,7 +1317,7 @@
     if (!cur) return;
     const [acao, modo] = id.split(':');
     const rotulo = (MANOBRAS.find(m => m[0] === id) || [id, id])[1];
-    if (acao === 'hide' || acao === 'escape' || acao === 'defend' || acao === 'flee') {
+    if (acao === 'hide' || acao === 'escape' || acao === 'defend' || acao === 'flee' || acao === 'cover') {
       act({ action: acao, actor: cur.name });
       return;
     }

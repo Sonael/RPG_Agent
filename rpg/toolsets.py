@@ -121,7 +121,7 @@ GENEROS_DA_FANTASIA = ("fantasia", "dark_fantasy")
 #   • end_combat fica SEMPRE: é o escape de uma luta que não fechou direito,
 #     e é justamente quando o estado está torto que ela precisa existir.
 FERRAMENTAS_SO_EM_COMBATE = frozenset({
-    "next_turn", "execute_npc_turn", "responder_reacao", "move_combatant",
+    "next_turn", "execute_npc_turn", "responder_reacao", "move_combatant", "set_cover",
     "legendary_action", "describe_battlefield", "get_combat_status",
 })
 

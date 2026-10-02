@@ -386,6 +386,8 @@ const TOOL_LABEL = {
   roll_initiative: 'rolando iniciativa', next_turn: 'passando a vez',
   end_combat: 'encerrando o combate', execute_npc_turn: 'jogando pelo NPC',
   responder_reacao: 'decidindo a reação',
+  set_cover: 'marcando a cobertura', set_legendary_resistance: 'dando a resistência lendária',
+  set_lair_actions: 'preparando o covil',
   spawn_monster: 'trazendo criatura', suggest_encounter: 'medindo o desafio',
   set_npc_strategy: 'definindo a tática', set_combat_side: 'definindo o lado',
   set_battlefield: 'montando o campo', describe_battlefield: 'olhando o campo',
