@@ -252,6 +252,12 @@ def _por_condicao(atacante: dict, alvo: dict, nome: str, extra: dict | None = No
         alvo["sheet"].setdefault("condicoes", []).append(c)
         td._log_combat_event("condition", atacante.get("name", ""), alvo.get("name", ""),
                              msg=f"{alvo['name']} ficou {nome} ({atacante.get('name', '')})")
+    if _norm(nome) == "caido":
+        from rpg import manobras
+        if manobras.cavaleiro_de(alvo):
+            return f"{alvo['name']}: **{nome.upper()}** — " + manobras.queda_da_montaria(alvo, "a montaria caiu")
+        if manobras.montaria_de(alvo):
+            manobras.desmontar(alvo["name"], "derrubado da sela")
     return f"{alvo['name']}: **{nome.upper()}**"
 
 

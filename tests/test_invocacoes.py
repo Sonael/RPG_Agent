@@ -47,6 +47,8 @@ def luta(campanha, povoar):
     povoar(criar_ficha("Kaelen", grupo=True, classe="clérigo", nivel=9, sabedoria=16, mana=60, vida=40,
                        habilidades=[dict(h) for h in MAGIAS]),
            criar_ficha("Orc", vida=200, raca="orc", arma="machado grande", ca=10))
+    # Componentes de preço (a bolsa de componentes não cobre): o motor cobra.
+    _ch("Kaelen")["inventario"].append({"nome": "Incenso e ervas", "qtd": 5})
     iniciar_combate(["Kaelen", "Orc"])
     cs = memory.campaign["combat_state"]
     cs["zonas"] = ["Portão", "Pátio"]
@@ -62,6 +64,8 @@ def cidade(campanha, povoar):
            criar_ficha("Brann", grupo=True, classe="paladino", nivel=5, mana=10,
                        habilidades=[_hab("Find Steed", 3), _hab("Detect Magic", 2)]),
            criar_ficha("Orc", vida=60, raca="orc", arma="machado grande", ca=10))
+    # Componentes de preço (a bolsa de componentes não cobre): o motor cobra.
+    _ch("Mira")["inventario"].append({"nome": "Incenso e ervas", "qtd": 5})
     return memory.campaign
 
 

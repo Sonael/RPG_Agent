@@ -539,6 +539,12 @@ EFEITOS_DE_MAGIA: dict[str, dict] = {
                                   "vantagem contra você"},
     "True Seeing": {"alvos": "aliado", "horas": 1, "efeito": {"ver_invisivel": True},
                     "texto": "o aliado vê quem está Invisível (e o que é ilusão, o Mestre narra)"},
+    "Light": {"alvos": "si", "zona": "luz", "zona_do_conjurador": True, "sem_concentracao": True,
+              "texto": "luz clara em torno de você (a zona onde estiver): quem não tem visão no escuro "
+                       "passa a ver ali"},
+    "Dancing Lights": {"alvos": "si", "zona": "luz", "zona_do_conjurador": True,
+                       "texto": "luzes flutuantes iluminam a zona onde você estiver, enquanto durar a "
+                                "concentração"},
     "Daylight": {"alvos": "nenhum", "zona": "luz",
                  "texto": "luz do dia na zona escolhida; a Escuridão nela acaba"},
     # ── Segunda leva: magias de combate que faltavam ────────────────────────
@@ -1733,6 +1739,8 @@ def _magia_de_zona(char: dict, hab: dict, ef: dict, modo: str, nome_pt: str, alv
                      and norm(z.get("magia", "")) == norm(hab.get("nome", "")))]
     entrada = {"tipo": ef["zona"], "nome": nome_pt,
                "concentracao_de": memory.char_key(char.get("name", "")), "magia": hab.get("nome", "")}
+    if ef.get("sem_concentracao"):
+        entrada.pop("concentracao_de")
     if ef["zona"] == "luz":
         alvo_luz = memory.char_key((_char(alvo_nome) or char).get("name", ""))
         lista = [z for z in lista if not (z.get("tipo") == "escuridao" and (
@@ -2083,13 +2091,23 @@ def _acao_de_movimento(char: dict, modo: str, nome: str) -> str:
             conds.append({"nome": "Escondido", "duracao": None})
         return f"\n   {nome}: dentro da {obsc}, ninguém o vê — ESCONDIDO. O próximo ataque tem vantagem."
     # Esconder: Furtividade contra a melhor Percepção passiva dos inimigos.
+    # No escuro, quem não tem visão no escuro não vê (esconder-se dele é
+    # automático); na penumbra, a Percepção dele cai 5.
     bonus = _mod(char, "destreza")
     if td._proficiente_na_pericia(s, "furtividade"):
         bonus += int(s.get("proficiencia", 2) or 2)
     d20 = random.randint(1, 20)
     total = d20 + bonus
     inimigos = [c for c in _combatentes_vivos() if not _mesmo_lado(char, c)]
-    melhor = max([10 + _mod(c, "sabedoria") for c in inimigos] or [10])
+    luz = td._luz_no_lugar(char.get("name", ""))
+    veem = [c for c in inimigos if td._ve_no_escuro(c, char)]
+    if inimigos and not veem:
+        conds = s.setdefault("condicoes", [])
+        if not any(norm(c.get("nome", "") if isinstance(c, dict) else c) == "escondido" for c in conds):
+            conds.append({"nome": "Escondido", "duracao": None})
+        return f"\n   {nome}: no escuro, nenhum inimigo o vê — ESCONDIDO. O próximo ataque tem vantagem."
+    melhor = max([10 + _mod(c, "sabedoria") - (5 if luz == "penumbra" and not td._visao_no_escuro(c) else 0)
+                  for c in veem] or [10])
     if total >= melhor:
         conds = s.setdefault("condicoes", [])
         if not any(norm(c.get("nome", "") if isinstance(c, dict) else c) == "escondido" for c in conds):

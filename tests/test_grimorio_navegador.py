@@ -411,6 +411,8 @@ def test_familiar_como_ritual_escolhe_a_forma_e_nao_gasta_mana(navegador):
     estado["characters"]["helena"]["habilidades"].append(
         cap._magia_de_captura("Convocar Familiar", 1, "Conjuração",
                               "Um espírito toma a forma de um animal e serve você."))
+    # O ritual dispensa a mana, não o componente de 10 po (consumido no braseiro).
+    estado["characters"]["helena"].setdefault("inventario", []).append({"nome": "Incenso e ervas", "qtd": 1})
     pg, erros = navegador(estado)
     mana_antes = _estado(pg)["personagem"]["mana_atual"]
     linha = ".grm-conhecida[data-nome='Convocar Familiar']"

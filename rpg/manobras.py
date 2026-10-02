@@ -160,6 +160,108 @@ def pedir_rendicao(ator: str, alvo: str, modo: str = "") -> str:
     return f"{a['name']} pede a rendição de {b['name']}: {linha} — {b['name']} recusa e continua lutando."
 
 
+# ---------------------------------------------------------------------------
+# Montaria
+# ---------------------------------------------------------------------------
+
+def montaria_de(ch: dict | None) -> dict | None:
+    """A criatura em que `ch` está montado."""
+    chave = ((ch or {}).get("sheet") or {}).get("montado_em")
+    return memory.campaign.get("characters", {}).get(chave) if chave else None
+
+
+def cavaleiro_de(ch: dict | None) -> dict | None:
+    chave = ((ch or {}).get("sheet") or {}).get("montaria_de")
+    return memory.campaign.get("characters", {}).get(chave) if chave else None
+
+
+def _pode_ser_montaria(c: dict) -> bool:
+    from rpg import criaturas
+    s = c.get("sheet") or {}
+    if s.get("montaria"):
+        return True
+    inv = c.get("invocacao") or {}
+    if _td()._norm_txt(inv.get("magia", "")) in ("find steed", "encontrar montaria"):
+        return True
+    for chave, f in criaturas.FICHAS.items():
+        if f.get("montaria") and _td()._norm_txt(f["nome"]) in _td()._norm_txt(c.get("name", "")):
+            return True
+    return False
+
+
+def montarias_livres(ch: dict | None) -> list[str]:
+    """As montarias do lado de `ch`, de pé, na zona dele, sem cavaleiro."""
+    td = _td()
+    if not ch:
+        return []
+    cs = memory.campaign.get("combat_state") or {}
+    saida = []
+    for n in cs.get("initiative_order") or []:
+        c = _ch(n)
+        if (not c or c is ch or memory.luta_com_o_grupo(c) != memory.luta_com_o_grupo(ch)
+                or not _pode_ser_montaria(c) or cavaleiro_de(c)
+                or (c.get("status") or "").lower() in td.OUT_OF_COMBAT_STATUSES
+                or int((c.get("sheet") or {}).get("vida_atual", 0) or 0) <= 0):
+            continue
+        if td._zonas_ativas() and td._zona_de(c["name"]) != td._zona_de(ch.get("name", "")):
+            continue
+        saida.append(c["name"])
+    return saida
+
+
+def montar(ator: str, alvo: str) -> str:
+    """Montar (gasta o movimento): numa montaria do seu lado, de pé, na sua zona, que ninguém monta."""
+    td = _td()
+    a, b = _ch(ator), _ch(alvo)
+    if not a or not b or not b.get("sheet"):
+        return "Erro: escolha a montaria."
+    if montaria_de(a):
+        return f"Erro: {a['name']} já está montado em {montaria_de(a)['name']}."
+    if memory.luta_com_o_grupo(a) != memory.luta_com_o_grupo(b) or not _pode_ser_montaria(b):
+        return f"Erro: {b['name']} não é montaria de {a['name']}."
+    if cavaleiro_de(b):
+        return f"Erro: {cavaleiro_de(b)['name']} já monta {b['name']}."
+    if (b.get("status") or "").lower() in td.OUT_OF_COMBAT_STATUSES or int(b["sheet"].get("vida_atual", 0) or 0) <= 0:
+        return f"Erro: {b['name']} está fora de combate."
+    if td._zonas_ativas() and td._zona_de(a["name"]) != td._zona_de(b["name"]):
+        return f"Erro: {b['name']} está em outra zona."
+    if any(td._norm_txt(c.get("nome", "") if isinstance(c, dict) else str(c)) == "caido"
+           for c in b["sheet"].get("condicoes") or []):
+        return f"Erro: {b['name']} está Caído."
+    a["sheet"]["montado_em"] = memory.char_key(b["name"])
+    b["sheet"]["montaria_de"] = memory.char_key(a["name"])
+    td._log_combat_event("mount", a["name"], b["name"], msg=f"{a['name']} monta {b['name']}")
+    return (f"{a['name']} monta {b['name']}: os dois se movem juntos; se {b['name']} cair, {a['name']} "
+            f"faz DES CD 10 ou cai Caído.")
+
+
+def desmontar(ator: str, motivo: str = "") -> str:
+    a = _ch(ator)
+    m = montaria_de(a)
+    if not a or not m:
+        return f"Erro: {ator} não está montado."
+    a["sheet"].pop("montado_em", None)
+    m["sheet"].pop("montaria_de", None)
+    _td()._log_combat_event("dismount", a["name"], m["name"], msg=f"{a['name']} desmonta de {m['name']}")
+    return f"{a['name']} desmonta de {m['name']}" + (f" ({motivo})" if motivo else "") + "."
+
+
+def queda_da_montaria(montaria: dict, motivo: str) -> str:
+    """A montaria caiu (Caída ou a 0 PV): quem monta faz DES CD 10 ou cai Caído."""
+    td = _td()
+    quem = cavaleiro_de(montaria)
+    if not quem:
+        return ""
+    desmontar(quem["name"], motivo)
+    passou, linha = td._rolar_salvaguarda(quem, "destreza", 10)
+    if passou:
+        return f"{quem['name']} salta de {montaria['name']} ({motivo}): {linha} — cai de pé."
+    conds = quem["sheet"].setdefault("condicoes", [])
+    if not any(td._norm_txt(c.get("nome", "") if isinstance(c, dict) else str(c)) == "caido" for c in conds):
+        conds.append({"nome": "Caído", "duracao": None})
+    return f"{quem['name']} é jogado de {montaria['name']} ({motivo}): {linha} — CAÍDO."
+
+
 def esconder(ator: str) -> str:
     from rpg import resolucao
     a = _ch(ator)
@@ -266,11 +368,19 @@ def empurrar(ator: str, alvo: str, modo: str) -> str:
 # Preparar
 # ---------------------------------------------------------------------------
 
-def preparar(ator: str, alvo: str = "") -> str:
+def preparar(ator: str, alvo: str = "", modo: str = "") -> str:
+    """
+    Preparar (gasta a Ação): um ataque, ou uma magia ("magia:<nome>"). A magia
+    preparada é conjurada AGORA — gasta a mana e prende a concentração — e
+    solta como reação quando o gatilho vem; se a concentração cair antes, ela
+    se perde (SRD).
+    """
     a = _ch(ator)
     cs = memory.campaign["combat_state"]
     lista = [p for p in cs.get("preparadas") or [] if memory.char_key(p.get("ator", "")) != memory.char_key(ator)]
     b = _ch(alvo) if alvo else None
+    if (modo or "").startswith("magia:"):
+        return _preparar_magia(a, b, modo.split(":", 1)[1].strip(), lista, cs)
     lista.append({"ator": a["name"], "alvo": b["name"] if b else ""})
     cs["preparadas"] = lista
     gatilho = (f"quando {b['name']} for agir" if b
@@ -279,8 +389,38 @@ def preparar(ator: str, alvo: str = "") -> str:
             f"(usa a reação).")
 
 
+def _preparar_magia(a: dict, b: dict | None, magia: str, lista: list, cs: dict) -> str:
+    td = _td()
+    from rpg import resolucao
+    hab = next((h for h in a.get("habilidades") or [] if isinstance(h, dict)
+                and td._norm_txt(h.get("nome", "")) == td._norm_txt(magia)), None)
+    if not hab or not resolucao._magia_srd(hab):
+        return f"Erro: {a['name']} não conhece a magia '{magia}'."
+    if td._slot_da_habilidade(hab.get("nome", ""), hab, a) != "acao":
+        return f"Erro: só se prepara magia de uma Ação; {hab['nome']} não é."
+    s = a["sheet"]
+    custo = int(hab.get("custo_mana", 0) or 0)
+    if int(s.get("mana_atual", 0) or 0) < custo:
+        return f"Erro: {a['name']} não tem mana para preparar {hab['nome']} ({custo})."
+    s["mana_atual"] = int(s.get("mana_atual", 0) or 0) - custo
+    linha_conc = td._start_concentration(a, hab["nome"])
+    lista.append({"ator": a["name"], "alvo": b["name"] if b else "", "magia": hab["nome"]})
+    cs["preparadas"] = lista
+    gatilho = (f"quando {b['name']} for agir" if b
+               else "contra o primeiro inimigo que agir ou chegar na sua zona")
+    return (f"{a['name']} prepara {hab['nome']} ({custo} mana gastos agora), {gatilho}, até o próximo "
+            f"turno dele (usa a reação; segura a magia na concentração).{linha_conc}")
+
+
 def expirar_preparadas(nome: str) -> None:
     cs = memory.campaign.get("combat_state") or {}
+    for p in cs.get("preparadas") or []:
+        if p.get("magia") and memory.char_key(p.get("ator", "")) == memory.char_key(nome):
+            quem = _ch(p["ator"])
+            conc = ((quem or {}).get("sheet") or {}).get("concentracao") or {}
+            if quem and _td()._norm_txt(conc.get("magia", "")) == _td()._norm_txt(p["magia"]):
+                quem["sheet"]["concentracao"] = None
+            _td()._log_combat_event("ready_lost", p["ator"], "", msg=f"{p['magia']} preparada de {p['ator']} se perde")
     if cs.get("preparadas"):
         cs["preparadas"] = [p for p in cs["preparadas"]
                             if memory.char_key(p.get("ator", "")) != memory.char_key(nome)]
@@ -306,6 +446,19 @@ def disparar_preparadas(npc_nome: str) -> list[str]:
                 or td._impedido_de_agir(quem) or not td._reaction_available(quem)
                 or (quem.get("status") or "").lower() in td.OUT_OF_COMBAT_STATUSES):
             ficam.append(p)
+            continue
+        if p.get("magia"):
+            conc = ((quem.get("sheet") or {}).get("concentracao") or {})
+            if td._norm_txt(conc.get("magia", "")) != td._norm_txt(p["magia"]):
+                linhas.append(f"{quem['name']} perdeu a concentração: {p['magia']} preparada se desfaz.")
+                continue
+            quem["sheet"]["concentracao"] = None       # solta a magia; a dela mesma começa ao conjurar
+            td._consume_reaction(quem)
+            saida = td.use_ability(quem["name"], p["magia"], npc["name"], end_turn=False,
+                                   _skip_turn_check=True, _sem_custo=True)
+            linhas.append(f"{quem['name']} solta {p['magia']} preparada:\n"
+                          + saida.replace(td._BONUS_ACTION_HINT, "").replace(
+                              "\n   Ação bônus disponível — próxima habilidade/ataque neste turno.", ""))
             continue
         arma = ((quem.get("sheet") or {}).get("equipamentos") or {}).get("arma_principal") or "ataque desarmado"
         golpe = td.attack_roll(quem["name"], npc["name"], arma, 6, end_turn=False, _skip_turn_check=True)

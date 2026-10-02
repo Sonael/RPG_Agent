@@ -462,6 +462,7 @@ def test_bruxo_vinganca_refugio_apenas_para_mim_mestrado(campanha, povoar, monke
 def test_familiar_do_pacto_ataca(campanha, povoar):
     povoar(criar_ficha("Zed", grupo=True, classe="bruxo", nivel=3, mana=14,
                        habilidades=[_hab("Encontrar Familiar Aprimorado"), _hab("Find Familiar", 2)]))
+    _ch("Zed")["inventario"].append({"nome": "Incenso e ervas", "qtd": 2})     # 10 po, consumido
     modos = resolucao.como_resolve(_hab("Find Familiar", 2), _ch("Zed"))["modos"]
     assert "diabrete:1" in modos
     assert td.conjurar_fora_de_combate("Zed", "Find Familiar", modo="diabrete:1")["ok"]

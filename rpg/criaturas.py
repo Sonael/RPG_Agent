@@ -311,6 +311,19 @@ def nd_valor(nd: str) -> float:
     return float(s)
 
 
+# Montarias (grandes o bastante para levar um cavaleiro) e quem vê no escuro (m).
+for _k in ("cavalo de guerra", "ponei", "lobo atroz", "urso pardo", "urso polar", "aguia gigante", "mamute",
+           "unicornio", "tiranossauro"):
+    if _k in FICHAS:
+        FICHAS[_k]["montaria"] = True
+VISAO_NO_ESCURO = {
+    "elemental do ar": 18, "elemental da terra": 18, "elemental do fogo": 18, "elemental da agua": 18,
+    "perseguidor invisivel": 18, "mefita de vapor": 18, "mefita de magma": 18, "gargula": 18,
+    "diabrete": 36, "quasit": 36, "pseudodragao": 18, "driade": 18, "carnical": 18, "esqueleto": 18,
+    "zumbi": 18, "unicornio": 18, "coruja": 36, "rato": 9, "aranha": 9, "aranha gigante": 18,
+}
+
+
 def ficha(chave: str) -> dict | None:
     return FICHAS.get(chave)
 
@@ -344,6 +357,8 @@ def montar_sheet(chave: str) -> dict:
         "vulnerabilidades": [{"tipos": [t]} for t in f.get("vulnerabilidades", [])],
         "vida_temp": 0, "concentracao": None,
         "tracos": list(f.get("tracos") or []),
+        "montaria": bool(f.get("montaria")),
+        "visao_no_escuro": int(f.get("visao_no_escuro", VISAO_NO_ESCURO.get(chave, 0)) or 0),
         "imunidades_condicao": list(f.get("imune_a") or []),
         "condicoes": [{"nome": "Invisível", "duracao": None}] if f.get("invisivel") else [],
         "death_saves_sucessos": 0, "death_saves_falhas": 0, "cr": f["nd"],

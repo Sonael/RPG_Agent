@@ -148,6 +148,8 @@ def druida(campanha, povoar):
                                     _hab("Animate Objects", 7), _hab("Create Undead", 9),
                                     _hab("Find Familiar", 2), _hab("Conjure Woodland Beings", 6)]),
            criar_ficha("Orc", vida=300, ca=10))
+    # Componentes de preço (a bolsa de componentes não cobre): o motor cobra.
+    _ch("Kaelen")["inventario"].append({"nome": "Incenso e ervas", "qtd": 5})
     return memory.campaign
 
 
@@ -353,6 +355,7 @@ def test_tempo_de_conjuracao_em_minutos(tempo, minutos):
 def test_ritual_poe_dez_minutos_no_relogio(campanha, povoar):
     povoar(criar_ficha("Mira", grupo=True, classe="mago", nivel=5, mana=27,
                        habilidades=[_hab("Detect Magic"), _hab("Find Familiar")]))
+    _ch("Mira")["inventario"].append({"nome": "Incenso e ervas", "qtd": 1})
     memory.campaign["relogio"] = {"dia": 2, "hora": 14}
     r = td.conjurar_fora_de_combate("Mira", "Detect Magic", ritual=True)
     assert r["ok"], r["message"]

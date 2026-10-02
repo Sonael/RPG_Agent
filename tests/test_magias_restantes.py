@@ -65,6 +65,8 @@ def luta(campanha, povoar):
            criar_ficha("Orc", vida=80, raca="orc", arma="machado grande", ca=10),
            criar_ficha("Ogro", vida=150, raca="ogro", arma="clava grande", ca=10))
     _ch("Mira")["sheet"]["mana_atual"] = _ch("Mira")["sheet"]["mana_max"] = 200
+    # Componentes de preço (a bolsa de componentes não cobre): o motor cobra.
+    _ch("Mira")["inventario"] += [{"nome": "Relicário sagrado", "qtd": 1}, {"nome": "Pó de diamante", "qtd": 3}]
     iniciar_combate(["Mira", "Alden", "Orc", "Ogro"])
     cs = memory.campaign["combat_state"]
     cs["zonas"] = ["Portão", "Pátio", "Sacada"]

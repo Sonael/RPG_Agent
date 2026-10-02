@@ -102,7 +102,8 @@ def test_passos_sem_pegadas_soma_dez_na_furtividade(grupo, monkeypatch):
 # ---------------------------------------------------------------------------
 
 def test_identificacao_escolhe_o_item_da_mochila(grupo, monkeypatch):
-    _ch("Mira")["inventario"] = [{"nome": "Anel Estranho", "qtd": 1, "descricao": "brilha"}]
+    _ch("Mira")["inventario"] = [{"nome": "Anel Estranho", "qtd": 1, "descricao": "brilha"},
+                                 {"nome": "Pérola", "qtd": 1, "identificado": True}]
     chamado = []
     monkeypatch.setattr(td, "identify_item", lambda quem, item: (chamado.append(item), f"**{item}** é um Anel de Proteção")[1])
     modos = resolucao.como_resolve(_hab("Identify"), _ch("Mira"))["modos"]
@@ -114,7 +115,8 @@ def test_identificacao_escolhe_o_item_da_mochila(grupo, monkeypatch):
 
 
 def test_identificacao_nao_se_conjura_na_luta(grupo):
-    _ch("Mira")["inventario"] = [{"nome": "Anel", "qtd": 1, "descricao": ""}]
+    _ch("Mira")["inventario"] = [{"nome": "Anel", "qtd": 1, "descricao": ""},
+                                 {"nome": "Pérola", "qtd": 1, "identificado": True}]
     iniciar_combate(["Mira", "Orc"])
     r = td.combat_action("ability", actor="Mira", ability="Identify", weapon="Anel")
     assert not r["ok"] and "não dá no meio da luta" in r["message"], r["message"]

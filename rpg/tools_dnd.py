@@ -207,6 +207,11 @@ def _mark_at_zero_hp(target: dict, source_name: str = "", nocaute: bool = False)
     name = target.get("name", "")
     from rpg import manobras as _manobras
     _manobras.soltar_quem_agarrou(name)
+    _queda = ""
+    if _manobras.cavaleiro_de(target):
+        _queda = " " + _manobras.queda_da_montaria(target, "a montaria caiu")
+    elif _manobras.montaria_de(target):
+        _manobras.desmontar(name, "caiu da sela")
     if nocaute:
         target["status"] = "estabilizado"
         s_n = target.setdefault("sheet", {})
@@ -214,15 +219,15 @@ def _mark_at_zero_hp(target: dict, source_name: str = "", nocaute: bool = False)
         if not memory.is_party_member(target):
             s_n["acorda_hora"] = _agora_em_horas() + random.randint(1, 4)
         _log_combat_event("down", source_name, name, msg=f"{name} foi nocauteado (estável)")
-        return " NOCAUTEADO! (estável — não morre)"
+        return " NOCAUTEADO! (estável — não morre)" + _queda
     if memory.is_party_member(target):
         target["status"] = "inconsciente"
         _log_combat_event("down", source_name, name, msg=f"{name} caiu inconsciente")
-        return " CAIU INCONSCIENTE!"
+        return " CAIU INCONSCIENTE!" + _queda
     target["status"] = "morto"
     (target.get("sheet") or {})["morreu_hora"] = _agora_em_horas()
     _log_combat_event("down", source_name, name, msg=f"{name} foi derrotado")
-    return " DERROTADO!"
+    return " DERROTADO!" + _queda
 
 
 def poupado(ch: dict | None) -> str:
@@ -4013,6 +4018,163 @@ def _areas_sobre(nome: str) -> list[dict]:
             and not (e.get("concentracao_de") and not _concentracao_segue(e))]
 
 
+# ── Luz e visão no escuro ────────────────────────────────────────────────────
+# A luz de cada lugar: "clara" (padrão), "penumbra" ou "escuridao". O Mestre
+# marca com set_light (zona, ou o campo inteiro); a Luz, as Luzes Dançantes,
+# a Luz do Dia e a tocha acesa iluminam. Na escuridão, quem não tem visão no
+# escuro não vê: ataca com desvantagem, é atacado com vantagem, não mira
+# magia que exige ver, e esconder-se de quem não vê é automático. Na
+# penumbra, a Percepção de quem não tem visão no escuro cai 5.
+_NIVEIS_DE_LUZ = {"clara": "clara", "luz": "clara", "dia": "clara", "bright": "clara",
+                  "penumbra": "penumbra", "meia luz": "penumbra", "dim": "penumbra",
+                  "escuridao": "escuridao", "escuro": "escuridao", "dark": "escuridao", "darkness": "escuridao"}
+_VISAO_DA_RACA = {"anao": 18, "elfo": 18, "meio-elfo": 18, "meio elfo": 18, "gnomo": 18, "meio-orc": 18,
+                  "meio orc": 18, "tiefling": 18, "drow": 36, "orc": 18, "goblin": 18, "kobold": 18,
+                  "hobgoblin": 18, "bugbear": 18, "gnoll": 18}
+
+
+def _tem_tocha(ch: dict | None) -> bool:
+    return any(isinstance(i, dict) and any(p in _norm_txt(i.get("nome", "")) for p in ("tocha", "lanterna", "torch",
+                                                                                       "lantern", "vela"))
+               and int(i.get("qtd", 1) or 1) > 0 for i in (ch or {}).get("inventario") or [])
+
+
+def _ilumina(ch: dict | None) -> bool:
+    """Carrega uma luz acesa (tocha, lanterna)."""
+    s = (ch or {}).get("sheet") or {}
+    return bool(s.get("luz_acesa")) and _tem_tocha(ch) and \
+        (ch.get("status") or "").lower() not in ("morto", "fugiu")
+
+
+def _luz_no_lugar(nome: str) -> str:
+    """A luz onde `nome` está."""
+    cs = memory.campaign.get("combat_state") or {}
+    if not cs.get("is_active"):
+        return "clara"
+    if any(e.get("tipo") == "luz" for e in _areas_sobre(nome)):
+        return "clara"
+    chars = memory.campaign.get("characters") or {}
+    na_luta = [chars.get(memory.char_key(n)) for n in cs.get("initiative_order") or []]
+    if _zonas_ativas():
+        zona = _zona_de(nome)
+        if any(c and _ilumina(c) and _zona_de(c.get("name", "")) == zona for c in na_luta):
+            return "clara"
+        return (cs.get("luz") or {}).get(zona) or cs.get("luz_geral") or "clara"
+    # Sem zonas, não há "longe": uma luz acesa ilumina a luta.
+    if any(c and _ilumina(c) for c in na_luta) or any(
+            isinstance(e, dict) and e.get("tipo") == "luz"
+            and not (e.get("concentracao_de") and not _concentracao_segue(e))
+            for e in cs.get("efeitos_de_zona") or []):
+        return "clara"
+    return cs.get("luz_geral") or "clara"
+
+
+def _visao_no_escuro(ch: dict | None) -> int:
+    """Alcance da visão no escuro em metros (0 = não tem)."""
+    if not ch:
+        return 0
+    s = ch.get("sheet") or {}
+    if s.get("visao_no_escuro"):
+        return int(s["visao_no_escuro"])
+    raca = _norm_txt(str(s.get("raca") or ""))
+    for chave, metros in _VISAO_DA_RACA.items():
+        if re.search(rf"\b{re.escape(chave)}\b", raca):
+            return metros
+    return 0
+
+
+def _ve_no_escuro(obs: dict | None, alvo: dict | None) -> bool:
+    """`obs` enxerga `alvo` com a luz que há onde o alvo está? (A Escuridão mágica é à parte.)"""
+    if not obs or not alvo:
+        return True
+    if _luz_no_lugar(alvo.get("name", "")) != "escuridao":
+        return True
+    return _visao_no_escuro(obs) > 0
+
+
+def set_light(where: str = "", level: str = "clara") -> str:
+    """
+    A luz do lugar: "clara", "penumbra" ou "escuridao". `where` é uma zona do
+    campo de batalha, ou vazio/"todas" para o campo inteiro (o padrão das
+    zonas sem nível próprio). Na escuridão, quem não tem visão no escuro
+    (anões, elfos, gnomos, meio-orcs, tieflings, muitos monstros têm) não vê:
+    ataca com desvantagem, é atacado com vantagem e não mira magia que exige
+    ver. Na penumbra, a Percepção dele cai 5. Tocha acesa, Luz, Luzes
+    Dançantes e Luz do Dia iluminam a zona.
+    """
+    nivel = _NIVEIS_DE_LUZ.get(_norm_txt(level or "").replace("ã", "a"))
+    if not nivel:
+        return 'Erro: nível de luz: "clara", "penumbra" ou "escuridao".'
+    cs = memory.campaign.setdefault("combat_state", {})
+    alvo = (where or "").strip()
+    if not alvo or _norm_txt(alvo) in ("todas", "todo", "geral", "campo"):
+        cs["luz_geral"] = nivel
+        cs.pop("luz", None) if not _zonas_ativas() else None
+        memory.save_campaign()
+        return f"Luz do campo inteiro: {nivel}."
+    zona = next((z for z in _zonas() if _norm_txt(z) == _norm_txt(alvo)), "")
+    if not zona:
+        return f"Erro: zona desconhecida: {alvo}. Zonas: {', '.join(_zonas()) or 'nenhuma (use o campo inteiro)'}."
+    cs.setdefault("luz", {})[zona] = nivel
+    memory.save_campaign()
+    return f"Luz em {zona}: {nivel}."
+
+
+# ── Componente material caro ────────────────────────────────────────────────
+# A bolsa de componentes não cobre o que tem preço ("um diamante de 300 po").
+# A magia do personagem do grupo pede o item na mochila (pelo nome), e gasta
+# um quando a magia o consome. Revivificar e as ressurreições já cobram o
+# diamante no caminho delas (rpg/resolucao.py).
+_MATERIAIS = (
+    ("diamond", ("diamante", "diamond")), ("black pearl", ("perola negra", "black pearl")),
+    ("pearl", ("perola", "pearl")), ("ruby", ("rubi", "ruby")), ("sapphire", ("safira", "sapphire")),
+    ("emerald", ("esmeralda", "emerald")), ("jacinth", ("jacinto", "jacinth")), ("agate", ("agata", "agate")),
+    ("jade", ("jade",)), ("gold dust", ("po de ouro", "ouro em po", "gold dust")),
+    ("platinum", ("platina", "platinum")), ("ink", ("tinta", "ink")), ("incense", ("incenso", "incense")),
+    ("holy water", ("agua benta", "holy water")), ("silver", ("prata", "silver")),
+    ("crystal ball", ("bola de cristal",)), ("mirror", ("espelho", "mirror")), ("statuette", ("estatueta",)),
+    ("bowl", ("tigela", "taca", "bowl")), ("reliquary", ("relicario", "reliquary")), ("rod", ("bastao", "forquilha", "rod")),
+    ("ivory", ("marfim", "ivory")), ("circlet", ("diadema", "tiara", "circlet")), ("chest", ("bau", "chest")),
+    ("oils", ("oleo", "unguento", "oil")), ("herbs", ("ervas", "herbs")), ("charcoal", ("carvao", "charcoal")),
+    ("jewel", ("joia", "gema", "jewel", "gem")), ("gem", ("joia", "gema", "gem")),
+    ("focus", ("foco", "chifre", "olho de vidro", "focus")),
+    ("sticks", ("varetas", "ossos", "runas", "cartas", "sticks")), ("tools", ("varetas", "ossos", "runas", "cartas")),
+)
+
+
+def componente_caro(hab: dict) -> dict | None:
+    """{"texto", "custo", "consome", "palavras"} da magia do SRD com componente de preço; None se não tem."""
+    from rpg import resolucao as _r
+    m = _r._magia_srd(hab) or {}
+    texto = m.get("material") or ""
+    achado = (re.search(r"worth (?:at least )?([\d,]+) ?gp", texto, re.I)
+              or re.search(r"([\d,]+) ?gp worth", texto, re.I))
+    if not achado:
+        return None
+    t = texto.lower()
+    palavras = next((pt for en, pt in _MATERIAIS if en in t), ())
+    if not palavras:
+        return None
+    return {"texto": texto, "custo": int(achado.group(1).replace(",", "")),
+            "consome": "consume" in t, "palavras": palavras}
+
+
+def _item_do_componente(char: dict, comp: dict) -> dict | None:
+    for it in char.get("inventario") or []:
+        if not isinstance(it, dict) or int(it.get("qtd", 1) or 1) <= 0:
+            continue
+        nome = _norm_txt(it.get("nome", ""))
+        if any(_norm_txt(p) in nome for p in comp["palavras"]):
+            valor = it.get("valor_po", it.get("valor"))
+            try:
+                if valor is not None and float(valor) < comp["custo"]:
+                    continue
+            except (TypeError, ValueError):
+                pass
+            return it
+    return None
+
+
 def _zona_obscurecida(nome: str) -> str:
     """O nome da magia que cega a área de `nome` (Escuridão, Névoa), ou ''."""
     for e in _areas_sobre(nome):
@@ -4042,12 +4204,19 @@ def _zona_silenciada(nome: str) -> str:
     return ""
 
 
-def _por_zona(char_name: str, zona: str) -> None:
+def _por_zona(char_name: str, zona: str, _junto: bool = True) -> None:
     cs = memory.campaign.setdefault("combat_state", {})
     if cs.get("posicoes", {}).get(memory.char_key(char_name)) != zona:
         # Sair do lugar é sair de trás da cobertura.
         (cs.get("cobertura") or {}).pop(memory.char_key(char_name), None)
     cs.setdefault("posicoes", {})[memory.char_key(char_name)] = zona
+    # Montado: cavaleiro e montaria andam juntos.
+    if _junto:
+        from rpg import manobras as _mb_z
+        ch = memory.campaign.get("characters", {}).get(memory.char_key(char_name))
+        par = _mb_z.montaria_de(ch) or _mb_z.cavaleiro_de(ch)
+        if par:
+            _por_zona(par.get("name", ""), zona, _junto=False)
 
 
 def _distancia(a: str, b: str) -> int | None:
@@ -7261,6 +7430,14 @@ def attack_roll(
     if _cego_por:
         advantage = disadvantage = True
         cond_notes.append(f"{_cego_por}: ninguém vê ninguém — vantagem e desvantagem se anulam")
+    else:
+        # Escuridão natural: quem não tem visão no escuro não vê.
+        if not _ve_no_escuro(attacker, target):
+            disadvantage = True
+            cond_notes.append(f"no escuro, {attacker['name']} não vê {target['name']} — desvantagem")
+        if not _ve_no_escuro(target, attacker):
+            advantage = True
+            cond_notes.append(f"no escuro, {target['name']} não vê {attacker['name']} — vantagem")
 
     # ── A arma existe? Tem munição? É mágica? Carrega algo? ─────────────────
     _mag = _bonus_magico_da_arma(attacker, weapon)
@@ -7812,7 +7989,9 @@ def use_ability(
         if (_alvo_z and memory.char_key(_alvo_z) != memory.char_key(char["name"])
                 and _m_zona.get("origem") == "alvo"
                 and "you can see" in (_m_zona.get("descricao_en") or "")):
-            _nao_ve = _zona_obscurecida(char["name"]) or _zona_obscurecida(_alvo_z)
+            _nao_ve = (_zona_obscurecida(char["name"]) or _zona_obscurecida(_alvo_z)
+                       or ("escuro" if not _ve_no_escuro(
+                           char, memory.campaign["characters"].get(memory.char_key(_alvo_z))) else ""))
             if _nao_ve:
                 return (f"Erro: {hab['nome']} exige ver o alvo, e o {_nao_ve} não deixa "
                         f"{char['name']} ver {_alvo_z}. Nada foi gasto.")
@@ -7837,6 +8016,18 @@ def use_ability(
         if _recusas_t:
             target_name = ", ".join(_ficam_t)
             _nota_tipo = "".join(f"\n   {r} — fica de fora." for r in _recusas_t)
+
+    # ── Componente material caro ──────────────────────────────────────────
+    _comp = componente_caro(hab) if memory.is_party_member(char) and not _sem_custo else None
+    _ef_comp = _resolucao.efeito_de_magia(hab)[1] if _comp else {}
+    _item_comp = None
+    if _comp and not (_ef_comp or {}).get("reviver"):
+        _item_comp = _item_do_componente(char, _comp)
+        if not _item_comp:
+            return (f"Aviso: {hab['nome']} pede um componente de {_comp['custo']} po "
+                    f"({_comp['palavras'][0]}) na mochila de {char['name']}"
+                    + (", que a magia consome" if _comp["consome"] else "") + ". A bolsa de componentes "
+                    f"não cobre o que tem preço. Nada foi gasto.")
 
     # ── Alcance da habilidade ─────────────────────────────────────────────
     # Cone e toque nascem no conjurador: só pegam quem está na zona dele. Só
@@ -7971,6 +8162,11 @@ def use_ability(
         s["mana_atual"] -= custo
         if _circ_alto >= 6:
             s.setdefault("circulos_altos_usados", []).append(_circ_alto)
+    # O componente que a magia consome vai embora com ela.
+    if _item_comp is not None and _comp and _comp["consome"]:
+        _item_comp["qtd"] = int(_item_comp.get("qtd", 1) or 1) - 1
+        if _item_comp["qtd"] <= 0:
+            char["inventario"] = [i for i in char.get("inventario") or [] if i is not _item_comp]
 
     # A reserva da Cura pelas Mãos é gasta pelo quanto curou, não por uso.
     _por_reserva = (_como["tipo"] == "acao_de_classe"
@@ -15053,6 +15249,9 @@ def spawn_monster(
             "cr":                   cr_label,
             # O tipo (Imobilizar Pessoa: só humanoides) e o que não o afeta.
             "tipo":                 monster_type,
+            "visao_no_escuro":      (round(int(_m_vis.group(1)) * 0.3)
+                                     if (_m_vis := re.search(r"darkvision (\d+)", str(m.get("senses") or "").lower()))
+                                     else 0),
             "imunidades_condicao":  __import__("rpg.tracos", fromlist=["x"]).imunidades_de_condicao(
                                         m.get("condition_immunities")),
         }
@@ -17091,6 +17290,13 @@ def _rolar_ataque_magico(char: dict, alvo: dict, hab: dict) -> tuple[bool, bool,
     if _cego_por:
         vantagem = desvantagem = True
         mods["notas"].append(f"{_cego_por}: vantagem e desvantagem se anulam")
+    else:
+        if not _ve_no_escuro(char, alvo):
+            desvantagem = True
+            mods["notas"].append(f"no escuro, {char.get('name')} não vê {alvo.get('name')} — desvantagem")
+        if not _ve_no_escuro(alvo, char):
+            vantagem = True
+            mods["notas"].append(f"no escuro, {alvo.get('name')} não vê {char.get('name')} — vantagem")
     d20, log = _roll_d20_with_adv(vantagem, desvantagem)
     total = d20 + prof + mod + mods["bonus"]
     ca = _ca_efetiva(alvo) + _cob_b
@@ -17251,6 +17457,14 @@ def _combatant_snapshot(name: str) -> dict | None:
         if key and key not in _seen_cond:        # dedup por nome
             _seen_cond.add(key)
             conds.append(nm)
+    # Montado: aparece com as condições.
+    from rpg import manobras as _mb_s
+    if _mb_s.montaria_de(ch):
+        conds.append(f"Montado em {_mb_s.montaria_de(ch).get('name', '')}")
+    # A luz onde ele está, quando não é clara.
+    _luz_c = _luz_no_lugar(ch.get("name", ""))
+    if _luz_c != "clara":
+        conds.append("Na escuridão" if _luz_c == "escuridao" else "Na penumbra")
     # Cobertura aparece com as condições: é o que muda a CA contra quem atira.
     if _cobertura_de(ch):
         conds.append(_COBERTURA_NOME[_cobertura_de(ch)].capitalize())
@@ -17353,6 +17567,12 @@ def _combatant_snapshot(name: str) -> dict | None:
         # Golpe não letal ligado: o corpo a corpo que derruba nocauteia.
         "nao_letal": bool(s.get("nao_letal")),
         "cobertura": _cobertura_de(ch),
+        "visao_no_escuro": _visao_no_escuro(ch),
+        "montado_em": ((__import__("rpg.manobras", fromlist=["x"]).montaria_de(ch) or {}).get("name", "")),
+        "montaria_de": ((__import__("rpg.manobras", fromlist=["x"]).cavaleiro_de(ch) or {}).get("name", "")),
+        "pode_montar": bool(__import__("rpg.manobras", fromlist=["x"]).montarias_livres(ch)),
+        "tem_tocha": _tem_tocha(ch),
+        "luz_acesa": bool(s.get("luz_acesa")),
         # Pode atacar com a outra mão: tem outra arma leve além da principal.
         "outra_mao": bool(_arma_da_outra_mao(ch, ((s.get("equipamentos") or {}).get("arma_principal") or ""))),
         # Rendido, ou enfeitiçado/dominado pelo grupo: não precisa morrer.
@@ -17516,7 +17736,7 @@ def combat_action(action: str, actor: str = "", target: str = "",
         return {"ok": False, "message": _aviso_de_pergunta_pendente(), "snapshot": combat_snapshot()}
     # A ação do jogador também pode chamar uma reação que pergunta: o
     # Oportunista do monge quando o guerreiro acerta, o Golpe Mágico.
-    if (a not in ("reagir", "end", "enemy", "auto", "death_save", "nao_letal", "cover")
+    if (a not in ("reagir", "end", "enemy", "auto", "death_save", "nao_letal", "cover", "light", "dismount")
             and _rea_ca._respostas is None and _rea_ca.alguem_pergunta()):
         return _com_perguntas({"fn": "combat_action",
                                "kw": {"action": action, "actor": actor, "target": target, "weapon": weapon,
@@ -17965,6 +18185,30 @@ def combat_action(action: str, actor: str = "", target: str = "",
             eco["ataque_leve"] = ""
             msg = "Ataque com a outra mão (ação bônus):\n" + msg
 
+        elif a in ("mount", "dismount"):
+            # Montar e desmontar gastam o movimento.
+            if eco.get("movimento_usado") and int(eco.get("movimento_extra", 0) or 0) <= 0:
+                return {"ok": False, "message": f"Erro: {actor} já usou o movimento neste turno.",
+                        "snapshot": combat_snapshot()}
+            from rpg import manobras as _mb_m
+            msg = _mb_m.montar(actor, (target or "").strip()) if a == "mount" else _mb_m.desmontar(actor)
+            if msg.startswith("Erro:"):
+                return {"ok": False, "message": msg, "snapshot": combat_snapshot()}
+            eco["movimento_usado"] = True
+
+        elif a == "light":
+            # Acender ou apagar a tocha: interação com objeto, não gasta a Ação.
+            _ch_l = memory.campaign["characters"].get(memory.char_key(actor)) or {}
+            if not _tem_tocha(_ch_l):
+                return {"ok": False, "message": f"Erro: {actor} não tem tocha nem lanterna.",
+                        "snapshot": combat_snapshot()}
+            _s_l = _ch_l.setdefault("sheet", {})
+            _s_l["luz_acesa"] = not _s_l.get("luz_acesa")
+            memory.save_campaign()
+            return {"ok": True, "message": (f"{actor} acende a luz: a zona dele fica clara."
+                                            if _s_l["luz_acesa"] else f"{actor} apaga a luz."),
+                    "snapshot": combat_snapshot()}
+
         elif a == "cover":
             # Buscar cobertura: gasta o movimento, não a Ação.
             if eco.get("movimento_usado") and int(eco.get("movimento_extra", 0) or 0) <= 0:
@@ -18008,7 +18252,7 @@ def combat_action(action: str, actor: str = "", target: str = "",
             elif a == "surrender":
                 msg = _manobras.pedir_rendicao(actor, alvo_m, (weapon or "").strip())
             else:
-                msg = _manobras.preparar(actor, alvo_m)
+                msg = _manobras.preparar(actor, alvo_m, (weapon or "").strip())
             if msg.startswith(("Erro:", "Aviso:")):
                 eco["acao_usada"] = False
                 return {"ok": False, "message": msg, "snapshot": combat_snapshot()}
@@ -18232,6 +18476,7 @@ DND_TOOLS = [
     set_legendary_resistance,
     set_lair_actions,
     set_cover,
+    set_light,
     # Onda 4 — relógio, exaustão, carga e loja
     advance_time,
     get_world_time,

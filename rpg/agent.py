@@ -1041,6 +1041,10 @@ Para definir estratégia de um NPC (opcional; padrão = agressivo):
   primeiro turno. COBERTURA: set_cover(criatura ou zona, "meia" |
   "tres_quartos" | "total"). CHEFE: set_legendary_resistance(nome, 3) e
   set_lair_actions(nome, "Poder A, Poder B").
+• LUZ: set_light(zona ou "", "clara" | "penumbra" | "escuridao"). No escuro,
+  quem não tem visão no escuro não vê (ataca com desvantagem, é atacado com
+  vantagem). Componentes caros (diamante, pérola...) precisam estar na
+  mochila: a recusa diz qual — narre a falta, não invente o item.
 • NINGUÉM É OBRIGADO A MATAR: inimigo que se rende → set_combat_side(nome,
   "rendido"). Só restando inimigos rendidos, enfeitiçados ou dominados pelo
   grupo, encerre com end_combat() (é vitória: XP normal, sem saque deles). O

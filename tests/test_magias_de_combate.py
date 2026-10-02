@@ -65,6 +65,8 @@ def luta(campanha, povoar):
            criar_ficha("Alden", grupo=True, vida=40, ca=10),
            criar_ficha("Orc", vida=60, raca="orc", arma="machado grande", ca=10),
            criar_ficha("Zumbi", vida=60, raca="zumbi", tipo="undead", arma="pancada"))
+    # Componentes de preço (a bolsa de componentes não cobre): o motor cobra.
+    _ch("Kaelen")["inventario"] += [{"nome": "Pó de diamante", "qtd": 5}, {"nome": "Anéis de platina", "qtd": 1}]
     iniciar_combate(["Kaelen", "Alden", "Orc", "Zumbi"])
     _vez("Kaelen")
     return memory.campaign
@@ -201,6 +203,7 @@ def test_poupar_os_moribundos_estabiliza(luta):
 
 
 def test_revivificar_exige_diamante_e_morte_recente(luta):
+    _ch("Kaelen")["inventario"] = [i for i in _ch("Kaelen")["inventario"] if "diamante" not in i["nome"].lower()]
     alden = _ch("Alden")
     alden["sheet"]["vida_atual"] = 0
     alden["status"] = "morto"

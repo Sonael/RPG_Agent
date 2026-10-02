@@ -1282,6 +1282,10 @@
     ['shove:derrubar', 'Derrubar', 'Atletismo contra Atletismo ou Acrobacia: o alvo fica Caído'],
     ['shove:afastar', 'Empurrar', 'Atletismo contra Atletismo ou Acrobacia: o alvo vai para a zona vizinha'],
     ['ready', 'Preparar ataque', 'ataca quando o alvo for agir, ou o primeiro inimigo que chegar (usa a reação)'],
+    ['mount', 'Montar', 'numa montaria do seu lado na sua zona: andam juntos (usa o movimento)'],
+    ['dismount', 'Desmontar', 'descer da montaria (usa o movimento)'],
+    ['light', 'Acender/apagar a tocha', 'interação com objeto: a sua zona fica clara'],
+    ['ready:magia', 'Preparar magia', 'conjura agora (gasta a mana, segura na concentração) e solta quando o alvo agir'],
     ['cover', 'Buscar cobertura', 'atrás do que houver: +2 de CA (ou +5) contra quem ataca de longe; usa o movimento'],
     ['offhand', 'Ataque com a outra mão', 'depois de atacar com arma leve: a outra arma leve ataca (ação bônus)'],
     ['surrender:intimidar', 'Pedir rendição (Intimidação)', 'Intimidação contra a Sabedoria dele: rendido, larga as armas e sai da luta, vivo'],
@@ -1300,7 +1304,10 @@
     const eco = (_last || {}).turn_economy || {};
     const lista = MANOBRAS.filter(([id]) =>
       (id !== 'escape' || agarrado) && (id !== 'shove:afastar' || temZonas)
-      && (id !== 'offhand' || (eco.ataque_leve && !eco.bonus_usada && cur.outra_mao)));
+      && (id !== 'offhand' || (eco.ataque_leve && !eco.bonus_usada && cur.outra_mao))
+      && (id !== 'mount' || (!cur.montado_em && cur.pode_montar)) && (id !== 'dismount' || cur.montado_em)
+      && (id !== 'light' || cur.tem_tocha)
+      && (id !== 'ready:magia' || (cur.habilidades || []).some(h => h.tipo_acao === 'acao' && (h.efeito || h.resolucao === 'efeito'))));
     abrirSeletor(
       `<div class="cbt-tgt-title">Manobras <small>· gastam a Ação</small></div>`
       + `<div class="cbt-picker-btns cbt-modos">`
@@ -1311,13 +1318,32 @@
       + `</div>`, false);
   }
 
+  // Preparar magia: escolhe a magia (de uma Ação) e depois o alvo, como no
+  // Preparar ataque.
+  function _prepararMagia(cur) {
+    const magias = (cur.habilidades || []).filter(h => h.tipo_acao === 'acao' && (h.efeito || h.resolucao === 'efeito'));
+    abrirSeletor(
+      `<div class="cbt-tgt-title">Preparar qual magia? <small>· gasta a mana agora</small></div>`
+      + `<div class="cbt-picker-btns">`
+      + magias.map(h => `<button class="cbt-btn" ${h.custo_mana > (cur.mp || 0) ? 'disabled' : ''} `
+          + `onclick="window.Combat._prepararMagiaEm('${jsNome(h.nome)}')">${esc(h.nome_exibido || h.nome)}`
+          + `<small> · ${h.custo_mana || 0} mana</small></button>`).join('')
+      + BOTAO_CANCELAR + `</div>`, false);
+  }
+
+  function _prepararMagiaEm(nome) {
+    showTargets('manobra', { acao: 'ready', modo: 'magia:' + nome, rotulo: 'Preparar ' + nome, permiteNenhum: true });
+  }
+
   function _manobra(id) {
     if (_busy) return;
     const cur = (_last.combatants || []).find(c => c.is_current);
     if (!cur) return;
     const [acao, modo] = id.split(':');
     const rotulo = (MANOBRAS.find(m => m[0] === id) || [id, id])[1];
-    if (acao === 'hide' || acao === 'escape' || acao === 'defend' || acao === 'flee' || acao === 'cover') {
+    if (id === 'ready:magia') { _prepararMagia(cur); return; }
+    if (acao === 'hide' || acao === 'escape' || acao === 'defend' || acao === 'flee' || acao === 'cover'
+        || acao === 'light' || acao === 'dismount') {
       act({ action: acao, actor: cur.name });
       return;
     }
@@ -1661,7 +1687,7 @@
   // ---- API pública -------------------------------------------------
   window.Combat = {
     sync,
-    _sel, _selHab, _usarHab, _modo, _circulo, _info, _reacao, _manobras, _manobra, _selWeapon, _selItem, _target, _confirmarAlvos, _naoLetal, _mover, _cancel, _free,
+    _sel, _selHab, _usarHab, _modo, _circulo, _info, _reacao, _manobras, _manobra, _selWeapon, _selItem, _target, _confirmarAlvos, _naoLetal, _prepararMagiaEm, _mover, _cancel, _free,
     _confirmarArea,
     _livreEnviar, _livreFechar,
     _act: act,

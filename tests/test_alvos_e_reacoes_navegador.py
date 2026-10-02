@@ -319,3 +319,21 @@ def test_buscar_cobertura_aparece_no_cartao(tela):
     helena = next(c for c in _motor(pg)["combatants"] if c["name"] == "Helena")
     assert helena["cobertura"] == "meia"
     assert not erros, erros[:3]
+
+
+# ---------------------------------------------------------------------------
+# Preparar magia
+# ---------------------------------------------------------------------------
+
+def test_preparar_magia_pelo_menu(tela):
+    abrir, cap = tela
+    pg, erros = abrir(copy.deepcopy(cap.COMBATE_MAGIAS), "O que fará Helena")
+    pg.click("#cbt-buttons button:has-text('Manobras')")
+    assert pg.locator("#cbt-targets button:has-text('Montar')").count() == 0      # sem montaria
+    pg.click("#cbt-targets button:has-text('Preparar magia')")
+    pg.click("#cbt-targets button.cbt-btn:has-text('Raio Guia')")
+    pg.click("#cbt-targets button.cbt-btn:has-text('Cultista')")
+    pg.wait_for_function("() => !document.querySelector('#cbt-targets:not(.hidden) .cbt-tgt-title')", timeout=8000)
+    log = " | ".join(e.get("msg", "") for e in _motor(pg)["log"])
+    assert "prepara Raio Guia" in log, log[-300:]
+    assert not erros, erros[:3]
