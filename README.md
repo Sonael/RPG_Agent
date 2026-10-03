@@ -827,6 +827,49 @@ mãos com um escudo.
 - **Armadura que pesa.** Desvantagem em Furtividade, e -3 m sem a FOR pedida
   (o anão não sente). A de mithral não tem nenhum dos dois.
 
+### Consumíveis: poções, pergaminhos, varinhas e cajados
+
+Antes só a Poção de Cura (e a de resistência) fazia alguma coisa. A Poção de
+Força do Gigante, o pergaminho de Bola de Fogo e a Varinha de Mísseis Mágicos
+eram "efeito desconhecido — descreva em Ação Livre".
+
+- **Poções do SRD** (campo `uso` em `srd_itens_pt.json`): Força do Gigante (a
+  FOR do gigante por uma hora, pela mesma conta dos atributos de item, e volta
+  quando a hora passa), Velocidade (Pressa até o fim da luta; fora dela não se
+  bebe), Heroísmo (10 PV temporários e Bênção), Invisibilidade, Crescimento e
+  Diminuição, Voo, Escalada, Forma Gasosa, e a Poção de Veneno, que parece de
+  cura. As narrativas (Clarividência, Respirar na Água) gravam o efeito com a
+  nota para o Mestre. Bebe-se pela Mochila ou pela tela (`_beber_pocao`).
+- **Varinhas e cajados com cargas** (16 itens): as magias deles aparecem no
+  botão Habilidade da tela tática como "Bola de Fogo (Varinha de Bolas de
+  Fogo)", com o contador de cargas e os círculos acima (cada carga a mais),
+  e passam pelo mesmo seletor de alvo das magias da ficha. O nome que viaja é
+  "Magia [Item]", e `combat_action` manda para `_conjurar_do_item`, que
+  chama o mesmo `use_ability` dentro de `_conjurando_pelo_item`: a CD e o
+  ataque passam a ser os do item quando ele tem (Varinha de Bolas de Fogo: CD
+  15), quem não conjura usa o melhor atributo mental, e o círculo é pago com
+  cargas, não com mana. Item que pede sintonia só aparece sintonizado. A última
+  carga, num 1 no d20, desfaz a varinha. As cargas voltam ao amanhecer (6h,
+  `_recarregar_itens` em `advance_time`), até o máximo.
+- **Pergaminhos de magia** ("Pergaminho de Bola de Fogo", "Pergaminho de
+  Magia: Teia"): CD e ataque pelo círculo (13/+5 a 19/+11). Só lê quem tem a
+  magia na lista da classe (ou o ladino com Uso Mágico de Itens); acima do
+  círculo que alcança, teste de Arcanismo CD 10 + círculo, e na falha o
+  pergaminho se desfaz à toa.
+- Fora da luta, o Mestre usa `use_magic_item` (o Cajado da Cura depois da
+  briga, a Varinha de Detectar Magia).
+- **Equipamento de aventura:** o Kit de Curandeiro estabiliza quem está caído,
+  sem teste (10 usos); o Frasco de Óleo aceso é arremesso de 5 de fogo. Item
+  comum do SRD sem uso no motor (o pergaminho em branco) deixou de aparecer como
+  consumível desconhecido.
+- **Munição e arremesso:** depois da luta volta metade das flechas, virotes,
+  balas e agulhas gastas; a arma de arremesso jogada de longe (a azagaia na
+  zona vizinha) sai da mão e é recolhida no fim da luta. `end_combat` diz quem
+  recolheu o quê.
+- **Defeito do lote 2 corrigido aqui:** `end_combat` regravava a lista de
+  efeitos a partir de `_efeitos`, que inclui os efeitos dos itens vestidos; o
+  Anel de Proteção ficava gravado na ficha e valia sem o anel.
+
 ### Camada de acesso ao SRD (`rpg/open5e.py`)
 
 Todas as consultas ao Open5e passam por um módulo único, em vez de

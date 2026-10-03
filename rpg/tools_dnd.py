@@ -5224,14 +5224,56 @@ def _atributo_de_conjuracao(sheet: dict) -> str:
 
 
 def _conjuracao(sheet: dict) -> dict | None:
-    """{atributo, sigla, cd, ataque} ou None quando a classe não conjura."""
+    """
+    {atributo, sigla, cd, ataque} ou None quando a classe não conjura.
+
+    Enquanto a magia sai de um item (_conjurando_pelo_item), a CD e o ataque
+    são os do item quando ele tem (Varinha de Bolas de Fogo: CD 15;
+    pergaminho de 3º círculo: CD 15, +7), e quem não conjura usa o melhor
+    atributo mental.
+    """
     atributo = _atributo_de_conjuracao(sheet)
-    if not atributo:
+    item = _item_conjurando(sheet)
+    if not atributo and not item:
         return None
+    if not atributo:
+        atributo = max(("inteligencia", "sabedoria", "carisma"),
+                       key=lambda a: int(sheet.get(a, 10) or 10))
     prof = int(sheet.get("proficiencia", _proficiency_bonus(int(sheet.get("nivel", 1) or 1))) or 2)
     mod  = _modifier(int(sheet.get(atributo, 10) or 10))
+    cd, ataque = 8 + prof + mod, prof + mod
+    if item:
+        cd = int(item.get("cd") or cd)
+        ataque = ataque if item.get("ataque") is None else int(item["ataque"])
     return {"atributo": _ATRIBUTO_PT[atributo], "sigla": _ATRIBUTO_SIGLA[atributo],
-            "cd": 8 + prof + mod, "ataque": _fmt_bonus(prof + mod)}
+            "cd": cd, "ataque": _fmt_bonus(ataque)}
+
+
+# ── Magia que sai de um item (pergaminho, varinha, cajado) ────────────────
+# Quem conjura é o personagem, pelo mesmo use_ability das magias da ficha; o
+# item muda o que a magia custa (cargas, o pergaminho que se desfaz) e, às
+# vezes, a CD e o ataque. A troca vale só para a ficha de quem usa o item.
+_CONJURACAO_DE_ITEM: dict | None = None
+
+
+def _item_conjurando(sheet: dict) -> dict | None:
+    c = _CONJURACAO_DE_ITEM
+    return c if c is not None and c.get("sheet") is sheet else None
+
+
+class _conjurando_pelo_item:
+    def __init__(self, sheet: dict, cd: int | None, ataque: int | None):
+        self.novo = {"sheet": sheet, "cd": cd, "ataque": ataque}
+
+    def __enter__(self):
+        global _CONJURACAO_DE_ITEM
+        self.antes, _CONJURACAO_DE_ITEM = _CONJURACAO_DE_ITEM, self.novo
+        return self
+
+    def __exit__(self, *exc):
+        global _CONJURACAO_DE_ITEM
+        _CONJURACAO_DE_ITEM = self.antes
+        return False
 
 
 # ── Deslocamento ───────────────────────────────────────────────────────────
@@ -7006,6 +7048,7 @@ def _gastar_municao(char: dict, weapon: str) -> tuple[str, str]:
             return (f"Erro: {char.get('name')} não tem mais {it.get('nome')} para "
                     f"a {weapon}. Recolha as que atirou ou compre mais."), ""
         it["qtd"] = qtd - 1
+        _anotar_gasto(char, "_municao_gasta", it.get("nome", ""))
         if it["qtd"] <= 0:
             (char.get("inventario") or []).remove(it)
             return "", f"Última {it.get('nome')} gasta — a {weapon} está sem munição."
@@ -7453,6 +7496,18 @@ def attack_roll(
     _recusa_mun, _nota_mun = _gastar_municao(attacker, weapon)
     if _recusa_mun:
         return _recusa_mun
+    # Arremessada de longe (a azagaia na zona vizinha): sai da mão e fica no
+    # chão até o fim da luta.
+    _nota_arremesso = ""
+    _a_arr = _itens.arma(weapon)
+    if (_a_arr and "arremesso" in _a_arr["propriedades"] and not _a_arr["distancia"]
+            and memory.is_party_member(attacker) and not matched_hab
+            and (_distancia(attacker["name"], target["name"]) or 0) >= 1):
+        _item_arr = _item_do_inventario(attacker, weapon)
+        if _item_arr:
+            _gastar_unidade(attacker, _item_arr)
+            _anotar_gasto(attacker, "_arremessadas", _item_arr["nome"])
+            _nota_arremesso = f"{_item_arr['nome']} arremessada: fica no chão até o fim da luta"
 
     # Reação do alvo antes do dado (Bandeira de Aviso).
     from rpg import reacoes as _reacoes
@@ -7553,7 +7608,7 @@ def attack_roll(
         result += "   " + "\n   ".join(cond_notes) + "\n"
     if style_note:
         result += f"   {style_note}\n"
-    for _nota in (_nota_arma, _nota_mun):
+    for _nota in (_nota_arma, _nota_mun, _nota_arremesso):
         if _nota:
             result += f"   {_nota}\n"
     _atk_style_str = f" +{style_atk_bonus}(estilo)" if style_atk_bonus else ""
@@ -8084,7 +8139,9 @@ def use_ability(
 
     # ── Conjurar com mais mana (círculo acima do da magia) ────────────────
     _circulo = _resolucao.circulo_do_modo(hab, modo)
-    if _circulo:
+    if _circulo and _item_conjurando(s):
+        pass            # o item paga o círculo (cargas), não a mana nem o nível
+    elif _circulo:
         _opcoes = _resolucao.circulos_da_magia(hab, char)
         if f"c{_circulo}" not in _opcoes:
             return (f"Aviso: {hab['nome']} não pode ser conjurada no {_circulo}º círculo agora "
@@ -9221,6 +9278,11 @@ def _aplicar_atributos_dos_itens(char: dict) -> None:
     for _nome, magico in _itens_ativos(s):
         for attr, v in ((magico.get("efeito") or {}).get("atributo") or {}).items():
             alvo[attr] = max(alvo.get(attr, 0), int(v))
+    # Poção de Força do Gigante: o mesmo, enquanto o efeito dura.
+    for e in s.get("efeitos") or []:
+        if isinstance(e, dict) and e.get("atributo") and e in _efeitos(s):
+            for attr, v in e["atributo"].items():
+                alvo[attr] = max(alvo.get(attr, 0), int(v))
     registro = s.get("_atributos_dos_itens") or {}
     novo = {}
     for attr in sorted(STAT_NAMES):
@@ -11231,9 +11293,16 @@ def _uso_na_mochila(dono: dict, item: dict) -> dict | None:
     if not ficha:
         return None
     efeito = ficha["efeito"]
-    rotulo = "Beber" if efeito in ("cura", "resistencia") else "Usar"
+    rotulo = "Beber" if efeito in ("cura", "resistencia", "pocao") else "Usar"
     uso = {"efeito": efeito, "rotulo": rotulo, "pode": True, "motivo": "",
            "detalhe": ficha.get("rotulo", ""), "alvos": []}
+    if efeito == "magia":
+        restam = ""
+        if ficha["uso"].get("tipo") == "cargas":
+            restam = f" ({_cargas_do_item(item, ficha['uso'])}/{ficha['uso'].get('cargas')} cargas)"
+        uso.update(pode=False, rotulo="Conjurar", detalhe=ficha.get("rotulo", "") + restam,
+                   motivo="Conjura pela tela tática (botão Habilidade), ou peça ao mestre fora da luta.")
+        return uso
     cs = memory.campaign.get("combat_state") or {}
     if cs.get("is_active"):
         uso.update(pode=False, motivo="Em combate, use pela tela tática: custa Ação ou Ação Bônus.")
@@ -11245,6 +11314,15 @@ def _uso_na_mochila(dono: dict, item: dict) -> dict | None:
                                        "Descreva o uso no chat para o mestre resolver."))
     elif efeito == "arremesso":
         uso.update(pode=False, motivo="Arremesso contra um alvo: só em combate, pela tela tática.")
+    elif efeito == "estabilizar":
+        caidos = [c.get("name", "") for c in _grupo_com_ficha()
+                  if int((c.get("sheet") or {}).get("vida_atual", 0) or 0) <= 0
+                  and (c.get("status") or "").lower() not in ("morto", "estabilizado")]
+        uso["alvos"] = caidos
+        if not caidos:
+            uso.update(pode=False, motivo="Ninguém do grupo está caído morrendo.")
+    elif efeito == "pocao" and ficha["uso"].get("duracao") == "1min":
+        uso.update(pode=False, motivo="Dura um minuto: beba na luta, pela tela tática.")
     elif efeito == "cura":
         # Fora do combate não há zonas: qualquer um do grupo que não esteja morto.
         eu = dono.get("name", "")
@@ -11308,6 +11386,15 @@ def _usar_na_mochila(char: str, item_nome: str, alvo_nome: str = "") -> str:
                         "descricao": "vantagem em salvaguardas contra Envenenado",
                         "origem": slot_inv["nome"], "ate_hora": _agora_em_horas() + 1})
         msg = f"{dono['name']} tomou {slot_inv['nome']}: vantagem contra Envenenado por 1 hora."
+    elif ficha["efeito"] == "pocao":
+        msg = _beber_pocao(dono, slot_inv["nome"], ficha["uso"])
+    elif ficha["efeito"] == "estabilizar":
+        recv = memory.campaign["characters"].get(memory.char_key((alvo_nome or "").strip()))
+        if not recv or recv.get("name") not in uso["alvos"]:
+            return f"Aviso: {alvo_nome or 'ninguém'} não está caído morrendo. O kit não foi gasto."
+        msg = _estabilizar_com_kit(dono, recv, slot_inv, ficha)
+        memory.save_campaign()
+        return msg
     else:
         return f"Aviso: {slot_inv['nome']}: não dá para usar fora do combate."
 
@@ -12465,6 +12552,7 @@ def advance_time(hours: int, reason: str = "") -> str:
 
     r     = _relogio()
     antes = _hora_legivel()
+    _inicio_h = _agora_em_horas()
     if r.get("_antes_minutos"):
         antes = r.pop("_antes_minutos")
     total = hora_do_relogio(r) + h
@@ -12506,12 +12594,39 @@ def advance_time(hours: int, reason: str = "") -> str:
         for i in _vencidas:
             _inv_f.remove(i)
             acabaram.append(f"{i.get('nome')} de {_ch_f.get('name')} perdeu a magia ({i.get('qtd', 1)})")
+    # Varinhas e cajados recuperam as cargas ao amanhecer (6h).
+    _amanheceres = (_agora_em_horas() - 6) // 24 - (_inicio_h - 6) // 24
+    if _amanheceres > 0:
+        acabaram += _recarregar_itens(_amanheceres)
+    # A poção de Força do Gigante que acabou devolve a Força.
+    for _ch_p in (memory.campaign.get("characters") or {}).values():
+        if isinstance(_ch_p, dict) and memory.is_party_member(_ch_p) and (_ch_p.get("sheet") or {}).get("_atributos_dos_itens"):
+            _recalculate_ca(_ch_p)
     memory.save_campaign()
 
     motivo = f" — {reason}" if reason else ""
     virou  = "\n   O dia virou." if total >= 24 else ""
     fim_encanto = "".join(f"\n   {l}" for l in acabaram)
     return f"{antes} → **{_hora_legivel()}**{motivo}{virou}{fim_encanto}"
+
+
+def _recarregar_itens(amanheceres: int) -> list[str]:
+    """Cada amanhecer devolve as cargas do item (1d6+1 na Varinha de Teia), até o máximo."""
+    linhas = []
+    for ch in (memory.campaign.get("characters") or {}).values():
+        for it in (ch or {}).get("inventario") or [] if isinstance(ch, dict) else []:
+            if not isinstance(it, dict) or it.get("cargas") is None:
+                continue
+            uso = _uso_do_item(it.get("nome", ""))
+            if not uso or uso.get("tipo") != "cargas" or not uso.get("recarga"):
+                continue
+            maximo, antes = int(uso.get("cargas", 0) or 0), int(it["cargas"])
+            for _ in range(int(amanheceres)):
+                v, _txt = _rolar_expr(uso["recarga"])
+                it["cargas"] = min(maximo, int(it["cargas"]) + max(0, v))
+            if it["cargas"] != antes:
+                linhas.append(f"{it['nome']} de {ch.get('name')} recupera cargas: {antes} → {it['cargas']}/{maximo}")
+    return linhas
 
 
 def get_world_time() -> str:
@@ -13781,7 +13896,10 @@ def end_combat() -> str:
             _sh["exaustao"] = min(6, int(_sh.get("exaustao", 0) or 0) + 1)
         # Efeitos de item duram o combate; as chamas também não passam dele.
         if _sh.get("efeitos"):
-            _sh["efeitos"] = [e for e in _efeitos(_sh) if e.get("ate") != "fim_do_combate"]
+            # _efeitos traz também os efeitos dos itens vestidos, que não se
+            # gravam: gravados, o Anel de Proteção valia mesmo sem o anel.
+            _sh["efeitos"] = [e for e in _efeitos(_sh)
+                              if e.get("ate") != "fim_do_combate" and not e.get("de_item")]
         if _sh.get("condicoes"):
             # Duração em turnos só existe dentro do combate; as chamas também.
             # Condição de magia (Imobilizar Pessoa, Cegueira, Lentidão: um
@@ -13792,8 +13910,13 @@ def end_combat() -> str:
                                         and ((c.get("nome") or "").lower() == "queimando"
                                              or _turnos_restantes(c) > 0
                                              or (c.get("magia") and not c.get("encanto"))))]
+    # A poção de Força do Gigante que acabou com a luta devolve a Força.
+    for _ch_a in memory.campaign.get("characters", {}).values():
+        if memory.is_party_member(_ch_a) and (_ch_a.get("sheet") or {}).get("equipamentos") is not None:
+            _recalculate_ca(_ch_a)
+    recolhido = _recolher_municao_e_arremessos()
     memory.save_campaign()
-    return "Combate encerrado. Iniciativa e rastreador de turnos limpos."
+    return "Combate encerrado. Iniciativa e rastreador de turnos limpos." + recolhido
 
 
 # ---------------------------------------------------------------------------
@@ -17072,6 +17195,14 @@ _ITENS_COM_EFEITO = (
     (("antitoxina", "antidoto", "antitoxin"),
      {"efeito": "antitoxina", "slot": "bonus",
       "rotulo": "vantagem contra envenenado"}),
+    # Frasco de óleo aceso: 5 de fogo (SRD), sem dado.
+    (("frasco de oleo", "oleo de lamparina", "oil flask", "flask of oil"),
+     {"efeito": "arremesso", "slot": "acao", "dado": (0, 1, 5), "tipo_dano": "fire",
+      "rotulo": "5 fogo (óleo aceso)"}),
+    # Kit de Curandeiro: estabiliza quem está a 0 PV, sem teste (10 usos).
+    (("kit de curandeiro", "kit medico", "kit de primeiros socorros", "healer"),
+     {"efeito": "estabilizar", "slot": "acao", "usos": 10,
+      "rotulo": "estabiliza quem está caído (10 usos)"}),
 )
 
 _TIPO_DANO_ITEM_PT = {
@@ -17085,6 +17216,48 @@ _MOTIVO_DESCONHECIDO = ("O motor não conhece o efeito deste item. Descreva o us
                         "em Ação Livre para o mestre resolver.")
 
 
+# CD e ataque do pergaminho pelo círculo da magia (SRD, Spell Scroll).
+_PERGAMINHO_CD_ATAQUE = {0: (13, 5), 1: (13, 5), 2: (13, 5), 3: (15, 7), 4: (15, 7),
+                         5: (17, 9), 6: (17, 9), 7: (18, 10), 8: (18, 10), 9: (19, 11)}
+_PERGAMINHO_RE = re.compile(
+    r"^\s*(?:pergaminho(?:\s+de\s+magia)?|spell\s+scroll|scroll(?:\s+of)?)\s*"
+    r"(?:de|da|do|of|:|-|\()?\s*(.+?)\s*\)?\s*$", re.IGNORECASE)
+
+
+def _magia_do_pergaminho(nome: str) -> dict | None:
+    """'Pergaminho de Bola de Fogo', 'Pergaminho de Magia: Teia' → a magia do compêndio."""
+    from rpg import compendio
+    m = _PERGAMINHO_RE.match(nome or "")
+    if not m or not m.group(1).strip():
+        return None
+    return compendio.magia(m.group(1).strip())
+
+
+def _uso_do_item(nome: str) -> dict | None:
+    """
+    Como o item se usa, do compêndio: poção ({tipo: "pocao"}), varinha ou
+    cajado ({tipo: "cargas", magias}), ou pergaminho de magia ({tipo:
+    "pergaminho"}, com a CD e o ataque do círculo). None para o resto.
+    """
+    magico = _magico_por_nome(nome or "")
+    if magico and magico.get("uso"):
+        return magico["uso"]
+    magia = _magia_do_pergaminho(nome)
+    if magia:
+        cd, ataque = _PERGAMINHO_CD_ATAQUE[int(magia.get("nivel", 0) or 0)]
+        return {"tipo": "pergaminho", "cd": cd, "ataque": ataque,
+                "magias": [{"magia": magia["nome_srd"], "cargas": 0}],
+                "nota": f"Pergaminho de {magia['nome']}: conjura a magia uma vez (CD {cd}, +{ataque}) e se desfaz."}
+    return None
+
+
+def _cargas_do_item(item: dict, uso: dict) -> int:
+    """As cargas que restam no item; o item novo vem cheio."""
+    if item.get("cargas") is None:
+        item["cargas"] = int(uso.get("cargas", 0) or 0)
+    return int(item["cargas"])
+
+
 def _efeito_de_item(item_name: str) -> dict | None:
     """
     Ficha de combate de um item, ou None quando ele não é consumível.
@@ -17095,6 +17268,10 @@ def _efeito_de_item(item_name: str) -> dict | None:
     n = _norm_txt(item_name or "")
     if not n:
         return None
+    uso = _uso_do_item(item_name)
+    if uso and uso.get("tipo") in ("cargas", "pergaminho"):
+        # Varinha, cajado, pergaminho: conjuram pelo botão Habilidade da tela.
+        return {"efeito": "magia", "slot": "acao", "rotulo": uso.get("nota", ""), "uso": uso}
     if any(kw in n for kw in (_norm_txt(k) for k in _NON_CONSUMABLE_KEYWORDS)):
         return None
 
@@ -17118,6 +17295,13 @@ def _efeito_de_item(item_name: str) -> dict | None:
     for chaves, ficha in _ITENS_COM_EFEITO:
         if any(k in n for k in chaves):
             return dict(ficha)
+
+    if uso and uso.get("tipo") == "pocao":
+        return {"efeito": "pocao", "slot": "bonus", "rotulo": uso.get("nota", ""), "uso": uso}
+    # Item comum do SRD sem uso no motor (o pergaminho em branco, o frasco
+    # vazio) não é consumível de combate.
+    if _itens.comum(item_name):
+        return None
 
     if any(kw in n for kw in (_norm_txt(k) for k in _CONSUMABLE_KEYWORDS)):
         return {"efeito": "desconhecido", "slot": "acao", "motivo": _MOTIVO_DESCONHECIDO}
@@ -17164,6 +17348,68 @@ def _cd_de_arremesso(ator: dict) -> int:
     return 8 + _modifier(int(s.get("destreza", 10) or 10)) + prof
 
 
+def _estabilizar_com_kit(quem: dict, caido: dict, kit: dict, ficha: dict) -> str:
+    """O Kit de Curandeiro estabiliza sem teste e gasta um dos 10 usos."""
+    s = caido["sheet"]
+    caido["status"] = "estabilizado"
+    s["death_saves_sucessos"] = 0
+    s["death_saves_falhas"] = 0
+    if kit.get("usos") is None:
+        kit["usos"] = int(ficha.get("usos", 10) or 10) * int(kit.get("qtd", 1) or 1)
+    kit["usos"] = int(kit["usos"]) - 1
+    resto = kit["usos"]
+    if resto <= 0:
+        inv = quem.get("inventario") or []
+        if kit in inv:
+            inv.remove(kit)
+    return (f"{quem['name']} usa {kit['nome']} em {caido['name']}: estabilizado, sem teste"
+            + (f" (restam {resto} usos)." if resto > 0 else " (o kit acabou)."))
+
+
+def _beber_pocao(dono: dict, nome: str, uso: dict) -> str:
+    """
+    Aplica uma poção do SRD em quem bebe. Dentro da luta, a de um minuto vale
+    até o fim dela; as de uma hora correm no relógio. Devolve o texto.
+    """
+    s = dono["sheet"]
+    prazo = ({"ate": "fim_do_combate"} if uso.get("duracao") == "1min"
+             else {"ate_hora": _agora_em_horas() + 1})
+    partes = []
+    efeito = dict(uso.get("efeito") or {})
+    if uso.get("atributo"):
+        efeito["atributo"] = dict(uso["atributo"])
+    if efeito:
+        _dar_efeito(s, {"nome": nome, "origem": nome, **efeito, **prazo})
+    if uso.get("pv_temp"):
+        s["vida_temp"] = max(int(s.get("vida_temp", 0) or 0), int(uso["pv_temp"]))
+        partes.append(f"{int(uso['pv_temp'])} PV temporários")
+    for cond in uso.get("tira") or []:
+        antes = len(s.get("condicoes") or [])
+        s["condicoes"] = [c for c in s.get("condicoes") or []
+                          if _norm_txt(c.get("nome", "") if isinstance(c, dict) else str(c)) != _norm_txt(cond)]
+        if len(s["condicoes"]) != antes:
+            partes.append(f"deixa de estar {cond}")
+    if uso.get("condicao"):
+        conds = s.setdefault("condicoes", [])
+        if not any(_norm_txt(c.get("nome", "")) == _norm_txt(uso["condicao"]) for c in conds if isinstance(c, dict)):
+            conds.append({"nome": uso["condicao"], "duracao": None, "magia": nome})
+    if uso.get("dano"):
+        d = uso["dano"]
+        n_d, faces, bonus = _parse_dice(d["dado"])
+        bruto = sum(random.randint(1, faces) for _ in range(n_d)) + bonus
+        res = _apply_damage(dono, bruto, d.get("tipo", ""), source_name=nome, arma_magica=True)
+        partes.append(f"{res['dano']} de dano ({_TIPO_DANO_ITEM_PT.get(d.get('tipo', ''), d.get('tipo', ''))})")
+        if d.get("condicao") and res["hp_depois"] > 0:
+            passou, linha = _rolar_salvaguarda(dono, d.get("salvaguarda", "constituicao"), int(d.get("cd", 10)))
+            if not passou:
+                s.setdefault("condicoes", []).append({"nome": d["condicao"], "duracao": None})
+            partes.append(f"{linha}: {'resiste' if passou else d['condicao']}")
+    if uso.get("atributo"):
+        _recalculate_ca(dono)
+    return (f"{dono['name']} bebeu {nome}: {uso.get('nota', '')}"
+            + (f" ({'; '.join(partes)})" if partes else ""))
+
+
 def _alcance_de_item(ator_nome: str, alvo: dict, ficha: dict) -> str:
     """
     "ok" | "fora" | "sem_efeito" para usar o item de `ator_nome` em `alvo`.
@@ -17178,13 +17424,13 @@ def _alcance_de_item(ator_nome: str, alvo: dict, ficha: dict) -> str:
     dist = _distancia(ator_nome, nome)
     if dist is None:
         return "ok"
-    limite = 0 if ficha["efeito"] == "cura" else 1
+    limite = 0 if ficha["efeito"] in ("cura", "estabilizar") else 1
     return "ok" if dist <= limite else "fora"
 
 
 def _alvos_de_item(ator_nome: str, ficha: dict) -> dict:
     """Quem cada item alcança, para a tela não oferecer o alvo que o motor recusa."""
-    if ficha["efeito"] not in ("cura", "arremesso"):
+    if ficha["efeito"] not in ("cura", "arremesso", "estabilizar"):
         return {}
     cs = memory.campaign.get("combat_state") or {}
     chars = memory.campaign.get("characters", {})
@@ -17197,7 +17443,7 @@ def _alvos_de_item(ator_nome: str, ficha: dict) -> dict:
         if status in ("morto", "fugiu"):
             continue
         eu = memory.char_key(nm) == memory.char_key(ator_nome)
-        if ficha["efeito"] == "cura" and not memory.luta_com_o_grupo(ch):
+        if ficha["efeito"] in ("cura", "estabilizar") and not memory.luta_com_o_grupo(ch):
             continue
         if ficha["efeito"] == "arremesso" and eu:
             continue
@@ -17756,6 +18002,10 @@ def _rolar_ataque_magico(char: dict, alvo: dict, hab: dict) -> tuple[bool, bool,
             vantagem = True
             mods["notas"].append(f"no escuro, {alvo.get('name')} não vê {char.get('name')} — vantagem")
     d20, log = _roll_d20_with_adv(vantagem, desvantagem)
+    # Pergaminho: o ataque é o do pergaminho (+5 a +11 pelo círculo).
+    _do_item = _item_conjurando(s)
+    if _do_item and _do_item.get("ataque") is not None:
+        prof, mod = 0, int(_do_item["ataque"])
     total = d20 + prof + mod + mods["bonus"]
     ca = _ca_efetiva(alvo) + _cob_b
     if _cob_b:
@@ -17885,6 +18135,319 @@ def _combatant_weapons(ch: dict) -> list[dict]:
     return out
 
 
+def _cartao_de_habilidade(h: dict, ch: dict, r: dict) -> dict:
+    """O cartão de uma habilidade na tela tática (r: habilidade.resolver)."""
+    from rpg import resolucao as _resolucao_snap
+    return {
+        # `nome` é o da FICHA: é por ele que use_ability procura. O que a
+        # tela mostra é `nome_exibido`, o nome oficial em português.
+        "nome":         h.get("nome", ""),
+        "nome_exibido": r["nome"],
+        "custo_mana":   int(h.get("custo_mana", 0) or 0),
+        "dado":         r["dado"],
+        "descricao":    r["descricao"],
+        "resumo":       r["resumo"],
+        "efeito":       r["efeito"],
+        "rotulo":       r["rotulo"],
+        "tipo_dano":    r["tipo_dano"],
+        "salvaguarda":  r["salvaguarda"],
+        "area":         r["area"],
+        "alvos":        r["alvos"],
+        "alcance":      r["alcance"],
+        "concentracao": r["concentracao"],
+        "reacao":       r["acao"] == "reacao",
+        # "acao" | "bonus" | "livre" (Guiar Ataque, Ataque Imprudente).
+        "tipo_acao":    (_slot_da_habilidade(h.get("nome", ""), h, ch) or "livre"),
+        # O que acontece ao usar: motor | efeito | acao_de_classe |
+        # narrativa (o Mestre decide). O cartão mostra o texto.
+        "resolucao":    r["resolucao"],
+        "resolucao_texto": r["resolucao_texto"],
+        "modos":        r["modos"],
+        "alvo_modo":    r["alvo_modo"],
+        "exige_ataque": r["exige_ataque"],
+        # Modo de alvo: "self" | "pool" | "single". A UI usa para decidir
+        # se mostra o picker ou despacha direto (self/pool não pedem alvo).
+        "target_mode": _ability_target_mode(h.get("nome", ""), h),
+        # Vários alvos: por círculo (Imobilizar Pessoa, Mísseis Mágicos) e,
+        # sem zonas, pelo tamanho da área (Bola de Fogo: 4).
+        "alvos_por_modo": _resolucao_snap.alvos_por_modo(h, ch),
+        # Mísseis Mágicos, Raio Ardente: cada toque no alvo é um dardo.
+        "projeteis": bool(_resolucao_snap.projeteis(h)),
+        "max_alvos": (max_alvos_da_area(h) if r["area"] and not _zonas_ativas() else 1),
+        # Usos por descanso (Surto de Ação, Fúria…). None quando a
+        # habilidade é livre — a tela não desenha contador nesse caso.
+        "usos":     usos_restantes(ch, h.get("nome", "")),
+        "usos_max": usos_maximos(ch, h.get("nome", "")),
+    }
+
+
+def _magias_de_itens(ch: dict) -> list[dict]:
+    """
+    As magias que os itens do personagem conjuram (pergaminho, varinha,
+    cajado), como cartões de habilidade. O nome é "Magia [Item]": é por ele
+    que combat_action manda a conjuração para o item, que paga com cargas ou
+    se desfaz. Os círculos acima são as cargas a mais.
+    """
+    from rpg import compendio, habilidade as _habilidade
+    saida = []
+    s = ch.get("sheet") or {}
+    for it in ch.get("inventario") or []:
+        if not isinstance(it, dict) or int(it.get("qtd", 1) or 1) <= 0:
+            continue
+        uso = _uso_do_item(it.get("nome", ""))
+        if not uso or uso.get("tipo") not in ("cargas", "pergaminho"):
+            continue
+        magico = _magico_por_nome(it["nome"])
+        if magico and magico.get("sintonizacao") and not _esta_sintonizado(s, it["nome"]):
+            continue
+        restam = _cargas_do_item(it, uso) if uso["tipo"] == "cargas" else int(it.get("qtd", 1) or 1)
+        for entrada in uso.get("magias") or []:
+            m = compendio.magia(entrada["magia"])
+            if not m:
+                continue
+            h = {"nome": m["nome"], "descricao": m.get("resumo", ""), "custo_mana": 0, "dado": ""}
+            r = _habilidade.resolver(h, ch)
+            if r["passiva"] or r["resolucao"] == "narrativa":
+                continue                   # Detectar Magia: o Mestre narra (use_magic_item)
+            cartao_i = _cartao_de_habilidade(h, ch, r)
+            circulos = _circulos_do_item(m, entrada, uso, restam)
+            if not circulos:
+                continue
+            cartao_i.update({
+                "nome": f"{m['nome']} [{it['nome']}]",
+                "nome_exibido": f"{m['nome']} ({it['nome']})",
+                "custo_mana": 0, "tipo_acao": "acao", "de_item": it["nome"],
+                "usos": restam, "usos_max": (int(uso.get("cargas", 0) or 0) if uso["tipo"] == "cargas" else None),
+                "modos": ([{"id": f"c{c}", "texto": f"{c}º círculo: {k} carga{'s' if k > 1 else ''}", "alvo": ""}
+                           for c, k in circulos] if len(circulos) > 1 else []),
+                "alvos_por_modo": _alvos_por_circulo_do_item(h, [c for c, _k in circulos]),
+            })
+            saida.append(cartao_i)
+    return saida
+
+
+def _circulos_do_item(m: dict, entrada: dict, uso: dict, restam: int) -> list[tuple[int, int]]:
+    """(círculo, cargas) que o item consegue agora. Pergaminho: o círculo da magia."""
+    base = int(m.get("nivel", 0) or 0)
+    if uso.get("tipo") != "cargas":
+        return [(base, 0)]
+    custo = int(entrada.get("cargas", 1) or 1)
+    if not entrada.get("extra"):
+        return [(base, custo)] if custo <= restam else []
+    teto = min(9, int(entrada.get("max_circulo", 9) or 9))
+    return [(c, custo + c - base) for c in range(base, teto + 1) if custo + c - base <= restam]
+
+
+def _alvos_por_circulo_do_item(h: dict, circulos: list[int]) -> dict:
+    from rpg import resolucao as _r
+    m = _r._magia_srd(h) or {}
+    if not m or not (m.get("alvos_por_espaco") or _r.projeteis(h)):
+        return {}
+    if not _r.projeteis(h) and (_get_control_effect(h) or {}).get("pool", True):
+        return {}
+    saida = {f"c{c}": _r.alvos_no_circulo(h, c) for c in circulos}
+    return saida if any(v > 1 for v in saida.values()) else {}
+
+
+_MAGIA_DE_ITEM_RE = re.compile(r"^(.+?)\s*\[(.+)\]\s*$")
+
+
+def _magia_de_item_no_nome(nome: str) -> tuple[str, str] | None:
+    """"Bola de Fogo [Varinha de Bolas de Fogo]" → ("Bola de Fogo", "Varinha de Bolas de Fogo")."""
+    m = _MAGIA_DE_ITEM_RE.match(nome or "")
+    return (m.group(1).strip(), m.group(2).strip()) if m else None
+
+
+def _ler_pergaminho(char: dict, m: dict) -> tuple[str, str]:
+    """
+    (recusa, nota do teste) para ler um pergaminho de magia. No 5e, só lê
+    quem tem a magia na lista da classe (ou o ladino com Uso Mágico de
+    Itens); magia acima do círculo que se alcança pede um teste de
+    Arcanismo, CD 10 + círculo, e na falha o pergaminho se desfaz à toa.
+    """
+    from rpg import compendio
+    s = char.get("sheet") or {}
+    if _char_has_feature(char, "Uso Mágico de Itens"):
+        return "", ""
+    classe = _norm_txt(s.get("classe", ""))
+    na_lista = any(x.get("nome_srd") == m.get("nome_srd")
+                   for x in compendio.magias_da_classe(classe, 9))
+    if not na_lista or not _atributo_de_conjuracao(s):
+        return (f"Erro: {m['nome']} não está na lista de magias de {s.get('classe') or 'quem não conjura'}: "
+                f"{char.get('name')} não consegue ler o pergaminho. Nada foi gasto."), ""
+    nivel = int(m.get("nivel", 0) or 0)
+    if nivel <= _nivel_maximo_de_magia(s):
+        return "", ""
+    cd = 10 + nivel
+    attr = _atributo_de_conjuracao(s)
+    bonus = _modifier(int(s.get(attr, 10) or 10))
+    if _proficiente_na_pericia(s, "arcanismo") or _proficiente_na_pericia(s, "arcana"):
+        bonus += int(s.get("proficiencia", 2) or 2)
+    d20 = random.randint(1, 20)
+    total = d20 + bonus
+    linha = f"teste de Arcanismo para ler acima do círculo: {d20}{bonus:+d} = {total} vs CD {cd}"
+    if total < cd:
+        return f"FALHOU: {linha}", linha
+    return "", linha
+
+
+def _conjurar_do_item(actor: str, item_nome: str, magia_nome: str, target: str = "",
+                      modo: str = "", end_turn: bool = False) -> str:
+    """
+    Conjura uma magia de um item: varinha e cajado gastam cargas (as a mais
+    sobem o círculo), o pergaminho se desfaz. A CD e o ataque são os do item
+    quando ele tem; quem conjura é o personagem, pelo mesmo use_ability.
+    """
+    from rpg import compendio, resolucao as _resolucao_i
+    char, err = _get_char(actor)
+    if not char:
+        return err
+    s = char["sheet"]
+    item = _item_do_inventario(char, item_nome)
+    if not item or int(item.get("qtd", 1) or 1) <= 0:
+        return f"Erro: {char['name']} não tem '{item_nome}'."
+    uso = _uso_do_item(item["nome"])
+    if not uso or uso.get("tipo") not in ("cargas", "pergaminho"):
+        return f"Aviso: {item['nome']} não conjura magia."
+    magico = _magico_por_nome(item["nome"])
+    if magico and magico.get("sintonizacao") and not _esta_sintonizado(s, item["nome"]):
+        return f"Erro: {item['nome']} só funciona sintonizado (attune_item). Nada foi gasto."
+    m = compendio.magia(magia_nome)
+    entrada = next((e for e in uso.get("magias") or []
+                    if m and (compendio.magia(e["magia"]) or {}).get("nome_srd") == m.get("nome_srd")), None)
+    if not m or not entrada:
+        opcoes = ", ".join((compendio.magia(e["magia"]) or {}).get("nome", e["magia"])
+                           for e in uso.get("magias") or [])
+        return f"Erro: {item['nome']} não conjura '{magia_nome}'. Conjura: {opcoes}."
+    base = int(m.get("nivel", 0) or 0)
+    circulo = _resolucao_i.circulo_do_modo({}, modo) or base
+    nota_teste = ""
+    if uso["tipo"] == "cargas":
+        restam = _cargas_do_item(item, uso)
+        possiveis = dict(_circulos_do_item(m, entrada, uso, 10 ** 6))
+        if circulo not in possiveis:
+            return f"Aviso: {item['nome']} não conjura {m['nome']} no {circulo}º círculo. Nada foi gasto."
+        custo = possiveis[circulo]
+        if custo > restam:
+            return (f"Aviso: {item['nome']} tem {restam} carga{'s' if restam != 1 else ''}; "
+                    f"{m['nome']} no {circulo}º círculo pede {custo}. Nada foi gasto.")
+    else:
+        circulo, custo = base, 0
+        recusa, nota_teste = _ler_pergaminho(char, m)
+        if recusa.startswith("Erro:"):
+            return recusa
+        if recusa.startswith("FALHOU"):
+            _gastar_unidade(char, item)
+            memory.save_campaign()
+            return (f"{char['name']} tenta ler {item['nome']}: {nota_teste}. As palavras se "
+                    f"embaralham e o pergaminho se desfaz sem efeito.")
+
+    ja_tinha = any(isinstance(h, dict) and _norm_txt(h.get("nome", "")) == _norm_txt(m["nome"])
+                   for h in char.get("habilidades") or [])
+    temp = {"nome": m["nome"], "descricao": m.get("resumo", ""), "custo_mana": 0, "dado": "", "_do_item": True}
+    if not ja_tinha:
+        char.setdefault("habilidades", []).append(temp)
+    try:
+        with _conjurando_pelo_item(s, uso.get("cd"), uso.get("ataque")):
+            msg = use_ability(char["name"], m["nome"], target, end_turn=end_turn, _skip_turn_check=True,
+                              modo=(f"c{circulo}" if circulo > base else ""), _sem_custo=True)
+    finally:
+        if not ja_tinha:
+            char["habilidades"] = [h for h in char.get("habilidades") or [] if h is not temp]
+    if msg.lstrip().startswith(("Erro:", "Aviso:")):
+        return msg
+    if uso["tipo"] == "cargas":
+        item["cargas"] = _cargas_do_item(item, uso) - custo
+        nota = f"\n   {item['nome']}: {item['cargas']}/{uso.get('cargas')} cargas."
+        # A última carga: num 1 no d20, a varinha se desfaz (SRD).
+        if item["cargas"] <= 0 and random.randint(1, 20) == 1:
+            _gastar_unidade(char, item)
+            nota = f"\n   A última carga de {item['nome']} se foi, e o item se desfaz em pó."
+    else:
+        _gastar_unidade(char, item)
+        nota = f"\n   O pergaminho se desfaz." + (f" ({nota_teste})" if nota_teste else "")
+    memory.save_campaign()
+    return f"{char['name']} usa {item['nome']}.\n" + msg + nota
+
+
+def _gastar_unidade(char: dict, item: dict) -> None:
+    item["qtd"] = int(item.get("qtd", 1) or 1) - 1
+    if item["qtd"] <= 0:
+        inv = char.get("inventario") or []
+        if item in inv:
+            inv.remove(item)
+        _desequipar_o_que_saiu(char, item.get("nome", ""))
+
+
+def use_magic_item(char_name: str, item_name: str, spell: str = "", target: str = "",
+                   charges: int = 0) -> str:
+    """
+    Usa um item mágico que conjura: pergaminho de magia, varinha ou cajado
+    (Varinha de Mísseis Mágicos, Cajado da Cura...). Fora da luta é aqui; na
+    luta o jogador usa pela tela tática. O motor gasta as cargas (ou o
+    pergaminho), aplica a CD do item e cobra quem pode ler o pergaminho.
+
+    Args:
+        char_name: Quem usa o item.
+        item_name: O item, como está no inventário.
+        spell:     A magia (vazio = a primeira que o item conjura).
+        target:    Alvo(s), separados por vírgula.
+        charges:   Cargas a gastar quando cada carga a mais sobe o círculo
+                   (0 = o mínimo).
+    """
+    from rpg import compendio
+    char, err = _get_char(char_name)
+    if not char:
+        return err
+    item = _item_do_inventario(char, item_name)
+    uso = _uso_do_item(item["nome"]) if item else None
+    if not uso or uso.get("tipo") not in ("cargas", "pergaminho"):
+        return f"Erro: '{item_name}' não é item que conjure magia."
+    if not spell:
+        spell = uso["magias"][0]["magia"]
+    modo = ""
+    if charges:
+        m = compendio.magia(spell) or {}
+        entrada = next((e for e in uso["magias"]
+                        if (compendio.magia(e["magia"]) or {}).get("nome_srd") == m.get("nome_srd")), {})
+        if entrada.get("extra"):
+            modo = f"c{int(m.get('nivel', 1) or 1) + max(0, int(charges) - int(entrada.get('cargas', 1)))}"
+    return _conjurar_do_item(char["name"], item["nome"], spell, target, modo)
+
+
+# ── Munição e arremesso: o que se recolhe depois da luta ──────────────────
+# No 5e, depois da luta se recupera metade da munição gasta, e a arma
+# arremessada fica no chão até alguém pegar. O motor gastava a flecha e a
+# azagaia ia e voltava sozinha para a mão.
+
+def _anotar_gasto(char: dict, campo: str, nome: str) -> None:
+    if not (memory.campaign.get("combat_state") or {}).get("is_active"):
+        return
+    gasto = (char.get("sheet") or {}).setdefault(campo, {})
+    gasto[nome] = int(gasto.get(nome, 0) or 0) + 1
+
+
+def _recolher_municao_e_arremessos() -> str:
+    linhas = []
+    for ch in (memory.campaign.get("characters") or {}).values():
+        s = (ch or {}).get("sheet") if isinstance(ch, dict) else None
+        if not s:
+            continue
+        for campo, metade in (("_municao_gasta", True), ("_arremessadas", False)):
+            for nome, n in (s.pop(campo, None) or {}).items():
+                volta = int(n) // 2 if metade else int(n)
+                if volta <= 0:
+                    continue
+                item = _item_do_inventario(ch, nome)
+                if item:
+                    item["qtd"] = int(item.get("qtd", 0) or 0) + volta
+                else:
+                    ch.setdefault("inventario", []).append({"nome": nome, "qtd": volta, "descricao": ""})
+                linhas.append(f"{ch.get('name')} recolhe {volta}x {nome}"
+                              + (f" (de {n} atiradas)" if metade else ""))
+    return "".join(f"\n   {l}" for l in linhas)
+
+
 def _defesas_visiveis(ch: dict, sheet: dict, campo: str) -> list[str]:
     """
     Os tipos daquele campo que a tela pode mostrar: todos, nos personagens do
@@ -17936,51 +18499,12 @@ def _combatant_snapshot(name: str) -> dict | None:
     from rpg import habilidade as _habilidade, resolucao as _resolucao_snap
     for h in _habilidade.sem_duplicatas(ch.get("habilidades") or []):
         r = _habilidade.resolver(h, ch)
-        entry = {
-            # `nome` é o da FICHA: é por ele que use_ability procura. O que a
-            # tela mostra é `nome_exibido`, o nome oficial em português.
-            "nome":         h.get("nome", ""),
-            "nome_exibido": r["nome"],
-            "custo_mana":   int(h.get("custo_mana", 0) or 0),
-            "dado":         r["dado"],
-            "descricao":    r["descricao"],
-            "resumo":       r["resumo"],
-            "efeito":       r["efeito"],
-            "rotulo":       r["rotulo"],
-            "tipo_dano":    r["tipo_dano"],
-            "salvaguarda":  r["salvaguarda"],
-            "area":         r["area"],
-            "alvos":        r["alvos"],
-            "alcance":      r["alcance"],
-            "concentracao": r["concentracao"],
-            "reacao":       r["acao"] == "reacao",
-            # "acao" | "bonus" | "livre" (Guiar Ataque, Ataque Imprudente).
-            "tipo_acao":    (_slot_da_habilidade(h.get("nome", ""), h, ch) or "livre"),
-            # O que acontece ao usar: motor | efeito | acao_de_classe |
-            # narrativa (o Mestre decide). O cartão mostra o texto.
-            "resolucao":    r["resolucao"],
-            "resolucao_texto": r["resolucao_texto"],
-            "modos":        r["modos"],
-            "alvo_modo":    r["alvo_modo"],
-            "exige_ataque": r["exige_ataque"],
-            # Modo de alvo: "self" | "pool" | "single". A UI usa para decidir
-            # se mostra o picker ou despacha direto (self/pool não pedem alvo).
-            "target_mode": _ability_target_mode(h.get("nome", ""), h),
-            # Vários alvos: por círculo (Imobilizar Pessoa, Mísseis Mágicos) e,
-            # sem zonas, pelo tamanho da área (Bola de Fogo: 4).
-            "alvos_por_modo": _resolucao_snap.alvos_por_modo(h, ch),
-            # Mísseis Mágicos, Raio Ardente: cada toque no alvo é um dardo.
-            "projeteis": bool(_resolucao_snap.projeteis(h)),
-            "max_alvos": (max_alvos_da_area(h) if r["area"] and not _zonas_ativas() else 1),
-            # Usos por descanso (Surto de Ação, Fúria…). None quando a
-            # habilidade é livre — a tela não desenha contador nesse caso.
-            "usos":     usos_restantes(ch, h.get("nome", "")),
-            "usos_max": usos_maximos(ch, h.get("nome", "")),
-        }
+        entry = _cartao_de_habilidade(h, ch, r)
         if r["passiva"]:
             passivas.append(entry["nome_exibido"])
         else:
             habs.append(entry)
+    habs.extend(_magias_de_itens(ch))
     itens = []
     itens_combate = []   # subconjunto consumível (usável na tela tática)
     for it in (ch.get("inventario") or []):
@@ -17997,11 +18521,14 @@ def _combatant_snapshot(name: str) -> dict | None:
             # kind: o que a tela faz ao clicar. "heal" abre "Curar quem",
             # "arremesso" abre o alvo, "si" aplica direto, "desconhecido" fica
             # travado com o motivo.
-            kind = {"cura": "heal", "arremesso": "arremesso",
+            if ficha["efeito"] == "magia":
+                continue           # conjura pelo botão Habilidade (magias_de_itens)
+            kind = {"cura": "heal", "estabilizar": "heal", "arremesso": "arremesso", "pocao": "si",
                     "resistencia": "si", "antitoxina": "si"}.get(ficha["efeito"], "desconhecido")
             itens_combate.append({
                 **entry,
                 "kind": kind,
+                "efeito": ficha["efeito"],
                 "tipo_acao": ficha["slot"],
                 "dice": ficha.get("rotulo", ""),
                 "usavel": kind != "desconhecido",
@@ -18327,6 +18854,16 @@ def combat_action(action: str, actor: str = "", target: str = "",
                 msg += (f"\n   Ataque Extra: mais {n} {'ataque' if n == 1 else 'ataques'} "
                         f"nesta mesma ação.")
 
+        elif a == "ability" and _magia_de_item_no_nome(ability or ""):
+            _magia_i, _item_i = _magia_de_item_no_nome(ability)
+            err = _use_slot(eco, "acao")
+            if err:
+                return {"ok": False, "message": err, "snapshot": combat_snapshot()}
+            msg = _conjurar_do_item(actor, _item_i, _magia_i, target, modo=(weapon or "").strip())
+            if msg.lstrip().startswith(("Erro:", "Aviso:")):
+                eco["acao_usada"] = False
+                return {"ok": False, "message": msg, "snapshot": combat_snapshot()}
+
         elif a == "ability":
             if not ability:
                 return {"ok": False, "message": "Habilidade exige ability.",
@@ -18433,7 +18970,12 @@ def combat_action(action: str, actor: str = "", target: str = "",
             # Alvo validado ANTES de gastar a economia e a unidade: uma recusa
             # nunca custa o turno nem o item.
             chars = memory.campaign["characters"]
-            if ficha["efeito"] in ("resistencia", "antitoxina"):
+            if ficha["efeito"] == "magia":
+                return {"ok": False,
+                        "message": (f"Aviso: {slot_inv['nome']} conjura pelo botão Habilidade. "
+                                    f"O item não foi gasto."),
+                        "snapshot": combat_snapshot()}
+            if ficha["efeito"] in ("resistencia", "antitoxina", "pocao"):
                 recv = ch
             else:
                 recv_name = (target or ("" if ficha["efeito"] == "arremesso" else actor)).strip()
@@ -18451,6 +18993,13 @@ def combat_action(action: str, actor: str = "", target: str = "",
                 if ficha["efeito"] == "arremesso" and recv is ch:
                     return {"ok": False,
                             "message": f"Aviso: escolha outro alvo para {slot_inv['nome']}.",
+                            "snapshot": combat_snapshot()}
+                if ficha["efeito"] == "estabilizar" and (
+                        int((recv.get("sheet") or {}).get("vida_atual", 0) or 0) > 0
+                        or (recv.get("status") or "").lower() == "estabilizado"):
+                    return {"ok": False,
+                            "message": (f"Aviso: {recv['name']} não está caído morrendo; "
+                                        f"o kit não foi gasto."),
                             "snapshot": combat_snapshot()}
                 alcance = _alcance_de_item(actor, recv, ficha)
                 if alcance == "fora":
@@ -18511,6 +19060,14 @@ def combat_action(action: str, actor: str = "", target: str = "",
                 msg = f"{actor} bebeu {slot_inv['nome']} [{tag_eco}]: resistência a dano de {pt} até o fim do combate."
                 _log_combat_event("item_buff", actor, actor, msg=msg, item=slot_inv["nome"], slot=slot)
 
+            elif ficha["efeito"] == "estabilizar":
+                msg = _estabilizar_com_kit(ch, recv, slot_inv, ficha) + f" [{tag_eco}]"
+                _log_combat_event("item_buff", actor, recv["name"], msg=msg, item=slot_inv["nome"], slot=slot)
+
+            elif ficha["efeito"] == "pocao":
+                msg = _beber_pocao(recv, slot_inv["nome"], ficha["uso"]) + f" [{tag_eco}]"
+                _log_combat_event("item_buff", actor, actor, msg=msg, item=slot_inv["nome"], slot=slot)
+
             elif ficha["efeito"] == "antitoxina":
                 _dar_efeito(st, {"nome": "Antitoxina", "antitoxina": True,
                                  "descricao": "vantagem em salvaguardas contra Envenenado",
@@ -18535,9 +19092,11 @@ def combat_action(action: str, actor: str = "", target: str = "",
                     res = _apply_damage(recv, bruto, ficha["tipo_dano"],
                                         source_name=actor, arma_magica=True)
                     pt = _TIPO_DANO_ITEM_PT.get(ficha["tipo_dano"], ficha["tipo_dano"])
+                    _dado_txt = (f"{n_d}d{sides} [{' + '.join(str(r) for r in rolls)}]"
+                                 + (f" +{bonus}" if bonus else "")) if n_d else f"{bonus}"
                     linha = (f"{actor} arremessou {slot_inv['nome']} em {recv['name']} "
-                             f"[{tag_eco}]: {texto_save} — falhou: {n_d}d{sides} "
-                             f"[{' + '.join(str(r) for r in rolls)}] = {res['dano']} de {pt} "
+                             f"[{tag_eco}]: {texto_save} — falhou: {_dado_txt} "
+                             f"= {res['dano']} de {pt} "
                              f"• HP {res['hp_antes']}→{res['hp_depois']}/{int(st.get('vida_max', 0) or 0)}")
                     if res["notas"]:
                         linha += " (" + "; ".join(res["notas"]) + ")"
@@ -18554,10 +19113,11 @@ def combat_action(action: str, actor: str = "", target: str = "",
                                       hp=res["hp_depois"])
                     msg = linha + "."
 
-            slot_inv["qtd"] = int(slot_inv.get("qtd", 1) or 1) - 1
-            if slot_inv["qtd"] <= 0:
-                try: inv.remove(slot_inv)
-                except ValueError: pass
+            if ficha["efeito"] != "estabilizar":
+                slot_inv["qtd"] = int(slot_inv.get("qtd", 1) or 1) - 1
+                if slot_inv["qtd"] <= 0:
+                    try: inv.remove(slot_inv)
+                    except ValueError: pass
             memory.save_campaign()
 
         elif a == "move":
@@ -18969,6 +19529,7 @@ DND_TOOLS = [
     identify_item,
     attune_item,
     end_attunement,
+    use_magic_item,
     choose_feat,
     apply_asi,
     set_feature_choice,

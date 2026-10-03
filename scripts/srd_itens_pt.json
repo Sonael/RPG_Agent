@@ -2026,40 +2026,124 @@
   },
   "Potion of Animal Friendship": {
    "nome": "Poção de Amizade Animal",
-   "aliases": []
+   "aliases": [],
+   "uso": {
+    "tipo": "pocao",
+    "duracao": "1h",
+    "efeito": {},
+    "nota": "Amizade Animal à vontade por uma hora (o Mestre narra)."
+   }
   },
   "Potion of Clairvoyance": {
    "nome": "Poção de Clarividência",
-   "aliases": []
+   "aliases": [],
+   "uso": {
+    "tipo": "pocao",
+    "duracao": "1h",
+    "efeito": {},
+    "nota": "Clarividência (o Mestre narra o que se vê)."
+   }
   },
   "Potion of Climbing": {
    "nome": "Poção de Escalada",
-   "aliases": []
+   "aliases": [],
+   "uso": {
+    "tipo": "pocao",
+    "duracao": "1h",
+    "efeito": {
+     "vantagem_pericias": [
+      "atletismo"
+     ]
+    },
+    "nota": "Escalada por uma hora: vantagem em Atletismo para escalar."
+   }
   },
   "Potion of Cloud Giant Strength": {
    "nome": "Poção de Força do Gigante das Nuvens",
-   "aliases": []
+   "aliases": [],
+   "uso": {
+    "tipo": "pocao",
+    "duracao": "1h",
+    "atributo": {
+     "forca": 27
+    },
+    "nota": "Força 27 por uma hora."
+   }
   },
   "Potion of Diminution": {
    "nome": "Poção de Diminuição",
-   "aliases": []
+   "aliases": [],
+   "uso": {
+    "tipo": "pocao",
+    "duracao": "1h",
+    "efeito": {
+     "dano_dado": "-1d4",
+     "so_arma": true,
+     "vantagem_pericias": [
+      "furtividade"
+     ]
+    },
+    "nota": "Reduzir: -1d4 de dano com arma; pequeno, mais fácil de se esconder."
+   }
   },
   "Potion of Fire Giant Strength": {
    "nome": "Poção de Força do Gigante do Fogo",
    "aliases": [],
-   "tipo": "Potion"
+   "tipo": "Potion",
+   "uso": {
+    "tipo": "pocao",
+    "duracao": "1h",
+    "atributo": {
+     "forca": 25
+    },
+    "nota": "Força 25 por uma hora."
+   }
   },
   "Potion of Flying": {
    "nome": "Poção de Voo",
-   "aliases": []
+   "aliases": [],
+   "uso": {
+    "tipo": "pocao",
+    "duracao": "1h",
+    "efeito": {
+     "movimento_por_turno": 1
+    },
+    "nota": "Voo por uma hora: mais uma zona de movimento a cada turno."
+   }
   },
   "Potion of Frost Giant Strength": {
    "nome": "Poção de Força do Gigante do Gelo",
-   "aliases": []
+   "aliases": [],
+   "uso": {
+    "tipo": "pocao",
+    "duracao": "1h",
+    "atributo": {
+     "forca": 23
+    },
+    "nota": "Força 23 por uma hora."
+   }
   },
   "Potion of Gaseous Form": {
    "nome": "Poção de Forma Gasosa",
-   "aliases": []
+   "aliases": [],
+   "uso": {
+    "tipo": "pocao",
+    "duracao": "1h",
+    "efeito": {
+     "resistencias": [
+      "acid",
+      "bludgeoning",
+      "cold",
+      "fire",
+      "lightning",
+      "piercing",
+      "poison",
+      "slashing",
+      "thunder"
+     ]
+    },
+    "nota": "Forma gasosa: resistência a dano não mágico de quase tudo; não ataca nem conjura."
+   }
   },
   "Potion of Greater Healing": {
    "nome": "Poção de Cura Maior",
@@ -2069,7 +2153,22 @@
   },
   "Potion of Growth": {
    "nome": "Poção de Crescimento",
-   "aliases": []
+   "aliases": [],
+   "uso": {
+    "tipo": "pocao",
+    "duracao": "1h",
+    "efeito": {
+     "dano_dado": "1d4",
+     "so_arma": true,
+     "vantagem_teste_atributos": [
+      "forca"
+     ],
+     "vantagem_save_atributos": [
+      "forca"
+     ]
+    },
+    "nota": "Aumentar: +1d4 de dano com arma e vantagem em FOR."
+   }
   },
   "Potion of Healing": {
    "nome": "Poção de Cura",
@@ -2081,25 +2180,70 @@
   },
   "Potion of Heroism": {
    "nome": "Poção de Heroísmo",
-   "aliases": []
+   "aliases": [],
+   "uso": {
+    "tipo": "pocao",
+    "duracao": "1h",
+    "pv_temp": 10,
+    "tira": [
+     "amedrontado"
+    ],
+    "efeito": {
+     "atk_dado": "1d4",
+     "save_dado": "1d4"
+    },
+    "nota": "10 PV temporários e Bênção (+1d4 nos ataques e nas salvaguardas) por uma hora."
+   }
   },
   "Potion of Hill Giant Strength": {
    "nome": "Poção de Força do Gigante da Colina",
    "aliases": [
     "poção de força do gigante"
-   ]
+   ],
+   "uso": {
+    "tipo": "pocao",
+    "duracao": "1h",
+    "atributo": {
+     "forca": 21
+    },
+    "nota": "Força 21 por uma hora."
+   }
   },
   "Potion of Invisibility": {
    "nome": "Poção de Invisibilidade",
-   "aliases": []
+   "aliases": [],
+   "uso": {
+    "tipo": "pocao",
+    "duracao": "1h",
+    "condicao": "Invisível",
+    "nota": "Invisível por uma hora, até atacar ou conjurar."
+   }
   },
   "Potion of Mind Reading": {
    "nome": "Poção de Leitura da Mente",
-   "aliases": []
+   "aliases": [],
+   "uso": {
+    "tipo": "pocao",
+    "duracao": "1h",
+    "efeito": {},
+    "nota": "Detectar Pensamentos por uma hora (o Mestre narra)."
+   }
   },
   "Potion of Poison": {
    "nome": "Poção de Veneno",
-   "aliases": []
+   "aliases": [],
+   "uso": {
+    "tipo": "pocao",
+    "duracao": "1h",
+    "dano": {
+     "dado": "3d6",
+     "tipo": "poison",
+     "salvaguarda": "constituicao",
+     "cd": 13,
+     "condicao": "Envenenado"
+    },
+    "nota": "Parece uma poção de cura: 3d6 de veneno e Envenenado (CON CD 13 evita a condição)."
+   }
   },
   "Potion of Resistance": {
    "nome": "Poção de Resistência",
@@ -2107,15 +2251,43 @@
   },
   "Potion of Speed": {
    "nome": "Poção de Velocidade",
-   "aliases": []
+   "aliases": [],
+   "uso": {
+    "tipo": "pocao",
+    "duracao": "1min",
+    "efeito": {
+     "ca": 2,
+     "vantagem_save_atributos": [
+      "destreza"
+     ],
+     "movimento_por_turno": 1
+    },
+    "nota": "Pressa: +2 na CA, vantagem nas salvaguardas de DES e o dobro do deslocamento até o fim da luta (a ação extra o Mestre arbitra)."
+   }
   },
   "Potion of Stone Giant Strength": {
    "nome": "Poção de Força do Gigante de Pedra",
-   "aliases": []
+   "aliases": [],
+   "uso": {
+    "tipo": "pocao",
+    "duracao": "1h",
+    "atributo": {
+     "forca": 23
+    },
+    "nota": "Força 23 por uma hora."
+   }
   },
   "Potion of Storm Giant Strength": {
    "nome": "Poção de Força do Gigante da Tempestade",
-   "aliases": []
+   "aliases": [],
+   "uso": {
+    "tipo": "pocao",
+    "duracao": "1h",
+    "atributo": {
+     "forca": 29
+    },
+    "nota": "Força 29 por uma hora."
+   }
   },
   "Potion of Superior Healing": {
    "nome": "Poção de Cura Superior",
@@ -2127,7 +2299,13 @@
   },
   "Potion of Water Breathing": {
    "nome": "Poção de Respiração Aquática",
-   "aliases": []
+   "aliases": [],
+   "uso": {
+    "tipo": "pocao",
+    "duracao": "1h",
+    "efeito": {},
+    "nota": "Respira debaixo d'água por uma hora."
+   }
   },
   "Restorative Ointment": {
    "nome": "Unguento Restaurador",
@@ -2332,19 +2510,105 @@
   },
   "Staff of Charming": {
    "nome": "Cajado do Encanto",
-   "aliases": []
+   "aliases": [],
+   "uso": {
+    "tipo": "cargas",
+    "cargas": 10,
+    "recarga": "1d8+2",
+    "magias": [
+     {
+      "magia": "Charm Person",
+      "cargas": 1
+     },
+     {
+      "magia": "Command",
+      "cargas": 1
+     },
+     {
+      "magia": "Comprehend Languages",
+      "cargas": 1
+     }
+    ],
+    "nota": "10 cargas: Enfeitiçar Pessoa, Comando ou Compreender Idiomas (1 cada). Recupera 1d8+2 ao amanhecer."
+   }
   },
   "Staff of Fire": {
    "nome": "Cajado do Fogo",
-   "aliases": []
+   "aliases": [],
+   "uso": {
+    "tipo": "cargas",
+    "cargas": 10,
+    "recarga": "1d6+4",
+    "magias": [
+     {
+      "magia": "Burning Hands",
+      "cargas": 1
+     },
+     {
+      "magia": "Fireball",
+      "cargas": 3
+     },
+     {
+      "magia": "Wall of Fire",
+      "cargas": 4
+     }
+    ],
+    "nota": "10 cargas: Mãos Flamejantes (1), Bola de Fogo (3), Muralha de Fogo (4). Recupera 1d6+4 ao amanhecer."
+   }
   },
   "Staff of Frost": {
    "nome": "Cajado do Gelo",
-   "aliases": []
+   "aliases": [],
+   "uso": {
+    "tipo": "cargas",
+    "cargas": 10,
+    "recarga": "1d6+4",
+    "magias": [
+     {
+      "magia": "Cone of Cold",
+      "cargas": 5
+     },
+     {
+      "magia": "Fog Cloud",
+      "cargas": 1
+     },
+     {
+      "magia": "Ice Storm",
+      "cargas": 4
+     },
+     {
+      "magia": "Wall of Ice",
+      "cargas": 4
+     }
+    ],
+    "nota": "10 cargas: Cone de Frio (5), Nuvem de Névoa (1), Tempestade de Gelo (4), Muralha de Gelo (4). Recupera 1d6+4 ao amanhecer."
+   }
   },
   "Staff of Healing": {
    "nome": "Cajado da Cura",
-   "aliases": []
+   "aliases": [],
+   "uso": {
+    "tipo": "cargas",
+    "cargas": 10,
+    "recarga": "1d6+4",
+    "magias": [
+     {
+      "magia": "Cure Wounds",
+      "cargas": 1,
+      "extra": true,
+      "max_circulo": 4
+     },
+     {
+      "magia": "Lesser Restoration",
+      "cargas": 2
+     },
+     {
+      "magia": "Mass Cure Wounds",
+      "cargas": 5
+     }
+    ],
+    "nota": "10 cargas: Curar Ferimentos (1 por círculo, até o 4º), Restauração Menor (2), Curar Ferimentos em Massa (5). Recupera 1d6+4 ao amanhecer."
+   }
   },
   "Staff of Power": {
    "nome": "Cajado do Poder",
@@ -2360,7 +2624,23 @@
   },
   "Staff of Swarming Insects": {
    "nome": "Cajado dos Insetos",
-   "aliases": []
+   "aliases": [],
+   "uso": {
+    "tipo": "cargas",
+    "cargas": 10,
+    "recarga": "1d6+4",
+    "magias": [
+     {
+      "magia": "Giant Insect",
+      "cargas": 4
+     },
+     {
+      "magia": "Insect Plague",
+      "cargas": 5
+     }
+    ],
+    "nota": "10 cargas: Inseto Gigante (4), Praga de Insetos (5). Recupera 1d6+4 ao amanhecer."
+   }
   },
   "Staff of the Magi": {
    "nome": "Cajado do Mago",
@@ -2378,7 +2658,43 @@
    "nome": "Cajado da Floresta",
    "aliases": [],
    "base_arma": "quarterstaff",
-   "bonus": 2
+   "bonus": 2,
+   "uso": {
+    "tipo": "cargas",
+    "cargas": 10,
+    "recarga": "1d6+4",
+    "magias": [
+     {
+      "magia": "Animal Friendship",
+      "cargas": 1
+     },
+     {
+      "magia": "Awaken",
+      "cargas": 5
+     },
+     {
+      "magia": "Barkskin",
+      "cargas": 2
+     },
+     {
+      "magia": "Locate Animals or Plants",
+      "cargas": 2
+     },
+     {
+      "magia": "Speak with Animals",
+      "cargas": 1
+     },
+     {
+      "magia": "Speak with Plants",
+      "cargas": 3
+     },
+     {
+      "magia": "Wall of Thorns",
+      "cargas": 6
+     }
+    ],
+    "nota": "10 cargas: Amizade Animal (1), Despertar (5), Pele de Árvore (2), Localizar Animais ou Plantas (2), Falar com Animais (1), Falar com Plantas (3), Muralha de Espinhos (6). Recupera 1d6+4 ao amanhecer."
+   }
   },
   "Staff of Thunder and Lightning": {
    "nome": "Cajado do Trovão e Relâmpago",
@@ -2487,7 +2803,24 @@
    "nome": "Varinha da Prisão",
    "aliases": [
     "varinha de amarração"
-   ]
+   ],
+   "uso": {
+    "tipo": "cargas",
+    "cargas": 7,
+    "recarga": "1d6+1",
+    "cd": 17,
+    "magias": [
+     {
+      "magia": "Hold Monster",
+      "cargas": 5
+     },
+     {
+      "magia": "Hold Person",
+      "cargas": 2
+     }
+    ],
+    "nota": "7 cargas: Imobilizar Monstro (5) ou Imobilizar Pessoa (2), CD 17. Recupera 1d6+1 ao amanhecer."
+   }
   },
   "Wand of Enemy Detection": {
    "nome": "Varinha de Detecção de Inimigos",
@@ -2495,23 +2828,93 @@
   },
   "Wand of Fear": {
    "nome": "Varinha do Medo",
-   "aliases": []
+   "aliases": [],
+   "uso": {
+    "tipo": "cargas",
+    "cargas": 7,
+    "recarga": "1d6+1",
+    "cd": 15,
+    "magias": [
+     {
+      "magia": "Command",
+      "cargas": 1
+     },
+     {
+      "magia": "Fear",
+      "cargas": 2
+     }
+    ],
+    "nota": "7 cargas: Comando (1) ou um cone de medo (2), CD 15. Recupera 1d6+1 ao amanhecer."
+   }
   },
   "Wand of Fireballs": {
    "nome": "Varinha de Bolas de Fogo",
-   "aliases": []
+   "aliases": [],
+   "uso": {
+    "tipo": "cargas",
+    "cargas": 7,
+    "recarga": "1d6+1",
+    "cd": 15,
+    "magias": [
+     {
+      "magia": "Fireball",
+      "cargas": 1,
+      "extra": true
+     }
+    ],
+    "nota": "7 cargas: Bola de Fogo (1 carga, CD 15; cada carga a mais, um círculo acima). Recupera 1d6+1 ao amanhecer."
+   }
   },
   "Wand of Lightning Bolts": {
    "nome": "Varinha de Relâmpagos",
-   "aliases": []
+   "aliases": [],
+   "uso": {
+    "tipo": "cargas",
+    "cargas": 7,
+    "recarga": "1d6+1",
+    "cd": 15,
+    "magias": [
+     {
+      "magia": "Lightning Bolt",
+      "cargas": 1,
+      "extra": true
+     }
+    ],
+    "nota": "7 cargas: Relâmpago (1 carga, CD 15; cada carga a mais, um círculo acima). Recupera 1d6+1 ao amanhecer."
+   }
   },
   "Wand of Magic Detection": {
    "nome": "Varinha de Detecção de Magia",
-   "aliases": []
+   "aliases": [],
+   "uso": {
+    "tipo": "cargas",
+    "cargas": 3,
+    "recarga": "1d3",
+    "magias": [
+     {
+      "magia": "Detect Magic",
+      "cargas": 1
+     }
+    ],
+    "nota": "3 cargas: Detectar Magia (1). Recupera 1d3 ao amanhecer."
+   }
   },
   "Wand of Magic Missiles": {
    "nome": "Varinha de Mísseis Mágicos",
-   "aliases": []
+   "aliases": [],
+   "uso": {
+    "tipo": "cargas",
+    "cargas": 7,
+    "recarga": "1d6+1",
+    "magias": [
+     {
+      "magia": "Magic Missile",
+      "cargas": 1,
+      "extra": true
+     }
+    ],
+    "nota": "7 cargas: Mísseis Mágicos (1 carga; cada carga a mais, um círculo acima). Recupera 1d6+1 ao amanhecer."
+   }
   },
   "Wand of Paralysis": {
    "nome": "Varinha de Paralisia",
@@ -2533,7 +2936,20 @@
   },
   "Wand of Web": {
    "nome": "Varinha de Teia",
-   "aliases": []
+   "aliases": [],
+   "uso": {
+    "tipo": "cargas",
+    "cargas": 7,
+    "recarga": "1d6+1",
+    "cd": 15,
+    "magias": [
+     {
+      "magia": "Web",
+      "cargas": 1
+     }
+    ],
+    "nota": "7 cargas: Teia (1 carga, CD 15). Recupera 1d6+1 ao amanhecer."
+   }
   },
   "Wand of Wonder": {
    "nome": "Varinha das Maravilhas",

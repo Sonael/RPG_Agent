@@ -1243,7 +1243,9 @@
           ? `<button class="cbt-btn" onclick="window.Combat._target('${jsNome(cur.name)}')">${esc(cur.name)} (em si)</button>`
           : '<div class="cbt-empty">Ninguém ao alcance.</div>');
     abrirSeletor(
-      `<div class="cbt-tgt-title">${kind === 'heal' ? 'Curar quem:' : `Alvo de ${esc(name)}:`}</div>`
+      `<div class="cbt-tgt-title">${kind === 'heal'
+          ? (it.efeito === 'estabilizar' ? 'Estabilizar quem:' : 'Curar quem:')
+          : `Alvo de ${esc(name)}:`}</div>`
       + `<div class="cbt-tgt-dica">Toque no combatente ou escolha abaixo.</div>`
       + `<div class="cbt-picker-btns">${lista}`
       + BOTAO_CANCELAR

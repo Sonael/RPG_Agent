@@ -5135,7 +5135,13 @@
    "raridade": "incomum",
    "sintonizacao": false,
    "peso_kg": 0.0,
-   "texto_srd": "When you drink this potion, you can cast the _animal friendship_ spell (save DC 13) for 1 hour at will. Agitating this muddy liquid brings little bits into view: a fish scale, a hummingbird tongue, a cat claw, or a squirrel hair."
+   "texto_srd": "When you drink this potion, you can cast the _animal friendship_ spell (save DC 13) for 1 hour at will. Agitating this muddy liquid brings little bits into view: a fish scale, a hummingbird tongue, a cat claw, or a squirrel hair.",
+   "uso": {
+    "tipo": "pocao",
+    "duracao": "1h",
+    "efeito": {},
+    "nota": "Amizade Animal à vontade por uma hora (o Mestre narra)."
+   }
   },
   "potion-of-clairvoyance": {
    "chave": "potion-of-clairvoyance",
@@ -5146,7 +5152,13 @@
    "raridade": "raro",
    "sintonizacao": false,
    "peso_kg": 0.0,
-   "texto_srd": "When you drink this potion, you gain the effect of the _clairvoyance_ spell. An eyeball bobs in this yellowish liquid but vanishes when the potion is opened."
+   "texto_srd": "When you drink this potion, you gain the effect of the _clairvoyance_ spell. An eyeball bobs in this yellowish liquid but vanishes when the potion is opened.",
+   "uso": {
+    "tipo": "pocao",
+    "duracao": "1h",
+    "efeito": {},
+    "nota": "Clarividência (o Mestre narra o que se vê)."
+   }
   },
   "potion-of-climbing": {
    "chave": "potion-of-climbing",
@@ -5157,7 +5169,17 @@
    "raridade": "comum",
    "sintonizacao": false,
    "peso_kg": 0.0,
-   "texto_srd": "When you drink this potion, you gain a climbing speed equal to your walking speed for 1 hour. During this time, you have advantage on Strength (Athletics) checks you make to climb. The potion is separated into brown, silver, and gray layers resembling bands of stone. Shaking the bottle fails to mix the colors."
+   "texto_srd": "When you drink this potion, you gain a climbing speed equal to your walking speed for 1 hour. During this time, you have advantage on Strength (Athletics) checks you make to climb. The potion is separated into brown, silver, and gray layers resembling bands of stone. Shaking the bottle fails to mix the colors.",
+   "uso": {
+    "tipo": "pocao",
+    "duracao": "1h",
+    "efeito": {
+     "vantagem_pericias": [
+      "atletismo"
+     ]
+    },
+    "nota": "Escalada por uma hora: vantagem em Atletismo para escalar."
+   }
   },
   "potion-of-cloud-giant-strength": {
    "chave": "potion-of-cloud-giant-strength",
@@ -5168,7 +5190,15 @@
    "raridade": "muito raro",
    "sintonizacao": false,
    "peso_kg": 0.0,
-   "texto_srd": "When you drink this potion, your Strength score changes for 1 hour. The type of giant determines the score (see the table below). The potion has no effect on you if your Strength is equal to or greater than that score.\\n\\nThis potion's transparent liquid has floating in it a sliver of fingernail from a giant of the appropriate type. The _potion of frost giant strength_ and the _potion of stone giant strength_ have the same effect.\\n\\n| Type of Giant | Strength | Rarity |\\n|-------------------|----------|-----------|\\n| Hill giant | 21 | Uncommon |\\n| Frost/stone giant | 23 | Rare |\\n| Fire giant | 25 | Rare |\\n| Cloud giant | 27 | Very rare |\\n| Storm giant | 29 | Legendary |"
+   "texto_srd": "When you drink this potion, your Strength score changes for 1 hour. The type of giant determines the score (see the table below). The potion has no effect on you if your Strength is equal to or greater than that score.\\n\\nThis potion's transparent liquid has floating in it a sliver of fingernail from a giant of the appropriate type. The _potion of frost giant strength_ and the _potion of stone giant strength_ have the same effect.\\n\\n| Type of Giant | Strength | Rarity |\\n|-------------------|----------|-----------|\\n| Hill giant | 21 | Uncommon |\\n| Frost/stone giant | 23 | Rare |\\n| Fire giant | 25 | Rare |\\n| Cloud giant | 27 | Very rare |\\n| Storm giant | 29 | Legendary |",
+   "uso": {
+    "tipo": "pocao",
+    "duracao": "1h",
+    "atributo": {
+     "forca": 27
+    },
+    "nota": "Força 27 por uma hora."
+   }
   },
   "potion-of-diminution": {
    "chave": "potion-of-diminution",
@@ -5179,7 +5209,19 @@
    "raridade": "raro",
    "sintonizacao": false,
    "peso_kg": 0.0,
-   "texto_srd": "When you drink this potion, you gain the \"reduce\" effect of the _enlarge/reduce_ spell for 1d4 hours (no concentration required). The red in the potion's liquid continuously contracts to a tiny bead and then expands to color the clear liquid around it. Shaking the bottle fails to interrupt this process."
+   "texto_srd": "When you drink this potion, you gain the \"reduce\" effect of the _enlarge/reduce_ spell for 1d4 hours (no concentration required). The red in the potion's liquid continuously contracts to a tiny bead and then expands to color the clear liquid around it. Shaking the bottle fails to interrupt this process.",
+   "uso": {
+    "tipo": "pocao",
+    "duracao": "1h",
+    "efeito": {
+     "dano_dado": "-1d4",
+     "so_arma": true,
+     "vantagem_pericias": [
+      "furtividade"
+     ]
+    },
+    "nota": "Reduzir: -1d4 de dano com arma; pequeno, mais fácil de se esconder."
+   }
   },
   "potion-of-fire-giant-strength": {
    "chave": "potion-of-fire-giant-strength",
@@ -5190,7 +5232,15 @@
    "raridade": "raro",
    "sintonizacao": false,
    "peso_kg": 0.0,
-   "texto_srd": "When you drink this potion, your Strength score changes for 1 hour. The type of giant determines the score (see the table below). The potion has no effect on you if your Strength is equal to or greater than that score.\\n\\nThis potion's transparent liquid has floating in it a sliver of fingernail from a giant of the appropriate type. The _potion of frost giant strength_ and the _potion of stone giant strength_ have the same effect.\\n\\n| Type of Giant | Strength | Rarity |\\n|-------------------|----------|-----------|\\n| Hill giant | 21 | Uncommon |\\n| Frost/stone giant | 23 | Rare |\\n| Fire giant | 25 | Rare |\\n| Cloud giant | 27 | Very rare |\\n| Storm giant | 29 | Legendary |"
+   "texto_srd": "When you drink this potion, your Strength score changes for 1 hour. The type of giant determines the score (see the table below). The potion has no effect on you if your Strength is equal to or greater than that score.\\n\\nThis potion's transparent liquid has floating in it a sliver of fingernail from a giant of the appropriate type. The _potion of frost giant strength_ and the _potion of stone giant strength_ have the same effect.\\n\\n| Type of Giant | Strength | Rarity |\\n|-------------------|----------|-----------|\\n| Hill giant | 21 | Uncommon |\\n| Frost/stone giant | 23 | Rare |\\n| Fire giant | 25 | Rare |\\n| Cloud giant | 27 | Very rare |\\n| Storm giant | 29 | Legendary |",
+   "uso": {
+    "tipo": "pocao",
+    "duracao": "1h",
+    "atributo": {
+     "forca": 25
+    },
+    "nota": "Força 25 por uma hora."
+   }
   },
   "potion-of-flying": {
    "chave": "potion-of-flying",
@@ -5201,7 +5251,15 @@
    "raridade": "muito raro",
    "sintonizacao": false,
    "peso_kg": 0.0,
-   "texto_srd": "When you drink this potion, you gain a flying speed equal to your walking speed for 1 hour and can hover. If you're in the air when the potion wears off, you fall unless you have some other means of staying aloft. This potion's clear liquid floats at the top of its container and has cloudy white impurities drifting in it."
+   "texto_srd": "When you drink this potion, you gain a flying speed equal to your walking speed for 1 hour and can hover. If you're in the air when the potion wears off, you fall unless you have some other means of staying aloft. This potion's clear liquid floats at the top of its container and has cloudy white impurities drifting in it.",
+   "uso": {
+    "tipo": "pocao",
+    "duracao": "1h",
+    "efeito": {
+     "movimento_por_turno": 1
+    },
+    "nota": "Voo por uma hora: mais uma zona de movimento a cada turno."
+   }
   },
   "potion-of-frost-giant-strength": {
    "chave": "potion-of-frost-giant-strength",
@@ -5212,7 +5270,15 @@
    "raridade": "raro",
    "sintonizacao": false,
    "peso_kg": 0.0,
-   "texto_srd": "When you drink this potion, your Strength score changes for 1 hour. The type of giant determines the score (see the table below). The potion has no effect on you if your Strength is equal to or greater than that score.\\n\\nThis potion's transparent liquid has floating in it a sliver of fingernail from a giant of the appropriate type. The _potion of frost giant strength_ and the _potion of stone giant strength_ have the same effect.\\n\\n| Type of Giant | Strength | Rarity |\\n|-------------------|----------|-----------|\\n| Hill giant | 21 | Uncommon |\\n| Frost/stone giant | 23 | Rare |\\n| Fire giant | 25 | Rare |\\n| Cloud giant | 27 | Very rare |\\n| Storm giant | 29 | Legendary |"
+   "texto_srd": "When you drink this potion, your Strength score changes for 1 hour. The type of giant determines the score (see the table below). The potion has no effect on you if your Strength is equal to or greater than that score.\\n\\nThis potion's transparent liquid has floating in it a sliver of fingernail from a giant of the appropriate type. The _potion of frost giant strength_ and the _potion of stone giant strength_ have the same effect.\\n\\n| Type of Giant | Strength | Rarity |\\n|-------------------|----------|-----------|\\n| Hill giant | 21 | Uncommon |\\n| Frost/stone giant | 23 | Rare |\\n| Fire giant | 25 | Rare |\\n| Cloud giant | 27 | Very rare |\\n| Storm giant | 29 | Legendary |",
+   "uso": {
+    "tipo": "pocao",
+    "duracao": "1h",
+    "atributo": {
+     "forca": 23
+    },
+    "nota": "Força 23 por uma hora."
+   }
   },
   "potion-of-gaseous-form": {
    "chave": "potion-of-gaseous-form",
@@ -5223,7 +5289,25 @@
    "raridade": "raro",
    "sintonizacao": false,
    "peso_kg": 0.0,
-   "texto_srd": "When you drink this potion, you gain the effect of the _gaseous form_ spell for 1 hour (no concentration required) or until you end the effect as a bonus action. This potion's container seems to hold fog that moves and pours like water."
+   "texto_srd": "When you drink this potion, you gain the effect of the _gaseous form_ spell for 1 hour (no concentration required) or until you end the effect as a bonus action. This potion's container seems to hold fog that moves and pours like water.",
+   "uso": {
+    "tipo": "pocao",
+    "duracao": "1h",
+    "efeito": {
+     "resistencias": [
+      "acid",
+      "bludgeoning",
+      "cold",
+      "fire",
+      "lightning",
+      "piercing",
+      "poison",
+      "slashing",
+      "thunder"
+     ]
+    },
+    "nota": "Forma gasosa: resistência a dano não mágico de quase tudo; não ataca nem conjura."
+   }
   },
   "potion-of-greater-healing": {
    "chave": "potion-of-greater-healing",
@@ -5247,7 +5331,22 @@
    "raridade": "incomum",
    "sintonizacao": false,
    "peso_kg": 0.0,
-   "texto_srd": "When you drink this potion, you gain the \"enlarge\" effect of the _enlarge/reduce_ spell for 1d4 hours (no concentration required). The red in the potion's liquid continuously expands from a tiny bead to color the clear liquid around it and then contracts. Shaking the bottle fails to interrupt this process."
+   "texto_srd": "When you drink this potion, you gain the \"enlarge\" effect of the _enlarge/reduce_ spell for 1d4 hours (no concentration required). The red in the potion's liquid continuously expands from a tiny bead to color the clear liquid around it and then contracts. Shaking the bottle fails to interrupt this process.",
+   "uso": {
+    "tipo": "pocao",
+    "duracao": "1h",
+    "efeito": {
+     "dano_dado": "1d4",
+     "so_arma": true,
+     "vantagem_teste_atributos": [
+      "forca"
+     ],
+     "vantagem_save_atributos": [
+      "forca"
+     ]
+    },
+    "nota": "Aumentar: +1d4 de dano com arma e vantagem em FOR."
+   }
   },
   "potion-of-healing": {
    "chave": "potion-of-healing",
@@ -5273,7 +5372,20 @@
    "raridade": "raro",
    "sintonizacao": false,
    "peso_kg": 0.0,
-   "texto_srd": "For 1 hour after drinking it, you gain 10 temporary hit points that last for 1 hour. For the same duration, you are under the effect of the _bless_ spell (no concentration required). This blue potion bubbles and steams as if boiling."
+   "texto_srd": "For 1 hour after drinking it, you gain 10 temporary hit points that last for 1 hour. For the same duration, you are under the effect of the _bless_ spell (no concentration required). This blue potion bubbles and steams as if boiling.",
+   "uso": {
+    "tipo": "pocao",
+    "duracao": "1h",
+    "pv_temp": 10,
+    "tira": [
+     "amedrontado"
+    ],
+    "efeito": {
+     "atk_dado": "1d4",
+     "save_dado": "1d4"
+    },
+    "nota": "10 PV temporários e Bênção (+1d4 nos ataques e nas salvaguardas) por uma hora."
+   }
   },
   "potion-of-hill-giant-strength": {
    "chave": "potion-of-hill-giant-strength",
@@ -5286,7 +5398,15 @@
    "raridade": "incomum",
    "sintonizacao": false,
    "peso_kg": 0.0,
-   "texto_srd": "When you drink this potion, your Strength score changes for 1 hour. The type of giant determines the score (see the table below). The potion has no effect on you if your Strength is equal to or greater than that score.\\n\\nThis potion's transparent liquid has floating in it a sliver of fingernail from a giant of the appropriate type. The _potion of frost giant strength_ and the _potion of stone giant strength_ have the same effect.\\n\\n| Type of Giant | Strength | Rarity |\\n|-------------------|----------|-----------|\\n| Hill giant | 21 | Uncommon |\\n| Frost/stone giant | 23 | Rare |\\n| Fire giant | 25 | Rare |\\n| Cloud giant | 27 | Very rare |\\n| Storm giant | 29 | Legendary |"
+   "texto_srd": "When you drink this potion, your Strength score changes for 1 hour. The type of giant determines the score (see the table below). The potion has no effect on you if your Strength is equal to or greater than that score.\\n\\nThis potion's transparent liquid has floating in it a sliver of fingernail from a giant of the appropriate type. The _potion of frost giant strength_ and the _potion of stone giant strength_ have the same effect.\\n\\n| Type of Giant | Strength | Rarity |\\n|-------------------|----------|-----------|\\n| Hill giant | 21 | Uncommon |\\n| Frost/stone giant | 23 | Rare |\\n| Fire giant | 25 | Rare |\\n| Cloud giant | 27 | Very rare |\\n| Storm giant | 29 | Legendary |",
+   "uso": {
+    "tipo": "pocao",
+    "duracao": "1h",
+    "atributo": {
+     "forca": 21
+    },
+    "nota": "Força 21 por uma hora."
+   }
   },
   "potion-of-invisibility": {
    "chave": "potion-of-invisibility",
@@ -5297,7 +5417,13 @@
    "raridade": "muito raro",
    "sintonizacao": false,
    "peso_kg": 0.0,
-   "texto_srd": "This potion's container looks empty but feels as though it holds liquid. When you drink it, you become invisible for 1 hour. Anything you wear or carry is invisible with you. The effect ends early if you attack or cast a spell."
+   "texto_srd": "This potion's container looks empty but feels as though it holds liquid. When you drink it, you become invisible for 1 hour. Anything you wear or carry is invisible with you. The effect ends early if you attack or cast a spell.",
+   "uso": {
+    "tipo": "pocao",
+    "duracao": "1h",
+    "condicao": "Invisível",
+    "nota": "Invisível por uma hora, até atacar ou conjurar."
+   }
   },
   "potion-of-mind-reading": {
    "chave": "potion-of-mind-reading",
@@ -5308,7 +5434,13 @@
    "raridade": "raro",
    "sintonizacao": false,
    "peso_kg": 0.0,
-   "texto_srd": "When you drink this potion, you gain the effect of the _detect thoughts_ spell (save DC 13). The potion's dense, purple liquid has an ovoid cloud of pink floating in it."
+   "texto_srd": "When you drink this potion, you gain the effect of the _detect thoughts_ spell (save DC 13). The potion's dense, purple liquid has an ovoid cloud of pink floating in it.",
+   "uso": {
+    "tipo": "pocao",
+    "duracao": "1h",
+    "efeito": {},
+    "nota": "Detectar Pensamentos por uma hora (o Mestre narra)."
+   }
   },
   "potion-of-poison": {
    "chave": "potion-of-poison",
@@ -5319,7 +5451,19 @@
    "raridade": "incomum",
    "sintonizacao": false,
    "peso_kg": 0.0,
-   "texto_srd": "This concoction looks, smells, and tastes like a _potion of healing_ or other beneficial potion. However, it is actually poison masked by illusion magic. An _identify_ spell reveals its true nature. If you drink it, you take 3d6 poison damage, and you must succeed on a DC 13 Constitution saving throw or be poisoned. At the start of each of your turns while you are poisoned in this way, you take 3d6 poison damage. At the end of each of your turns, you can repeat the saving throw. On a successful save, the poison damage you take on your subsequent turns decreases by 1d6. The poison ends when the damage decreases to 0."
+   "texto_srd": "This concoction looks, smells, and tastes like a _potion of healing_ or other beneficial potion. However, it is actually poison masked by illusion magic. An _identify_ spell reveals its true nature. If you drink it, you take 3d6 poison damage, and you must succeed on a DC 13 Constitution saving throw or be poisoned. At the start of each of your turns while you are poisoned in this way, you take 3d6 poison damage. At the end of each of your turns, you can repeat the saving throw. On a successful save, the poison damage you take on your subsequent turns decreases by 1d6. The poison ends when the damage decreases to 0.",
+   "uso": {
+    "tipo": "pocao",
+    "duracao": "1h",
+    "dano": {
+     "dado": "3d6",
+     "tipo": "poison",
+     "salvaguarda": "constituicao",
+     "cd": 13,
+     "condicao": "Envenenado"
+    },
+    "nota": "Parece uma poção de cura: 3d6 de veneno e Envenenado (CON CD 13 evita a condição)."
+   }
   },
   "potion-of-resistance": {
    "chave": "potion-of-resistance",
@@ -5341,7 +5485,19 @@
    "raridade": "muito raro",
    "sintonizacao": false,
    "peso_kg": 0.0,
-   "texto_srd": "When you drink this potion, you gain the effect of the _haste_ spell for 1 minute (no concentration required). The potion's yellow fluid is streaked with black and swirls on its own."
+   "texto_srd": "When you drink this potion, you gain the effect of the _haste_ spell for 1 minute (no concentration required). The potion's yellow fluid is streaked with black and swirls on its own.",
+   "uso": {
+    "tipo": "pocao",
+    "duracao": "1min",
+    "efeito": {
+     "ca": 2,
+     "vantagem_save_atributos": [
+      "destreza"
+     ],
+     "movimento_por_turno": 1
+    },
+    "nota": "Pressa: +2 na CA, vantagem nas salvaguardas de DES e o dobro do deslocamento até o fim da luta (a ação extra o Mestre arbitra)."
+   }
   },
   "potion-of-stone-giant-strength": {
    "chave": "potion-of-stone-giant-strength",
@@ -5352,7 +5508,15 @@
    "raridade": "raro",
    "sintonizacao": false,
    "peso_kg": 0.0,
-   "texto_srd": "When you drink this potion, your Strength score changes for 1 hour. The type of giant determines the score (see the table below). The potion has no effect on you if your Strength is equal to or greater than that score.\\n\\nThis potion's transparent liquid has floating in it a sliver of fingernail from a giant of the appropriate type. The _potion of frost giant strength_ and the _potion of stone giant strength_ have the same effect.\\n\\n| Type of Giant | Strength | Rarity |\\n|-------------------|----------|-----------|\\n| Hill giant | 21 | Uncommon |\\n| Frost/stone giant | 23 | Rare |\\n| Fire giant | 25 | Rare |\\n| Cloud giant | 27 | Very rare |\\n| Storm giant | 29 | Legendary |"
+   "texto_srd": "When you drink this potion, your Strength score changes for 1 hour. The type of giant determines the score (see the table below). The potion has no effect on you if your Strength is equal to or greater than that score.\\n\\nThis potion's transparent liquid has floating in it a sliver of fingernail from a giant of the appropriate type. The _potion of frost giant strength_ and the _potion of stone giant strength_ have the same effect.\\n\\n| Type of Giant | Strength | Rarity |\\n|-------------------|----------|-----------|\\n| Hill giant | 21 | Uncommon |\\n| Frost/stone giant | 23 | Rare |\\n| Fire giant | 25 | Rare |\\n| Cloud giant | 27 | Very rare |\\n| Storm giant | 29 | Legendary |",
+   "uso": {
+    "tipo": "pocao",
+    "duracao": "1h",
+    "atributo": {
+     "forca": 23
+    },
+    "nota": "Força 23 por uma hora."
+   }
   },
   "potion-of-storm-giant-strength": {
    "chave": "potion-of-storm-giant-strength",
@@ -5363,7 +5527,15 @@
    "raridade": "lendário",
    "sintonizacao": false,
    "peso_kg": 0.0,
-   "texto_srd": "When you drink this potion, your Strength score changes for 1 hour. The type of giant determines the score (see the table below). The potion has no effect on you if your Strength is equal to or greater than that score.\\n\\nThis potion's transparent liquid has floating in it a sliver of fingernail from a giant of the appropriate type. The _potion of frost giant strength_ and the _potion of stone giant strength_ have the same effect.\\n\\n| Type of Giant | Strength | Rarity |\\n|-------------------|----------|-----------|\\n| Hill giant | 21 | Uncommon |\\n| Frost/stone giant | 23 | Rare |\\n| Fire giant | 25 | Rare |\\n| Cloud giant | 27 | Very rare |\\n| Storm giant | 29 | Legendary |"
+   "texto_srd": "When you drink this potion, your Strength score changes for 1 hour. The type of giant determines the score (see the table below). The potion has no effect on you if your Strength is equal to or greater than that score.\\n\\nThis potion's transparent liquid has floating in it a sliver of fingernail from a giant of the appropriate type. The _potion of frost giant strength_ and the _potion of stone giant strength_ have the same effect.\\n\\n| Type of Giant | Strength | Rarity |\\n|-------------------|----------|-----------|\\n| Hill giant | 21 | Uncommon |\\n| Frost/stone giant | 23 | Rare |\\n| Fire giant | 25 | Rare |\\n| Cloud giant | 27 | Very rare |\\n| Storm giant | 29 | Legendary |",
+   "uso": {
+    "tipo": "pocao",
+    "duracao": "1h",
+    "atributo": {
+     "forca": 29
+    },
+    "nota": "Força 29 por uma hora."
+   }
   },
   "potion-of-superior-healing": {
    "chave": "potion-of-superior-healing",
@@ -5396,7 +5568,13 @@
    "raridade": "incomum",
    "sintonizacao": false,
    "peso_kg": 0.0,
-   "texto_srd": "You can breathe underwater for 1 hour after drinking this potion. Its cloudy green fluid smells of the sea and has a jellyfish-like bubble floating in it."
+   "texto_srd": "You can breathe underwater for 1 hour after drinking this potion. Its cloudy green fluid smells of the sea and has a jellyfish-like bubble floating in it.",
+   "uso": {
+    "tipo": "pocao",
+    "duracao": "1h",
+    "efeito": {},
+    "nota": "Respira debaixo d'água por uma hora."
+   }
   },
   "restorative-ointment": {
    "chave": "restorative-ointment",
@@ -5990,7 +6168,27 @@
    "sintonizacao": true,
    "peso_kg": 0.0,
    "texto_srd": "While holding this staff, you can use an action to expend 1 of its 10 charges to cast _charm person_, _command_, _or comprehend languages_ from it using your spell save DC. The staff can also be used as a magic quarterstaff. If you are holding the staff and fail a saving throw against an enchantment spell that targets only you, you can turn your failed save into a successful one. You can't use this property of the staff again until the next dawn. If you succeed on a save against an enchantment spell that targets only you, with or without the staff's intervention, you can use your reaction to expend 1 charge from the staff and turn the spell back on its caster as if you had cast the spell. The staff regains 1d8 + 2 expended charges daily at dawn. If you expend the last charge, roll a d20. On a 1, the staff becomes a nonmagical quarterstaff.",
-   "sintonizacao_detalhe": "requires attunement by a bard, cleric, druid, sorcerer, warlock, or wizard"
+   "sintonizacao_detalhe": "requires attunement by a bard, cleric, druid, sorcerer, warlock, or wizard",
+   "uso": {
+    "tipo": "cargas",
+    "cargas": 10,
+    "recarga": "1d8+2",
+    "magias": [
+     {
+      "magia": "Charm Person",
+      "cargas": 1
+     },
+     {
+      "magia": "Command",
+      "cargas": 1
+     },
+     {
+      "magia": "Comprehend Languages",
+      "cargas": 1
+     }
+    ],
+    "nota": "10 cargas: Enfeitiçar Pessoa, Comando ou Compreender Idiomas (1 cada). Recupera 1d8+2 ao amanhecer."
+   }
   },
   "staff-of-fire": {
    "chave": "staff-of-fire",
@@ -6002,7 +6200,27 @@
    "sintonizacao": true,
    "peso_kg": 0.0,
    "texto_srd": "You have resistance to fire damage while you hold this staff. The staff has 10 charges. While holding it, you can use an action to expend 1 or more of its charges to cast one of the following spells from it, using your spell save DC: _burning hands_ (1 charge), _fireball_ (3 charges), or _wall of fire_ (4 charges). The staff regains 1d6 + 4 expended charges daily at dawn. If you expend the last charge, roll a d20. On a 1, the staff blackens, crumbles into cinders, and is destroyed.",
-   "sintonizacao_detalhe": "requires attunement by a druid, sorcerer, warlock, or wizard"
+   "sintonizacao_detalhe": "requires attunement by a druid, sorcerer, warlock, or wizard",
+   "uso": {
+    "tipo": "cargas",
+    "cargas": 10,
+    "recarga": "1d6+4",
+    "magias": [
+     {
+      "magia": "Burning Hands",
+      "cargas": 1
+     },
+     {
+      "magia": "Fireball",
+      "cargas": 3
+     },
+     {
+      "magia": "Wall of Fire",
+      "cargas": 4
+     }
+    ],
+    "nota": "10 cargas: Mãos Flamejantes (1), Bola de Fogo (3), Muralha de Fogo (4). Recupera 1d6+4 ao amanhecer."
+   }
   },
   "staff-of-frost": {
    "chave": "staff-of-frost",
@@ -6014,7 +6232,31 @@
    "sintonizacao": true,
    "peso_kg": 0.0,
    "texto_srd": "You have resistance to cold damage while you hold this staff. The staff has 10 charges. While holding it, you can use an action to expend 1 or more of its charges to cast one of the following spells from it, using your spell save DC: _cone of cold_ (5 charges), _fog cloud_ (1 charge), _ice storm_ (4 charges), or _wall of ice_ (4 charges). The staff regains 1d6 + 4 expended charges daily at dawn. If you expend the last charge, roll a d20. On a 1, the staff turns to water and is destroyed.",
-   "sintonizacao_detalhe": "requires attunement by a druid, sorcerer, warlock, or wizard"
+   "sintonizacao_detalhe": "requires attunement by a druid, sorcerer, warlock, or wizard",
+   "uso": {
+    "tipo": "cargas",
+    "cargas": 10,
+    "recarga": "1d6+4",
+    "magias": [
+     {
+      "magia": "Cone of Cold",
+      "cargas": 5
+     },
+     {
+      "magia": "Fog Cloud",
+      "cargas": 1
+     },
+     {
+      "magia": "Ice Storm",
+      "cargas": 4
+     },
+     {
+      "magia": "Wall of Ice",
+      "cargas": 4
+     }
+    ],
+    "nota": "10 cargas: Cone de Frio (5), Nuvem de Névoa (1), Tempestade de Gelo (4), Muralha de Gelo (4). Recupera 1d6+4 ao amanhecer."
+   }
   },
   "staff-of-healing": {
    "chave": "staff-of-healing",
@@ -6026,7 +6268,29 @@
    "sintonizacao": true,
    "peso_kg": 0.0,
    "texto_srd": "This staff has 10 charges. While holding it, you can use an action to expend 1 or more of its charges to cast one of the following spells from it, using your spell save DC and spellcasting ability modifier: _cure wounds_ (1 charge per spell level, up to 4th), _lesser restoration_ (2 charges), or _mass cure wounds_ (5 charges). The staff regains 1d6 + 4 expended charges daily at dawn. If you expend the last charge, roll a d20. On a 1, the staff vanishes in a flash of light, lost forever.",
-   "sintonizacao_detalhe": "requires attunement by a bard, cleric, or druid"
+   "sintonizacao_detalhe": "requires attunement by a bard, cleric, or druid",
+   "uso": {
+    "tipo": "cargas",
+    "cargas": 10,
+    "recarga": "1d6+4",
+    "magias": [
+     {
+      "magia": "Cure Wounds",
+      "cargas": 1,
+      "extra": true,
+      "max_circulo": 4
+     },
+     {
+      "magia": "Lesser Restoration",
+      "cargas": 2
+     },
+     {
+      "magia": "Mass Cure Wounds",
+      "cargas": 5
+     }
+    ],
+    "nota": "10 cargas: Curar Ferimentos (1 por círculo, até o 4º), Restauração Menor (2), Curar Ferimentos em Massa (5). Recupera 1d6+4 ao amanhecer."
+   }
   },
   "staff-of-power": {
    "chave": "staff-of-power",
@@ -6065,7 +6329,23 @@
    "sintonizacao": true,
    "peso_kg": 0.0,
    "texto_srd": "This staff has 10 charges and regains 1d6 + 4 expended charges daily at dawn. If you expend the last charge, roll a d20. On a 1, a swarm of insects consumes and destroys the staff, then disperses. **_Spells_**. While holding the staff, you can use an action to expend some of its charges to cast one of the following spells from it, using your spell save DC: _giant insect_ (4 charges) or _insect plague_ (5 charges). **_Insect Cloud_**. While holding the staff, you can use an action and expend 1 charge to cause a swarm of harmless flying insects to spread out in a 30-foot radius from you. The insects remain for 10 minutes, making the area heavily obscured for creatures other than you. The swarm moves with you, remaining centered on you. A wind of at least 10 miles per hour disperses the swarm and ends the effect.",
-   "sintonizacao_detalhe": "requires attunement by a bard, cleric, druid, sorcerer, warlock, or wizard"
+   "sintonizacao_detalhe": "requires attunement by a bard, cleric, druid, sorcerer, warlock, or wizard",
+   "uso": {
+    "tipo": "cargas",
+    "cargas": 10,
+    "recarga": "1d6+4",
+    "magias": [
+     {
+      "magia": "Giant Insect",
+      "cargas": 4
+     },
+     {
+      "magia": "Insect Plague",
+      "cargas": 5
+     }
+    ],
+    "nota": "10 cargas: Inseto Gigante (4), Praga de Insetos (5). Recupera 1d6+4 ao amanhecer."
+   }
   },
   "staff-of-the-magi": {
    "chave": "staff-of-the-magi",
@@ -6107,6 +6387,42 @@
    "texto_srd": "This staff can be wielded as a magic quarterstaff that grants a +2 bonus to attack and damage rolls made with it. While holding it, you have a +2 bonus to spell attack rolls. The staff has 10 charges for the following properties. It regains 1d6 + 4 expended charges daily at dawn. If you expend the last charge, roll a d20. On a 1, the staff loses its properties and becomes a nonmagical quarterstaff. **_Spells_**. You can use an action to expend 1 or more of the staff's charges to cast one of the following spells from it, using your spell save DC: _animal friendship_ (1 charge), _awaken_ (5 charges), _barkskin_ (2 charges), _locate animals or plants_ (2 charges), _speak with animals_ (1 charge), _speak with plants_ (3 charges), or _wall of thorns_ (6 charges). You can also use an action to cast the _pass without trace_ spell from the staff without using any charges. **_Tree Form_**. You can use an action to plant one end of the staff in fertile earth and expend 1 charge to transform the staff into a healthy tree. The tree is 60 feet tall and has a 5-foot-diameter trunk, and its branches at the top spread out in a 20-foot radius. The tree appears ordinary but radiates a faint aura of transmutation magic if targeted by _detect magic_. While touching the tree and using another action to speak its command word, you return the staff to its normal form. Any creature in the tree falls when it reverts to a staff.",
    "sintonizacao_detalhe": "requires attunement by a druid",
    "base_arma": "quarterstaff",
+   "uso": {
+    "tipo": "cargas",
+    "cargas": 10,
+    "recarga": "1d6+4",
+    "magias": [
+     {
+      "magia": "Animal Friendship",
+      "cargas": 1
+     },
+     {
+      "magia": "Awaken",
+      "cargas": 5
+     },
+     {
+      "magia": "Barkskin",
+      "cargas": 2
+     },
+     {
+      "magia": "Locate Animals or Plants",
+      "cargas": 2
+     },
+     {
+      "magia": "Speak with Animals",
+      "cargas": 1
+     },
+     {
+      "magia": "Speak with Plants",
+      "cargas": 3
+     },
+     {
+      "magia": "Wall of Thorns",
+      "cargas": 6
+     }
+    ],
+    "nota": "10 cargas: Amizade Animal (1), Despertar (5), Pele de Árvore (2), Localizar Animais ou Plantas (2), Falar com Animais (1), Falar com Plantas (3), Muralha de Espinhos (6). Recupera 1d6+4 ao amanhecer."
+   },
    "bonus": 2
   },
   "staff-of-thunder-and-lightning": {
@@ -6579,7 +6895,24 @@
    "sintonizacao": true,
    "peso_kg": 0.0,
    "texto_srd": "This wand has 7 charges for the following properties. It regains 1d6 + 1 expended charges daily at dawn. If you expend the wand's last charge, roll a d20. On a 1, the wand crumbles into ashes and is destroyed. **_Spells_**. While holding the wand, you can use an action to expend some of its charges to cast one of the following spells (save DC 17): _hold monster_ (5 charges) or _hold person_ (2 charges). **_Assisted Escape_**. While holding the wand, you can use your reaction to expend 1 charge and gain advantage on a saving throw you make to avoid being paralyzed or restrained, or you can expend 1 charge and gain advantage on any check you make to escape a grapple.",
-   "sintonizacao_detalhe": "requires attunement by a spellcaster"
+   "sintonizacao_detalhe": "requires attunement by a spellcaster",
+   "uso": {
+    "tipo": "cargas",
+    "cargas": 7,
+    "recarga": "1d6+1",
+    "cd": 17,
+    "magias": [
+     {
+      "magia": "Hold Monster",
+      "cargas": 5
+     },
+     {
+      "magia": "Hold Person",
+      "cargas": 2
+     }
+    ],
+    "nota": "7 cargas: Imobilizar Monstro (5) ou Imobilizar Pessoa (2), CD 17. Recupera 1d6+1 ao amanhecer."
+   }
   },
   "wand-of-enemy-detection": {
    "chave": "wand-of-enemy-detection",
@@ -6601,7 +6934,24 @@
    "raridade": "raro",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "This wand has 7 charges for the following properties. It regains 1d6 + 1 expended charges daily at dawn. If you expend the wand's last charge, roll a d20. On a 1, the wand crumbles into ashes and is destroyed. **_Command_**. While holding the wand, you can use an action to expend 1 charge and command another creature to flee or grovel, as with the _command_ spell (save DC 15). **_Cone of Fear_**. While holding the wand, you can use an action to expend 2 charges, causing the wand's tip to emit a 60-foot cone of amber light. Each creature in the cone must succeed on a DC 15 Wisdom saving throw or become frightened of you for 1 minute. While it is frightened in this way, a creature must spend its turns trying to move as far away from you as it can, and it can't willingly move to a space within 30 feet of you. It also can't take reactions. For its action, it can use only the Dash action or try to escape from an effect that prevents it from moving. If it has nowhere it can move, the creature can use the Dodge action. At the end of each of its turns, a creature can repeat the saving throw, ending the effect on itself on a success."
+   "texto_srd": "This wand has 7 charges for the following properties. It regains 1d6 + 1 expended charges daily at dawn. If you expend the wand's last charge, roll a d20. On a 1, the wand crumbles into ashes and is destroyed. **_Command_**. While holding the wand, you can use an action to expend 1 charge and command another creature to flee or grovel, as with the _command_ spell (save DC 15). **_Cone of Fear_**. While holding the wand, you can use an action to expend 2 charges, causing the wand's tip to emit a 60-foot cone of amber light. Each creature in the cone must succeed on a DC 15 Wisdom saving throw or become frightened of you for 1 minute. While it is frightened in this way, a creature must spend its turns trying to move as far away from you as it can, and it can't willingly move to a space within 30 feet of you. It also can't take reactions. For its action, it can use only the Dash action or try to escape from an effect that prevents it from moving. If it has nowhere it can move, the creature can use the Dodge action. At the end of each of its turns, a creature can repeat the saving throw, ending the effect on itself on a success.",
+   "uso": {
+    "tipo": "cargas",
+    "cargas": 7,
+    "recarga": "1d6+1",
+    "cd": 15,
+    "magias": [
+     {
+      "magia": "Command",
+      "cargas": 1
+     },
+     {
+      "magia": "Fear",
+      "cargas": 2
+     }
+    ],
+    "nota": "7 cargas: Comando (1) ou um cone de medo (2), CD 15. Recupera 1d6+1 ao amanhecer."
+   }
   },
   "wand-of-fireballs": {
    "chave": "wand-of-fireballs",
@@ -6613,7 +6963,21 @@
    "sintonizacao": true,
    "peso_kg": 0.0,
    "texto_srd": "This wand has 7 charges. While holding it, you can use an action to expend 1 or more of its charges to cast the _fireball_ spell (save DC 15) from it. For 1 charge, you cast the 3rd-level version of the spell. You can increase the spell slot level by one for each additional charge you expend. The wand regains 1d6 + 1 expended charges daily at dawn. If you expend the wand's last charge, roll a d20. On a 1, the wand crumbles into ashes and is destroyed.",
-   "sintonizacao_detalhe": "requires attunement by a spellcaster"
+   "sintonizacao_detalhe": "requires attunement by a spellcaster",
+   "uso": {
+    "tipo": "cargas",
+    "cargas": 7,
+    "recarga": "1d6+1",
+    "cd": 15,
+    "magias": [
+     {
+      "magia": "Fireball",
+      "cargas": 1,
+      "extra": true
+     }
+    ],
+    "nota": "7 cargas: Bola de Fogo (1 carga, CD 15; cada carga a mais, um círculo acima). Recupera 1d6+1 ao amanhecer."
+   }
   },
   "wand-of-lightning-bolts": {
    "chave": "wand-of-lightning-bolts",
@@ -6625,7 +6989,21 @@
    "sintonizacao": true,
    "peso_kg": 0.0,
    "texto_srd": "This wand has 7 charges. While holding it, you can use an action to expend 1 or more of its charges to cast the _lightning bolt_ spell (save DC 15) from it. For 1 charge, you cast the 3rd-level version of the spell. You can increase the spell slot level by one for each additional charge you expend. The wand regains 1d6 + 1 expended charges daily at dawn. If you expend the wand's last charge, roll a d20. On a 1, the wand crumbles into ashes and is destroyed.",
-   "sintonizacao_detalhe": "requires attunement by a spellcaster"
+   "sintonizacao_detalhe": "requires attunement by a spellcaster",
+   "uso": {
+    "tipo": "cargas",
+    "cargas": 7,
+    "recarga": "1d6+1",
+    "cd": 15,
+    "magias": [
+     {
+      "magia": "Lightning Bolt",
+      "cargas": 1,
+      "extra": true
+     }
+    ],
+    "nota": "7 cargas: Relâmpago (1 carga, CD 15; cada carga a mais, um círculo acima). Recupera 1d6+1 ao amanhecer."
+   }
   },
   "wand-of-magic-detection": {
    "chave": "wand-of-magic-detection",
@@ -6636,7 +7014,19 @@
    "raridade": "incomum",
    "sintonizacao": false,
    "peso_kg": 0.0,
-   "texto_srd": "This wand has 3 charges. While holding it, you can expend 1 charge as an action to cast the _detect magic_ spell from it. The wand regains 1d3 expended charges daily at dawn."
+   "texto_srd": "This wand has 3 charges. While holding it, you can expend 1 charge as an action to cast the _detect magic_ spell from it. The wand regains 1d3 expended charges daily at dawn.",
+   "uso": {
+    "tipo": "cargas",
+    "cargas": 3,
+    "recarga": "1d3",
+    "magias": [
+     {
+      "magia": "Detect Magic",
+      "cargas": 1
+     }
+    ],
+    "nota": "3 cargas: Detectar Magia (1). Recupera 1d3 ao amanhecer."
+   }
   },
   "wand-of-magic-missiles": {
    "chave": "wand-of-magic-missiles",
@@ -6647,7 +7037,20 @@
    "raridade": "incomum",
    "sintonizacao": false,
    "peso_kg": 0.0,
-   "texto_srd": "This wand has 7 charges. While holding it, you can use an action to expend 1 or more of its charges to cast the _magic missile_ spell from it. For 1 charge, you cast the 1st-level version of the spell. You can increase the spell slot level by one for each additional charge you expend. The wand regains 1d6 + 1 expended charges daily at dawn. If you expend the wand's last charge, roll a d20. On a 1, the wand crumbles into ashes and is destroyed."
+   "texto_srd": "This wand has 7 charges. While holding it, you can use an action to expend 1 or more of its charges to cast the _magic missile_ spell from it. For 1 charge, you cast the 1st-level version of the spell. You can increase the spell slot level by one for each additional charge you expend. The wand regains 1d6 + 1 expended charges daily at dawn. If you expend the wand's last charge, roll a d20. On a 1, the wand crumbles into ashes and is destroyed.",
+   "uso": {
+    "tipo": "cargas",
+    "cargas": 7,
+    "recarga": "1d6+1",
+    "magias": [
+     {
+      "magia": "Magic Missile",
+      "cargas": 1,
+      "extra": true
+     }
+    ],
+    "nota": "7 cargas: Mísseis Mágicos (1 carga; cada carga a mais, um círculo acima). Recupera 1d6+1 ao amanhecer."
+   }
   },
   "wand-of-paralysis": {
    "chave": "wand-of-paralysis",
@@ -6727,7 +7130,20 @@
    "sintonizacao": true,
    "peso_kg": 0.0,
    "texto_srd": "This wand has 7 charges. While holding it, you can use an action to expend 1 of its charges to cast the _web_ spell (save DC 15) from it. The wand regains 1d6 + 1 expended charges daily at dawn. If you expend the wand's last charge, roll a d20. On a 1, the wand crumbles into ashes and is destroyed.",
-   "sintonizacao_detalhe": "requires attunement by a spellcaster"
+   "sintonizacao_detalhe": "requires attunement by a spellcaster",
+   "uso": {
+    "tipo": "cargas",
+    "cargas": 7,
+    "recarga": "1d6+1",
+    "cd": 15,
+    "magias": [
+     {
+      "magia": "Web",
+      "cargas": 1
+     }
+    ],
+    "nota": "7 cargas: Teia (1 carga, CD 15). Recupera 1d6+1 ao amanhecer."
+   }
   },
   "wand-of-wonder": {
    "chave": "wand-of-wonder",

@@ -839,6 +839,13 @@ REGRA: Se a ação faria sentido num mundo real coerente, use social_check().
   SINTONIZAÇÃO só faz efeito depois de attune_item(), que no 5e é um
   descanso curto com o item; no máximo 3 de cada vez (end_attunement()
   libera uma vaga). Arma de duas mãos não divide a mão com escudo.
+  Poções do SRD (Força do Gigante, Velocidade, Heroísmo, Invisibilidade,
+  Voo...) aplicam o efeito sozinhas quando o jogador bebe pela Mochila ou
+  pela tela. Pergaminho de magia, varinha e cajado conjuram: na luta pelo
+  botão Habilidade da tela; fora dela, use_magic_item() (Cajado da Cura,
+  Varinha de Detectar Magia). O motor gasta as cargas, recarrega ao
+  amanhecer, aplica a CD do item e cobra quem pode ler o pergaminho. Não
+  conjure de item na narração nem desconte carga de cabeça.
   O motor também cobra a proficiência: o mago de cota de malha tem
   desvantagem em FOR e DES e não conjura; arma sem proficiência ataca sem o
   bônus; armadura pesada sem a FOR pedida tira 3 m de deslocamento.

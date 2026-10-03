@@ -327,6 +327,8 @@ def gerar_magicos(pt: dict, comuns: dict, relatorio: list[str]) -> dict:
             entrada["slot"] = _slot_do_magico(base)
         if nomes.get("efeito"):
             entrada["efeito"] = nomes["efeito"]
+        if nomes.get("uso"):
+            entrada["uso"] = nomes["uso"]
         for campo in ("bonus", "qualquer_arma", "qualquer_armadura"):
             if nomes.get(campo):
                 entrada[campo] = nomes[campo]
