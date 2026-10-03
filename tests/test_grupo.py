@@ -23,8 +23,8 @@ def trio(campanha, povoar):
     helena["sheet"]["mana_max"] = 12
     # Helena dormiu há 10 horas: o descanso longo só volta daqui a 14.
     helena["sheet"]["ultimo_descanso_longo"] = 4 * 24 + 10
-    # Lyra (FOR 8, capacidade 54,4 kg, sobrecarregada acima de 27,2) leva 24 kg.
-    lyra["inventario"] = [{"nome": "Baú de Ferramentas", "qtd": 1, "descricao": "", "peso": 24}]
+    # Lyra (FOR 8, capacidade 54,4 kg, sobrecarregada acima de 1/3: 18,1) leva 15 kg.
+    lyra["inventario"] = [{"nome": "Baú de Ferramentas", "qtd": 1, "descricao": "", "peso": 15}]
     thorn["inventario"] = [{"nome": "Corda", "qtd": 1, "descricao": "", "peso": 4.5}]
     thorn["sheet"]["xp"] = 900
     thorn["sheet"]["xp_proximo"] = 900
@@ -136,14 +136,14 @@ def test_carga_folga_e_perto_do_limite(trio):
     snap = grupo.group_snapshot()
     lyra = _heroi(snap, "Lyra")
     assert lyra["carga"]["capacidade"] == 54.4
-    assert lyra["carga"]["limite_sobrecarga"] == 27.2
-    assert lyra["carga"]["folga_kg"] == 3.2
+    assert lyra["carga"]["limite_sobrecarga"] == 18.1
+    assert lyra["carga"]["folga_kg"] == 3.1
     assert lyra["carga"]["perto_do_limite"] is True and lyra["carga"]["estado"] == "livre"
     thorn = _heroi(snap, "Thorn")
-    assert thorn["carga"]["folga_kg"] == 50.0 and thorn["carga"]["perto_do_limite"] is False
+    assert thorn["carga"]["folga_kg"] == 31.8 and thorn["carga"]["perto_do_limite"] is False
     resumo = snap["resumo"]
     assert resumo["mais_folga"] == "Thorn"
-    assert resumo["carga"].startswith("Mais folga para carregar: Thorn (50 kg), Helena (34 kg), Lyra (3.2 kg).")
+    assert resumo["carga"].startswith("Mais folga para carregar: Thorn (31.8 kg), Helena (22.7 kg), Lyra (3.1 kg).")
     assert "Perto do limite: Lyra." in resumo["carga"]
 
 

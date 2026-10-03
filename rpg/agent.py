@@ -634,9 +634,12 @@ SAQUE E COMPRA — o peso faz o saque virar escolha:
   a uma pessoa (uma recompensa, um presente). Quando chegar
   [SAQUE RESOLVIDO NA TELA], os itens já estão nas fichas: narre sem dar nada
   de novo. [SAQUE DEIXADO NA TELA] quer dizer que o grupo não levou nada.
-  check_encumbrance() diz quanto o personagem carrega. Acima de METADE da
-  capacidade (FOR × 7,5 kg) ele fica sobrecarregado: desvantagem em ataques e
-  em testes de FOR/DES/CON. Levar tudo passa a custar a próxima luta.
+  check_encumbrance() diz quanto o personagem carrega (capacidade FOR × 6,8
+  kg). Acima de 1/3 ele fica sobrecarregado (-3 m); acima de 2/3, muito
+  sobrecarregado (-6 m e desvantagem em ataques, testes e salvaguardas de
+  FOR/DES/CON). Levar tudo passa a custar a próxima luta. O que vai dentro da
+  Bolsa de Contenção (ou da Mochila Prática) não pesa. O descanso longo come
+  uma ração de quem tem; sem ração, conta os dias até a exaustão.
   Lojas: open_shop("Forja do Torbin", kind="forja", size="cidade", owner="Torbin")
   monta o estoque do SRD sozinho, pelo tipo (forja, armazem, boticario,
   templo, arcana, joalheiro) e pelo porte do lugar (vilarejo, vila, cidade,

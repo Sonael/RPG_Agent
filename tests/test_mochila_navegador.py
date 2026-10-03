@@ -381,3 +381,20 @@ def test_dar_a_tocha_a_alguem_do_grupo(pagina):
     pg.wait_for_timeout(1000)
     assert f'deu 1x Tocha a {quem}' in pg.inner_text('#inv-msg')
     assert '×4' in pg.inner_text(f"{_item('Tocha')} .inv-item-nome")
+
+
+# ---- bolsa de contenção ----------------------------------------------------
+
+def test_guardar_na_bolsa_tira_o_peso(navegador):
+    import copy
+    import capturar_telas as cap
+    estado = copy.deepcopy(cap.MOCHILA)
+    estado["characters"]["stelar"]["inventario"].append(
+        {"nome": "Bolsa de Contenção", "qtd": 1, "descricao": ""})
+    pg, _ = navegador(estado)
+    cota = _item('Cota de Malha')
+    assert pg.is_visible(f"{cota} .inv-btn-guardar")
+    _clicar(pg, f"{cota} .inv-btn-guardar", 1000)
+    assert 'deixa de pesar' in pg.inner_text('#inv-msg')
+    assert 'na Bolsa de Contenção' in pg.inner_text(cota)
+    assert pg.is_visible(f"{cota} .inv-btn-tirar-bolsa")

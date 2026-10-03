@@ -62,7 +62,8 @@ def test_snapshot_traz_a_bolsa_e_a_carga(forja):
     assert c["nome"] == "Helena"
     assert (c["ouro"], c["prata"]) == (96, 8)
     assert c["capacidade"] == pytest.approx(81.6, abs=0.1)
-    assert c["meia_capacidade"] == pytest.approx(40.8, abs=0.1)
+    assert c["carga_leve"] == pytest.approx(27.2, abs=0.1)
+    assert c["carga_pesada"] == pytest.approx(54.4, abs=0.1)
     assert c["estado_carga"] == "livre"
 
 

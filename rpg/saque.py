@@ -354,13 +354,9 @@ def suggest_loot(enemies: str = "") -> str:
 def _carga_de(ch: dict, extra_kg: float = 0.0) -> dict:
     estado, kg, cap = td._estado_de_carga(ch)
     previsto = round(kg + extra_kg, 2)
-    if previsto > cap:
-        est_prev = "imovel"
-    elif previsto > cap / 2:
-        est_prev = "sobrecarregado"
-    else:
-        est_prev = "livre"
-    return {"kg": kg, "capacidade": cap, "metade": round(cap / 2, 1), "estado": estado,
+    est_prev = td._estado_por_peso(previsto, cap)
+    return {"kg": kg, "capacidade": cap, "leve": round(cap / 3, 1), "pesado": round(cap * 2 / 3, 1),
+            "estado": estado,
             "kg_previsto": previsto, "estado_previsto": est_prev}
 
 

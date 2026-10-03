@@ -1940,7 +1940,21 @@
   },
   "Necklace of Fireballs": {
    "nome": "Colar de Bolas de Fogo",
-   "aliases": []
+   "aliases": [],
+   "uso": {
+    "tipo": "cargas",
+    "cargas_iniciais": "1d6+3",
+    "sem_desfazer": true,
+    "cd": 15,
+    "magias": [
+     {
+      "magia": "Fireball",
+      "cargas": 1,
+      "extra": true
+     }
+    ],
+    "nota": "Contas que explodem em Bola de Fogo (CD 15); várias de uma vez, um círculo acima por conta. Não se recuperam."
+   }
   },
   "Necklace of Prayer Beads": {
    "nome": "Colar de Contas de Oração",
@@ -1963,17 +1977,53 @@
    "nome": "Óleo da Etereidade",
    "aliases": [
     "óleo etéreo"
-   ]
+   ],
+   "uso": {
+    "tipo": "pocao",
+    "verbo": "aplicar",
+    "duracao": "1h",
+    "efeito": {},
+    "nota": "Passa ao Plano Etéreo por uma hora (o Mestre narra o que se vê e o que se atravessa)."
+   }
   },
   "Oil of Sharpness": {
    "nome": "Óleo da Afiação",
    "aliases": [
     "óleo de afiação"
-   ]
+   ],
+   "uso": {
+    "tipo": "pocao",
+    "verbo": "aplicar",
+    "duracao": "1h",
+    "efeito": {
+     "atk_bonus": 3,
+     "dano_fixo": 3,
+     "so_arma": true
+    },
+    "nota": "A arma fica +3 no ataque e no dano por uma hora."
+   }
   },
   "Oil of Slipperiness": {
    "nome": "Óleo Escorregadio",
-   "aliases": []
+   "aliases": [],
+   "uso": {
+    "tipo": "pocao",
+    "verbo": "aplicar",
+    "duracao": "8h",
+    "tira": [
+     "contido",
+     "agarrado",
+     "imobilizado"
+    ],
+    "efeito": {
+     "imune_condicoes": [
+      "contido",
+      "agarrado",
+      "imobilizado"
+     ]
+    },
+    "nota": "Liberdade de movimento por oito horas: nada prende, agarra nem imobiliza."
+   }
   },
   "Orb of Dragonkind": {
    "nome": "Orbe dos Dragões",
@@ -2614,7 +2664,58 @@
    "nome": "Cajado do Poder",
    "aliases": [],
    "base_arma": "quarterstaff",
-   "bonus": 2
+   "bonus": 2,
+   "uso": {
+    "tipo": "cargas",
+    "cargas": 20,
+    "recarga": "2d8+4",
+    "magias": [
+     {
+      "magia": "Cone of Cold",
+      "cargas": 5
+     },
+     {
+      "magia": "Fireball",
+      "cargas": 5,
+      "circulo": 5
+     },
+     {
+      "magia": "Globe of Invulnerability",
+      "cargas": 6
+     },
+     {
+      "magia": "Hold Monster",
+      "cargas": 5
+     },
+     {
+      "magia": "Levitate",
+      "cargas": 2
+     },
+     {
+      "magia": "Lightning Bolt",
+      "cargas": 5,
+      "circulo": 5
+     },
+     {
+      "magia": "Magic Missile",
+      "cargas": 1
+     },
+     {
+      "magia": "Ray of Enfeeblement",
+      "cargas": 1
+     },
+     {
+      "magia": "Wall of Force",
+      "cargas": 5
+     }
+    ],
+    "nota": "20 cargas: Cone de Frio, Bola de Fogo e Relâmpago no 5º círculo, Globo de Invulnerabilidade, Imobilizar Monstro, Levitação, Mísseis Mágicos, Raio do Enfraquecimento, Muralha de Força. Recupera 2d8+4 ao amanhecer."
+   },
+   "efeito": {
+    "nota": "+2 na CA e nas salvaguardas, e +2 de arma.",
+    "ca": 2,
+    "save_fixo": 2
+   }
   },
   "Staff of Striking": {
    "nome": "Cajado do Golpe",
@@ -2648,7 +2749,97 @@
     "cajado dos magos"
    ],
    "base_arma": "quarterstaff",
-   "bonus": 2
+   "bonus": 2,
+   "uso": {
+    "tipo": "cargas",
+    "cargas": 50,
+    "recarga": "4d6+2",
+    "magias": [
+     {
+      "magia": "Conjure Elemental",
+      "cargas": 7
+     },
+     {
+      "magia": "Dispel Magic",
+      "cargas": 3
+     },
+     {
+      "magia": "Fireball",
+      "cargas": 7,
+      "circulo": 7
+     },
+     {
+      "magia": "Flaming Sphere",
+      "cargas": 2
+     },
+     {
+      "magia": "Ice Storm",
+      "cargas": 4
+     },
+     {
+      "magia": "Invisibility",
+      "cargas": 2
+     },
+     {
+      "magia": "Knock",
+      "cargas": 2
+     },
+     {
+      "magia": "Lightning Bolt",
+      "cargas": 7,
+      "circulo": 7
+     },
+     {
+      "magia": "Passwall",
+      "cargas": 5
+     },
+     {
+      "magia": "Plane Shift",
+      "cargas": 7
+     },
+     {
+      "magia": "Telekinesis",
+      "cargas": 5
+     },
+     {
+      "magia": "Wall of Fire",
+      "cargas": 4
+     },
+     {
+      "magia": "Web",
+      "cargas": 2
+     },
+     {
+      "magia": "Arcane Lock",
+      "cargas": 0
+     },
+     {
+      "magia": "Detect Magic",
+      "cargas": 0
+     },
+     {
+      "magia": "Enlarge/Reduce",
+      "cargas": 0
+     },
+     {
+      "magia": "Light",
+      "cargas": 0
+     },
+     {
+      "magia": "Mage Hand",
+      "cargas": 0
+     },
+     {
+      "magia": "Protection from Evil and Good",
+      "cargas": 0
+     }
+    ],
+    "nota": "50 cargas: Bola de Fogo e Relâmpago no 7º círculo, Conjurar Elemental, Dissipar Magia, Muralha de Fogo e mais; Detectar Magia, Luz, Aumentar/Reduzir e outras à vontade. Recupera 4d6+2 ao amanhecer."
+   },
+   "efeito": {
+    "nota": "Vantagem nas salvaguardas contra magia, e +2 de arma.",
+    "resistencia_a_magia": true
+   }
   },
   "Staff of the Python": {
    "nome": "Cajado da Píton",
@@ -2955,7 +3146,122 @@
    "nome": "Varinha das Maravilhas",
    "aliases": [
     "varinha de prodígios"
-   ]
+   ],
+   "uso": {
+    "tipo": "cargas",
+    "cargas": 7,
+    "recarga": "1d6+1",
+    "cd": 15,
+    "magias": [],
+    "maravilha": [
+     {
+      "ate": 5,
+      "magia": "Slow",
+      "texto": "o ar em volta do alvo fica pesado"
+     },
+     {
+      "ate": 10,
+      "magia": "Faerie Fire",
+      "texto": "o alvo brilha em luz de fada"
+     },
+     {
+      "ate": 15,
+      "em_si": true,
+      "condicao": "Atordoado",
+      "texto": "a varinha estala na mão e atordoa quem a usa até o próximo turno"
+     },
+     {
+      "ate": 20,
+      "magia": "Gust of Wind",
+      "texto": "uma rajada de vento sai da ponta"
+     },
+     {
+      "ate": 25,
+      "texto": "quem usa ouve, por um instante, o que o alvo está pensando"
+     },
+     {
+      "ate": 30,
+      "magia": "Stinking Cloud",
+      "texto": "uma nuvem amarela e fétida estoura no alvo"
+     },
+     {
+      "ate": 33,
+      "texto": "começa a chover forte em volta"
+     },
+     {
+      "ate": 36,
+      "texto": "um animal surge do nada ao lado do alvo (o Mestre escolhe qual)"
+     },
+     {
+      "ate": 46,
+      "magia": "Lightning Bolt",
+      "texto": "um raio estala da ponta"
+     },
+     {
+      "ate": 49,
+      "texto": "uma nuvem de borboletas enche o lugar e atrapalha a vista"
+     },
+     {
+      "ate": 53,
+      "magia": "Enlarge/Reduce",
+      "modo": "aumentar",
+      "texto": "o alvo cresce"
+     },
+     {
+      "ate": 58,
+      "magia": "Darkness",
+      "texto": "a escuridão engole a área"
+     },
+     {
+      "ate": 62,
+      "texto": "o chão em volta se cobre de grama"
+     },
+     {
+      "ate": 65,
+      "texto": "um objeto qualquer perto do alvo some (o Mestre diz qual)"
+     },
+     {
+      "ate": 69,
+      "magia": "Enlarge/Reduce",
+      "modo": "reduzir",
+      "em_si": true,
+      "texto": "quem usa encolhe"
+     },
+     {
+      "ate": 79,
+      "magia": "Fireball",
+      "texto": "uma bola de fogo voa para o alvo"
+     },
+     {
+      "ate": 84,
+      "magia": "Invisibility",
+      "em_si": true,
+      "texto": "quem usa some de vista"
+     },
+     {
+      "ate": 87,
+      "texto": "folhas brotam na pele do alvo"
+     },
+     {
+      "ate": 90,
+      "texto": "uma chuva de gemas sai da ponta (o Mestre põe as gemas no chão)"
+     },
+     {
+      "ate": 95,
+      "texto": "uma luz cintilante ofusca quem está perto"
+     },
+     {
+      "ate": 97,
+      "texto": "a pele do alvo fica azul"
+     },
+     {
+      "ate": 100,
+      "magia": "Flesh to Stone",
+      "texto": "o alvo começa a virar pedra"
+     }
+    ],
+    "nota": "7 cargas: cada uso tira um efeito ao acaso, de um raio a uma chuva de borboletas. Recupera 1d6+1 ao amanhecer."
+   }
   },
   "Well of Many Worlds": {
    "nome": "Poço dos Muitos Mundos",

@@ -175,10 +175,9 @@
     // 20 kg, e isso só vira ESCOLHA se der para ver enquanto se decide.
     const pct = c.capacidade > 0
       ? Math.max(0, Math.min(100, (c.carga / c.capacidade) * 100)) : 0;
-    const meio = c.capacidade > 0 ? 50 : 0;
     const cls = c.estado_carga === 'imovel' ? ' shp-carga-imovel'
-              : (c.estado_carga === 'sobrecarregado' ? ' shp-carga-cheia' : '');
-    const rotulo = c.estado_carga === 'livre' ? 'livre' : c.estado_carga;
+              : (/sobrecarregado/.test(c.estado_carga) ? ' shp-carga-cheia' : '');
+    const rotulo = String(c.estado_carga || '').replace('_', ' ');
 
     el.innerHTML = `
       <div class="shp-bolsa-quem">${troca}</div>
@@ -190,8 +189,10 @@
         </div>
         <div class="shp-carga-barra">
           <div class="shp-carga-fill${cls}" data-barra="shp:${esc(c.nome)}:carga" style="width:${pct}%"></div>
-          <div class="shp-carga-meio" style="left:${meio}%"
-               title="Metade da capacidade: acima daqui, desvantagem"></div>
+          <div class="shp-carga-meio" style="left:33.3%"
+               title="1/3 da capacidade (${c.carga_leve} kg): acima daqui, -3 m"></div>
+          <div class="shp-carga-meio" style="left:66.7%"
+               title="2/3 da capacidade (${c.carga_pesada} kg): acima daqui, -6 m e desvantagem"></div>
         </div>
       </div>`;
     // Comprar e vender: as moedas contam, a carga desliza.

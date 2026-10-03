@@ -29,7 +29,7 @@ class _MotorTardio:
 td = _MotorTardio()
 
 # Carga a partir da qual o cartão avisa "perto do limite": 80% do ponto em que
-# o herói fica sobrecarregado (metade da capacidade).
+# o herói fica sobrecarregado (1/3 da capacidade, a regra variante do 5e).
 _PERTO_DO_LIMITE = 0.8
 
 
@@ -39,7 +39,7 @@ def _pct(atual: int, maximo: int) -> int:
 
 def _carga(ch: dict) -> dict:
     estado, kg, cap = td._estado_de_carga(ch)
-    limite = round(cap / 2, 1)
+    limite = round(cap / 3, 1)
     return {
         "kg": round(kg, 1),
         "capacidade": cap,
@@ -48,7 +48,7 @@ def _carga(ch: dict) -> dict:
         "estado": estado,
         "perto_do_limite": estado == "livre" and limite > 0 and kg >= limite * _PERTO_DO_LIMITE,
         "pct": _pct(kg, cap),
-        "pct_limite": 50,
+        "pct_limite": 33,
     }
 
 

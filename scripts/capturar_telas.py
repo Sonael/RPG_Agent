@@ -744,7 +744,7 @@ GRUPO = {
                               "ultimo_descanso_longo": 4 * 24 + 10}},
         "natasha": {"sheet": {"vida_atual": 21},
                     "inventario": [
-                        {"nome": "Baú de Ferramentas", "qtd": 1, "descricao": "", "peso": 28},
+                        {"nome": "Baú de Ferramentas", "qtd": 1, "descricao": "", "peso": 19},
                         {"nome": "Adaga", "qtd": 2, "descricao": ""},
                     ]},
     },

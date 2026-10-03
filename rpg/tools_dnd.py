@@ -2519,6 +2519,9 @@ def _rolar_salvaguarda(alvo: dict, atributo: str, cd: int,
     if _desv_arm_sv:
         desvantagem = True
         notas_extra.append(f"desvantagem: {_desv_arm_sv}")
+    if atributo in ("forca", "destreza", "constituicao") and memory.is_party_member(alvo) and _carga_pesa(alvo):
+        desvantagem = True
+        notas_extra.append("desvantagem: muito sobrecarregado")
     # Cobertura: +2 (meia) ou +5 (três quartos) nas salvaguardas de DES.
     _cob_sv = _cobertura_de(alvo)
     if atributo == "destreza" and _COBERTURA.get(_cob_sv):
@@ -5329,6 +5332,9 @@ def _deslocamento(char: dict) -> dict:
     elif estado == "sobrecarregado":
         metros = max(0.0, metros - 3.0)
         notas.append("-3 m de sobrecarga")
+    elif estado == "muito_sobrecarregado":
+        metros = max(0.0, metros - 6.0)
+        notas.append("-6 m de sobrecarga")
 
     # Armadura pesada sem a Força que ela pede: -3 m (anão não sente).
     if armadura and armadura.get("forca_min") and int(sheet.get("forca", 10) or 10) < armadura["forca_min"] \
@@ -6560,7 +6566,7 @@ def make_skill_check(
         disadvantage = True
     # Sobrecarga pesa em Força, Destreza e Constituição — não em Inteligência,
     # Sabedoria ou Carisma: a mochila atrapalha o corpo, não o raciocínio.
-    if attr_key in ("forca", "destreza", "constituicao")             and _estado_de_carga(char)[0] != "livre":
+    if attr_key in ("forca", "destreza", "constituicao") and _carga_pesa(char):
         disadvantage = True
     _desv_armadura = _desvantagem_da_armadura(char, attr_key, skill)
     if _desv_armadura:
@@ -7020,7 +7026,24 @@ _MUNICAO_DA_ARMA = (
 )
 
 
-def _gastar_municao(char: dict, weapon: str) -> tuple[str, str]:
+_MUNICAO_ESCOLHIDA_RE = re.compile(r"^(.+?)\s*\((.+\+\s*[123])\)\s*$")
+
+
+def _separar_municao(weapon: str) -> tuple[str, str]:
+    """"Arco Longo (Flecha +1)" → ("Arco Longo", "Flecha +1"); sem munição, (weapon, "")."""
+    m = _MUNICAO_ESCOLHIDA_RE.match(weapon or "")
+    if m and _itens.arma(m.group(1)) and (_itens.arma(m.group(1)) or {}).get("municao"):
+        return m.group(1).strip(), m.group(2).strip()
+    return weapon, ""
+
+
+def _municao_compativel(arma: str, item_nome: str) -> bool:
+    a = _itens.arma(arma) or {}
+    base = _itens.comum(_itens.separar_bonus(item_nome)[0]) or {}
+    return bool(a.get("municao")) and base.get("chave") == a["municao"]
+
+
+def _gastar_municao(char: dict, weapon: str, escolhida: str = "") -> tuple[str, str]:
     """
     Gasta uma munição do inventário. Devolve (recusa, nota).
 
@@ -7042,6 +7065,11 @@ def _gastar_municao(char: dict, weapon: str) -> tuple[str, str]:
             continue
         n = _norm_txt(it.get("nome", ""))
         if not any(t in n for t in tipos):
+            continue
+        # A flecha +1 só sai quando é escolhida; a comum, quando não há escolha.
+        if escolhida and _norm_txt(it["nome"]) != _norm_txt(escolhida):
+            continue
+        if not escolhida and _itens.separar_bonus(it["nome"])[1]:
             continue
         qtd = int(it.get("qtd", 0) or 0)
         if qtd <= 0:
@@ -7144,6 +7172,8 @@ def attack_roll(
     """
     attacker = memory.campaign["characters"].get(memory.char_key(attacker_name))
     target   = memory.campaign["characters"].get(memory.char_key(target_name))
+    # "Arco Longo (Flecha +1)": a arma e a munição escolhida.
+    weapon, _municao_escolhida = _separar_municao(weapon or "")
 
     if not attacker or not attacker.get("sheet"):
         return f"Atacante '{attacker_name}' não encontrado ou sem ficha D&D."
@@ -7241,7 +7271,7 @@ def attack_roll(
 
     # Sobrecarga: desvantagem em ataques. É o que faz o saque ser uma ESCOLHA
     # — levar tudo passa a custar a próxima luta.
-    if _estado_de_carga(attacker)[0] != "livre":
+    if _carga_pesa(attacker):
         disadvantage = True
 
     sa = attacker["sheet"]
@@ -7493,9 +7523,12 @@ def attack_roll(
     _mag = _bonus_magico_da_arma(attacker, weapon)
     _rider = efeito_extra_da_arma(attacker, weapon)
     _nota_arma = _nota_de_posse(attacker, weapon, matched_hab)
-    _recusa_mun, _nota_mun = _gastar_municao(attacker, weapon)
+    _recusa_mun, _nota_mun = _gastar_municao(attacker, weapon, _municao_escolhida)
     if _recusa_mun:
         return _recusa_mun
+    # A munição +1 soma no ataque e no dano, como a arma +1 (e com ela).
+    if _municao_escolhida:
+        _mag += _itens.separar_bonus(_municao_escolhida)[1]
     # Arremessada de longe (a azagaia na zona vizinha): sai da mão e fica no
     # chão até o fim da luta.
     _nota_arremesso = ""
@@ -7632,7 +7665,24 @@ def attack_roll(
         memory.save_campaign()
         return result
 
-    if _acerta:
+    _rede = not matched_hab and (_itens.arma(weapon) or {}).get("chave") == "net"
+    if _acerta and _rede:
+        # A Rede não fere: prende. Contido até escapar (FOR CD 10, uma ação).
+        result += "   ACERTO!\n"
+        if _imune_a_condicao(target, "contido"):
+            result += f"   {target['name']} não fica preso: é imune a Contido."
+        else:
+            _conds_r = st.setdefault("condicoes", [])
+            if not any(isinstance(c, dict) and c.get("da_rede") for c in _conds_r):
+                _conds_r.append({"nome": "Contido", "duracao": None, "da_rede": True,
+                                 "escapa_cd": 10, "por": attacker["name"]})
+            result += (f"   {target['name']} fica preso na rede (Contido): escapa com uma ação, "
+                       f"FOR CD 10.")
+        _log_combat_event("attack_hit", attacker["name"], target["name"],
+                          msg=f"{attacker['name']} prende {target['name']} na rede",
+                          weapon=weapon, d20=d20, atk_total=attack_total, ca=target_ca)
+        memory.save_campaign()
+    elif _acerta:
         if _sorte:
             result += f"   {_sorte}: o erro vira acerto.\n"
         n_dice = damage_dice_count * (2 if critico else 1)
@@ -11211,9 +11261,12 @@ def hero_snapshot(char_name: str = "") -> dict:
 # lá, e de uma tabela curta para o resto. Em quilos e em peças de cobre: a
 # mesa é em português, e uma tocha custa 1 pc, não 1 po.
 #
-# CAPACIDADE segue o 5e: FOR × 7,5 kg. Acima da metade disso o personagem
-# fica SOBRECARREGADO (desvantagem em testes e ataques de FOR/DES/CON);
-# acima do total, não anda.
+# CAPACIDADE segue o 5e: FOR × 15 lb (FOR × 6,8 kg), com a regra variante de
+# carga do Livro do Jogador: acima de 1/3 (FOR × 5 lb) o personagem fica
+# SOBRECARREGADO (-3 m); acima de 2/3 (FOR × 10 lb), MUITO SOBRECARREGADO
+# (-6 m e desvantagem em ataques, testes e salvaguardas de FOR, DES e CON);
+# acima do total, não anda. Antes era uma mistura: a partir da metade, -3 m e
+# a desvantagem de uma vez.
 # ===========================================================================
 
 _LB_PARA_KG = 0.4536
@@ -11270,33 +11323,72 @@ def _capacidade_kg(sheet: dict) -> float:
     return round(int(sheet.get("forca", 10) or 10) * 15 * _LB_PARA_KG, 1)
 
 
+# Bolsa de Contenção, Mochila Prática, Buraco Portátil: o que vai dentro não
+# pesa, até o limite de cada uma (o SRD dá 500 lb, 120 lb e um buraco de 3 m).
+_BOLSAS_MAGICAS_KG = {"bag-of-holding": 226.8, "handy-haversack": 54.4, "portable-hole": 10000.0}
+
+
+def _bolsa_magica(char: dict) -> tuple[dict, float] | None:
+    """(item, limite em kg) da bolsa mágica que o personagem carrega, ou None."""
+    for item in char.get("inventario") or []:
+        if not isinstance(item, dict) or item.get("nome_verdadeiro"):
+            continue
+        magico = _magico_por_nome(item.get("nome", ""))
+        if magico and magico.get("chave") in _BOLSAS_MAGICAS_KG:
+            return item, _BOLSAS_MAGICAS_KG[magico["chave"]]
+    return None
+
+
+def _peso_na_bolsa(char: dict) -> float:
+    return round(sum(_peso_do_item(i) * max(0, int(i.get("qtd", 1) or 1))
+                     for i in char.get("inventario") or []
+                     if isinstance(i, dict) and i.get("na_bolsa")), 2)
+
+
 def _carga_atual(char: dict) -> float:
+    bolsa = _bolsa_magica(char)
     total = 0.0
     for item in (char.get("inventario") or []):
         if not isinstance(item, dict):
             continue
+        if bolsa and item.get("na_bolsa") and item is not bolsa[0]:
+            continue                       # dentro da bolsa mágica: não pesa
         total += _peso_do_item(item) * max(0, int(item.get("qtd", 1) or 1))
     return round(total, 2)
 
 
+def _estado_por_peso(carga: float, cap: float) -> str:
+    """'livre' | 'sobrecarregado' | 'muito_sobrecarregado' | 'imovel'."""
+    if carga > cap:
+        return "imovel"
+    if carga > cap * 2 / 3:
+        return "muito_sobrecarregado"
+    if carga > cap / 3:
+        return "sobrecarregado"
+    return "livre"
+
+
 def _estado_de_carga(char: dict) -> tuple[str, float, float]:
-    """('livre'|'sobrecarregado'|'imovel', carga, capacidade)."""
+    """('livre'|'sobrecarregado'|'muito_sobrecarregado'|'imovel', carga, capacidade)."""
     sheet = char.get("sheet") or {}
     carga = _carga_atual(char)
     cap   = _capacidade_kg(sheet)
-    if carga > cap:
-        return "imovel", carga, cap
-    if carga > cap / 2:
-        return "sobrecarregado", carga, cap
-    return "livre", carga, cap
+    return _estado_por_peso(carga, cap), carga, cap
+
+
+def _carga_pesa(char: dict) -> bool:
+    """Muito sobrecarregado (ou imóvel): a desvantagem em FOR, DES e CON."""
+    return _estado_de_carga(char)[0] in ("muito_sobrecarregado", "imovel")
 
 
 def check_encumbrance(char_name: str) -> str:
     """
     Quanto o personagem está carregando e o que isso custa.
 
-    Acima de METADE da capacidade: sobrecarregado (desvantagem em ataques e
-    testes de Força, Destreza e Constituição). Acima do total: não anda.
+    Acima de 1/3 da capacidade: sobrecarregado (-3 m). Acima de 2/3: muito
+    sobrecarregado (-6 m e desvantagem em ataques, testes e salvaguardas de
+    Força, Destreza e Constituição). Acima do total: não anda. O que está
+    dentro de uma Bolsa de Contenção não pesa.
 
     Args:
         char_name: Nome do personagem.
@@ -11308,7 +11400,10 @@ def check_encumbrance(char_name: str) -> str:
     linhas = [f"{char['name']}: **{carga:.1f} kg** de {cap:.1f} kg "
               f"(FOR {(char.get('sheet') or {}).get('forca', 10)}) — {estado}"]
     if estado == "sobrecarregado":
-        linhas.append("   Desvantagem em ataques e testes de FOR/DES/CON.")
+        linhas.append(f"   -3 m de deslocamento (acima de {cap / 3:.1f} kg).")
+    elif estado == "muito_sobrecarregado":
+        linhas.append(f"   -6 m e desvantagem em ataques, testes e salvaguardas de FOR/DES/CON "
+                      f"(acima de {cap * 2 / 3:.1f} kg).")
     elif estado == "imovel":
         linhas.append("   Carga acima da capacidade — não consegue se mover.")
     pesados = sorted(
@@ -11376,6 +11471,42 @@ def _item_identificado(dono: dict, nome: str) -> bool:
     return not item or not _a_identificar(item)
 
 
+def _bolsa_na_mochila(dono: dict, item: dict, equip: dict) -> dict | None:
+    """{na_bolsa, pode, motivo} quando o personagem tem uma bolsa mágica; None se não tem."""
+    bolsa = _bolsa_magica(dono)
+    if not bolsa or item is bolsa[0]:
+        return None
+    if item.get("na_bolsa"):
+        return {"na_bolsa": True, "pode": True, "motivo": "", "bolsa": bolsa[0]["nome"]}
+    if _slots_ocupados_por(equip or {}, item.get("nome", "")):
+        return {"na_bolsa": False, "pode": False, "motivo": "Está equipado.", "bolsa": bolsa[0]["nome"]}
+    cabe = _peso_na_bolsa(dono) + _peso_do_item(item) * int(item.get("qtd", 1) or 1) <= bolsa[1]
+    return {"na_bolsa": False, "pode": cabe,
+            "motivo": "" if cabe else f"Não cabe: a {bolsa[0]['nome']} aguenta {bolsa[1]:g} kg.",
+            "bolsa": bolsa[0]["nome"]}
+
+
+def _guardar_na_bolsa(char: str, nome: str, guardar: bool) -> str:
+    dono, err = _get_char(char)
+    if not dono:
+        return err
+    item = _item_do_inventario(dono, nome)
+    if not item:
+        return f"Erro: {dono['name']} não tem '{nome}'."
+    uso = _bolsa_na_mochila(dono, item, (dono.get("sheet") or {}).get("equipamentos") or {})
+    if not uso:
+        return f"Aviso: {dono['name']} não tem bolsa mágica onde guardar."
+    if not guardar:
+        item.pop("na_bolsa", None)
+        memory.save_campaign()
+        return f"{dono['name']} tira {item['nome']} de dentro da {uso['bolsa']}."
+    if not uso["pode"]:
+        return f"Aviso: {uso['motivo']}"
+    item["na_bolsa"] = True
+    memory.save_campaign()
+    return f"{dono['name']} guarda {item['nome']} na {uso['bolsa']}: deixa de pesar."
+
+
 def _sintonia_na_mochila(dono: dict, item: dict) -> dict | None:
     """
     O botão de sintonizar do item, ou None quando o item não pede sintonia:
@@ -11410,12 +11541,14 @@ def _uso_na_mochila(dono: dict, item: dict) -> dict | None:
         return None
     efeito = ficha["efeito"]
     rotulo = "Beber" if efeito in ("cura", "resistencia", "pocao") else "Usar"
+    if efeito == "pocao" and ficha["uso"].get("verbo") == "aplicar":
+        rotulo = "Aplicar"
     uso = {"efeito": efeito, "rotulo": rotulo, "pode": True, "motivo": "",
            "detalhe": ficha.get("rotulo", ""), "alvos": []}
     if efeito == "magia":
         restam = ""
         if ficha["uso"].get("tipo") == "cargas":
-            restam = f" ({_cargas_do_item(item, ficha['uso'])}/{ficha['uso'].get('cargas')} cargas)"
+            restam = f" ({_cargas_do_item(item, ficha['uso'])}/{_cargas_maximas(item, ficha['uso'])} cargas)"
         uso.update(pode=False, rotulo="Conjurar", detalhe=ficha.get("rotulo", "") + restam,
                    motivo="Conjura pela tela tática (botão Habilidade), ou peça ao mestre fora da luta.")
         return uso
@@ -11602,6 +11735,8 @@ def inventory_snapshot(char_name: str = "") -> dict:
             "efeito_desconhecido": bool(it.get("efeito_desconhecido")),
             "uso": _uso_na_mochila(alvo, it),
             "sintonia": _sintonia_na_mochila(alvo, it),
+            # Bolsa de Contenção: guardar ou tirar (o que vai dentro não pesa).
+            "bolsa": _bolsa_na_mochila(alvo, it, equip),
             # Para quem do grupo dá para passar o item (vivo, e não ele mesmo).
             "dar_a": [c.get("name", "") for c in grupo
                       if c is not alvo and (c.get("status") or "").lower() != "morto"],
@@ -11613,7 +11748,7 @@ def inventory_snapshot(char_name: str = "") -> dict:
         "ca": ca_atual,
         "moedas": _moedas_da_ficha(s),
         "carga": {"kg": carga, "capacidade": cap, "estado": estado,
-                  "metade": round(cap / 2, 1)},
+                  "leve": round(cap / 3, 1), "pesado": round(cap * 2 / 3, 1)},
         "sintonizados": {"usados": len([n for n in s.get("sintonizados") or [] if isinstance(n, str)]),
                          "limite": _LIMITE_DE_SINTONIA},
         "equipados": equipados,
@@ -11638,6 +11773,8 @@ def inventory_action(action: str, char: str = "", item: str = "", slot: str = ""
         msg = _usar_na_mochila(char, item, alvo)
     elif a == "dar":
         msg = give_item(char, alvo, item, 1)
+    elif a in ("guardar", "tirar"):
+        msg = _guardar_na_bolsa(char, item, a == "guardar")
     elif a == "sintonizar":
         # Um descanso curto com o item: a hora passa no relógio, como no
         # "Identificar" (attune_item, a ferramenta do mestre, não mexe nele).
@@ -12484,7 +12621,8 @@ def shop_snapshot(shop_name: str = "", buyer: str = "") -> dict:
             "bolsa_texto": _fmt_pc(_cobre_total(sh)),
             "carga":      round(carga, 1),
             "capacidade": round(cap, 1),
-            "meia_capacidade": round(cap / 2, 1),
+            "carga_leve": round(cap / 3, 1),
+            "carga_pesada": round(cap * 2 / 3, 1),
             "estado_carga":   estado,
         }
         if escolhida:
@@ -13417,6 +13555,35 @@ def use_hit_die(char_name: str, count: int = 1) -> str:
     )
 
 
+def _comer_no_descanso(char: dict) -> str:
+    """
+    O dia de descanso come uma ração. A conta só começa quando o personagem
+    come a primeira (a mesa que não anda com ração não é cobrada): daí em
+    diante, sem ração, conta os dias, e passado o limite do 5e (3 + mod. de
+    CON, no mínimo 1) cada dia a mais dá um nível de exaustão.
+    """
+    s = char["sheet"]
+    racao = next((i for i in char.get("inventario") or []
+                  if isinstance(i, dict) and int(i.get("qtd", 0) or 0) > 0
+                  and (_itens.comum(i.get("nome", "")) or {}).get("chave") == "rations-1-day"), None)
+    if racao:
+        racao["qtd"] = int(racao["qtd"]) - 1
+        if racao["qtd"] <= 0:
+            char["inventario"].remove(racao)
+        s["come_racoes"] = True
+        s["dias_sem_comer"] = 0
+        return f" Come uma ração (restam {max(0, racao['qtd'])})."
+    if not s.get("come_racoes"):
+        return ""
+    s["dias_sem_comer"] = int(s.get("dias_sem_comer", 0) or 0) + 1
+    limite = max(1, 3 + _modifier(int(s.get("constituicao", 10) or 10)))
+    if s["dias_sem_comer"] > limite:
+        s["exaustao"] = min(6, _exaustao(s) + 1)
+        return (f"\n   Aviso: {s['dias_sem_comer']}º dia sem comer (aguenta {limite}): "
+                f"um nível de exaustão (agora {s['exaustao']}).")
+    return f"\n   Nota: sem ração — {s['dias_sem_comer']}º dia sem comer (aguenta {limite} sem exaustão)."
+
+
 def long_rest(char_name: str) -> str:
     """
     Descanso longo (~8 horas): restaura toda a vida e toda a mana.
@@ -13517,9 +13684,10 @@ def long_rest(char_name: str) -> str:
     removidas = len(conds_antes) - len(s["condicoes"])
     cond_msg  = f"\n   {removidas} condição(ões) temporária(s) removida(s)." if removidas else ""
 
+    comida = _comer_no_descanso(char)
     memory.save_campaign()
     return (
-        f"{char['name']} faz um descanso longo.\n"
+        f"{char['name']} faz um descanso longo.{comida}\n"
         f"   Vida restaurada: {s['vida_atual']}/{s['vida_max']}{_nota_teto(s)}\n"
         f"   Mana restaurada: {s['mana_max']}/{s['mana_max']}\n"
         f"   Dados de vida: {dados_antes} → {s['hit_dice_remaining']}/{dados_max}"
@@ -16683,7 +16851,9 @@ def _npc_aproximar(npc_name: str, alvo: str) -> tuple[str, bool]:
     _npc_ch = memory.campaign["characters"].get(memory.char_key(npc_name)) or {}
     _preso_mv = _condicao_com(_npc_ch, "no_movement")
     if _preso_mv:
-        if _norm_txt(_preso_mv) == "agarrado":
+        _na_rede = any(isinstance(c, dict) and c.get("da_rede")
+                       for c in (_npc_ch.get("sheet") or {}).get("condicoes") or [])
+        if _norm_txt(_preso_mv) == "agarrado" or _na_rede:
             from rpg import manobras as _manobras
             return _manobras.escapar(npc_name), False
         return f"{npc_name} está {_preso_mv} e não sai da zona.", False
@@ -17687,8 +17857,17 @@ def _uso_do_item(nome: str) -> dict | None:
 def _cargas_do_item(item: dict, uso: dict) -> int:
     """As cargas que restam no item; o item novo vem cheio."""
     if item.get("cargas") is None:
-        item["cargas"] = int(uso.get("cargas", 0) or 0)
+        if uso.get("cargas_iniciais"):
+            # O Colar de Bolas de Fogo vem com 1d6+3 contas, e elas não voltam.
+            v, _txt = _rolar_expr(uso["cargas_iniciais"])
+            item["cargas"] = item["cargas_max"] = max(1, v)
+        else:
+            item["cargas"] = int(uso.get("cargas", 0) or 0)
     return int(item["cargas"])
+
+
+def _cargas_maximas(item: dict, uso: dict) -> int:
+    return int(item.get("cargas_max") or uso.get("cargas") or 0)
 
 
 def _efeito_de_item(item_name: str) -> dict | None:
@@ -17805,8 +17984,9 @@ def _beber_pocao(dono: dict, nome: str, uso: dict) -> str:
     até o fim dela; as de uma hora correm no relógio. Devolve o texto.
     """
     s = dono["sheet"]
+    horas = int(str(uso.get("duracao", "1h")).rstrip("h") or 1) if uso.get("duracao") != "1min" else 0
     prazo = ({"ate": "fim_do_combate"} if uso.get("duracao") == "1min"
-             else {"ate_hora": _agora_em_horas() + 1})
+             else {"ate_hora": _agora_em_horas() + max(1, horas)})
     partes = []
     efeito = dict(uso.get("efeito") or {})
     if uso.get("atributo"):
@@ -17839,7 +18019,8 @@ def _beber_pocao(dono: dict, nome: str, uso: dict) -> str:
             partes.append(f"{linha}: {'resiste' if passou else d['condicao']}")
     if uso.get("atributo"):
         _recalculate_ca(dono)
-    return (f"{dono['name']} bebeu {nome}: {uso.get('nota', '')}"
+    verbo = "aplicou" if uso.get("verbo") == "aplicar" else "bebeu"
+    return (f"{dono['name']} {verbo} {nome}: {uso.get('nota', '')}"
             + (f" ({'; '.join(partes)})" if partes else ""))
 
 
@@ -18564,6 +18745,12 @@ def _combatant_weapons(ch: dict) -> list[dict]:
         inm = (it.get("nome") or "")
         if _itens.arma(inm) or any(kw in inm.lower() for kw in _WEAPON_KEYWORDS):
             _add(inm, "inventário")
+    # A munição mágica vira uma opção da arma: "Arco Longo (Flecha +1)".
+    for w in list(out):
+        for it in (ch.get("inventario") or []):
+            if (isinstance(it, dict) and _itens.separar_bonus(it.get("nome", ""))[1]
+                    and int(it.get("qtd", 0) or 0) > 0 and _municao_compativel(w["nome"], it["nome"])):
+                _add(f"{w['nome']} ({it['nome']})", "munição mágica")
     _add("Ataque desarmado", "desarmado")
     return out
 
@@ -18634,6 +18821,20 @@ def _magias_de_itens(ch: dict) -> list[dict]:
         if magico and magico.get("sintonizacao") and not _esta_sintonizado(s, it["nome"]):
             continue
         restam = _cargas_do_item(it, uso) if uso["tipo"] == "cargas" else int(it.get("qtd", 1) or 1)
+        if uso.get("maravilha") and restam > 0:
+            base_h = {"nome": "Mísseis Mágicos", "descricao": "", "custo_mana": 0, "dado": ""}
+            cartao_m = _cartao_de_habilidade(base_h, ch, _habilidade.resolver(base_h, ch))
+            cartao_m.update({
+                "nome": f"Maravilha [{it['nome']}]", "nome_exibido": f"Maravilha ({it['nome']})",
+                "descricao": uso.get("nota", ""), "resumo": "um efeito ao acaso, d100",
+                "dado": "", "efeito": "", "rotulo": "efeito ao acaso", "tipo_dano": "", "salvaguarda": "",
+                "area": "", "alvos": "um", "concentracao": False, "tipo_acao": "acao",
+                "resolucao": "motor", "resolucao_texto": "o motor rola o d100 da varinha",
+                "modos": [], "alvo_modo": "inimigo", "target_mode": "single", "alvos_por_modo": {},
+                "projeteis": False, "max_alvos": 1, "de_item": it["nome"],
+                "usos": restam, "usos_max": _cargas_maximas(it, uso),
+            })
+            saida.append(cartao_m)
         for entrada in uso.get("magias") or []:
             m = compendio.magia(entrada["magia"])
             if not m:
@@ -18650,7 +18851,7 @@ def _magias_de_itens(ch: dict) -> list[dict]:
                 "nome": f"{m['nome']} [{it['nome']}]",
                 "nome_exibido": f"{m['nome']} ({it['nome']})",
                 "custo_mana": 0, "tipo_acao": "acao", "de_item": it["nome"],
-                "usos": restam, "usos_max": (int(uso.get("cargas", 0) or 0) if uso["tipo"] == "cargas" else None),
+                "usos": restam, "usos_max": (_cargas_maximas(it, uso) if uso["tipo"] == "cargas" else None),
                 "modos": ([{"id": f"c{c}", "texto": f"{c}º círculo: {k} carga{'s' if k > 1 else ''}", "alvo": ""}
                            for c, k in circulos] if len(circulos) > 1 else []),
                 "alvos_por_modo": _alvos_por_circulo_do_item(h, [c for c, _k in circulos]),
@@ -18661,10 +18862,11 @@ def _magias_de_itens(ch: dict) -> list[dict]:
 
 def _circulos_do_item(m: dict, entrada: dict, uso: dict, restam: int) -> list[tuple[int, int]]:
     """(círculo, cargas) que o item consegue agora. Pergaminho: o círculo da magia."""
-    base = int(m.get("nivel", 0) or 0)
+    # "circulo": o Cajado do Poder lança a Bola de Fogo no 5º, não no 3º.
+    base = int(entrada.get("circulo") or m.get("nivel", 0) or 0)
     if uso.get("tipo") != "cargas":
         return [(base, 0)]
-    custo = int(entrada.get("cargas", 1) or 1)
+    custo = int(entrada.get("cargas", 1))         # 0: à vontade (Luz no Cajado do Mago)
     if not entrada.get("extra"):
         return [(base, custo)] if custo <= restam else []
     teto = min(9, int(entrada.get("max_circulo", 9) or 9))
@@ -18745,6 +18947,8 @@ def _conjurar_do_item(actor: str, item_nome: str, magia_nome: str, target: str =
     magico = _magico_por_nome(item["nome"])
     if magico and magico.get("sintonizacao") and not _esta_sintonizado(s, item["nome"]):
         return f"Erro: {item['nome']} só funciona sintonizado (attune_item). Nada foi gasto."
+    if uso.get("maravilha"):
+        return _usar_maravilha(char, item, uso, target, end_turn)
     m = compendio.magia(magia_nome)
     entrada = next((e for e in uso.get("magias") or []
                     if m and (compendio.magia(e["magia"]) or {}).get("nome_srd") == m.get("nome_srd")), None)
@@ -18753,7 +18957,7 @@ def _conjurar_do_item(actor: str, item_nome: str, magia_nome: str, target: str =
                            for e in uso.get("magias") or [])
         return f"Erro: {item['nome']} não conjura '{magia_nome}'. Conjura: {opcoes}."
     base = int(m.get("nivel", 0) or 0)
-    circulo = _resolucao_i.circulo_do_modo({}, modo) or base
+    circulo = _resolucao_i.circulo_do_modo({}, modo) or int(entrada.get("circulo") or base)
     nota_teste = ""
     if uso["tipo"] == "cargas":
         restam = _cargas_do_item(item, uso)
@@ -18775,25 +18979,16 @@ def _conjurar_do_item(actor: str, item_nome: str, magia_nome: str, target: str =
             return (f"{char['name']} tenta ler {item['nome']}: {nota_teste}. As palavras se "
                     f"embaralham e o pergaminho se desfaz sem efeito.")
 
-    ja_tinha = any(isinstance(h, dict) and _norm_txt(h.get("nome", "")) == _norm_txt(m["nome"])
-                   for h in char.get("habilidades") or [])
-    temp = {"nome": m["nome"], "descricao": m.get("resumo", ""), "custo_mana": 0, "dado": "", "_do_item": True}
-    if not ja_tinha:
-        char.setdefault("habilidades", []).append(temp)
-    try:
-        with _conjurando_pelo_item(s, uso.get("cd"), uso.get("ataque")):
-            msg = use_ability(char["name"], m["nome"], target, end_turn=end_turn, _skip_turn_check=True,
-                              modo=(f"c{circulo}" if circulo > base else ""), _sem_custo=True)
-    finally:
-        if not ja_tinha:
-            char["habilidades"] = [h for h in char.get("habilidades") or [] if h is not temp]
+    msg = _lancar_pelo_item(char, m, target, (f"c{circulo}" if circulo > base else ""),
+                            uso.get("cd"), uso.get("ataque"), end_turn)
     if msg.lstrip().startswith(("Erro:", "Aviso:")):
         return msg
     if uso["tipo"] == "cargas":
         item["cargas"] = _cargas_do_item(item, uso) - custo
-        nota = f"\n   {item['nome']}: {item['cargas']}/{uso.get('cargas')} cargas."
-        # A última carga: num 1 no d20, a varinha se desfaz (SRD).
-        if item["cargas"] <= 0 and random.randint(1, 20) == 1:
+        nota = f"\n   {item['nome']}: {item['cargas']}/{_cargas_maximas(item, uso)} cargas."
+        # A última carga: num 1 no d20, a varinha se desfaz (SRD). As contas
+        # do colar só acabam.
+        if item["cargas"] <= 0 and not uso.get("sem_desfazer") and random.randint(1, 20) == 1:
             _gastar_unidade(char, item)
             nota = f"\n   A última carga de {item['nome']} se foi, e o item se desfaz em pó."
     else:
@@ -18801,6 +18996,54 @@ def _conjurar_do_item(actor: str, item_nome: str, magia_nome: str, target: str =
         nota = f"\n   O pergaminho se desfaz." + (f" ({nota_teste})" if nota_teste else "")
     memory.save_campaign()
     return f"{char['name']} usa {item['nome']}.\n" + msg + nota
+
+
+def _lancar_pelo_item(char: dict, m: dict, target: str, modo: str, cd, ataque,
+                      end_turn: bool = False) -> str:
+    """A magia `m` conjurada por `char` com a CD e o ataque do item, sem mana."""
+    ja_tinha = any(isinstance(h, dict) and _norm_txt(h.get("nome", "")) == _norm_txt(m["nome"])
+                   for h in char.get("habilidades") or [])
+    temp = {"nome": m["nome"], "descricao": m.get("resumo", ""), "custo_mana": 0, "dado": "", "_do_item": True}
+    if not ja_tinha:
+        char.setdefault("habilidades", []).append(temp)
+    try:
+        with _conjurando_pelo_item(char["sheet"], cd, ataque):
+            return use_ability(char["name"], m["nome"], target, end_turn=end_turn, _skip_turn_check=True,
+                               modo=modo, _sem_custo=True)
+    finally:
+        if not ja_tinha:
+            char["habilidades"] = [h for h in char.get("habilidades") or [] if h is not temp]
+
+
+def _usar_maravilha(char: dict, item: dict, uso: dict, target: str, end_turn: bool = False) -> str:
+    """
+    Varinha das Maravilhas: uma carga, um d100 na tabela do item. Às vezes é
+    uma magia (Bola de Fogo, Lentidão), às vezes só a cena (borboletas, uma
+    chuva de gemas que o Mestre põe no chão).
+    """
+    from rpg import compendio
+    restam = _cargas_do_item(item, uso)
+    if restam < 1:
+        return f"Aviso: {item['nome']} está sem cargas. Nada foi gasto."
+    rolagem = random.randint(1, 100)
+    linha = next(l for l in uso["maravilha"] if rolagem <= int(l["ate"]))
+    item["cargas"] = restam - 1
+    alvo = char["name"] if linha.get("em_si") else target
+    texto = f"{char['name']} usa {item['nome']}: d100 = {rolagem} — {linha['texto']}."
+    if linha.get("magia"):
+        m = compendio.magia(linha["magia"])
+        msg = _lancar_pelo_item(char, m, alvo, linha.get("modo", ""), uso.get("cd"), None, end_turn)
+        texto += "\n" + msg
+    elif linha.get("condicao") and linha.get("em_si"):
+        char["sheet"].setdefault("condicoes", []).append({"nome": linha["condicao"], "duracao": 1})
+    else:
+        texto += " (O Mestre narra o efeito.)"
+    texto += f"\n   {item['nome']}: {item['cargas']}/{_cargas_maximas(item, uso)} cargas."
+    if item["cargas"] <= 0 and random.randint(1, 20) == 1:
+        _gastar_unidade(char, item)
+        texto += f"\n   A última carga se foi, e {item['nome']} se desfaz em pó."
+    memory.save_campaign()
+    return texto
 
 
 def _gastar_unidade(char: dict, item: dict) -> None:
@@ -18911,6 +19154,9 @@ def _combatant_snapshot(name: str) -> dict | None:
         if key and key not in _seen_cond:        # dedup por nome
             _seen_cond.add(key)
             conds.append(nm)
+    # Preso na rede: aparece com as condições (o botão Escapar vale para ela).
+    if any(isinstance(c, dict) and c.get("da_rede") for c in (s.get("condicoes") or [])):
+        conds.append("Preso na rede")
     # Montado: aparece com as condições.
     from rpg import manobras as _mb_s
     if _mb_s.montaria_de(ch):

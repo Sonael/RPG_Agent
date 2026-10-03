@@ -106,7 +106,8 @@
 
   // ---- Render ------------------------------------------------------
   const kg = (n) => `${Number(n).toFixed(n % 1 ? 2 : 0).replace(/\.?0+$/, '') || 0} kg`;
-  const ROTULO_CARGA = { livre: 'livre', sobrecarregado: 'sobrecarregado', imovel: 'imóvel' };
+  const ROTULO_CARGA = { livre: 'livre', sobrecarregado: 'sobrecarregado',
+                         muito_sobrecarregado: 'muito sobrecarregado', imovel: 'imóvel' };
 
   function itemNoChao(it, grupo) {
     const vivos = grupo.filter(p => !p.morto);
@@ -152,7 +153,7 @@
     const pct = (v) => (c.capacidade > 0 ? Math.max(0, Math.min(100, (v / c.capacidade) * 100)) : 0);
     const muda = c.kg_previsto !== c.kg;
     const cls = c.estado_previsto === 'imovel' ? ' lot-carga-imovel'
-              : (c.estado_previsto === 'sobrecarregado' ? ' lot-carga-cheia' : '');
+              : (/sobrecarregado/.test(c.estado_previsto) ? ' lot-carga-cheia' : '');
     const piora = c.estado_previsto !== c.estado;
     const moedasTxt = MOEDAS
       .filter(([k]) => (p.moedas_recebe || {})[k]).map(([k, a]) => `${p.moedas_recebe[k]} ${a}`).join(' ');
@@ -176,7 +177,8 @@
           <div class="lot-carga-barra">
             <div class="lot-carga-atual" style="width:${pct(c.kg)}%"></div>
             <div class="lot-carga-prevista${cls}" data-barra="lot:${esc(p.nome)}:previsto" style="left:${pct(c.kg)}%;width:${Math.max(0, pct(c.kg_previsto) - pct(c.kg))}%"></div>
-            <div class="lot-carga-meio" style="left:50%" title="Metade da capacidade (${kg(c.metade)}): acima daqui, desvantagem"></div>
+            <div class="lot-carga-meio" style="left:33.3%" title="1/3 da capacidade (${kg(c.leve)}): acima daqui, -3 m"></div>
+            <div class="lot-carga-meio" style="left:66.7%" title="2/3 da capacidade (${kg(c.pesado)}): acima daqui, -6 m e desvantagem"></div>
           </div>
           <div class="lot-estado${piora ? ' lot-estado-piora' : ''}">${piora
             ? `${ROTULO_CARGA[c.estado]} → ${ROTULO_CARGA[c.estado_previsto]}`

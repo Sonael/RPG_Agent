@@ -94,7 +94,7 @@
     const c = p.carga;
     const pct = c.capacidade > 0 ? Math.max(0, Math.min(100, (c.kg / c.capacidade) * 100)) : 0;
     const cls = c.estado === 'imovel' ? ' inv-carga-imovel'
-              : (c.estado === 'sobrecarregado' ? ' inv-carga-cheia' : '');
+              : (/sobrecarregado/.test(c.estado) ? ' inv-carga-cheia' : '');
     return `
       <div class="inv-ca" title="Classe de Armadura">
         <span class="inv-ca-num" id="inv-ca-num" data-num="inv:${esc(p.nome)}:ca">${p.ca}</span><span class="inv-ca-rotulo">CA</span>
@@ -106,8 +106,10 @@
         </div>
         <div class="inv-carga-barra">
           <div class="inv-carga-fill${cls}" data-barra="inv:${esc(p.nome)}:carga" style="width:${pct}%"></div>
-          <div class="inv-carga-meio" style="left:50%"
-               title="Metade da capacidade (${c.metade} kg): acima daqui, desvantagem"></div>
+          <div class="inv-carga-meio" style="left:33.3%"
+               title="1/3 da capacidade (${c.leve} kg): acima daqui, -3 m"></div>
+          <div class="inv-carga-meio" style="left:66.7%"
+               title="2/3 da capacidade (${c.pesado} kg): acima daqui, -6 m e desvantagem"></div>
         </div>
       </div>
       <div class="inv-moedas">${moedas(p.moedas, `inv:${p.nome}`)}</div>`;
@@ -174,6 +176,7 @@
       i.efeito_desconhecido
         ? '<span class="inv-marca inv-marca-sem-efeito" title="Ninguém declarou o que este item faz. Pergunte ao mestre em cena.">efeito não declarado</span>' : '',
       i.sintonia && i.sintonia.sintonizado ? '<span class="inv-marca inv-marca-sintonia">sintonizado</span>' : '',
+      i.bolsa && i.bolsa.na_bolsa ? `<span class="inv-marca" title="Dentro da bolsa mágica: não pesa">na ${esc(i.bolsa.bolsa)}</span>` : '',
       i.sintonia && !i.sintonia.sintonizado
         ? '<span class="inv-marca inv-marca-sem-sintonia" title="Este item só faz efeito depois de sintonizado">pede sintonia</span>' : '',
     ].join('');
@@ -200,6 +203,11 @@
           ${usos(i)}
           ${botoes}
           ${sintonia(i)}
+          ${i.bolsa ? (i.bolsa.na_bolsa
+              ? `<button class="inv-btn inv-btn-tirar-bolsa" onclick="window.Inventory._tirar('${aspas(i.nome)}')">Tirar da ${esc(i.bolsa.bolsa)}</button>`
+              : `<button class="inv-btn inv-btn-guardar" ${i.bolsa.pode ? '' : 'disabled'} title="${esc(i.bolsa.motivo || 'O que vai dentro não pesa')}"
+                         onclick="window.Inventory._guardar('${aspas(i.nome)}')">Guardar na ${esc(i.bolsa.bolsa)}</button>`)
+            : ''}
           ${(i.dar_a || []).length ? `<select class="inv-dar" aria-label="Dar a alguém do grupo"
                   onchange="if (this.value) window.Inventory._dar('${aspas(i.nome)}', this.value)">
               <option value="">Dar a…</option>
@@ -391,6 +399,8 @@
     _identificar: identificar,
     _sintonizar: (item) => agir({ action: 'sintonizar', item }),
     _dar: (item, alvo) => agir({ action: 'dar', item, alvo }),
+    _guardar: (item) => agir({ action: 'guardar', item }),
+    _tirar: (item) => agir({ action: 'tirar', item }),
     _dessintonizar: (item) => agir({ action: 'dessintonizar', item }),
   };
 

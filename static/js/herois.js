@@ -106,7 +106,7 @@
     (p.efeitos || []).forEach(e => marcas.push(
       `<span class="hro-marca hro-marca-efeito" title="Efeito de item até o fim do combate">${esc(e)}</span>`));
     if (p.carga && p.carga.estado !== 'livre') {
-      marcas.push(`<span class="hro-marca hro-marca-perigo">${p.carga.estado === 'imovel' ? 'Imóvel' : 'Sobrecarregado'}</span>`);
+      marcas.push(`<span class="hro-marca hro-marca-perigo">${p.carga.estado === 'imovel' ? 'Imóvel' : (p.carga.estado === 'muito_sobrecarregado' ? 'Muito sobrecarregado' : 'Sobrecarregado')}</span>`);
     }
     return marcas.join('');
   }

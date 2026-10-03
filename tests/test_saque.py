@@ -74,7 +74,7 @@ def test_dar_devolver_e_carga_prevista(grupo):
     assert r["ok"] is True
     lyra = _membro("Lyra")
     assert lyra["carga"]["kg_previsto"] > lyra["carga"]["kg"]
-    assert lyra["carga"]["estado_previsto"] in ("sobrecarregado", "imovel")
+    assert lyra["carga"]["estado_previsto"] in ("sobrecarregado", "muito_sobrecarregado", "imovel")
     assert lyra["recebe"] == [{"id": cota["id"], "nome": "Cota de Malha", "qtd": 1}]
     assert _item("Cota de Malha")["sobra"] == 0
 

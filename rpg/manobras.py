@@ -299,6 +299,15 @@ def escapar(ator: str) -> str:
     a = _ch(ator)
     pegada = next((c for c in (a.get("sheet") or {}).get("condicoes") or []
                    if isinstance(c, dict) and c.get("nome") == "Agarrado"), None)
+    rede = next((c for c in (a.get("sheet") or {}).get("condicoes") or []
+                 if isinstance(c, dict) and c.get("da_rede")), None)
+    if not pegada and rede:
+        atl, _ = _pericia(a, "atletismo", "forca")
+        cd = int(rede.get("escapa_cd", 10) or 10)
+        if atl >= cd:
+            a["sheet"]["condicoes"].remove(rede)
+            return f"{a['name']} rasga a rede: Atletismo {atl} contra CD {cd} — livre."
+        return f"{a['name']} se debate na rede: Atletismo {atl} contra CD {cd} — continua preso."
     if not pegada:
         return f"Erro: {a['name']} não está agarrado."
     quem = _ch(pegada.get("por", ""))

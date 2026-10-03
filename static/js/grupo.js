@@ -88,6 +88,7 @@
   function carga(h) {
     const c = h.carga;
     const estado = c.estado === 'imovel' ? 'imóvel'
+      : c.estado === 'muito_sobrecarregado' ? 'muito sobrecarregado'
       : c.estado === 'sobrecarregado' ? 'sobrecarregado'
       : c.perto_do_limite ? `perto do limite · folga ${c.folga_kg} kg`
       : `folga ${c.folga_kg} kg`;

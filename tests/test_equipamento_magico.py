@@ -342,13 +342,14 @@ def test_furtividade_com_armadura_que_pesa(heroi):
 
 
 def test_mithral_nao_atrapalha_a_furtividade_nem_pede_forca(heroi):
+    heroi["sheet"]["forca"] = 12           # aguenta o peso (25 kg) sem sobrecarga
     _vestir(heroi, "Cota de Malha de Mithral")
     assert "Furtividade" not in td.make_skill_check("Brynn", "destreza", 10, skill="furtividade").split("\n")[1]
     assert td._deslocamento(heroi)["metros"] == 9.0
 
 
 def test_forca_minima_da_armadura_pesada(heroi):
-    heroi["sheet"]["forca"] = 12           # aguenta o peso, não a armadura (FOR 15)
+    heroi["sheet"]["forca"] = 14           # aguenta o peso (29,5 kg), não a armadura (FOR 15)
     _vestir(heroi, "Armadura de Placas")
     desl = td._deslocamento(heroi)
     assert desl["metros"] == 6.0 and any("FOR 15" in n for n in desl["notas"])

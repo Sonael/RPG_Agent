@@ -887,6 +887,25 @@ eram "efeito desconhecido — descreva em Ação Livre".
   ("platina", "electro"), a divisão do saque e as telas. A compra paga com
   ouro, prata e cobre; a platina só se quebra (e vira troco) quando eles não
   bastam.
+- **Rede:** o acerto não fere, prende (Contido, "Preso na rede" na tela); o
+  botão Escapar vale para ela (FOR CD 10, uma ação), e o inimigo preso tenta
+  escapar sozinho.
+- **Munição mágica:** a Flecha +1 vira uma opção da arma na tela ("Arco Longo
+  (Flecha +1)"): soma +1 no ataque e no dano e é a que se gasta; sem escolha,
+  sai a flecha comum.
+- **Óleos:** Afiação (a arma fica +3 por uma hora), Escorregadio (oito horas
+  sem ficar Contido, Agarrado ou Imobilizado, e solta quem já estava) e
+  Etereidade (narrado). A Mochila oferece "Aplicar".
+- **Cajado do Poder** (Bola de Fogo e Relâmpago no 5º círculo, +2 na CA e nas
+  salvaguardas), **Cajado do Mago** (Bola de Fogo e Relâmpago no 7º; Luz,
+  Detectar Magia e outras à vontade; vantagem contra magia), **Colar de Bolas
+  de Fogo** (1d6+3 contas que não voltam nem desfazem o colar) e **Varinha das
+  Maravilhas** (um d100 nas faixas da tabela do SRD, com as palavras do jogo:
+  às vezes uma magia pelo motor, às vezes só a cena para o Mestre narrar).
+- **Rações:** o descanso longo come uma ração. A conta só começa quando o
+  personagem come a primeira (mesa que não anda com ração não é cobrada);
+  daí em diante, sem ração, conta os dias, e passado o limite do 5e (3 + mod.
+  de CON) cada dia dá um nível de exaustão.
 - **Defeito do lote 2 corrigido aqui:** `end_combat` regravava a lista de
   efeitos a partir de `_efeitos`, que inclui os efeitos dos itens vestidos; o
   Anel de Proteção ficava gravado na ficha e valia sem o anel.
@@ -1013,10 +1032,17 @@ independentes é o que gerou o problema, então
 `test_o_wizard_promete_a_ca_que_o_motor_entrega` lê o `menu.js` de dentro do
 pytest e compara entrada por entrada.
 
-Capacidade = **FOR × 7,5 kg**. Acima da metade o personagem fica
-**sobrecarregado**: desvantagem em ataques e em testes de FOR, DES e CON — não
-em INT, SAB ou CAR, porque a mochila atrapalha o corpo, não o raciocínio.
-Acima do total, não anda. `check_encumbrance` mostra a conta e os itens mais
+Capacidade = **FOR × 15 lb (FOR × 6,8 kg)**, com a regra variante de carga do
+Livro do Jogador: acima de 1/3 o personagem fica **sobrecarregado** (-3 m);
+acima de 2/3, **muito sobrecarregado** (-6 m e desvantagem em ataques, testes e
+salvaguardas de FOR, DES e CON — não em INT, SAB ou CAR, porque a mochila
+atrapalha o corpo, não o raciocínio); acima do total, não anda. Antes era uma
+mistura das duas regras: a partir da metade, -3 m e a desvantagem de uma vez.
+As telas mostram as duas marcas (1/3 e 2/3) na barra de carga.
+
+O que vai dentro de uma **Bolsa de Contenção** (226 kg), **Mochila Prática** (54
+kg) ou **Buraco Portátil** não pesa: "Guardar na bolsa" e "Tirar" na Mochila
+(o equipado não entra; sem a bolsa, tudo volta a pesar). `check_encumbrance` mostra a conta e os itens mais
 pesados.
 
 Lojas: `open_shop`, `list_shop`, `buy_item`, `sell_item`. A compra desconta da

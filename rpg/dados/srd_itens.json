@@ -4906,7 +4906,21 @@
    "sintonizacao": false,
    "peso_kg": 0.0,
    "texto_srd": "This necklace has 1d6 + 3 beads hanging from it. You can use an action to detach a bead and throw it up to 60 feet away. When it reaches the end of its trajectory, the bead detonates as a 3rd-level _fireball_ spell (save DC 15). You can hurl multiple beads, or even the whole necklace, as one action. When you do so, increase the level of the _fireball_ by 1 for each bead beyond the first.",
-   "slot": "amuleto"
+   "slot": "amuleto",
+   "uso": {
+    "tipo": "cargas",
+    "cargas_iniciais": "1d6+3",
+    "sem_desfazer": true,
+    "cd": 15,
+    "magias": [
+     {
+      "magia": "Fireball",
+      "cargas": 1,
+      "extra": true
+     }
+    ],
+    "nota": "Contas que explodem em Bola de Fogo (CD 15); várias de uma vez, um círculo acima por conta. Não se recuperam."
+   }
   },
   "necklace-of-prayer-beads": {
    "chave": "necklace-of-prayer-beads",
@@ -4977,7 +4991,14 @@
    "raridade": "raro",
    "sintonizacao": false,
    "peso_kg": 0.0,
-   "texto_srd": "Beads of this cloudy gray oil form on the outside of its container and quickly evaporate. The oil can cover a Medium or smaller creature, along with the equipment it's wearing and carrying (one additional vial is required for each size category above Medium). Applying the oil takes 10 minutes. The affected creature then gains the effect of the _etherealness_ spell for 1 hour."
+   "texto_srd": "Beads of this cloudy gray oil form on the outside of its container and quickly evaporate. The oil can cover a Medium or smaller creature, along with the equipment it's wearing and carrying (one additional vial is required for each size category above Medium). Applying the oil takes 10 minutes. The affected creature then gains the effect of the _etherealness_ spell for 1 hour.",
+   "uso": {
+    "tipo": "pocao",
+    "verbo": "aplicar",
+    "duracao": "1h",
+    "efeito": {},
+    "nota": "Passa ao Plano Etéreo por uma hora (o Mestre narra o que se vê e o que se atravessa)."
+   }
   },
   "oil-of-sharpness": {
    "chave": "oil-of-sharpness",
@@ -4990,7 +5011,18 @@
    "raridade": "muito raro",
    "sintonizacao": false,
    "peso_kg": 0.0,
-   "texto_srd": "This clear, gelatinous oil sparkles with tiny, ultrathin silver shards. The oil can coat one slashing or piercing weapon or up to 5 pieces of slashing or piercing ammunition. Applying the oil takes 1 minute. For 1 hour, the coated item is magical and has a +3 bonus to attack and damage rolls."
+   "texto_srd": "This clear, gelatinous oil sparkles with tiny, ultrathin silver shards. The oil can coat one slashing or piercing weapon or up to 5 pieces of slashing or piercing ammunition. Applying the oil takes 1 minute. For 1 hour, the coated item is magical and has a +3 bonus to attack and damage rolls.",
+   "uso": {
+    "tipo": "pocao",
+    "verbo": "aplicar",
+    "duracao": "1h",
+    "efeito": {
+     "atk_bonus": 3,
+     "dano_fixo": 3,
+     "so_arma": true
+    },
+    "nota": "A arma fica +3 no ataque e no dano por uma hora."
+   }
   },
   "oil-of-slipperiness": {
    "chave": "oil-of-slipperiness",
@@ -5001,7 +5033,25 @@
    "raridade": "incomum",
    "sintonizacao": false,
    "peso_kg": 0.0,
-   "texto_srd": "This sticky black unguent is thick and heavy in the container, but it flows quickly when poured. The oil can cover a Medium or smaller creature, along with the equipment it's wearing and carrying (one additional vial is required for each size category above Medium). Applying the oil takes 10 minutes. The affected creature then gains the effect of a _freedom of movement_ spell for 8 hours. Alternatively, the oil can be poured on the ground as an action, where it covers a 10-foot square, duplicating the effect of the _grease_ spell in that area for 8 hours."
+   "texto_srd": "This sticky black unguent is thick and heavy in the container, but it flows quickly when poured. The oil can cover a Medium or smaller creature, along with the equipment it's wearing and carrying (one additional vial is required for each size category above Medium). Applying the oil takes 10 minutes. The affected creature then gains the effect of a _freedom of movement_ spell for 8 hours. Alternatively, the oil can be poured on the ground as an action, where it covers a 10-foot square, duplicating the effect of the _grease_ spell in that area for 8 hours.",
+   "uso": {
+    "tipo": "pocao",
+    "verbo": "aplicar",
+    "duracao": "8h",
+    "tira": [
+     "contido",
+     "agarrado",
+     "imobilizado"
+    ],
+    "efeito": {
+     "imune_condicoes": [
+      "contido",
+      "agarrado",
+      "imobilizado"
+     ]
+    },
+    "nota": "Liberdade de movimento por oito horas: nada prende, agarra nem imobiliza."
+   }
   },
   "orb-of-dragonkind": {
    "chave": "orb-of-dragonkind",
@@ -6304,6 +6354,57 @@
    "texto_srd": "This staff can be wielded as a magic quarterstaff that grants a +2 bonus to attack and damage rolls made with it. While holding it, you gain a +2 bonus to Armor Class, saving throws, and spell attack rolls. The staff has 20 charges for the following properties. The staff regains 2d8 + 4 expended charges daily at dawn. If you expend the last charge, roll a d20. On a 1, the staff retains its +2 bonus to attack and damage rolls but loses all other properties. On a 20, the staff regains 1d8 + 2 charges. **_Power Strike_**. When you hit with a melee attack using the staff, you can expend 1 charge to deal an extra 1d6 force damage to the target. **_Spells_**. While holding this staff, you can use an action to expend 1 or more of its charges to cast one of the following spells from it, using your spell save DC and spell attack bonus: _cone of cold_ (5 charges), _fireball_ (5th-level version, 5 charges), _globe of invulnerability_ (6 charges), _hold monster_ (5 charges), _levitate_ (2 charges), _lightning bolt_ (5th-level version, 5 charges), _magic missile_ (1 charge), _ray of enfeeblement_ (1 charge), or _wall of force_ (5 charges). **_Retributive Strike_**. You can use an action to break the staff over your knee or against a solid surface, performing a retributive strike. The staff is destroyed and releases its remaining magic in an explosion that expands to fill a 30-foot-radius sphere centered on it. You have a 50 percent chance to instantly travel to a random plane of existence, avoiding the explosion. If you fail to avoid the effect, you take force damage equal to 16 × the number of charges in the staff. Every other creature in the area must make a DC 17 Dexterity saving throw. On a failed save, a creature takes an amount of damage based on how far away it is from the point of origin, as shown in the following table. On a successful save, a creature takes half as much damage. | Distance from Origin | Damage | |-----------------------|----------------------------------------| | 10 ft. away or closer | 8 × the number of charges in the staff | | 11 to 20 ft. away | 6 × the number of charges in the staff | | 21 to 30 ft. away | 4 × the number of charges in the staff |",
    "sintonizacao_detalhe": "requires attunement by a sorcerer, warlock, or wizard",
    "base_arma": "quarterstaff",
+   "efeito": {
+    "nota": "+2 na CA e nas salvaguardas, e +2 de arma.",
+    "ca": 2,
+    "save_fixo": 2
+   },
+   "uso": {
+    "tipo": "cargas",
+    "cargas": 20,
+    "recarga": "2d8+4",
+    "magias": [
+     {
+      "magia": "Cone of Cold",
+      "cargas": 5
+     },
+     {
+      "magia": "Fireball",
+      "cargas": 5,
+      "circulo": 5
+     },
+     {
+      "magia": "Globe of Invulnerability",
+      "cargas": 6
+     },
+     {
+      "magia": "Hold Monster",
+      "cargas": 5
+     },
+     {
+      "magia": "Levitate",
+      "cargas": 2
+     },
+     {
+      "magia": "Lightning Bolt",
+      "cargas": 5,
+      "circulo": 5
+     },
+     {
+      "magia": "Magic Missile",
+      "cargas": 1
+     },
+     {
+      "magia": "Ray of Enfeeblement",
+      "cargas": 1
+     },
+     {
+      "magia": "Wall of Force",
+      "cargas": 5
+     }
+    ],
+    "nota": "20 cargas: Cone de Frio, Bola de Fogo e Relâmpago no 5º círculo, Globo de Invulnerabilidade, Imobilizar Monstro, Levitação, Mísseis Mágicos, Raio do Enfraquecimento, Muralha de Força. Recupera 2d8+4 ao amanhecer."
+   },
    "bonus": 2
   },
   "staff-of-striking": {
@@ -6361,6 +6462,96 @@
    "texto_srd": "This staff can be wielded as a magic quarterstaff that grants a +2 bonus to attack and damage rolls made with it. While you hold it, you gain a +2 bonus to spell attack rolls. The staff has 50 charges for the following properties. It regains 4d6 + 2 expended charges daily at dawn. If you expend the last charge, roll a d20. On a 20, the staff regains 1d12 + 1 charges. **_Spell Absorption_**. While holding the staff, you have advantage on saving throws against spells. In addition, you can use your reaction when another creature casts a spell that targets only you. If you do, the staff absorbs the magic of the spell, canceling its effect and gaining a number of charges equal to the absorbed spell's level. However, if doing so brings the staff's total number of charges above 50, the staff explodes as if you activated its retributive strike (see below). **_Spells_**. While holding the staff, you can use an action to expend some of its charges to cast one of the following spells from it, using your spell save DC and spellcasting ability: _conjure elemental_ (7 charges), _dispel magic_ (3 charges), _fireball_ (7th-level version, 7 charges), _flaming sphere_ (2 charges), _ice storm_ (4 charges), _invisibility_ (2 charges), _knock_ (2 charges), _lightning bolt_ (7th-level version, 7 charges), _passwall_ (5 charges), _plane shift_ (7 charges), _telekinesis_ (5 charges), _wall of fire_ (4 charges), or _web_ (2 charges). You can also use an action to cast one of the following spells from the staff without using any charges: _arcane lock_, _detect magic_, _enlarge/reduce_, _light_, _mage hand_, or _protection from evil and good._ **_Retributive Strike_**. You can use an action to break the staff over your knee or against a solid surface, performing a retributive strike. The staff is destroyed and releases its remaining magic in an explosion that expands to fill a 30-foot-radius sphere centered on it. You have a 50 percent chance to instantly travel to a random plane of existence, avoiding the explosion. If you fail to avoid the effect, you take force damage equal to 16 × the number of charges in the staff. Every other creature in the area must make a DC 17 Dexterity saving throw. On a failed save, a creature takes an amount of damage based on how far away it is from the point of origin, as shown in the following table. On a successful save, a creature takes half as much damage. | Distance from Origin | Damage | |-----------------------|----------------------------------------| | 10 ft. away or closer | 8 × the number of charges in the staff | | 11 to 20 ft. away | 6 × the number of charges in the staff | | 21 to 30 ft. away | 4 × the number of charges in the staff |",
    "sintonizacao_detalhe": "requires attunement by a sorcerer, warlock, or wizard",
    "base_arma": "quarterstaff",
+   "efeito": {
+    "nota": "Vantagem nas salvaguardas contra magia, e +2 de arma.",
+    "resistencia_a_magia": true
+   },
+   "uso": {
+    "tipo": "cargas",
+    "cargas": 50,
+    "recarga": "4d6+2",
+    "magias": [
+     {
+      "magia": "Conjure Elemental",
+      "cargas": 7
+     },
+     {
+      "magia": "Dispel Magic",
+      "cargas": 3
+     },
+     {
+      "magia": "Fireball",
+      "cargas": 7,
+      "circulo": 7
+     },
+     {
+      "magia": "Flaming Sphere",
+      "cargas": 2
+     },
+     {
+      "magia": "Ice Storm",
+      "cargas": 4
+     },
+     {
+      "magia": "Invisibility",
+      "cargas": 2
+     },
+     {
+      "magia": "Knock",
+      "cargas": 2
+     },
+     {
+      "magia": "Lightning Bolt",
+      "cargas": 7,
+      "circulo": 7
+     },
+     {
+      "magia": "Passwall",
+      "cargas": 5
+     },
+     {
+      "magia": "Plane Shift",
+      "cargas": 7
+     },
+     {
+      "magia": "Telekinesis",
+      "cargas": 5
+     },
+     {
+      "magia": "Wall of Fire",
+      "cargas": 4
+     },
+     {
+      "magia": "Web",
+      "cargas": 2
+     },
+     {
+      "magia": "Arcane Lock",
+      "cargas": 0
+     },
+     {
+      "magia": "Detect Magic",
+      "cargas": 0
+     },
+     {
+      "magia": "Enlarge/Reduce",
+      "cargas": 0
+     },
+     {
+      "magia": "Light",
+      "cargas": 0
+     },
+     {
+      "magia": "Mage Hand",
+      "cargas": 0
+     },
+     {
+      "magia": "Protection from Evil and Good",
+      "cargas": 0
+     }
+    ],
+    "nota": "50 cargas: Bola de Fogo e Relâmpago no 7º círculo, Conjurar Elemental, Dissipar Magia, Muralha de Fogo e mais; Detectar Magia, Luz, Aumentar/Reduzir e outras à vontade. Recupera 4d6+2 ao amanhecer."
+   },
    "bonus": 2
   },
   "staff-of-the-python": {
@@ -7157,7 +7348,122 @@
    "sintonizacao": true,
    "peso_kg": 0.0,
    "texto_srd": "This wand has 7 charges. While holding it, you can use an action to expend 1 of its charges and choose a target within 120 feet of you. The target can be a creature, an object, or a point in space. Roll d100 and consult the following table to discover what happens. If the effect causes you to cast a spell from the wand, the spell's save DC is 15. If the spell normally has a range expressed in feet, its range becomes 120 feet if it isn't already. If an effect covers an area, you must center the spell on and include the target. If an effect has multiple possible subjects, the GM randomly determines which ones are affected. The wand regains 1d6 + 1 expended charges daily at dawn. If you expend the wand's last charge, roll a d20. On a 1, the wand crumbles into dust and is destroyed. | d100 | Effect | |--------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------| | 01-05 | You cast slow. 06-10 You cast faerie fire. | | 11-15 | You are stunned until the start of your next turn, believing something awesome just happened. 16-20 You cast gust of wind. | | 21-25 | You cast detect thoughts on the target you chose. If you didn't target a creature, you instead take 1d6 psychic damage. | | 26-30 | You cast stinking cloud. | | 31-33 | Heavy rain falls in a 60-foot radius centered on the target. The area becomes lightly obscured. The rain falls until the start of your next turn. | | 34-36 | An animal appears in the unoccupied space nearest the target. The animal isn't under your control and acts as it normally would. Roll a d100 to determine which animal appears. On a 01-25, a rhinoceros appears; on a 26-50, an elephant appears; and on a 51-100, a rat appears. | | 37-46 | You cast lightning bolt. | | 47-49 | A cloud of 600 oversized butterflies fills a 30-foot radius centered on the target. The area becomes heavily obscured. The butterflies remain for 10 minutes. | | 50-53 | You enlarge the target as if you had cast enlarge/reduce. If the target can't be affected by that spell, or if you didn't target a creature, you become the target. | | 54-58 | You cast darkness. | | 59-62 | Grass grows on the ground in a 60-foot radius centered on the target. If grass is already there, it grows to ten times its normal size and remains overgrown for 1 minute. | | 63-65 | An object of the GM's choice disappears into the Ethereal Plane. The object must be neither worn nor carried, within 120 feet of the target, and no larger than 10 feet in any dimension. | | 66-69 | You shrink yourself as if you had cast enlarge/reduce on yourself. | | 70-79 | You cast fireball. | | 80-84 | You cast invisibility on yourself. | | 85-87 | Leaves grow from the target. If you chose a point in space as the target, leaves sprout from the creature nearest to that point. Unless they are picked off, the leaves turn brown and fall off after 24 hours. | | 88-90 | A stream of 1d4 × 10 gems, each worth 1 gp, shoots from the wand's tip in a line 30 feet long and 5 feet wide. Each gem deals 1 bludgeoning damage, and the total damage of the gems is divided equally among all creatures in the line. | | 91-95 | A burst of colorful shimmering light extends from you in a 30-foot radius. You and each creature in the area that can see must succeed on a DC 15 Constitution saving throw or become blinded for 1 minute. A creature can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success. | | 96-97 | The target's skin turns bright blue for 1d10 days. If you chose a point in space, the creature nearest to that point is affected. | | 98-100 | If you targeted a creature, it must make a DC 15 Constitution saving throw. If you didn't target a creature, you become the target and must make the saving throw. If the saving throw fails by 5 or more, the target is instantly petrified. On any other failed save, the target is restrained and begins to turn to stone. While restrained in this way, the target must repeat the saving throw at the end of its next turn, becoming petrified on a failure or ending the effect on a success. The petrification lasts until the target is freed by the greater restoration spell or similar magic. |",
-   "sintonizacao_detalhe": "requires attunement by a spellcaster"
+   "sintonizacao_detalhe": "requires attunement by a spellcaster",
+   "uso": {
+    "tipo": "cargas",
+    "cargas": 7,
+    "recarga": "1d6+1",
+    "cd": 15,
+    "magias": [],
+    "maravilha": [
+     {
+      "ate": 5,
+      "magia": "Slow",
+      "texto": "o ar em volta do alvo fica pesado"
+     },
+     {
+      "ate": 10,
+      "magia": "Faerie Fire",
+      "texto": "o alvo brilha em luz de fada"
+     },
+     {
+      "ate": 15,
+      "em_si": true,
+      "condicao": "Atordoado",
+      "texto": "a varinha estala na mão e atordoa quem a usa até o próximo turno"
+     },
+     {
+      "ate": 20,
+      "magia": "Gust of Wind",
+      "texto": "uma rajada de vento sai da ponta"
+     },
+     {
+      "ate": 25,
+      "texto": "quem usa ouve, por um instante, o que o alvo está pensando"
+     },
+     {
+      "ate": 30,
+      "magia": "Stinking Cloud",
+      "texto": "uma nuvem amarela e fétida estoura no alvo"
+     },
+     {
+      "ate": 33,
+      "texto": "começa a chover forte em volta"
+     },
+     {
+      "ate": 36,
+      "texto": "um animal surge do nada ao lado do alvo (o Mestre escolhe qual)"
+     },
+     {
+      "ate": 46,
+      "magia": "Lightning Bolt",
+      "texto": "um raio estala da ponta"
+     },
+     {
+      "ate": 49,
+      "texto": "uma nuvem de borboletas enche o lugar e atrapalha a vista"
+     },
+     {
+      "ate": 53,
+      "magia": "Enlarge/Reduce",
+      "modo": "aumentar",
+      "texto": "o alvo cresce"
+     },
+     {
+      "ate": 58,
+      "magia": "Darkness",
+      "texto": "a escuridão engole a área"
+     },
+     {
+      "ate": 62,
+      "texto": "o chão em volta se cobre de grama"
+     },
+     {
+      "ate": 65,
+      "texto": "um objeto qualquer perto do alvo some (o Mestre diz qual)"
+     },
+     {
+      "ate": 69,
+      "magia": "Enlarge/Reduce",
+      "modo": "reduzir",
+      "em_si": true,
+      "texto": "quem usa encolhe"
+     },
+     {
+      "ate": 79,
+      "magia": "Fireball",
+      "texto": "uma bola de fogo voa para o alvo"
+     },
+     {
+      "ate": 84,
+      "magia": "Invisibility",
+      "em_si": true,
+      "texto": "quem usa some de vista"
+     },
+     {
+      "ate": 87,
+      "texto": "folhas brotam na pele do alvo"
+     },
+     {
+      "ate": 90,
+      "texto": "uma chuva de gemas sai da ponta (o Mestre põe as gemas no chão)"
+     },
+     {
+      "ate": 95,
+      "texto": "uma luz cintilante ofusca quem está perto"
+     },
+     {
+      "ate": 97,
+      "texto": "a pele do alvo fica azul"
+     },
+     {
+      "ate": 100,
+      "magia": "Flesh to Stone",
+      "texto": "o alvo começa a virar pedra"
+     }
+    ],
+    "nota": "7 cargas: cada uso tira um efeito ao acaso, de um raio a uma chuva de borboletas. Recupera 1d6+1 ao amanhecer."
+   }
   },
   "well-of-many-worlds": {
    "chave": "well-of-many-worlds",

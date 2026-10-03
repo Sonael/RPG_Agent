@@ -1294,7 +1294,7 @@
     ['offhand', 'Ataque com a outra mão', 'depois de atacar com arma leve: a outra arma leve ataca (ação bônus)'],
     ['surrender:intimidar', 'Pedir rendição (Intimidação)', 'Intimidação contra a Sabedoria dele: rendido, larga as armas e sai da luta, vivo'],
     ['surrender:persuadir', 'Pedir rendição (Persuasão)', 'Persuasão contra a Sabedoria dele; enfeitiçado por vocês, com vantagem'],
-    ['escape', 'Escapar', 'Atletismo ou Acrobacia contra o Atletismo de quem agarra'],
+    ['escape', 'Escapar', 'Atletismo ou Acrobacia contra quem agarra; da rede, FOR CD 10'],
     ['flee', 'Fugir', 'sair do combate; quem está perto ganha ataque de oportunidade'],
     ['flee_all', 'Fugir em grupo', 'o grupo inteiro larga a luta: cada um provoca ataques de oportunidade; sem XP nem saque'],
     ['end', 'Encerrar a luta', 'acaba o combate agora; o Mestre decide e narra como (trégua, rendição, fuga)'],
@@ -1305,7 +1305,7 @@
     const cur = (_last.combatants || []).find(c => c.is_current);
     if (!cur) return;
     _livreFechar();
-    const agarrado = (cur.condicoes || []).some(c => /agarrad/i.test(String(c)));
+    const agarrado = (cur.condicoes || []).some(c => /agarrad|preso na rede/i.test(String(c)));
     const temZonas = ((_last || {}).zonas || []).length > 1;
     const eco = (_last || {}).turn_economy || {};
     const lista = MANOBRAS.filter(([id]) =>

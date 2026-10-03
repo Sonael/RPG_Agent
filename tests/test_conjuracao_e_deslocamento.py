@@ -112,11 +112,14 @@ def test_exaustao_e_carga_cortam_o_deslocamento(campanha):
     ch["sheet"]["exaustao"] = 5
     assert _heroi("Stelar")["deslocamento"]["metros"] == 0.0
 
-    # FOR 16: capacidade 120 kg, sobrecarregado acima de 60.
+    # FOR 16: capacidade 108,9 kg; sobrecarregado acima de 1/3 (36,3), muito
+    # acima de 2/3 (72,6).
     ch["sheet"]["exaustao"] = 0
-    ch["inventario"] = [{"nome": "Bigorna", "qtd": 1, "descricao": "", "peso": 100}]
+    ch["inventario"] = [{"nome": "Bigorna", "qtd": 1, "descricao": "", "peso": 50}]
     d = _heroi("Stelar")["deslocamento"]
     assert d["metros"] == 6.0 and any("sobrecarga" in n for n in d["notas"])
+    ch["inventario"] = [{"nome": "Bigorna", "qtd": 1, "descricao": "", "peso": 100}]
+    assert _heroi("Stelar")["deslocamento"]["metros"] == 3.0
 
     ch["inventario"] = [{"nome": "Bigorna", "qtd": 2, "descricao": "", "peso": 100}]
     d = _heroi("Stelar")["deslocamento"]
