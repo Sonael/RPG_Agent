@@ -1170,11 +1170,21 @@
    "aliases": [
     "armadura de adamantina"
    ],
-   "qualquer_armadura": true
+   "qualquer_armadura": true,
+   "efeito": {
+    "nota": "Crítico contra quem a veste vira acerto normal.",
+    "critico_vira_normal": true
+   }
   },
   "Amulet of Health": {
    "nome": "Amuleto da Saúde",
-   "aliases": []
+   "aliases": [],
+   "efeito": {
+    "nota": "Constituição 19 enquanto usar.",
+    "atributo": {
+     "constituicao": 19
+    }
+   }
   },
   "Amulet of Proof against Detection and Location": {
    "nome": "Amuleto contra Detecção e Localização",
@@ -1201,7 +1211,11 @@
   "Armor of Resistance": {
    "nome": "Armadura de Resistência",
    "aliases": [],
-   "qualquer_armadura": true
+   "qualquer_armadura": true,
+   "efeito": {
+    "nota": "Resistência ao tipo de dano da armadura (diga no nome: \"Cota de Malha de Resistência ao Fogo\").",
+    "resistencia_do_nome": true
+   }
   },
   "Armor of Vulnerability": {
    "nome": "Armadura da Vulnerabilidade",
@@ -1245,7 +1259,13 @@
   },
   "Belt of Cloud Giant Strength": {
    "nome": "Cinto de Força do Gigante das Nuvens",
-   "aliases": []
+   "aliases": [],
+   "efeito": {
+    "nota": "Força 27 enquanto usar.",
+    "atributo": {
+     "forca": 27
+    }
+   }
   },
   "Belt of Dwarvenkind": {
    "nome": "Cinto dos Anões",
@@ -1255,29 +1275,65 @@
   },
   "Belt of Fire Giant Strength": {
    "nome": "Cinto de Força do Gigante do Fogo",
-   "aliases": []
+   "aliases": [],
+   "efeito": {
+    "nota": "Força 25 enquanto usar.",
+    "atributo": {
+     "forca": 25
+    }
+   }
   },
   "Belt of Frost Giant Strength": {
    "nome": "Cinto de Força do Gigante do Gelo",
-   "aliases": []
+   "aliases": [],
+   "efeito": {
+    "nota": "Força 23 enquanto usar.",
+    "atributo": {
+     "forca": 23
+    }
+   }
   },
   "Belt of Hill Giant Strength": {
    "nome": "Cinto de Força do Gigante da Colina",
-   "aliases": []
+   "aliases": [],
+   "efeito": {
+    "nota": "Força 21 enquanto usar.",
+    "atributo": {
+     "forca": 21
+    }
+   }
   },
   "Belt of Stone Giant Strength": {
    "nome": "Cinto de Força do Gigante de Pedra",
-   "aliases": []
+   "aliases": [],
+   "efeito": {
+    "nota": "Força 23 enquanto usar.",
+    "atributo": {
+     "forca": 23
+    }
+   }
   },
   "Belt of Storm Giant Strength": {
    "nome": "Cinto de Força do Gigante da Tempestade",
-   "aliases": []
+   "aliases": [],
+   "efeito": {
+    "nota": "Força 29 enquanto usar.",
+    "atributo": {
+     "forca": 29
+    }
+   }
   },
   "Boots of Elvenkind": {
    "nome": "Botas Élficas",
    "aliases": [
     "botas dos elfos"
-   ]
+   ],
+   "efeito": {
+    "nota": "Vantagem em Furtividade (passos silenciosos).",
+    "vantagem_pericias": [
+     "furtividade"
+    ]
+   }
   },
   "Boots of Levitation": {
    "nome": "Botas da Levitação",
@@ -1289,7 +1345,11 @@
   },
   "Boots of Striding and Springing": {
    "nome": "Botas de Passos Largos e Saltos",
-   "aliases": []
+   "aliases": [],
+   "efeito": {
+    "nota": "Deslocamento de pelo menos 9 m, mesmo com carga.",
+    "deslocamento_min": 9
+   }
   },
   "Boots of the Winterlands": {
    "nome": "Botas das Terras Invernais",
@@ -1301,11 +1361,23 @@
   },
   "Bracers of Archery": {
    "nome": "Braçadeiras de Arquearia",
-   "aliases": []
+   "aliases": [],
+   "efeito": {
+    "nota": "+2 de dano com arco longo e arco curto, e proficiência neles.",
+    "dano_arco": 2,
+    "proficiencia_armas": [
+     "longbow",
+     "shortbow"
+    ]
+   }
   },
   "Bracers of Defense": {
    "nome": "Braçadeiras de Defesa",
-   "aliases": []
+   "aliases": [],
+   "efeito": {
+    "nota": "+2 na CA sem armadura e sem escudo.",
+    "ca_sem_armadura": 2
+   }
   },
   "Brazier of Commanding Fire Elementals": {
    "nome": "Braseiro de Comandar Elementais do Fogo",
@@ -1315,7 +1387,13 @@
    "nome": "Broche Protetor",
    "aliases": [
     "broche de blindagem"
-   ]
+   ],
+   "efeito": {
+    "nota": "Resistência a dano de força.",
+    "resistencias": [
+     "force"
+    ]
+   }
   },
   "Broom of Flying": {
    "nome": "Vassoura Voadora",
@@ -1358,13 +1436,24 @@
    "aliases": [
     "capa élfica",
     "manto dos elfos"
-   ]
+   ],
+   "efeito": {
+    "nota": "Vantagem em Furtividade.",
+    "vantagem_pericias": [
+     "furtividade"
+    ]
+   }
   },
   "Cloak of Protection": {
    "nome": "Manto de Proteção",
    "aliases": [
     "capa de proteção"
-   ]
+   ],
+   "efeito": {
+    "nota": "+1 na CA e nas salvaguardas.",
+    "ca": 1,
+    "save_fixo": 1
+   }
   },
   "Cloak of the Bat": {
    "nome": "Manto do Morcego",
@@ -1461,7 +1550,17 @@
     "matador de dragões"
    ],
    "base_arma": "longsword",
-   "bonus": 1
+   "bonus": 1,
+   "efeito": {
+    "nota": "+3d6 contra dragões.",
+    "dano_extra": {
+     "dado": "3d6",
+     "tipo": "",
+     "contra": [
+      "dragao"
+     ]
+    }
+   }
   },
   "Dust of Disappearance": {
    "nome": "Pó do Desaparecimento",
@@ -1509,7 +1608,11 @@
     "cota de malha élfica"
    ],
    "base_armadura": "chain shirt",
-   "bonus": 1
+   "bonus": 1,
+   "efeito": {
+    "nota": "Quem a veste é proficiente nela.",
+    "proficiente": true
+   }
   },
   "Eversmoking Bottle": {
    "nome": "Garrafa Fumegante",
@@ -1525,7 +1628,13 @@
   },
   "Eyes of the Eagle": {
    "nome": "Olhos da Águia",
-   "aliases": []
+   "aliases": [],
+   "efeito": {
+    "nota": "Vantagem em Percepção pela visão.",
+    "vantagem_pericias": [
+     "percepção"
+    ]
+   }
   },
   "Feather Token": {
    "nome": "Pena Mágica",
@@ -1542,7 +1651,14 @@
    "aliases": [
     "língua flamejante"
    ],
-   "base_arma": "longsword"
+   "base_arma": "longsword",
+   "efeito": {
+    "nota": "+2d6 de fogo nos golpes (a lâmina acesa).",
+    "dano_extra": {
+     "dado": "2d6",
+     "tipo": "fire"
+    }
+   }
   },
   "Folding Boat": {
    "nome": "Barco Dobrável",
@@ -1553,13 +1669,29 @@
    "aliases": [
     "marca de gelo"
    ],
-   "base_arma": "longsword"
+   "base_arma": "longsword",
+   "efeito": {
+    "nota": "+1d6 de frio nos golpes, e resistência a fogo.",
+    "dano_extra": {
+     "dado": "1d6",
+     "tipo": "cold"
+    },
+    "resistencias": [
+     "fire"
+    ]
+   }
   },
   "Gauntlets of Ogre Power": {
    "nome": "Manoplas de Força de Ogro",
    "aliases": [
     "manoplas do poder do ogro"
-   ]
+   ],
+   "efeito": {
+    "nota": "Força 19 enquanto usar.",
+    "atributo": {
+     "forca": 19
+    }
+   }
   },
   "Gem of Brightness": {
    "nome": "Gema do Brilho",
@@ -1575,7 +1707,17 @@
     "matador de gigantes"
    ],
    "qualquer_arma": true,
-   "bonus": 1
+   "bonus": 1,
+   "efeito": {
+    "nota": "+2d6 contra gigantes.",
+    "dano_extra": {
+     "dado": "2d6",
+     "tipo": "",
+     "contra": [
+      "gigante"
+     ]
+    }
+   }
   },
   "Glamoured Studded Leather": {
    "nome": "Couro Batido Encantado",
@@ -1595,7 +1737,11 @@
    "nome": "Óculos da Noite",
    "aliases": [
     "óculos de visão noturna"
-   ]
+   ],
+   "efeito": {
+    "nota": "Visão no escuro de 18 m.",
+    "visao_no_escuro": 18
+   }
   },
   "Hammer of Thunderbolts": {
    "nome": "Martelo dos Raios",
@@ -1615,7 +1761,13 @@
   },
   "Headband of Intellect": {
    "nome": "Faixa do Intelecto",
-   "aliases": []
+   "aliases": [],
+   "efeito": {
+    "nota": "Inteligência 19 enquanto usar.",
+    "atributo": {
+     "inteligencia": 19
+    }
+   }
   },
   "Helm of Brilliance": {
    "nome": "Elmo do Brilho",
@@ -1637,7 +1789,18 @@
    "nome": "Vingador Sagrado",
    "aliases": [],
    "base_arma": "longsword",
-   "bonus": 3
+   "bonus": 3,
+   "efeito": {
+    "nota": "+2d10 radiante contra corruptores e mortos-vivos.",
+    "dano_extra": {
+     "dado": "2d10",
+     "tipo": "radiant",
+     "contra": [
+      "corruptor",
+      "morto-vivo"
+     ]
+    }
+   }
   },
   "Horn of Blasting": {
    "nome": "Trompa da Explosão",
@@ -1697,7 +1860,18 @@
   "Mace of Disruption": {
    "nome": "Maça da Ruptura",
    "aliases": [],
-   "base_arma": "mace"
+   "base_arma": "mace",
+   "efeito": {
+    "nota": "+2d6 radiante contra corruptores e mortos-vivos.",
+    "dano_extra": {
+     "dado": "2d6",
+     "tipo": "radiant",
+     "contra": [
+      "corruptor",
+      "morto-vivo"
+     ]
+    }
+   }
   },
   "Mace of Smiting": {
    "nome": "Maça da Punição",
@@ -1712,7 +1886,11 @@
   },
   "Mantle of Spell Resistance": {
    "nome": "Manto de Resistência à Magia",
-   "aliases": []
+   "aliases": [],
+   "efeito": {
+    "nota": "Vantagem nas salvaguardas contra magia.",
+    "resistencia_a_magia": true
+   }
   },
   "Manual of Bodily Health": {
    "nome": "Manual da Saúde Corporal",
@@ -1749,7 +1927,12 @@
    "aliases": [
     "armadura de mitral"
    ],
-   "qualquer_armadura": true
+   "qualquer_armadura": true,
+   "efeito": {
+    "nota": "Sem Força mínima e sem desvantagem em Furtividade.",
+    "sem_forca_minima": true,
+    "sem_desvantagem_furtividade": true
+   }
   },
   "Necklace of Adaptation": {
    "nome": "Colar da Adaptação",
@@ -1806,7 +1989,13 @@
   },
   "Periapt of Proof against Poison": {
    "nome": "Periapto contra Veneno",
-   "aliases": []
+   "aliases": [],
+   "efeito": {
+    "nota": "Imune a dano de veneno.",
+    "imunidades": [
+     "poison"
+    ]
+   }
   },
   "Periapt of Wound Closure": {
    "nome": "Periapto do Fechamento de Feridas",
@@ -1988,7 +2177,12 @@
   },
   "Ring of Protection": {
    "nome": "Anel de Proteção",
-   "aliases": []
+   "aliases": [],
+   "efeito": {
+    "nota": "+1 na CA e nas salvaguardas.",
+    "ca": 1,
+    "save_fixo": 1
+   }
   },
   "Ring of Regeneration": {
    "nome": "Anel de Regeneração",
@@ -1996,7 +2190,11 @@
   },
   "Ring of Resistance": {
    "nome": "Anel de Resistência",
-   "aliases": []
+   "aliases": [],
+   "efeito": {
+    "nota": "Resistência ao tipo de dano do anel (diga no nome: \"Anel de Resistência ao Fogo\").",
+    "resistencia_do_nome": true
+   }
   },
   "Ring of Shooting Stars": {
    "nome": "Anel de Estrelas Cadentes",
@@ -2199,7 +2397,12 @@
   },
   "Stone of Good Luck": {
    "nome": "Pedra da Sorte",
-   "aliases": []
+   "aliases": [],
+   "efeito": {
+    "nota": "+1 nos testes de atributo e nas salvaguardas.",
+    "save_fixo": 1,
+    "teste_dado": 1
+   }
   },
   "Sun Blade": {
    "nome": "Lâmina Solar",
@@ -2207,7 +2410,17 @@
     "lâmina do sol"
    ],
    "base_arma": "longsword",
-   "bonus": 2
+   "bonus": 2,
+   "efeito": {
+    "nota": "+1d8 radiante contra mortos-vivos.",
+    "dano_extra": {
+     "dado": "1d8",
+     "tipo": "radiant",
+     "contra": [
+      "morto-vivo"
+     ]
+    }
+   }
   },
   "Sword of Life Stealing": {
    "nome": "Espada Roubadora de Vida",

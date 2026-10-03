@@ -193,8 +193,16 @@ _magias_em_curso = 0
 
 
 def contra_magia(alvo: dict) -> bool:
-    """A salvaguarda que se rola agora é contra magia, e o alvo tem Resistência à Magia."""
-    return _magias_em_curso > 0 and "resistencia magica" in tracos_de(alvo)
+    """
+    A salvaguarda que se rola agora é contra magia, e o alvo tem Resistência à
+    Magia: o traço do monstro, ou o Manto de Resistência à Magia vestido.
+    """
+    if _magias_em_curso <= 0:
+        return False
+    if "resistencia magica" in tracos_de(alvo):
+        return True
+    from rpg import tools_dnd as td
+    return any(e.get("resistencia_a_magia") for e in td._efeitos_dos_itens((alvo or {}).get("sheet") or {}))
 
 
 def armas_magicas(ch: dict) -> bool:

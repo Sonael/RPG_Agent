@@ -52,6 +52,8 @@ def test_barbaro_sem_armadura_troca_peles_por_constituicao(campanha):
 def test_barbaro_sem_armadura_ainda_soma_o_escudo(campanha):
     _ficha("Grok", "bárbaro")
     td.unequip_item("Grok", "armadura")
+    # O machado grande do kit pede as duas mãos: guardado, o escudo cabe.
+    td.unequip_item("Grok", "arma_principal")
     td.add_item("Grok", "Escudo", 1)
     td.equip_item("Grok", "Escudo", "escudo")
     assert _sheet("Grok")["ca"] == 18

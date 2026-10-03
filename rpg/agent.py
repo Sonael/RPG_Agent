@@ -832,6 +832,16 @@ REGRA: Se a ação faria sentido num mundo real coerente, use social_check().
   isso. equip_item() recusa item que não reconhece sem slot, armadura que o
   motor não conhece e uma unidade em dois slots. Vender ou remover um item
   equipado tira ele do corpo sozinho — não chame unequip_item antes.
+  Item mágico de vestir tem slot próprio (anel_1, anel_2, capa, botas, luvas,
+  cabeca, cinto, amuleto): o Anel de Proteção dá +1 na CA e nas salvaguardas,
+  as Manoplas de Força de Ogro põem a FOR em 19, o Manto Élfico dá vantagem
+  em Furtividade — o motor aplica, não narre o número. Item que pede
+  SINTONIZAÇÃO só faz efeito depois de attune_item(), que no 5e é um
+  descanso curto com o item; no máximo 3 de cada vez (end_attunement()
+  libera uma vaga). Arma de duas mãos não divide a mão com escudo.
+  O motor também cobra a proficiência: o mago de cota de malha tem
+  desvantagem em FOR e DES e não conjura; arma sem proficiência ataca sem o
+  bônus; armadura pesada sem a FOR pedida tira 3 m de deslocamento.
 
 TALENTOS — choose_feat()
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

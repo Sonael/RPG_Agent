@@ -108,6 +108,28 @@ RARIDADE = {"common": "comum", "uncommon": "incomum", "rare": "raro",
             "very-rare": "muito raro", "legendary": "lendário", "artifact": "artefato"}
 ORDEM_RARIDADE = ["comum", "incomum", "raro", "muito raro", "lendário", "artefato"]
 
+# Onde se usa o item mágico, pelo começo do nome no SRD. O SRD 5.1 não tem
+# slots; o motor tem, para que dois mantos não deem +2 de CA. Pedra Ioun e
+# Pedra da Sorte valem carregadas ("carregado").
+SLOT_POR_NOME = (
+    ("Ring of", "anel"),
+    ("Cloak of", "capa"), ("Cape of", "capa"), ("Mantle of", "capa"), ("Robe of", "capa"),
+    ("Boots of", "botas"), ("Winged Boots", "botas"), ("Slippers of", "botas"),
+    ("Gloves of", "luvas"), ("Gauntlets of", "luvas"), ("Bracers of", "luvas"),
+    ("Helm of", "cabeca"), ("Hat of", "cabeca"), ("Circlet of", "cabeca"),
+    ("Headband of", "cabeca"), ("Goggles of", "cabeca"), ("Eyes of", "cabeca"),
+    ("Belt of", "cinto"),
+    ("Amulet of", "amuleto"), ("Necklace of", "amuleto"), ("Medallion of", "amuleto"),
+    ("Periapt of", "amuleto"), ("Talisman of", "amuleto"), ("Scarab of", "amuleto"),
+    ("Brooch of", "amuleto"),
+    ("Stone of Good Luck", "carregado"), ("Ioun Stone", "carregado"),
+)
+
+
+def _slot_do_magico(nome_srd: str) -> str:
+    return next((slot for prefixo, slot in SLOT_POR_NOME if nome_srd.startswith(prefixo)), "")
+
+
 TIPO_MAGICO = {"Armor": "armadura", "Weapon": "arma", "Shield": "escudo", "Ring": "anel",
                "Rod": "cetro", "Staff": "cajado", "Wand": "varinha", "Potion": "poção",
                "Scroll": "pergaminho", "Wondrous Item": "item maravilhoso",
@@ -301,6 +323,10 @@ def gerar_magicos(pt: dict, comuns: dict, relatorio: list[str]) -> dict:
                     relatorio.append(f"{base}: {campo} '{nomes[campo]}' não existe")
                     continue
                 entrada[campo] = alvo
+        if _slot_do_magico(base):
+            entrada["slot"] = _slot_do_magico(base)
+        if nomes.get("efeito"):
+            entrada["efeito"] = nomes["efeito"]
         for campo in ("bonus", "qualquer_arma", "qualquer_armadura"):
             if nomes.get(campo):
                 entrada[campo] = nomes[campo]

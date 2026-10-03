@@ -146,6 +146,19 @@
                     onclick="window.Inventory._usar('${aspas(i.nome)}','${aspas(n)}')">Dar a ${esc(n)}</button>`).join('');
   }
 
+  // Sintonizar é um descanso curto (uma hora) com o item; desfazer é de graça.
+  function sintonia(i) {
+    const s = i.sintonia;
+    if (!s) return '';
+    if (s.sintonizado) {
+      return `<button class="inv-btn inv-btn-dessintonizar" title="Libera uma das vagas de sintonia"
+                      onclick="window.Inventory._dessintonizar('${aspas(i.nome)}')">Desfazer sintonia</button>`;
+    }
+    const dica = s.pode ? 'Uma hora de descanso com o item' : s.motivo;
+    return `<button class="inv-btn inv-btn-sintonizar" title="${esc(dica)}" ${s.pode ? '' : 'disabled'}
+                    onclick="window.Inventory._sintonizar('${aspas(i.nome)}')">Sintonizar</button>`;
+  }
+
   function item(i, ca) {
     const marcas = [
       i.equipado_em.length ? `<span class="inv-marca inv-marca-equip">${i.equipado_em.map(esc).join(', ')}</span>` : '',
@@ -158,6 +171,9 @@
       // resolve é o mestre, perguntado em cena.
       i.efeito_desconhecido
         ? '<span class="inv-marca inv-marca-sem-efeito" title="Ninguém declarou o que este item faz. Pergunte ao mestre em cena.">efeito não declarado</span>' : '',
+      i.sintonia && i.sintonia.sintonizado ? '<span class="inv-marca inv-marca-sintonia">sintonizado</span>' : '',
+      i.sintonia && !i.sintonia.sintonizado
+        ? '<span class="inv-marca inv-marca-sem-sintonia" title="Este item só faz efeito depois de sintonizado">pede sintonia</span>' : '',
     ].join('');
     const botoes = i.opcoes_de_equipar.map(o => {
       // A prévia é o que torna a troca uma decisão: "CA 12 → 16" ao lado do
@@ -177,9 +193,11 @@
         </div>
         ${marcas ? `<div class="inv-marcas">${marcas}</div>` : ''}
         ${i.descricao ? `<p class="inv-item-desc">${esc(i.descricao)}</p>` : ''}
+        ${i.sintonia && i.sintonia.efeito ? `<p class="inv-item-efeito">${esc(i.sintonia.efeito)}</p>` : ''}
         <div class="inv-item-acoes">
           ${usos(i)}
           ${botoes}
+          ${sintonia(i)}
           ${i.a_identificar ? `<button class="inv-btn inv-btn-identificar"
                                        title="Confere o item no SRD de D&amp;D 5e"
                                        onclick="window.Inventory._identificar('${aspas(i.nome)}', this)">Identificar</button>` : ''}
@@ -212,7 +230,12 @@
         : '')
       + `<span><span class="inv-classe">${esc(p.classe)}</span> · nível ${p.nivel} · FOR ${p.forca}</span>`;
     q('inv-resumo').innerHTML = resumo(p);
-    q('inv-slots').innerHTML = p.equipados.map(slot).join('');
+    // Os slots de item mágico (anel, manto, botas...) só aparecem ocupados:
+    // vazios, eles só alongariam a lista. O botão de vestir está no item.
+    q('inv-slots').innerHTML = p.equipados.filter(e => e.basico || e.item).map(slot).join('')
+      + (p.sintonizados && p.sintonizados.usados
+          ? `<div class="inv-sintonia-conta" title="Itens mágicos sintonizados (no máximo ${p.sintonizados.limite})">Sintonia: ${p.sintonizados.usados}/${p.sintonizados.limite}</div>`
+          : '');
     q('inv-itens').innerHTML = p.itens.length
       ? p.itens.map(i => item(i, p.ca)).join('')
       : '<div class="inv-vazio">Mochila vazia.</div>';
@@ -357,6 +380,8 @@
     _largar: (item) => agir({ action: 'largar', item }),
     _usar: (item, alvo) => agir({ action: 'usar', item, alvo }),
     _identificar: identificar,
+    _sintonizar: (item) => agir({ action: 'sintonizar', item }),
+    _dessintonizar: (item) => agir({ action: 'dessintonizar', item }),
   };
 
   document.addEventListener('DOMContentLoaded', () => { ensureDom(); });

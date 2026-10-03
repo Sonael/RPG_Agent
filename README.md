@@ -783,6 +783,50 @@ Bastão Imóvel) não vira arma por ter "bastão" no nome.
 O editor de ficha busca itens no compêndio (`/api/dnd/items/search`), com
 nome e resumo em português.
 
+### Equipamento mágico, sintonização e proficiência
+
+O Anel de Proteção, o Manto Élfico e as Manoplas de Força de Ogro eram nomes na
+mochila: o motor sabia a raridade e não aplicava nada. O mago vestia placas e
+brandia um machado grande com a proficiência inteira, e um espadão dividia as
+mãos com um escudo.
+
+- **Slots.** Além dos cinco de sempre, `anel_1`, `anel_2`, `capa`, `botas`,
+  `luvas`, `cabeca` e `cinto`. O slot de cada item mágico vem do compêndio
+  (`SLOT_POR_NOME` em `gerar_itens.py`); item fora do SRD vai pela primeira
+  palavra ("Capa de Viagem"). A Mochila e a ficha do herói só mostram os
+  slots novos ocupados. O editor de ficha deixou de apagar os slots que ele
+  não mostra.
+- **Mãos.** Duas, não três (`_conflito_de_maos`): arma de duas mãos não divide
+  a mão com escudo nem com outra arma, e duas armas não cabem com um escudo.
+- **Sintonização.** `attune_item` / `end_attunement`, e os botões na Mochila
+  (sintonizar custa uma hora no relógio, como identificar; não dá no meio da
+  luta). No máximo três itens; o que o SRD pede ("by a cleric", "by a
+  spellcaster") é cobrado. Sintonizar também identifica. Largar o item desfaz a
+  sintonia. Sem sintonia o item não faz nada: a Defensora é uma espada longa e
+  a Armadura Demoníaca, uma armadura de placas.
+- **Efeitos.** 34 itens têm o efeito no compêndio (`efeito` em
+  `srd_itens_pt.json`), no mesmo formato dos efeitos de combate, e por isso valem
+  nos mesmos lugares: `_efeitos` acrescenta os dos itens vestidos e
+  sintonizados (`_efeitos_dos_itens`), sem gravá-los na ficha. CA (Anel e Manto
+  de Proteção, Braçadeiras de Defesa sem armadura), salvaguarda e teste (Pedra
+  da Sorte), atributo (Manoplas, Cintos de Gigante, Amuleto da Saúde, que mexe
+  na vida máxima; o valor de antes volta quando o item sai), resistência
+  (Anel e Armadura de Resistência pelo tipo do nome), imunidade (Periapto
+  contra Veneno), vantagem em perícia (Manto e Botas Élficas, Olhos da Águia),
+  visão no escuro (Óculos da Noite), deslocamento mínimo (Botas de Passos
+  Largos), Resistência à Magia (Manto), dano de arco (Braçadeiras de
+  Arquearia), crítico que vira acerto (Adamante) e o dano extra das armas
+  (Língua de Fogo; Matadora de Dragões só contra dragão). Dois itens iguais
+  não somam.
+- **Proficiência** (só o grupo; NPC e monstro usam o stat block). Armadura
+  sem proficiência: desvantagem em ataque, teste e salvaguarda de FOR e DES,
+  e nada de conjurar. Arma sem proficiência: o ataque não soma o bônus. As
+  tabelas são as da classe e da raça (elfo e anão), mais "Treinamento em
+  Armadura Pesada" e "armas marciais" nas habilidades da ficha; a Cota Élfica
+  é proficiente para qualquer um.
+- **Armadura que pesa.** Desvantagem em Furtividade, e -3 m sem a FOR pedida
+  (o anão não sente). A de mithral não tem nenhum dos dois.
+
 ### Camada de acesso ao SRD (`rpg/open5e.py`)
 
 Todas as consultas ao Open5e passam por um módulo único, em vez de

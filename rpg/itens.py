@@ -135,6 +135,21 @@ def _contidos() -> dict[str, list[tuple[str, str, str]]]:
     return grupos
 
 
+@lru_cache(maxsize=1)
+def _prefixos_magicos() -> list[tuple[str, str]]:
+    """(forma, chave) dos itens mágicos, da forma mais longa para a mais curta."""
+    saida = []
+    for chave, e in magicos().items():
+        if e.get("sintetico"):
+            continue
+        for nome in (e["nome"], e["nome_srd"], *e.get("aliases", [])):
+            for f in _formas(nome):
+                if len(f.split()) >= 2:          # "Defensora" sozinho não é prefixo
+                    saida.append((f, chave))
+    saida.sort(key=lambda t: -len(t[0]))
+    return saida
+
+
 # ---------------------------------------------------------------------------
 # Nome
 # ---------------------------------------------------------------------------
@@ -202,6 +217,25 @@ def magico(nome: str) -> dict | None:
         if bonus:
             e["bonus"] = max(bonus, int(e.get("bonus", 0) or 0))
         return e
+    if not achado:
+        # "Peitoral de Adamante", "Espada Curta Língua de Fogo": o item
+        # mágico feito daquela armadura ou arma.
+        for procura in (armadura, arma):
+            dados = procura(base)
+            if dados and dados.get("item_magico"):
+                e = dict(magicos()[dados["item_magico"]])
+                if bonus:
+                    e["bonus"] = max(bonus, int(e.get("bonus", 0) or 0))
+                return e
+        # "Anel de Resistência ao Fogo", "Pedra Ioun da Proteção": o nome do
+        # item seguido do que escolhe a variante.
+        alvo = f"{_singular(norm(base))} "
+        for forma, chave in _prefixos_magicos():
+            if alvo.startswith(forma + " "):
+                e = dict(magicos()[chave])
+                if bonus:
+                    e["bonus"] = max(bonus, int(e.get("bonus", 0) or 0))
+                return e
     if not bonus:
         return None
     if achado and achado[1].get("categoria") == "municao":

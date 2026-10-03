@@ -107,7 +107,9 @@ def test_o_compendio_le_o_bonus_do_nome(nome, bonus):
 
 
 def test_bonus_proprio_do_item_magico():
-    assert td._bonus_magico_da_arma({}, "Defensora") == 3
+    # A Defensora pede sintonização: sem ela, é uma espada longa.
+    assert td._bonus_magico_da_arma({}, "Defensora") == 0
+    assert td._bonus_magico_da_arma({"sheet": {"sintonizados": ["Defensora"]}}, "Defensora") == 3
     assert td._bonus_magico_da_arma({}, "Espada Longa +2") == 2
     assert td._bonus_magico_da_arma({}, "Espada Longa") == 0
 

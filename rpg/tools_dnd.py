@@ -15,6 +15,7 @@ Novidades (v2):
 """
 
 import copy
+import functools
 import os
 import random
 import re
@@ -2514,6 +2515,10 @@ def _rolar_salvaguarda(alvo: dict, atributo: str, cd: int,
     if atributo == "destreza" and conds & {"contido", "imobilizado"}:
         desvantagem = True
     notas_extra = []
+    _desv_arm_sv = _desvantagem_da_armadura(alvo, atributo)
+    if _desv_arm_sv:
+        desvantagem = True
+        notas_extra.append(f"desvantagem: {_desv_arm_sv}")
     # Cobertura: +2 (meia) ou +5 (três quartos) nas salvaguardas de DES.
     _cob_sv = _cobertura_de(alvo)
     if atributo == "destreza" and _COBERTURA.get(_cob_sv):
@@ -3142,11 +3147,18 @@ def _armadura_na_tabela(nome: str) -> dict | None:
     a = _itens.armadura(nome)
     if not a:
         return None
+    magico = _itens.magicos().get(a.get("item_magico") or "") or {}
+    efeito = magico.get("efeito") or {}
     return {"ca_base": a["ca_base"], "dex_bonus": a["dex"],
             "slot": "escudo" if a["tipo"] == "escudo" else "armadura",
-            "srd": a["nome_srd"].lower(), "bonus": int(a["bonus"] or 0),
-            "forca_min": a["forca_min"],
-            "furtividade_desvantagem": a["furtividade_desvantagem"]}
+            "tipo": a["tipo"], "srd": a["nome_srd"].lower(), "bonus": int(a["bonus"] or 0),
+            # Mithral: sem Força mínima e sem desvantagem em Furtividade.
+            "forca_min": 0 if efeito.get("sem_forca_minima") else a["forca_min"],
+            "furtividade_desvantagem": (a["furtividade_desvantagem"]
+                                        and not efeito.get("sem_desvantagem_furtividade")),
+            "item_magico": magico.get("chave", ""),
+            "sintonizacao": bool(magico.get("sintonizacao")),
+            "proficiente": bool(efeito.get("proficiente"))}
 
 
 # ---------------------------------------------------------------------------
@@ -3468,6 +3480,12 @@ def _traits_lookup(sheet: dict, campo: str) -> list[dict]:
                   "requer_magica": False, "origem": e.get("origem", e.get("nome", ""))}
                  for e in _efeitos(sheet or {})
                  if e.get("resistencia") or e.get("resistencias")]
+        if extra:
+            return list(base) + extra
+    if campo == "imunidades":
+        extra = [{"tipos": list(e["imunidades"]), "requer_magica": False,
+                  "origem": e.get("origem", e.get("nome", ""))}
+                 for e in _efeitos(sheet or {}) if e.get("imunidades")]
         if extra:
             return list(base) + extra
     return base
@@ -3960,13 +3978,14 @@ def _visao_no_escuro(ch: dict | None) -> int:
     if not ch:
         return 0
     s = ch.get("sheet") or {}
+    dos_itens = max([int(e.get("visao_no_escuro", 0) or 0) for e in _efeitos_dos_itens(s)] or [0])
     if s.get("visao_no_escuro"):
-        return int(s["visao_no_escuro"])
+        return max(int(s["visao_no_escuro"]), dos_itens)
     raca = _norm_txt(str(s.get("raca") or ""))
     for chave, metros in _VISAO_DA_RACA.items():
         if re.search(rf"\b{re.escape(chave)}\b", raca):
-            return metros
-    return 0
+            return max(metros, dos_itens)
+    return dos_itens
 
 
 def _ve_no_escuro(obs: dict | None, alvo: dict | None) -> bool:
@@ -5269,6 +5288,18 @@ def _deslocamento(char: dict) -> dict:
         metros = max(0.0, metros - 3.0)
         notas.append("-3 m de sobrecarga")
 
+    # Armadura pesada sem a Força que ela pede: -3 m (anão não sente).
+    if armadura and armadura.get("forca_min") and int(sheet.get("forca", 10) or 10) < armadura["forca_min"] \
+            and "anao" not in _norm_txt(sheet.get("raca", "")) and exaustao < 5:
+        metros = max(0.0, metros - 3.0)
+        notas.append(f"-3 m: {equip.get('armadura')} pede FOR {armadura['forca_min']}")
+
+    # Botas de Passos Largos e Saltos: pelo menos 9 m, com carga ou sem.
+    minimo = max([float(e.get("deslocamento_min", 0) or 0) for e in _efeitos_dos_itens(sheet)] or [0])
+    if minimo and metros < minimo and exaustao < 5 and estado != "imovel":
+        metros = minimo
+        notas.append(f"no mínimo {_metros(minimo)} pelas botas")
+
     return {"metros": round(metros, 1), "base": base, "notas": notas}
 
 
@@ -5285,6 +5316,8 @@ def _recalculate_ca(char: dict) -> None:
     Escudo sempre soma +2. Armadura e escudo mágicos somam o próprio +N.
     """
     s    = char["sheet"]
+    # Os atributos dos itens primeiro (Manoplas de Força de Ogro: FOR 19).
+    _aplicar_atributos_dos_itens(char)
     dex  = _modifier(s["destreza"])
     equip = s.get("equipamentos", {})
 
@@ -5305,8 +5338,10 @@ def _recalculate_ca(char: dict) -> None:
             new_ca = ca_base + min(2, dex)
         else:  # "none"
             new_ca = ca_base
-        # Armadura mágica: o +1 da "Cota de Malha +1", o +2 das Placas Anãs.
-        new_ca += armor_data["bonus"]
+        # Armadura mágica: o +1 da "Cota de Malha +1", o +2 das Placas Anãs
+        # (a Armadura Demoníaca só depois de sintonizada).
+        if not armor_data["sintonizacao"] or _esta_sintonizado(s, armor_name):
+            new_ca += armor_data["bonus"]
     else:
         # Sem armadura: CA padrão 10 + DES. Duas habilidades põem outra conta
         # no lugar dela, e nenhuma se soma à outra: fica a maior.
@@ -5321,7 +5356,17 @@ def _recalculate_ca(char: dict) -> None:
         new_ca = max(contas)
 
     if shield_data and shield_data["dex_bonus"] == "shield":
-        new_ca += shield_data["ca_base"] + shield_data["bonus"]
+        new_ca += shield_data["ca_base"]
+        if not shield_data["sintonizacao"] or _esta_sintonizado(s, shield_name):
+            new_ca += shield_data["bonus"]
+
+    # Anel e Manto de Proteção (+1), Braçadeiras de Defesa (+2 sem armadura
+    # e sem escudo): o que os itens vestidos e sintonizados dão.
+    for _nome_i, _mag_i in _itens_ativos(s):
+        _ef_i = _mag_i.get("efeito") or {}
+        new_ca += int(_ef_i.get("ca", 0) or 0)
+        if _ef_i.get("ca_sem_armadura") and not armor_data and not shield_data:
+            new_ca += int(_ef_i["ca_sem_armadura"])
 
     # ── Estilo de Combate: Defesa → +1 CA enquanto usando QUALQUER armadura.
     if armor_data and _has_combat_style(char, "Defesa"):
@@ -6475,6 +6520,9 @@ def make_skill_check(
     # Sabedoria ou Carisma: a mochila atrapalha o corpo, não o raciocínio.
     if attr_key in ("forca", "destreza", "constituicao")             and _estado_de_carga(char)[0] != "livre":
         disadvantage = True
+    _desv_armadura = _desvantagem_da_armadura(char, attr_key, skill)
+    if _desv_armadura:
+        disadvantage = True
 
     attr_val = s[attr_key]
     mod      = _modifier(attr_val)
@@ -6498,6 +6546,8 @@ def make_skill_check(
     total    = d20 + mod + prof_pericia + _bonus_ef
     if _notas_ef:
         roll_log += f" [{'; '.join(_notas_ef)}]"
+    if _desv_armadura:
+        roll_log += f" [desvantagem: {_desv_armadura}]"
     sign     = "+" if mod >= 0 else ""
     prof_str = (f" +{prof_pericia}(prof)" if prof_pericia else "") + (f" {_bonus_ef:+d}(efeitos)" if _bonus_ef else "")
 
@@ -6773,6 +6823,10 @@ def _bonus_magico_da_arma(char: dict, weapon: str) -> int:
     """
     a = _itens.arma(weapon)
     if a and a["bonus"]:
+        magico = _itens.magicos().get(a.get("item_magico") or "") or {}
+        # A Defensora (+3) só é +3 sintonizada; sem isso é uma espada longa.
+        if magico.get("sintonizacao") and not _esta_sintonizado(char.get("sheet") or {}, weapon):
+            return 0
         return int(a["bonus"])
     achado = _MAGICO_NO_NOME.search(weapon or "")
     if achado:
@@ -6849,6 +6903,13 @@ def efeito_extra_da_arma(char: dict, weapon: str) -> dict | None:
 
     None quando o item não promete nada — que é o caso da esmagadora maioria.
     """
+    magico = _magico_por_nome(weapon or "")
+    extra = ((magico or {}).get("efeito") or {}).get("dano_extra")
+    if extra and (not magico.get("sintonizacao") or _esta_sintonizado(char.get("sheet") or {}, weapon)):
+        n, faces, _b = _parse_dice(extra["dado"])
+        return {"dados": (n, faces), "tipo": extra.get("tipo", ""),
+                "contra": list(extra.get("contra") or []), "nota": ""}
+
     item = _item_do_inventario(char, weapon)
     desc = (item or {}).get("descricao", "") or ""
     if not desc.strip():
@@ -7214,10 +7275,18 @@ def attack_roll(
     # vulnerável. '' quando não dá para saber (dano sem tipo, sem modificador).
     dmg_type = _resolve_damage_type(sa, weapon, matched_hab)
 
+    _nota_prof = ""
+    if is_proficient and not matched_hab and not _proficiente_com_arma(attacker, weapon):
+        is_proficient = False
+        _nota_prof = f"{attacker['name']} não tem proficiência com {weapon}: sem o bônus de proficiência"
     prof = sa.get("proficiencia", _proficiency_bonus(sa.get("nivel", 1))) if is_proficient else 0
 
     # ── Verificação automática de condições ─────────────────────────────────
-    cond_notes = [_nota_versatil] if _nota_versatil else []
+    cond_notes = [n for n in (_nota_versatil, _nota_prof) if n]
+    _arm_sem_prof = _armadura_sem_proficiencia(attacker)
+    if _arm_sem_prof:
+        disadvantage = True
+        cond_notes.append(f"{_arm_sem_prof} sem proficiência → desvantagem")
 
     # Atacante tem condição que força desvantagem?
     if _has_condition_effect(attacker, "attack_disadvantage"):
@@ -7466,7 +7535,15 @@ def attack_roll(
             and (attack_total >= target_ca or _sorte) and _surpreso(target)):
         critico = True
         cond_notes.append(f"Assassinato: {target['name']} está Surpreso — o acerto é crítico")
-    _acerta = (critico or attack_total >= target_ca or bool(_sorte)) and not _erra_por_reacao
+    # Armadura de Adamante: o crítico contra quem a veste vira acerto normal.
+    if critico and any(e.get("critico_vira_normal") for e in _efeitos(st)):
+        critico = False
+        _adamante_acerta = True
+        cond_notes.append(f"a armadura de adamante de {target['name']} desfaz o crítico")
+    else:
+        _adamante_acerta = False
+    _acerta = ((critico or attack_total >= target_ca or bool(_sorte) or _adamante_acerta)
+               and not _erra_por_reacao)
     if critico and crit_min < 20 and not force_crit and d20 < 20:
         style_note = (style_note + " · " if style_note else "") + \
                      f"Crítico ampliado ({crit_min}-20)"
@@ -7532,7 +7609,10 @@ def attack_roll(
         # componente separado logo abaixo). O bônus mágico entra aqui: uma
         # espada +1 soma +1 no ataque E no dano, que é o que faz dela uma
         # espada +1 — antes ela era uma espada com nome comprido.
-        dmg_arma = max(1, sum(rolls) + _mod_dano + _hab_bonus + extra_dmg + _mag)
+        # Braçadeiras de Arquearia: +2 de dano com arco.
+        _arco = (sum(int(e.get("dano_arco", 0) or 0) for e in _efeitos(sa))
+                 if (_itens.arma(weapon) or {}).get("chave") in ("longbow", "shortbow") else 0)
+        dmg_arma = max(1, sum(rolls) + _mod_dano + _hab_bonus + extra_dmg + _mag + _arco)
         _enfraq = _condicao_com(attacker, "metade_dano_for")
         if _enfraq and attack_attribute.lower() == "forca":
             dmg_arma = max(1, dmg_arma // 2)
@@ -7544,6 +7624,8 @@ def attack_roll(
             bonus_str += f" +{extra_dmg}(estilo/favor)"
         if _mag:
             bonus_str += f" +{_mag}(mágica)"
+        if _arco:
+            bonus_str += f" +{_arco}(braçadeiras)"
         if gd_total:
             bonus_str += f" +{gd_total}(golpe divino)"
 
@@ -7572,7 +7654,7 @@ def attack_roll(
         # pode ser imune ao veneno e não ao corte do mesmo golpe. Dobra no
         # crítico, como todo dado extra de arma.
         _rider_rolls: list[int] = []
-        if _rider and _rider.get("dados"):
+        if _rider and _rider.get("dados") and _rider_vale_contra(_rider, target):
             _rn, _rfaces = _rider["dados"]
             _rider_rolls = [random.randint(1, _rfaces)
                             for _ in range(_rn * (2 if critico else 1))]
@@ -7905,6 +7987,10 @@ def use_ability(
 
     # ── Escuridão, Névoa, Silêncio ────────────────────────────────────────
     _m_zona = _resolucao._magia_srd(hab) or {}
+    _arm_conj = _armadura_sem_proficiencia(char) if _m_zona else ""
+    if _arm_conj:
+        return (f"Erro: {char['name']} veste {_arm_conj} sem proficiência e não consegue "
+                f"conjurar com ela. Nada foi gasto.")
     if _m_zona:
         _alvo_am = (target_name or "").split(",")[0].strip()
         _campo = _area_do_tipo(char["name"], "antimagia") or (
@@ -8743,9 +8829,26 @@ def use_ability(
 # 7. Equipamentos e CA Dinâmica  (NOVO)
 # ---------------------------------------------------------------------------
 
-# Ordem dos slots em toda a interface.
-_SLOTS = ("armadura", "escudo", "arma_principal", "arma_secundaria", "amuleto")
-_PALAVRAS_DE_AMULETO = ("amuleto", "colar", "pingente", "talisma", "medalhao")
+# Ordem dos slots em toda a interface. Os cinco primeiros são os de sempre; os
+# outros recebem os itens mágicos de vestir (anel, manto, botas...), para que
+# dois mantos não deem +2 de CA. A Mochila só mostra os novos quando ocupados.
+_SLOTS = ("armadura", "escudo", "arma_principal", "arma_secundaria", "amuleto",
+          "anel_1", "anel_2", "capa", "botas", "luvas", "cabeca", "cinto")
+_SLOTS_BASICOS = _SLOTS[:5]
+_PALAVRAS_DE_AMULETO = ("amuleto", "colar", "pingente", "talisma", "medalhao", "periapto",
+                        "escaravelho", "broche")
+# O slot do compêndio ("anel") → os slots da ficha.
+_SLOTS_DO_MAGICO = {"anel": ["anel_1", "anel_2"], "capa": ["capa"], "botas": ["botas"],
+                    "luvas": ["luvas"], "cabeca": ["cabeca"], "cinto": ["cinto"],
+                    "amuleto": ["amuleto"]}
+# Item fora do SRD: a primeira palavra diz onde ele vai ("Anel de Vhar").
+_PRIMEIRA_PALAVRA_DO_SLOT = {
+    "anel": "anel", "manto": "capa", "capa": "capa", "tunica": "capa", "robe": "capa",
+    "botas": "botas", "sapatilhas": "botas", "luvas": "luvas", "manoplas": "luvas",
+    "bracadeiras": "luvas", "elmo": "cabeca", "capacete": "cabeca", "chapeu": "cabeca",
+    "diadema": "cabeca", "tiara": "cabeca", "faixa": "cabeca", "oculos": "cabeca",
+    "cinto": "cinto",
+}
 
 
 def _slots_para_item(nome: str) -> list[str]:
@@ -8760,12 +8863,41 @@ def _slots_para_item(nome: str) -> list[str]:
     armadura = _armadura_na_tabela(nome)
     if armadura:
         return [armadura["slot"]]
+    magico = _itens.magico(nome)
+    if magico and magico.get("slot") in _SLOTS_DO_MAGICO:
+        return list(_SLOTS_DO_MAGICO[magico["slot"]])
     base = _norm_txt(nome)
     if _itens.arma(nome) or any(_norm_txt(k) in base for k in _WEAPON_KEYWORDS):
         return ["arma_principal", "arma_secundaria"]
     if any(k in base for k in _PALAVRAS_DE_AMULETO):
         return ["amuleto"]
+    primeira = base.split(" ")[0] if base else ""
+    if primeira in _PRIMEIRA_PALAVRA_DO_SLOT:
+        return list(_SLOTS_DO_MAGICO[_PRIMEIRA_PALAVRA_DO_SLOT[primeira]])
     return []
+
+
+def _conflito_de_maos(equip: dict, slot: str, nome: str) -> str:
+    """
+    Duas mãos, não três: arma de duas mãos não divide a mão com escudo nem
+    com outra arma, e duas armas não cabem com um escudo. Devolve a recusa,
+    ou "" quando cabe. A versátil conta uma mão (a outra é a escolha de
+    empunhá-la com as duas, que o ataque decide).
+    """
+    if slot not in ("arma_principal", "arma_secundaria", "escudo"):
+        return ""
+    novo = dict(equip)
+    novo[slot] = nome
+    nas_maos, maos = [], 0
+    for s in ("arma_principal", "arma_secundaria", "escudo"):
+        if novo.get(s):
+            duas = s != "escudo" and _arma_de_duas_maos(novo[s])
+            maos += 2 if duas else 1
+            nas_maos.append(f"{novo[s]}" + (" (duas mãos)" if duas else ""))
+    if maos <= 2:
+        return ""
+    return (f"Erro: não cabe nas mãos: {', '.join(nas_maos)}. Tire algo primeiro "
+            f"(arma de duas mãos não divide a mão com escudo nem com outra arma).")
 
 
 def _slots_ocupados_por(equip: dict, nome: str, exceto: str = "") -> list[str]:
@@ -8778,9 +8910,14 @@ def equip_item(char_name: str, item_name: str, slot: str = "") -> str:
     Equipa um item de um personagem, recalculando a CA automaticamente.
     O item deve estar no inventário do personagem.
 
-    Slots: armadura, escudo, arma_principal, arma_secundaria, amuleto.
+    Slots: armadura, escudo, arma_principal, arma_secundaria, amuleto,
+    anel_1, anel_2, capa, botas, luvas, cabeca, cinto.
     Sem slot, a ferramenta usa o que sabe do item (armadura e escudo pela
-    tabela, arma pelo nome); item que ela não reconhece exige o slot.
+    tabela, arma pelo nome, item mágico pelo SRD: o anel vai num dedo livre);
+    item que ela não reconhece exige o slot. Arma de duas mãos não divide a
+    mão com escudo nem com outra arma.
+
+    Item mágico que exige sintonização só faz efeito depois de attune_item.
 
     Armaduras pesadas ignoram o modificador de Destreza na CA.
     Armaduras médias limitam o bônus de Destreza a +2.
@@ -8816,10 +8953,13 @@ def equip_item(char_name: str, item_name: str, slot: str = "") -> str:
             return (f"Erro: Não sei onde equipar '{item['nome']}'. Informe o slot: "
                     f"{', '.join(_SLOTS)}.")
         # Arma: a mão principal, ou a secundária se a principal já tem outra.
+        # Anel: o primeiro dedo livre.
         slot = possiveis[0]
         if slot == "arma_principal" and equip.get("arma_principal") \
                 and not equip.get("arma_secundaria"):
             slot = "arma_secundaria"
+        if slot == "anel_1" and equip.get("anel_1") and not equip.get("anel_2"):
+            slot = "anel_2"
     if slot not in _SLOTS:
         return f"Erro: Slot '{slot}' inválido. Use: {', '.join(_SLOTS)}."
 
@@ -8835,6 +8975,10 @@ def equip_item(char_name: str, item_name: str, slot: str = "") -> str:
 
     if equip.get(slot) and _norm_txt(equip[slot]) == _norm_txt(item["nome"]):
         return f"Nota: {char['name']} já está com '{item['nome']}' em [{slot}]."
+
+    maos = _conflito_de_maos(equip, slot, item["nome"])
+    if maos:
+        return maos
 
     # Uma unidade não ocupa dois slots: com 1 adaga no inventário, pô-la nas
     # duas mãos dava dois ataques com uma arma só.
@@ -8867,7 +9011,8 @@ def unequip_item(char_name: str, slot: str) -> str:
     Args:
         char_name: Nome do personagem.
         slot:      Slot a desocupar: armadura, escudo, arma_principal,
-                   arma_secundaria, amuleto.
+                   arma_secundaria, amuleto, anel_1, anel_2, capa, botas,
+                   luvas, cabeca, cinto.
     """
     char, err = _get_char(char_name)
     if not char:
@@ -8896,6 +9041,318 @@ def unequip_item(char_name: str, slot: str) -> str:
     )
 
 
+# ── Sintonização ──────────────────────────────────────────────────────────
+# O item mágico que pede sintonização não faz nada até o personagem passar um
+# descanso curto com ele (no 5e, no máximo três de cada vez). Antes o motor
+# lia "requer sintonização" do SRD e não fazia nada com isso.
+_LIMITE_DE_SINTONIA = 3
+
+# "requires attunement by a cleric" → quem pode.
+_SINTONIA_POR_CLASSE = (("cleric", "clérigo"), ("druid", "druida"), ("wizard", "mago"),
+                        ("sorcerer", "feiticeiro"), ("warlock", "bruxo"), ("bard", "bardo"),
+                        ("paladin", "paladino"), ("ranger", "patrulheiro"))
+
+
+def _esta_sintonizado(sheet: dict, nome: str) -> bool:
+    alvo = _norm_txt(nome or "")
+    return bool(alvo) and any(_norm_txt(n) == alvo for n in (sheet or {}).get("sintonizados") or []
+                              if isinstance(n, str))
+
+
+def _quem_pode_sintonizar(char: dict, magico: dict) -> str:
+    """Recusa (texto) quando o item pede uma classe ou raça que o personagem não tem."""
+    detalhe = (magico.get("sintonizacao_detalhe") or "").lower()
+    if not detalhe:
+        return ""
+    s = char.get("sheet") or {}
+    classe = _norm_txt(s.get("classe", ""))
+    aceitas = [pt for en, pt in _SINTONIA_POR_CLASSE if en in detalhe]
+    if "spellcaster" in detalhe:
+        if not _atributo_de_conjuracao(s):
+            return "só um conjurador pode se sintonizar com ele"
+        return ""
+    if aceitas and classe not in {_norm_txt(c) for c in aceitas}:
+        return f"só se sintoniza com {', '.join(aceitas)}"
+    if "dwarf" in detalhe and "anao" not in _norm_txt(s.get("raca", "")):
+        return "só um anão se sintoniza com ele"
+    return ""
+
+
+def attune_item(char_name: str, item_name: str) -> str:
+    """
+    Sintoniza o personagem com um item mágico que exige sintonização: só
+    então o item faz efeito. No 5e leva um descanso curto (uma hora) com o
+    item, e ninguém fica sintonizado com mais de três ao mesmo tempo.
+    Sintonizar também revela o que o item é.
+
+    Args:
+        char_name: Quem se sintoniza.
+        item_name: O item (precisa estar no inventário).
+    """
+    char, err = _get_char(char_name)
+    if not char:
+        return err
+    if _em_combate():
+        return "Aviso: sintonizar leva um descanso curto; não dá no meio da luta."
+    item = _item_do_inventario(char, item_name)
+    if not item:
+        return f"Erro: '{item_name}' não está no inventário de {char['name']}."
+    magico = _item_magico_do_srd(item["nome"])
+    if not magico:
+        return (f"Nota: '{item['nome']}' não é item mágico do SRD; se ele pede "
+                f"sintonização, diga isso na descrição e narre.")
+    if not magico.get("sintonizacao"):
+        return f"Nota: {magico['nome']} não precisa de sintonização: já funciona."
+    s = char["sheet"]
+    if _esta_sintonizado(s, item["nome"]):
+        return f"Nota: {char['name']} já está sintonizado com {item['nome']}."
+    recusa = _quem_pode_sintonizar(char, magico)
+    if recusa:
+        return f"Erro: {magico['nome']}: {recusa}."
+    atuais = [n for n in s.get("sintonizados") or [] if isinstance(n, str)]
+    if len(atuais) >= _LIMITE_DE_SINTONIA:
+        return (f"Erro: {char['name']} já está sintonizado com {_LIMITE_DE_SINTONIA} itens "
+                f"({', '.join(atuais)}). Desfaça uma sintonia antes (end_attunement).")
+    s["sintonizados"] = atuais + [item["nome"]]
+    item["identificado"] = True
+    item["custom"] = False
+    item["nome_srd"] = magico["nome_srd"]
+    item["srd"] = _dados_srd_do_item(magico)
+    _recalculate_ca(char)
+    memory.save_campaign()
+    nota = (magico.get("efeito") or {}).get("nota", "")
+    vestir = ""
+    if magico.get("slot") in _SLOTS_DO_MAGICO and not _slots_ocupados_por(s.get("equipamentos") or {}, item["nome"]):
+        vestir = " Vista o item (equip_item) para ele fazer efeito."
+    return (f"{char['name']} se sintonizou com {item['nome']} ({len(atuais) + 1}/{_LIMITE_DE_SINTONIA})."
+            + (f" Efeito: {nota}" if nota else "") + vestir)
+
+
+def end_attunement(char_name: str, item_name: str) -> str:
+    """
+    Desfaz a sintonia do personagem com um item (libera uma das três vagas).
+
+    Args:
+        char_name: Quem desfaz.
+        item_name: O item.
+    """
+    char, err = _get_char(char_name, allow_dead=True)
+    if not char:
+        return err
+    s = char["sheet"]
+    if not _esta_sintonizado(s, item_name):
+        return f"Nota: {char['name']} não está sintonizado com '{item_name}'."
+    s["sintonizados"] = [n for n in s.get("sintonizados") or []
+                         if _norm_txt(n) != _norm_txt(item_name)]
+    _recalculate_ca(char)
+    memory.save_campaign()
+    return f"{char['name']} desfez a sintonia com {item_name}."
+
+
+@functools.lru_cache(maxsize=512)
+def _magico_por_nome(nome: str) -> dict | None:
+    """O item mágico do compêndio com este nome — só leitura, em cache."""
+    return _itens.magico(nome)
+
+
+def _itens_ativos(sheet: dict) -> list[tuple[str, dict]]:
+    """
+    (nome, item mágico) dos itens cujo efeito vale agora: vestido no slot
+    dele, ou carregado quando é de carregar (Pedra da Sorte), e sintonizado
+    quando o SRD exige. Um item de cada tipo: dois Anéis de Proteção não
+    somam +2.
+    """
+    equip = (sheet or {}).get("equipamentos") or {}
+    vestidos = {_norm_txt(v) for v in equip.values() if isinstance(v, str) and v}
+    nomes = [v for v in equip.values() if isinstance(v, str) and v]
+    nomes += [n for n in (sheet or {}).get("sintonizados") or [] if isinstance(n, str)]
+    ativos, vistos = [], set()
+    for nome in nomes:
+        magico = _magico_por_nome(nome)
+        if not magico or magico["chave"] in vistos:
+            continue
+        if magico.get("sintonizacao") and not _esta_sintonizado(sheet, nome):
+            continue
+        if _norm_txt(nome) not in vestidos and magico.get("slot") != "carregado":
+            continue
+        vistos.add(magico["chave"])
+        ativos.append((nome, magico))
+    return ativos
+
+
+_CAMPOS_DE_EFEITO_DE_ITEM = ("save_fixo", "teste_dado", "vantagem_pericias", "resistencias",
+                             "imunidades", "visao_no_escuro", "deslocamento_min", "dano_arco",
+                             "critico_vira_normal", "resistencia_a_magia", "proficiencia_armas")
+
+
+def _efeitos_dos_itens(sheet: dict) -> list[dict]:
+    """
+    Os itens vestidos viram efeitos no mesmo formato dos de combate (Bênção,
+    Pele de Árvore), e por isso valem nos mesmos lugares: a salvaguarda, o
+    teste, a resistência. Não ficam gravados na ficha: tirar o anel tira o
+    efeito.
+    """
+    saida = []
+    for nome, magico in _itens_ativos(sheet):
+        ef = magico.get("efeito") or {}
+        d = {"nome": nome, "origem": nome, "de_item": True}
+        for campo in _CAMPOS_DE_EFEITO_DE_ITEM:
+            if ef.get(campo):
+                d[campo] = ef[campo]
+        if ef.get("resistencia_do_nome"):
+            tipo = _damage_type_from_text(nome)
+            if tipo:
+                d["resistencias"] = list(d.get("resistencias") or []) + [tipo]
+        if len(d) > 3:
+            saida.append(d)
+    return saida
+
+
+def _aplicar_atributos_dos_itens(char: dict) -> None:
+    """
+    Manoplas de Força de Ogro (FOR 19), Amuleto da Saúde (CON 19), Cinto de
+    Força de Gigante: o atributo vira o do item enquanto ele vale, se for
+    maior. O valor de antes fica guardado e volta quando o item sai; se
+    alguém mudar o atributo por fora (aumento de nível), o novo vira a base.
+    A Constituição mexe na vida máxima, como no 5e.
+    """
+    s = char.get("sheet") or {}
+    alvo: dict[str, int] = {}
+    for _nome, magico in _itens_ativos(s):
+        for attr, v in ((magico.get("efeito") or {}).get("atributo") or {}).items():
+            alvo[attr] = max(alvo.get(attr, 0), int(v))
+    registro = s.get("_atributos_dos_itens") or {}
+    novo = {}
+    for attr in sorted(STAT_NAMES):
+        atual = int(s.get(attr, 10) or 10)
+        r = registro.get(attr)
+        base = int(r["base"]) if r and int(r.get("aplicado", -1)) == atual else atual
+        valor = max(base, alvo[attr]) if attr in alvo else base
+        if valor != base:
+            novo[attr] = {"base": base, "aplicado": valor}
+        if valor != atual:
+            s[attr] = valor
+            if attr == "constituicao":
+                delta = (_modifier(valor) - _modifier(atual)) * int(s.get("nivel", 1) or 1)
+                s["vida_max"] = max(1, int(s.get("vida_max", 1) or 1) + delta)
+                s["vida_atual"] = max(0, min(s["vida_max"],
+                                             int(s.get("vida_atual", 0) or 0) + max(0, delta)))
+    if novo:
+        s["_atributos_dos_itens"] = novo
+    else:
+        s.pop("_atributos_dos_itens", None)
+
+
+# ── Proficiência com armadura e arma ──────────────────────────────────────
+# A ficha dizia "mago" e o mago vestia placas e brandia um machado grande com
+# a proficiência inteira. No 5e, armadura sem proficiência dá desvantagem em
+# tudo o que usa FOR e DES e impede de conjurar; arma sem proficiência não
+# soma o bônus de proficiência no ataque. Vale para o grupo; NPC e monstro
+# usam o stat block.
+_ARMADURAS_DA_CLASSE = {
+    "barbaro": {"leve", "media", "escudo"}, "bardo": {"leve"}, "bruxo": {"leve"},
+    "clerigo": {"leve", "media", "escudo"}, "druida": {"leve", "media", "escudo"},
+    "feiticeiro": set(), "guerreiro": {"leve", "media", "pesada", "escudo"},
+    "ladino": {"leve"}, "mago": set(), "monge": set(),
+    "paladino": {"leve", "media", "pesada", "escudo"},
+    "patrulheiro": {"leve", "media", "escudo"}, "arcanista": {"leve", "media", "escudo"},
+}
+_SIMPLES_E_MARCIAIS = {"simples", "marcial"}
+_ARMAS_DA_CLASSE = {
+    "barbaro": _SIMPLES_E_MARCIAIS, "guerreiro": _SIMPLES_E_MARCIAIS,
+    "paladino": _SIMPLES_E_MARCIAIS, "patrulheiro": _SIMPLES_E_MARCIAIS,
+    "bardo": {"simples", "crossbow-hand", "longsword", "rapier", "shortsword"},
+    "ladino": {"simples", "crossbow-hand", "longsword", "rapier", "shortsword"},
+    "bruxo": {"simples"}, "clerigo": {"simples"}, "arcanista": {"simples"},
+    "monge": {"simples", "shortsword"},
+    "druida": {"club", "dagger", "dart", "javelin", "mace", "quarterstaff", "scimitar",
+               "sickle", "sling", "spear"},
+    "feiticeiro": {"dagger", "dart", "sling", "quarterstaff", "crossbow-light"},
+    "mago": {"dagger", "dart", "sling", "quarterstaff", "crossbow-light"},
+}
+_ARMAS_DA_RACA = {"elfo": {"longsword", "shortsword", "shortbow", "longbow"},
+                  "anao": {"battleaxe", "handaxe", "light-hammer", "warhammer"}}
+_TIPO_DA_ARMADURA = {"full": "leve", "cap2": "media", "none": "pesada", "shield": "escudo"}
+
+
+def _classe_com_tabela(char: dict) -> str:
+    classe = _norm_txt(((char or {}).get("sheet") or {}).get("classe", ""))
+    return classe if classe in _ARMADURAS_DA_CLASSE else ""
+
+
+def _habilidade_que_diz(char: dict, trecho: str) -> bool:
+    """Alguma habilidade da ficha fala disso (\"Treinamento em Armadura Pesada\")."""
+    alvo = _norm_txt(trecho)
+    return any(alvo in _norm_txt(f"{h.get('nome', '')} {h.get('descricao', '')}")
+               for h in (char.get("habilidades") or []) if isinstance(h, dict))
+
+
+def _proficiente_com_armadura(char: dict, nome: str) -> bool:
+    if not memory.is_party_member(char) or not _classe_com_tabela(char):
+        return True
+    dados = _armadura_na_tabela(nome)
+    if not dados or dados.get("proficiente"):
+        return True                        # desconhecida, ou a Cota Élfica
+    tipo = _TIPO_DA_ARMADURA.get(dados["dex_bonus"], "")
+    if tipo in _ARMADURAS_DA_CLASSE[_classe_com_tabela(char)]:
+        return True
+    return tipo == "pesada" and _habilidade_que_diz(char, "armadura pesada")
+
+
+def _armadura_sem_proficiencia(char: dict) -> str:
+    """O nome da armadura ou do escudo vestido sem proficiência, ou ''."""
+    equip = ((char or {}).get("sheet") or {}).get("equipamentos") or {}
+    for slot in ("armadura", "escudo"):
+        nome = equip.get(slot)
+        if nome and not _proficiente_com_armadura(char, nome):
+            return nome
+    return ""
+
+
+def _proficiente_com_arma(char: dict, arma: str) -> bool:
+    if not memory.is_party_member(char) or not _classe_com_tabela(char):
+        return True
+    a = _itens.arma(arma)
+    if not a:
+        return True                        # arma fora do SRD: o mestre decide
+    profs = _ARMAS_DA_CLASSE[_classe_com_tabela(char)]
+    if a["grupo"] in profs or a["chave"] in profs:
+        return True
+    raca = _norm_txt(((char.get("sheet") or {}).get("raca") or ""))
+    if any(r in raca for r, armas in _ARMAS_DA_RACA.items() if a["chave"] in armas):
+        return True
+    if a["grupo"] == "marcial" and _habilidade_que_diz(char, "armas marciais"):
+        return True
+    return any(a["nome_srd"].lower() in (e.get("proficiencia_armas") or [])
+               or a["chave"] in (e.get("proficiencia_armas") or [])
+               for e in _efeitos((char.get("sheet") or {})))
+
+
+def _desvantagem_da_armadura(char: dict, atributo: str, pericia: str = "") -> str:
+    """
+    Por que a armadura impõe desvantagem neste teste, ou ''. Sem proficiência:
+    tudo de FOR e DES. Armadura que pesa (placas, talas, cota de malha...):
+    Furtividade, menos a de mithral.
+    """
+    equip = ((char or {}).get("sheet") or {}).get("equipamentos") or {}
+    sem_prof = _armadura_sem_proficiencia(char)
+    if sem_prof and _norm_txt(atributo) in ("forca", "destreza"):
+        return f"{sem_prof} sem proficiência"
+    if pericia and _norm_txt(pericia) == "furtividade" and equip.get("armadura"):
+        dados = _armadura_na_tabela(equip["armadura"])
+        if dados and dados.get("furtividade_desvantagem"):
+            return f"{equip['armadura']}: desvantagem em Furtividade"
+    return ""
+
+
+def _rider_vale_contra(rider: dict, alvo: dict) -> bool:
+    """O dano extra que só vale contra um tipo (Matadora de Dragões) acerta este alvo?"""
+    if not rider.get("contra"):
+        return True
+    from rpg import tracos as _tracos_r
+    return _tracos_r.tipo_de_criatura(alvo) in rider["contra"]
+
+
 def _desequipar_o_que_saiu(char: dict, nome: str) -> str:
     """
     Tira do corpo o que não está mais na mochila.
@@ -8910,6 +9367,9 @@ def _desequipar_o_que_saiu(char: dict, nome: str) -> str:
     item = next((i for i in (char.get("inventario") or []) if isinstance(i, dict)
                  and _norm_txt(i.get("nome", "")) == _norm_txt(nome)), None)
     restam = int(item.get("qtd", 1) or 1) if item else 0
+    if not restam and _esta_sintonizado(sheet, nome):
+        sheet["sintonizados"] = [n for n in sheet.get("sintonizados") or []
+                                 if _norm_txt(n) != _norm_txt(nome)]
     # A mão secundária solta primeiro: a arma principal é a do ataque.
     ocupados = sorted(_slots_ocupados_por(equip, nome),
                       key=lambda s: 0 if s == "arma_secundaria" else 1)
@@ -10545,8 +11005,10 @@ def hero_snapshot(char_name: str = "") -> dict:
         "atributos": atributos,
         "pericias": pericias,
         "ataques": ataques,
+        # Os slots de item mágico só entram ocupados, como na Mochila.
         "equipados": [{"rotulo": _ROTULO_DO_SLOT[slot], "item": equip.get(slot) or ""}
-                      for slot in _SLOTS],
+                      for slot in _SLOTS if slot in _SLOTS_BASICOS or equip.get(slot)],
+        "sintonizados": [n for n in s.get("sintonizados") or [] if isinstance(n, str)],
         "moedas": {"ouro": int(s.get("ouro", 0) or 0), "prata": int(s.get("prata", 0) or 0),
                    "cobre": int(s.get("cobre", 0) or 0)},
         "carga": {"kg": carga, "capacidade": cap, "estado": estado},
@@ -10695,6 +11157,8 @@ def check_encumbrance(char_name: str) -> str:
 _ROTULO_DO_SLOT = {
     "armadura": "Armadura", "escudo": "Escudo", "arma_principal": "Mão principal",
     "arma_secundaria": "Mão secundária", "amuleto": "Pescoço",
+    "anel_1": "Anel", "anel_2": "Segundo anel", "capa": "Capa ou manto",
+    "botas": "Pés", "luvas": "Mãos e pulsos", "cabeca": "Cabeça", "cinto": "Cintura",
 }
 _TIPO_DE_ARMADURA = {"full": "leve", "cap2": "média", "none": "pesada", "shield": "escudo"}
 
@@ -10726,6 +11190,35 @@ def _ca_se_equipar(char: dict, nome: str, slot: str) -> int | None:
     copia["sheet"].setdefault("equipamentos", {})[slot] = nome
     _recalculate_ca(copia)
     return copia["sheet"]["ca"]
+
+
+def _item_identificado(dono: dict, nome: str) -> bool:
+    """O item da mochila com este nome já foi identificado (ou nunca precisou)?"""
+    item = _item_do_inventario(dono, nome)
+    return not item or not _a_identificar(item)
+
+
+def _sintonia_na_mochila(dono: dict, item: dict) -> dict | None:
+    """
+    O botão de sintonizar do item, ou None quando o item não pede sintonia:
+    {sintonizado, pode, motivo, efeito}. O efeito só aparece depois de
+    identificado: sintonizar também identifica.
+    """
+    magico = _magico_por_nome(item.get("nome", ""))
+    if not magico or not magico.get("sintonizacao"):
+        return None
+    s = dono.get("sheet") or {}
+    sintonizado = _esta_sintonizado(s, item["nome"])
+    motivo = ""
+    if not sintonizado:
+        motivo = _quem_pode_sintonizar(dono, magico)
+        usados = len([n for n in s.get("sintonizados") or [] if isinstance(n, str)])
+        if not motivo and usados >= _LIMITE_DE_SINTONIA:
+            motivo = f"já sintonizado com {_LIMITE_DE_SINTONIA} itens: desfaça uma sintonia antes"
+        if not motivo and (memory.campaign.get("combat_state") or {}).get("is_active"):
+            motivo = "sintonizar leva um descanso curto; não dá no meio da luta"
+    return {"sintonizado": sintonizado, "pode": not motivo, "motivo": motivo,
+            "efeito": (magico.get("efeito") or {}).get("nota", "") if not _a_identificar(item) else ""}
 
 
 def _uso_na_mochila(dono: dict, item: dict) -> dict | None:
@@ -10853,7 +11346,15 @@ def inventory_snapshot(char_name: str = "") -> dict:
             detalhe = (f"+{dados['ca_base'] + dados['bonus']} CA" if dados["dex_bonus"] == "shield"
                        else f"CA base {dados['ca_base']} · {_TIPO_DE_ARMADURA.get(dados['dex_bonus'], '')}"
                        + (f" · +{dados['bonus']} mágica" if dados["bonus"] else ""))
+        if not dados and nome:
+            magico_s = _magico_por_nome(nome)
+            if magico_s and (magico_s.get("efeito") or {}).get("nota") and _item_identificado(alvo, nome):
+                ativo = any(_norm_txt(n) == _norm_txt(nome) for n, _m in _itens_ativos(s))
+                detalhe = (magico_s["efeito"]["nota"] if ativo
+                           else "sem efeito até sintonizar")
         equipados.append({"slot": slot, "rotulo": _ROTULO_DO_SLOT[slot],
+                          # Os slots de item mágico só aparecem ocupados.
+                          "basico": slot in _SLOTS_BASICOS,
                           "item": nome or "", "detalhe": detalhe,
                           # Equipado sem estar na mochila: ficha antiga ou do
                           # editor. Continua valendo; a tela só avisa.
@@ -10897,6 +11398,7 @@ def inventory_snapshot(char_name: str = "") -> dict:
             # resolver, porque quem responde é o mestre.
             "efeito_desconhecido": bool(it.get("efeito_desconhecido")),
             "uso": _uso_na_mochila(alvo, it),
+            "sintonia": _sintonia_na_mochila(alvo, it),
         })
 
     base["personagem"] = {
@@ -10907,6 +11409,8 @@ def inventory_snapshot(char_name: str = "") -> dict:
                    "cobre": int(s.get("cobre", 0) or 0)},
         "carga": {"kg": carga, "capacidade": cap, "estado": estado,
                   "metade": round(cap / 2, 1)},
+        "sintonizados": {"usados": len([n for n in s.get("sintonizados") or [] if isinstance(n, str)]),
+                         "limite": _LIMITE_DE_SINTONIA},
         "equipados": equipados,
         "itens": itens,
     }
@@ -10918,7 +11422,7 @@ def inventory_action(action: str, char: str = "", item: str = "", slot: str = ""
     """
     Aplica UMA intenção da Mochila.
 
-    actions: equipar | desequipar | largar | identificar | usar
+    actions: equipar | desequipar | largar | identificar | usar | sintonizar | dessintonizar
 
     Só despacho: equip_item, unequip_item, remove_item (uma unidade) e
     identify_item — as mesmas ferramentas do mestre. "usar" aplica um
@@ -10927,6 +11431,14 @@ def inventory_action(action: str, char: str = "", item: str = "", slot: str = ""
     a = (action or "").lower().strip()
     if a == "usar":
         msg = _usar_na_mochila(char, item, alvo)
+    elif a == "sintonizar":
+        # Um descanso curto com o item: a hora passa no relógio, como no
+        # "Identificar" (attune_item, a ferramenta do mestre, não mexe nele).
+        msg = attune_item(char, item)
+        if not msg.lstrip().startswith(("Aviso:", "Erro:", "Nota:")):
+            avancar_minutos(60, f"{char} se sintonizou com {item}")
+    elif a == "dessintonizar":
+        msg = end_attunement(char, item)
     elif a == "equipar":
         msg = equip_item(char, item, slot)
     elif a == "desequipar":
@@ -16717,6 +17229,8 @@ def _efeitos(sheet: dict) -> list[dict]:
         if e.get("concentracao_de") and not _concentracao_segue(e):
             continue
         ativos.append(e)
+    # Anel de Proteção, Manto Élfico: o que os itens vestidos dão.
+    ativos.extend(_efeitos_dos_itens(sheet))
     return ativos
 
 
@@ -18453,6 +18967,8 @@ DND_TOOLS = [
     justify_custom_item,
     list_inventory,
     identify_item,
+    attune_item,
+    end_attunement,
     choose_feat,
     apply_asi,
     set_feature_choice,

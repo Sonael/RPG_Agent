@@ -40,6 +40,7 @@ const STATE_TOOLS = new Set([
   'learn_spell',
   // Mochila: o que entra, sai ou é conferido aparece com ela aberta.
   'add_item', 'remove_item', 'identify_item', 'buy_item', 'sell_item',
+  'attune_item', 'end_attunement',
   // Fechamento do turno: a relação mudou, e a ficha aberta tem de mostrar.
   'relacao',
 ]);
@@ -407,6 +408,7 @@ const TOOL_LABEL = {
   // Loja e itens
   open_shop: 'abrindo a loja', list_shop: 'vendo a loja', buy_item: 'comprando item',
   sell_item: 'vendendo item', haggle: 'pechinchando', identify_item: 'identificando item',
+  attune_item: 'sintonizando o item', end_attunement: 'desfazendo a sintonia',
   justify_custom_item: 'justificando o item', list_custom_items: 'listando itens próprios',
   // Mundo e tempo
   advance_time: 'adiantando o relógio', get_world_time: 'vendo a hora',
@@ -2130,7 +2132,7 @@ function getEditValues() {
         // CR: campo de texto para NPCs (pode ser "1/4", "1", etc.); preserva original se elemento não existir
         const crEl  = document.getElementById('ef-sheet_cr');
         const crVal = crEl ? (crEl.value.trim() || null) : (orig.cr ?? null);
-        base.sheet = { ...orig, classe: f('sheet_classe').toLowerCase() || orig.classe, raca: f('sheet_raca').toLowerCase() || orig.raca, cr: crVal, nivel: n('sheet_nivel', orig.nivel), xp: n('sheet_xp', orig.xp), vida_atual: n('sheet_vida_atual'), vida_max: n('sheet_vida_max'), mana_atual: n('sheet_mana_atual'), mana_max: n('sheet_mana_max'), ca: n('sheet_ca'), proficiencia: n('sheet_proficiencia', orig.proficiencia), forca: n('sheet_forca'), destreza: n('sheet_destreza'), constituicao: n('sheet_constituicao'), inteligencia: n('sheet_inteligencia'), sabedoria: n('sheet_sabedoria'), carisma: n('sheet_carisma'), ouro: n('sheet_ouro'), prata: n('sheet_prata'), cobre: n('sheet_cobre'), equipamentos: { armadura: f('sheet_eq_armadura') || null, escudo: f('sheet_eq_escudo') || null, arma_principal: f('sheet_eq_arma') || null, arma_secundaria: f('sheet_eq_arma_sec') || null, amuleto: f('sheet_eq_amuleto') || null }, death_saves_sucessos: n('sheet_ds_suc'), death_saves_falhas: n('sheet_ds_fail') };
+        base.sheet = { ...orig, classe: f('sheet_classe').toLowerCase() || orig.classe, raca: f('sheet_raca').toLowerCase() || orig.raca, cr: crVal, nivel: n('sheet_nivel', orig.nivel), xp: n('sheet_xp', orig.xp), vida_atual: n('sheet_vida_atual'), vida_max: n('sheet_vida_max'), mana_atual: n('sheet_mana_atual'), mana_max: n('sheet_mana_max'), ca: n('sheet_ca'), proficiencia: n('sheet_proficiencia', orig.proficiencia), forca: n('sheet_forca'), destreza: n('sheet_destreza'), constituicao: n('sheet_constituicao'), inteligencia: n('sheet_inteligencia'), sabedoria: n('sheet_sabedoria'), carisma: n('sheet_carisma'), ouro: n('sheet_ouro'), prata: n('sheet_prata'), cobre: n('sheet_cobre'), equipamentos: { ...(orig.equipamentos || {}), armadura: f('sheet_eq_armadura') || null, escudo: f('sheet_eq_escudo') || null, arma_principal: f('sheet_eq_arma') || null, arma_secundaria: f('sheet_eq_arma_sec') || null, amuleto: f('sheet_eq_amuleto') || null }, death_saves_sucessos: n('sheet_ds_suc'), death_saves_falhas: n('sheet_ds_fail') };
         base.habilidades = _editCtx.data.habilidades || [];
         // Sem isto o servidor mantém nível, atributos, CA, equipamento e
         // magias como estavam (normalize_edited_character).

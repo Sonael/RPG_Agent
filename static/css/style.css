@@ -3955,6 +3955,13 @@ body.inventory-on { overflow: hidden; }
    preenche. Cor de atenção, não de perigo. */
 .inv-marca-sem-efeito { border-color: var(--inv-leather); color: var(--inv-leather); font-weight: 700; }
 .inv-item-desc { margin: var(--esp-2) 0 0; font-size: 0.82rem; color: var(--inv-muted); line-height: 1.4; }
+/* Sintonia: o item mágico que pede sintonia só funciona depois dela. */
+.inv-marca-sintonia { border-color: var(--inv-green); color: var(--inv-verde-texto); font-weight: 700; }
+.inv-marca-sem-sintonia { border-color: var(--inv-roxo-borda); color: var(--inv-roxo); }
+.inv-item-efeito { margin: var(--esp-1) 0 0; font-size: 0.82rem; color: var(--inv-verde-texto); line-height: 1.4; }
+.inv-btn-sintonizar { border-color: var(--inv-roxo-borda); color: var(--inv-roxo); }
+.inv-btn-dessintonizar { border-color: var(--inv-line); color: var(--inv-muted); font-weight: 400; }
+.inv-sintonia-conta { font-size: 0.8rem; color: var(--inv-muted); text-align: right; }
 .inv-item-acoes { display: flex; gap: var(--esp-2); flex-wrap: wrap; margin-top: var(--esp-2); }
 .inv-btn {
   font-family: 'Lora', serif; font-weight: 700; font-size: 0.82rem;

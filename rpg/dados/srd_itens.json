@@ -2817,6 +2817,10 @@
    "sintonizacao": false,
    "peso_kg": 9.07,
    "texto_srd": "This suit of armor is reinforced with adamantine, one of the hardest substances in existence. While you're wearing it, any critical hit against you becomes a normal hit.",
+   "efeito": {
+    "nota": "Crítico contra quem a veste vira acerto normal.",
+    "critico_vira_normal": true
+   },
    "qualquer_armadura": true,
    "variantes": [
     {
@@ -2862,7 +2866,14 @@
    "raridade": "raro",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "Your Constitution score is 19 while you wear this amulet. It has no effect on you if your Constitution is already 19 or higher."
+   "texto_srd": "Your Constitution score is 19 while you wear this amulet. It has no effect on you if your Constitution is already 19 or higher.",
+   "slot": "amuleto",
+   "efeito": {
+    "nota": "Constituição 19 enquanto usar.",
+    "atributo": {
+     "constituicao": 19
+    }
+   }
   },
   "amulet-of-proof-against-detection-and-location": {
    "chave": "amulet-of-proof-against-detection-and-location",
@@ -2873,7 +2884,8 @@
    "raridade": "incomum",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "While wearing this amulet, you are hidden from divination magic. You can't be targeted by such magic or perceived through magical scrying sensors."
+   "texto_srd": "While wearing this amulet, you are hidden from divination magic. You can't be targeted by such magic or perceived through magical scrying sensors.",
+   "slot": "amuleto"
   },
   "amulet-of-the-planes": {
    "chave": "amulet-of-the-planes",
@@ -2884,7 +2896,8 @@
    "raridade": "muito raro",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "While wearing this amulet, you can use an action to name a location that you are familiar with on another plane of existence. Then make a DC 15 Intelligence check. On a successful check, you cast the _plane shift_ spell. On a failure, you and each creature and object within 15 feet of you travel to a random destination. Roll a d100. On a 1-60, you travel to a random location on the plane you named. On a 61-100, you travel to a randomly determined plane of existence."
+   "texto_srd": "While wearing this amulet, you can use an action to name a location that you are familiar with on another plane of existence. Then make a DC 15 Intelligence check. On a successful check, you cast the _plane shift_ spell. On a failure, you and each creature and object within 15 feet of you travel to a random destination. Roll a d100. On a 1-60, you travel to a random location on the plane you named. On a 61-100, you travel to a randomly determined plane of existence.",
+   "slot": "amuleto"
   },
   "animated-shield": {
    "chave": "animated-shield",
@@ -2931,6 +2944,10 @@
    "sintonizacao": true,
    "peso_kg": 9.07,
    "texto_srd": "You have resistance to one type of damage while you wear this armor. The GM chooses the type or determines it randomly from the options below. | d10 | Damage Type | |-----|-------------| | 1 | Acid | | 2 | Cold | | 3 | Fire | | 4 | Force | | 5 | Lightning | | 6 | Necrotic | | 7 | Poison | | 8 | Psychic | | 9 | Radiant | | 10 | Thunder |",
+   "efeito": {
+    "nota": "Resistência ao tipo de dano da armadura (diga no nome: \"Cota de Malha de Resistência ao Fogo\").",
+    "resistencia_do_nome": true
+   },
    "qualquer_armadura": true,
    "variantes": [
     {
@@ -3088,7 +3105,14 @@
    "raridade": "lendário",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "While wearing this belt, your Strength score changes to a score granted by the belt. If your Strength is already equal to or greater than the belt's score, the item has no effect on you.\\n\\nSix varieties of this belt exist, corresponding with and having rarity according to the six kinds of true giants. The _belt of stone giant strength_ and the _belt of frost giant strength_ look different, but they have the same effect.\\n\\n| Type | Strength | Rarity |\\n|-------------------|----------|-----------|\\n| Hill giant | 21 | Rare |\\n| Stone/frost giant | 23 | Very rare |\\n| Fire giant | 25 | Very rare |\\n| Cloud giant | 27 | Legendary |\\n| Storm giant | 29 | Legendary |\""
+   "texto_srd": "While wearing this belt, your Strength score changes to a score granted by the belt. If your Strength is already equal to or greater than the belt's score, the item has no effect on you.\\n\\nSix varieties of this belt exist, corresponding with and having rarity according to the six kinds of true giants. The _belt of stone giant strength_ and the _belt of frost giant strength_ look different, but they have the same effect.\\n\\n| Type | Strength | Rarity |\\n|-------------------|----------|-----------|\\n| Hill giant | 21 | Rare |\\n| Stone/frost giant | 23 | Very rare |\\n| Fire giant | 25 | Very rare |\\n| Cloud giant | 27 | Legendary |\\n| Storm giant | 29 | Legendary |\"",
+   "slot": "cinto",
+   "efeito": {
+    "nota": "Força 27 enquanto usar.",
+    "atributo": {
+     "forca": 27
+    }
+   }
   },
   "belt-of-dwarvenkind": {
    "chave": "belt-of-dwarvenkind",
@@ -3101,7 +3125,8 @@
    "raridade": "raro",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "While wearing this belt, you gain the following benefits: * Your Constitution score increases by 2, to a maximum of 20. * You have advantage on Charisma (Persuasion) checks made to interact with dwarves. In addition, while attuned to the belt, you have a 50 percent chance each day at dawn of growing a full beard if you're capable of growing one, or a visibly thicker beard if you already have one. If you aren't a dwarf, you gain the following additional benefits while wearing the belt: * You have advantage on saving throws against poison, and you have resistance against poison damage. * You have darkvision out to a range of 60 feet. * You can speak, read, and write Dwarvish."
+   "texto_srd": "While wearing this belt, you gain the following benefits: * Your Constitution score increases by 2, to a maximum of 20. * You have advantage on Charisma (Persuasion) checks made to interact with dwarves. In addition, while attuned to the belt, you have a 50 percent chance each day at dawn of growing a full beard if you're capable of growing one, or a visibly thicker beard if you already have one. If you aren't a dwarf, you gain the following additional benefits while wearing the belt: * You have advantage on saving throws against poison, and you have resistance against poison damage. * You have darkvision out to a range of 60 feet. * You can speak, read, and write Dwarvish.",
+   "slot": "cinto"
   },
   "belt-of-fire-giant-strength": {
    "chave": "belt-of-fire-giant-strength",
@@ -3112,7 +3137,14 @@
    "raridade": "muito raro",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "While wearing this belt, your Strength score changes to a score granted by the belt. If your Strength is already equal to or greater than the belt's score, the item has no effect on you.\\n\\nSix varieties of this belt exist, corresponding with and having rarity according to the six kinds of true giants. The _belt of stone giant strength_ and the _belt of frost giant strength_ look different, but they have the same effect.\\n\\n| Type | Strength | Rarity |\\n|-------------------|----------|-----------|\\n| Hill giant | 21 | Rare |\\n| Stone/frost giant | 23 | Very rare |\\n| Fire giant | 25 | Very rare |\\n| Cloud giant | 27 | Legendary |\\n| Storm giant | 29 | Legendary |\""
+   "texto_srd": "While wearing this belt, your Strength score changes to a score granted by the belt. If your Strength is already equal to or greater than the belt's score, the item has no effect on you.\\n\\nSix varieties of this belt exist, corresponding with and having rarity according to the six kinds of true giants. The _belt of stone giant strength_ and the _belt of frost giant strength_ look different, but they have the same effect.\\n\\n| Type | Strength | Rarity |\\n|-------------------|----------|-----------|\\n| Hill giant | 21 | Rare |\\n| Stone/frost giant | 23 | Very rare |\\n| Fire giant | 25 | Very rare |\\n| Cloud giant | 27 | Legendary |\\n| Storm giant | 29 | Legendary |\"",
+   "slot": "cinto",
+   "efeito": {
+    "nota": "Força 25 enquanto usar.",
+    "atributo": {
+     "forca": 25
+    }
+   }
   },
   "belt-of-frost-giant-strength": {
    "chave": "belt-of-frost-giant-strength",
@@ -3123,7 +3155,14 @@
    "raridade": "muito raro",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "While wearing this belt, your Strength score changes to a score granted by the belt. If your Strength is already equal to or greater than the belt's score, the item has no effect on you.\\n\\nSix varieties of this belt exist, corresponding with and having rarity according to the six kinds of true giants. The _belt of stone giant strength_ and the _belt of frost giant strength_ look different, but they have the same effect.\\n\\n| Type | Strength | Rarity |\\n|-------------------|----------|-----------|\\n| Hill giant | 21 | Rare |\\n| Stone/frost giant | 23 | Very rare |\\n| Fire giant | 25 | Very rare |\\n| Cloud giant | 27 | Legendary |\\n| Storm giant | 29 | Legendary |\""
+   "texto_srd": "While wearing this belt, your Strength score changes to a score granted by the belt. If your Strength is already equal to or greater than the belt's score, the item has no effect on you.\\n\\nSix varieties of this belt exist, corresponding with and having rarity according to the six kinds of true giants. The _belt of stone giant strength_ and the _belt of frost giant strength_ look different, but they have the same effect.\\n\\n| Type | Strength | Rarity |\\n|-------------------|----------|-----------|\\n| Hill giant | 21 | Rare |\\n| Stone/frost giant | 23 | Very rare |\\n| Fire giant | 25 | Very rare |\\n| Cloud giant | 27 | Legendary |\\n| Storm giant | 29 | Legendary |\"",
+   "slot": "cinto",
+   "efeito": {
+    "nota": "Força 23 enquanto usar.",
+    "atributo": {
+     "forca": 23
+    }
+   }
   },
   "belt-of-hill-giant-strength": {
    "chave": "belt-of-hill-giant-strength",
@@ -3134,7 +3173,14 @@
    "raridade": "raro",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "While wearing this belt, your Strength score changes to a score granted by the belt. If your Strength is already equal to or greater than the belt's score, the item has no effect on you.\\n\\nSix varieties of this belt exist, corresponding with and having rarity according to the six kinds of true giants. The _belt of stone giant strength_ and the _belt of frost giant strength_ look different, but they have the same effect.\\n\\n| Type | Strength | Rarity |\\n|-------------------|----------|-----------|\\n| Hill giant | 21 | Rare |\\n| Stone/frost giant | 23 | Very rare |\\n| Fire giant | 25 | Very rare |\\n| Cloud giant | 27 | Legendary |\\n| Storm giant | 29 | Legendary |\""
+   "texto_srd": "While wearing this belt, your Strength score changes to a score granted by the belt. If your Strength is already equal to or greater than the belt's score, the item has no effect on you.\\n\\nSix varieties of this belt exist, corresponding with and having rarity according to the six kinds of true giants. The _belt of stone giant strength_ and the _belt of frost giant strength_ look different, but they have the same effect.\\n\\n| Type | Strength | Rarity |\\n|-------------------|----------|-----------|\\n| Hill giant | 21 | Rare |\\n| Stone/frost giant | 23 | Very rare |\\n| Fire giant | 25 | Very rare |\\n| Cloud giant | 27 | Legendary |\\n| Storm giant | 29 | Legendary |\"",
+   "slot": "cinto",
+   "efeito": {
+    "nota": "Força 21 enquanto usar.",
+    "atributo": {
+     "forca": 21
+    }
+   }
   },
   "belt-of-stone-giant-strength": {
    "chave": "belt-of-stone-giant-strength",
@@ -3145,7 +3191,14 @@
    "raridade": "muito raro",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "While wearing this belt, your Strength score changes to a score granted by the belt. If your Strength is already equal to or greater than the belt's score, the item has no effect on you.\\n\\nSix varieties of this belt exist, corresponding with and having rarity according to the six kinds of true giants. The _belt of stone giant strength_ and the _belt of frost giant strength_ look different, but they have the same effect.\\n\\n| Type | Strength | Rarity |\\n|-------------------|----------|-----------|\\n| Hill giant | 21 | Rare |\\n| Stone/frost giant | 23 | Very rare |\\n| Fire giant | 25 | Very rare |\\n| Cloud giant | 27 | Legendary |\\n| Storm giant | 29 | Legendary |\""
+   "texto_srd": "While wearing this belt, your Strength score changes to a score granted by the belt. If your Strength is already equal to or greater than the belt's score, the item has no effect on you.\\n\\nSix varieties of this belt exist, corresponding with and having rarity according to the six kinds of true giants. The _belt of stone giant strength_ and the _belt of frost giant strength_ look different, but they have the same effect.\\n\\n| Type | Strength | Rarity |\\n|-------------------|----------|-----------|\\n| Hill giant | 21 | Rare |\\n| Stone/frost giant | 23 | Very rare |\\n| Fire giant | 25 | Very rare |\\n| Cloud giant | 27 | Legendary |\\n| Storm giant | 29 | Legendary |\"",
+   "slot": "cinto",
+   "efeito": {
+    "nota": "Força 23 enquanto usar.",
+    "atributo": {
+     "forca": 23
+    }
+   }
   },
   "belt-of-storm-giant-strength": {
    "chave": "belt-of-storm-giant-strength",
@@ -3156,7 +3209,14 @@
    "raridade": "lendário",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "While wearing this belt, your Strength score changes to a score granted by the belt. If your Strength is already equal to or greater than the belt's score, the item has no effect on you.\\n\\nSix varieties of this belt exist, corresponding with and having rarity according to the six kinds of true giants. The _belt of stone giant strength_ and the _belt of frost giant strength_ look different, but they have the same effect.\\n\\n| Type | Strength | Rarity |\\n|-------------------|----------|-----------|\\n| Hill giant | 21 | Rare |\\n| Stone/frost giant | 23 | Very rare |\\n| Fire giant | 25 | Very rare |\\n| Cloud giant | 27 | Legendary |\\n| Storm giant | 29 | Legendary |\""
+   "texto_srd": "While wearing this belt, your Strength score changes to a score granted by the belt. If your Strength is already equal to or greater than the belt's score, the item has no effect on you.\\n\\nSix varieties of this belt exist, corresponding with and having rarity according to the six kinds of true giants. The _belt of stone giant strength_ and the _belt of frost giant strength_ look different, but they have the same effect.\\n\\n| Type | Strength | Rarity |\\n|-------------------|----------|-----------|\\n| Hill giant | 21 | Rare |\\n| Stone/frost giant | 23 | Very rare |\\n| Fire giant | 25 | Very rare |\\n| Cloud giant | 27 | Legendary |\\n| Storm giant | 29 | Legendary |\"",
+   "slot": "cinto",
+   "efeito": {
+    "nota": "Força 29 enquanto usar.",
+    "atributo": {
+     "forca": 29
+    }
+   }
   },
   "boots-of-elvenkind": {
    "chave": "boots-of-elvenkind",
@@ -3169,7 +3229,14 @@
    "raridade": "incomum",
    "sintonizacao": false,
    "peso_kg": 0.0,
-   "texto_srd": "While you wear these boots, your steps make no sound, regardless of the surface you are moving across. You also have advantage on Dexterity (Stealth) checks that rely on moving silently."
+   "texto_srd": "While you wear these boots, your steps make no sound, regardless of the surface you are moving across. You also have advantage on Dexterity (Stealth) checks that rely on moving silently.",
+   "slot": "botas",
+   "efeito": {
+    "nota": "Vantagem em Furtividade (passos silenciosos).",
+    "vantagem_pericias": [
+     "furtividade"
+    ]
+   }
   },
   "boots-of-levitation": {
    "chave": "boots-of-levitation",
@@ -3180,7 +3247,8 @@
    "raridade": "raro",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "While you wear these boots, you can use an action to cast the _levitate_ spell on yourself at will."
+   "texto_srd": "While you wear these boots, you can use an action to cast the _levitate_ spell on yourself at will.",
+   "slot": "botas"
   },
   "boots-of-speed": {
    "chave": "boots-of-speed",
@@ -3191,7 +3259,8 @@
    "raridade": "raro",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "While you wear these boots, you can use a bonus action and click the boots' heels together. If you do, the boots double your walking speed, and any creature that makes an opportunity attack against you has disadvantage on the attack roll. If you click your heels together again, you end the effect. When the boots' property has been used for a total of 10 minutes, the magic ceases to function until you finish a long rest."
+   "texto_srd": "While you wear these boots, you can use a bonus action and click the boots' heels together. If you do, the boots double your walking speed, and any creature that makes an opportunity attack against you has disadvantage on the attack roll. If you click your heels together again, you end the effect. When the boots' property has been used for a total of 10 minutes, the magic ceases to function until you finish a long rest.",
+   "slot": "botas"
   },
   "boots-of-striding-and-springing": {
    "chave": "boots-of-striding-and-springing",
@@ -3202,7 +3271,12 @@
    "raridade": "incomum",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "While you wear these boots, your walking speed becomes 30 feet, unless your walking speed is higher, and your speed isn't reduced if you are encumbered or wearing heavy armor. In addition, you can jump three times the normal distance, though you can't jump farther than your remaining movement would allow."
+   "texto_srd": "While you wear these boots, your walking speed becomes 30 feet, unless your walking speed is higher, and your speed isn't reduced if you are encumbered or wearing heavy armor. In addition, you can jump three times the normal distance, though you can't jump farther than your remaining movement would allow.",
+   "slot": "botas",
+   "efeito": {
+    "nota": "Deslocamento de pelo menos 9 m, mesmo com carga.",
+    "deslocamento_min": 9
+   }
   },
   "boots-of-the-winterlands": {
    "chave": "boots-of-the-winterlands",
@@ -3213,7 +3287,8 @@
    "raridade": "incomum",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "These furred boots are snug and feel quite warm. While you wear them, you gain the following benefits: * You have resistance to cold damage. * You ignore difficult terrain created by ice or snow. * You can tolerate temperatures as low as -50 degrees Fahrenheit without any additional protection. If you wear heavy clothes, you can tolerate temperatures as low as -100 degrees Fahrenheit."
+   "texto_srd": "These furred boots are snug and feel quite warm. While you wear them, you gain the following benefits: * You have resistance to cold damage. * You ignore difficult terrain created by ice or snow. * You can tolerate temperatures as low as -50 degrees Fahrenheit without any additional protection. If you wear heavy clothes, you can tolerate temperatures as low as -100 degrees Fahrenheit.",
+   "slot": "botas"
   },
   "bowl-of-commanding-water-elementals": {
    "chave": "bowl-of-commanding-water-elementals",
@@ -3235,7 +3310,16 @@
    "raridade": "incomum",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "While wearing these bracers, you have proficiency with the longbow and shortbow, and you gain a +2 bonus to damage rolls on ranged attacks made with such weapons."
+   "texto_srd": "While wearing these bracers, you have proficiency with the longbow and shortbow, and you gain a +2 bonus to damage rolls on ranged attacks made with such weapons.",
+   "slot": "luvas",
+   "efeito": {
+    "nota": "+2 de dano com arco longo e arco curto, e proficiência neles.",
+    "dano_arco": 2,
+    "proficiencia_armas": [
+     "longbow",
+     "shortbow"
+    ]
+   }
   },
   "bracers-of-defense": {
    "chave": "bracers-of-defense",
@@ -3246,7 +3330,12 @@
    "raridade": "raro",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "While wearing these bracers, you gain a +2 bonus to AC if you are wearing no armor and using no shield."
+   "texto_srd": "While wearing these bracers, you gain a +2 bonus to AC if you are wearing no armor and using no shield.",
+   "slot": "luvas",
+   "efeito": {
+    "nota": "+2 na CA sem armadura e sem escudo.",
+    "ca_sem_armadura": 2
+   }
   },
   "brazier-of-commanding-fire-elementals": {
    "chave": "brazier-of-commanding-fire-elementals",
@@ -3270,7 +3359,14 @@
    "raridade": "incomum",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "While wearing this brooch, you have resistance to force damage, and you have immunity to damage from the _magic missile_ spell."
+   "texto_srd": "While wearing this brooch, you have resistance to force damage, and you have immunity to damage from the _magic missile_ spell.",
+   "slot": "amuleto",
+   "efeito": {
+    "nota": "Resistência a dano de força.",
+    "resistencias": [
+     "force"
+    ]
+   }
   },
   "broom-of-flying": {
    "chave": "broom-of-flying",
@@ -3303,7 +3399,8 @@
    "raridade": "raro",
    "sintonizacao": false,
    "peso_kg": 0.0,
-   "texto_srd": "This cape smells faintly of brimstone. While wearing it, you can use it to cast the _dimension door_ spell as an action. This property of the cape can't be used again until the next dawn. When you disappear, you leave behind a cloud of smoke, and you appear in a similar cloud of smoke at your destination. The smoke lightly obscures the space you left and the space you appear in, and it dissipates at the end of your next turn. A light or stronger wind disperses the smoke."
+   "texto_srd": "This cape smells faintly of brimstone. While wearing it, you can use it to cast the _dimension door_ spell as an action. This property of the cape can't be used again until the next dawn. When you disappear, you leave behind a cloud of smoke, and you appear in a similar cloud of smoke at your destination. The smoke lightly obscures the space you left and the space you appear in, and it dissipates at the end of your next turn. A light or stronger wind disperses the smoke.",
+   "slot": "capa"
   },
   "carpet-of-flying": {
    "chave": "carpet-of-flying",
@@ -3347,7 +3444,8 @@
    "raridade": "incomum",
    "sintonizacao": false,
    "peso_kg": 0.0,
-   "texto_srd": "While wearing this circlet, you can use an action to cast the _scorching ray_ spell with it. When you make the spell's attacks, you do so with an attack bonus of +5. The circlet can't be used this way again until the next dawn."
+   "texto_srd": "While wearing this circlet, you can use an action to cast the _scorching ray_ spell with it. When you make the spell's attacks, you do so with an attack bonus of +5. The circlet can't be used this way again until the next dawn.",
+   "slot": "cabeca"
   },
   "cloak-of-arachnida": {
    "chave": "cloak-of-arachnida",
@@ -3358,7 +3456,8 @@
    "raridade": "muito raro",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "This fine garment is made of black silk interwoven with faint silvery threads. While wearing it, you gain the following benefits: * You have resistance to poison damage. * You have a climbing speed equal to your walking speed. * You can move up, down, and across vertical surfaces and upside down along ceilings, while leaving your hands free. * You can't be caught in webs of any sort and can move through webs as if they were difficult terrain. * You can use an action to cast the _web_ spell (save DC 13). The web created by the spell fills twice its normal area. Once used, this property of the cloak can't be used again until the next dawn."
+   "texto_srd": "This fine garment is made of black silk interwoven with faint silvery threads. While wearing it, you gain the following benefits: * You have resistance to poison damage. * You have a climbing speed equal to your walking speed. * You can move up, down, and across vertical surfaces and upside down along ceilings, while leaving your hands free. * You can't be caught in webs of any sort and can move through webs as if they were difficult terrain. * You can use an action to cast the _web_ spell (save DC 13). The web created by the spell fills twice its normal area. Once used, this property of the cloak can't be used again until the next dawn.",
+   "slot": "capa"
   },
   "cloak-of-displacement": {
    "chave": "cloak-of-displacement",
@@ -3369,7 +3468,8 @@
    "raridade": "raro",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "While you wear this cloak, it projects an illusion that makes you appear to be standing in a place near your actual location, causing any creature to have disadvantage on attack rolls against you. If you take damage, the property ceases to function until the start of your next turn. This property is suppressed while you are incapacitated, restrained, or otherwise unable to move."
+   "texto_srd": "While you wear this cloak, it projects an illusion that makes you appear to be standing in a place near your actual location, causing any creature to have disadvantage on attack rolls against you. If you take damage, the property ceases to function until the start of your next turn. This property is suppressed while you are incapacitated, restrained, or otherwise unable to move.",
+   "slot": "capa"
   },
   "cloak-of-elvenkind": {
    "chave": "cloak-of-elvenkind",
@@ -3383,7 +3483,14 @@
    "raridade": "incomum",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "While you wear this cloak with its hood up, Wisdom (Perception) checks made to see you have disadvantage, and you have advantage on Dexterity (Stealth) checks made to hide, as the cloak's color shifts to camouflage you. Pulling the hood up or down requires an action."
+   "texto_srd": "While you wear this cloak with its hood up, Wisdom (Perception) checks made to see you have disadvantage, and you have advantage on Dexterity (Stealth) checks made to hide, as the cloak's color shifts to camouflage you. Pulling the hood up or down requires an action.",
+   "slot": "capa",
+   "efeito": {
+    "nota": "Vantagem em Furtividade.",
+    "vantagem_pericias": [
+     "furtividade"
+    ]
+   }
   },
   "cloak-of-protection": {
    "chave": "cloak-of-protection",
@@ -3396,7 +3503,13 @@
    "raridade": "incomum",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "You gain a +1 bonus to AC and saving throws while you wear this cloak."
+   "texto_srd": "You gain a +1 bonus to AC and saving throws while you wear this cloak.",
+   "slot": "capa",
+   "efeito": {
+    "nota": "+1 na CA e nas salvaguardas.",
+    "ca": 1,
+    "save_fixo": 1
+   }
   },
   "cloak-of-the-bat": {
    "chave": "cloak-of-the-bat",
@@ -3407,7 +3520,8 @@
    "raridade": "raro",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "While wearing this cloak, you have advantage on Dexterity (Stealth) checks. In an area of dim light or darkness, you can grip the edges of the cloak with both hands and use it to fly at a speed of 40 feet. If you ever fail to grip the cloak's edges while flying in this way, or if you are no longer in dim light or darkness, you lose this flying speed. While wearing the cloak in an area of dim light or darkness, you can use your action to cast _polymorph_ on yourself, transforming into a bat. While you are in the form of the bat, you retain your Intelligence, Wisdom, and Charisma scores. The cloak can't be used this way again until the next dawn."
+   "texto_srd": "While wearing this cloak, you have advantage on Dexterity (Stealth) checks. In an area of dim light or darkness, you can grip the edges of the cloak with both hands and use it to fly at a speed of 40 feet. If you ever fail to grip the cloak's edges while flying in this way, or if you are no longer in dim light or darkness, you lose this flying speed. While wearing the cloak in an area of dim light or darkness, you can use your action to cast _polymorph_ on yourself, transforming into a bat. While you are in the form of the bat, you retain your Intelligence, Wisdom, and Charisma scores. The cloak can't be used this way again until the next dawn.",
+   "slot": "capa"
   },
   "cloak-of-the-manta-ray": {
    "chave": "cloak-of-the-manta-ray",
@@ -3418,7 +3532,8 @@
    "raridade": "incomum",
    "sintonizacao": false,
    "peso_kg": 0.0,
-   "texto_srd": "While wearing this cloak with its hood up, you can breathe underwater, and you have a swimming speed of 60 feet. Pulling the hood up or down requires an action."
+   "texto_srd": "While wearing this cloak with its hood up, you can breathe underwater, and you have a swimming speed of 60 feet. Pulling the hood up or down requires an action.",
+   "slot": "capa"
   },
   "crystal-ball": {
    "chave": "crystal-ball",
@@ -3655,6 +3770,16 @@
    "peso_kg": 0.0,
    "texto_srd": "You gain a +1 bonus to attack and damage rolls made with this magic weapon. When you hit a dragon with this weapon, the dragon takes an extra 3d6 damage of the weapon's type. For the purpose of this weapon, \"dragon\" refers to any creature with the dragon type, including dragon turtles and wyverns.",
    "base_arma": "longsword",
+   "efeito": {
+    "nota": "+3d6 contra dragões.",
+    "dano_extra": {
+     "dado": "3d6",
+     "tipo": "",
+     "contra": [
+      "dragao"
+     ]
+    }
+   },
    "bonus": 1,
    "variantes": [
     {
@@ -3785,6 +3910,10 @@
    "peso_kg": 9.07,
    "texto_srd": "You gain a +1 bonus to AC while you wear this armor. You are considered proficient with this armor even if you lack proficiency with medium armor.",
    "base_armadura": "chain-shirt",
+   "efeito": {
+    "nota": "Quem a veste é proficiente nela.",
+    "proficiente": true
+   },
    "bonus": 1
   },
   "eversmoking-bottle": {
@@ -3807,7 +3936,8 @@
    "raridade": "incomum",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "These crystal lenses fit over the eyes. They have 3 charges. While wearing them, you can expend 1 charge as an action to cast the _charm person_ spell (save DC 13) on a humanoid within 30 feet of you, provided that you and the target can see each other. The lenses regain all expended charges daily at dawn."
+   "texto_srd": "These crystal lenses fit over the eyes. They have 3 charges. While wearing them, you can expend 1 charge as an action to cast the _charm person_ spell (save DC 13) on a humanoid within 30 feet of you, provided that you and the target can see each other. The lenses regain all expended charges daily at dawn.",
+   "slot": "cabeca"
   },
   "eyes-of-minute-seeing": {
    "chave": "eyes-of-minute-seeing",
@@ -3818,7 +3948,8 @@
    "raridade": "incomum",
    "sintonizacao": false,
    "peso_kg": 0.0,
-   "texto_srd": "These crystal lenses fit over the eyes. While wearing them, you can see much better than normal out to a range of 1 foot. You have advantage on Intelligence (Investigation) checks that rely on sight while searching an area or studying an object within that range."
+   "texto_srd": "These crystal lenses fit over the eyes. While wearing them, you can see much better than normal out to a range of 1 foot. You have advantage on Intelligence (Investigation) checks that rely on sight while searching an area or studying an object within that range.",
+   "slot": "cabeca"
   },
   "eyes-of-the-eagle": {
    "chave": "eyes-of-the-eagle",
@@ -3829,7 +3960,14 @@
    "raridade": "incomum",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "These crystal lenses fit over the eyes. While wearing them, you have advantage on Wisdom (Perception) checks that rely on sight. In conditions of clear visibility, you can make out details of even extremely distant creatures and objects as small as 2 feet across."
+   "texto_srd": "These crystal lenses fit over the eyes. While wearing them, you have advantage on Wisdom (Perception) checks that rely on sight. In conditions of clear visibility, you can make out details of even extremely distant creatures and objects as small as 2 feet across.",
+   "slot": "cabeca",
+   "efeito": {
+    "nota": "Vantagem em Percepção pela visão.",
+    "vantagem_pericias": [
+     "percepção"
+    ]
+   }
   },
   "feather-token": {
    "chave": "feather-token",
@@ -3919,6 +4057,13 @@
    "peso_kg": 0.0,
    "texto_srd": "You can use a bonus action to speak this magic sword's command word, causing flames to erupt from the blade. These flames shed bright light in a 40-foot radius and dim light for an additional 40 feet. While the sword is ablaze, it deals an extra 2d6 fire damage to any target it hits. The flames last until you use a bonus action to speak the command word again or until you drop or sheathe the sword.",
    "base_arma": "longsword",
+   "efeito": {
+    "nota": "+2d6 de fogo nos golpes (a lâmina acesa).",
+    "dano_extra": {
+     "dado": "2d6",
+     "tipo": "fire"
+    }
+   },
    "variantes": [
     {
      "nome_srd": "Flame Tongue (Greatsword)",
@@ -3962,6 +4107,16 @@
    "peso_kg": 0.0,
    "texto_srd": "When you hit with an attack using this magic sword, the target takes an extra 1d6 cold damage. In addition, while you hold the sword, you have resistance to fire damage. In freezing temperatures, the blade sheds bright light in a 10-foot radius and dim light for an additional 10 feet. When you draw this weapon, you can extinguish all nonmagical flames within 30 feet of you. This property can be used no more than once per hour.",
    "base_arma": "longsword",
+   "efeito": {
+    "nota": "+1d6 de frio nos golpes, e resistência a fogo.",
+    "dano_extra": {
+     "dado": "1d6",
+     "tipo": "cold"
+    },
+    "resistencias": [
+     "fire"
+    ]
+   },
    "variantes": [
     {
      "nome_srd": "Frost Brand (Greatsword)",
@@ -3992,7 +4147,14 @@
    "raridade": "incomum",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "Your Strength score is 19 while you wear these gauntlets. They have no effect on you if your Strength is already 19 or higher."
+   "texto_srd": "Your Strength score is 19 while you wear these gauntlets. They have no effect on you if your Strength is already 19 or higher.",
+   "slot": "luvas",
+   "efeito": {
+    "nota": "Força 19 enquanto usar.",
+    "atributo": {
+     "forca": 19
+    }
+   }
   },
   "gem-of-brightness": {
    "chave": "gem-of-brightness",
@@ -4028,6 +4190,16 @@
    "sintonizacao": false,
    "peso_kg": 1.81,
    "texto_srd": "You gain a +1 bonus to attack and damage rolls made with this magic weapon. When you hit a giant with it, the giant takes an extra 2d6 damage of the weapon's type and must succeed on a DC 15 Strength saving throw or fall prone. For the purpose of this weapon, \"giant\" refers to any creature with the giant type, including ettins and trolls.",
+   "efeito": {
+    "nota": "+2d6 contra gigantes.",
+    "dano_extra": {
+     "dado": "2d6",
+     "tipo": "",
+     "contra": [
+      "gigante"
+     ]
+    }
+   },
    "bonus": 1,
    "qualquer_arma": true,
    "variantes": [
@@ -4083,7 +4255,8 @@
    "raridade": "incomum",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "These gloves seem to almost meld into your hands when you don them. When a ranged weapon attack hits you while you're wearing them, you can use your reaction to reduce the damage by 1d10 + your Dexterity modifier, provided that you have a free hand. If you reduce the damage to 0, you can catch the missile if it is small enough for you to hold in that hand."
+   "texto_srd": "These gloves seem to almost meld into your hands when you don them. When a ranged weapon attack hits you while you're wearing them, you can use your reaction to reduce the damage by 1d10 + your Dexterity modifier, provided that you have a free hand. If you reduce the damage to 0, you can catch the missile if it is small enough for you to hold in that hand.",
+   "slot": "luvas"
   },
   "gloves-of-swimming-and-climbing": {
    "chave": "gloves-of-swimming-and-climbing",
@@ -4094,7 +4267,8 @@
    "raridade": "incomum",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "While wearing these gloves, climbing and swimming don't cost you extra movement, and you gain a +5 bonus to Strength (Athletics) checks made to climb or swim."
+   "texto_srd": "While wearing these gloves, climbing and swimming don't cost you extra movement, and you gain a +5 bonus to Strength (Athletics) checks made to climb or swim.",
+   "slot": "luvas"
   },
   "goggles-of-night": {
    "chave": "goggles-of-night",
@@ -4107,7 +4281,12 @@
    "raridade": "incomum",
    "sintonizacao": false,
    "peso_kg": 0.0,
-   "texto_srd": "While wearing these dark lenses, you have darkvision out to a range of 60 feet. If you already have darkvision, wearing the goggles increases its range by 60 feet."
+   "texto_srd": "While wearing these dark lenses, you have darkvision out to a range of 60 feet. If you already have darkvision, wearing the goggles increases its range by 60 feet.",
+   "slot": "cabeca",
+   "efeito": {
+    "nota": "Visão no escuro de 18 m.",
+    "visao_no_escuro": 18
+   }
   },
   "hammer-of-thunderbolts": {
    "chave": "hammer-of-thunderbolts",
@@ -4144,7 +4323,8 @@
    "raridade": "incomum",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "While wearing this hat, you can use an action to cast the _disguise self_ spell from it at will. The spell ends if the hat is removed."
+   "texto_srd": "While wearing this hat, you can use an action to cast the _disguise self_ spell from it at will. The spell ends if the hat is removed.",
+   "slot": "cabeca"
   },
   "headband-of-intellect": {
    "chave": "headband-of-intellect",
@@ -4155,7 +4335,14 @@
    "raridade": "incomum",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "Your Intelligence score is 19 while you wear this headband. It has no effect on you if your Intelligence is already 19 or higher."
+   "texto_srd": "Your Intelligence score is 19 while you wear this headband. It has no effect on you if your Intelligence is already 19 or higher.",
+   "slot": "cabeca",
+   "efeito": {
+    "nota": "Inteligência 19 enquanto usar.",
+    "atributo": {
+     "inteligencia": 19
+    }
+   }
   },
   "helm-of-brilliance": {
    "chave": "helm-of-brilliance",
@@ -4166,7 +4353,8 @@
    "raridade": "muito raro",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "This dazzling helm is set with 1d10 diamonds, 2d10 rubies, 3d10 fire opals, and 4d10 opals. Any gem pried from the helm crumbles to dust. When all the gems are removed or destroyed, the helm loses its magic. You gain the following benefits while wearing it: * You can use an action to cast one of the following spells (save DC 18), using one of the helm's gems of the specified type as a component: _daylight_ (opal), _fireball_ (fire opal), _prismatic spray_ (diamond), or _wall of fire_ (ruby). The gem is destroyed when the spell is cast and disappears from the helm. * As long as it has at least one diamond, the helm emits dim light in a 30-foot radius when at least one undead is within that area. Any undead that starts its turn in that area takes 1d6 radiant damage. * As long as the helm has at least one ruby, you have resistance to fire damage. * As long as the helm has at least one fire opal, you can use an action and speak a command word to cause one weapon you are holding to burst into flames. The flames emit bright light in a 10-foot radius and dim light for an additional 10 feet. The flames are harmless to you and the weapon. When you hit with an attack using the blazing weapon, the target takes an extra 1d6 fire damage. The flames last until you use a bonus action to speak the command word again or until you drop or stow the weapon. Roll a d20 if you are wearing the helm and take fire damage as a result of failing a saving throw against a spell. On a roll of 1, the helm emits beams of light from its remaining gems. Each creature within 60 feet of the helm other than you must succeed on a DC 17 Dexterity saving throw or be struck by a beam, taking radiant damage equal to the number of gems in the helm. The helm and its gems are then destroyed."
+   "texto_srd": "This dazzling helm is set with 1d10 diamonds, 2d10 rubies, 3d10 fire opals, and 4d10 opals. Any gem pried from the helm crumbles to dust. When all the gems are removed or destroyed, the helm loses its magic. You gain the following benefits while wearing it: * You can use an action to cast one of the following spells (save DC 18), using one of the helm's gems of the specified type as a component: _daylight_ (opal), _fireball_ (fire opal), _prismatic spray_ (diamond), or _wall of fire_ (ruby). The gem is destroyed when the spell is cast and disappears from the helm. * As long as it has at least one diamond, the helm emits dim light in a 30-foot radius when at least one undead is within that area. Any undead that starts its turn in that area takes 1d6 radiant damage. * As long as the helm has at least one ruby, you have resistance to fire damage. * As long as the helm has at least one fire opal, you can use an action and speak a command word to cause one weapon you are holding to burst into flames. The flames emit bright light in a 10-foot radius and dim light for an additional 10 feet. The flames are harmless to you and the weapon. When you hit with an attack using the blazing weapon, the target takes an extra 1d6 fire damage. The flames last until you use a bonus action to speak the command word again or until you drop or stow the weapon. Roll a d20 if you are wearing the helm and take fire damage as a result of failing a saving throw against a spell. On a roll of 1, the helm emits beams of light from its remaining gems. Each creature within 60 feet of the helm other than you must succeed on a DC 17 Dexterity saving throw or be struck by a beam, taking radiant damage equal to the number of gems in the helm. The helm and its gems are then destroyed.",
+   "slot": "cabeca"
   },
   "helm-of-comprehending-languages": {
    "chave": "helm-of-comprehending-languages",
@@ -4177,7 +4365,8 @@
    "raridade": "incomum",
    "sintonizacao": false,
    "peso_kg": 0.0,
-   "texto_srd": "While wearing this helm, you can use an action to cast the _comprehend languages_ spell from it at will."
+   "texto_srd": "While wearing this helm, you can use an action to cast the _comprehend languages_ spell from it at will.",
+   "slot": "cabeca"
   },
   "helm-of-telepathy": {
    "chave": "helm-of-telepathy",
@@ -4188,7 +4377,8 @@
    "raridade": "incomum",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "While wearing this helm, you can use an action to cast the _detect thoughts_ spell (save DC 13) from it. As long as you maintain concentration on the spell, you can use a bonus action to send a telepathic message to a creature you are focused on. It can reply-using a bonus action to do so-while your focus on it continues. While focusing on a creature with _detect thoughts_, you can use an action to cast the _suggestion_ spell (save DC 13) from the helm on that creature. Once used, the _suggestion_ property can't be used again until the next dawn."
+   "texto_srd": "While wearing this helm, you can use an action to cast the _detect thoughts_ spell (save DC 13) from it. As long as you maintain concentration on the spell, you can use a bonus action to send a telepathic message to a creature you are focused on. It can reply-using a bonus action to do so-while your focus on it continues. While focusing on a creature with _detect thoughts_, you can use an action to cast the _suggestion_ spell (save DC 13) from the helm on that creature. Once used, the _suggestion_ property can't be used again until the next dawn.",
+   "slot": "cabeca"
   },
   "helm-of-teleportation": {
    "chave": "helm-of-teleportation",
@@ -4199,7 +4389,8 @@
    "raridade": "raro",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "This helm has 3 charges. While wearing it, you can use an action and expend 1 charge to cast the _teleport_ spell from it. The helm regains 1d3 expended charges daily at dawn."
+   "texto_srd": "This helm has 3 charges. While wearing it, you can use an action and expend 1 charge to cast the _teleport_ spell from it. The helm regains 1d3 expended charges daily at dawn.",
+   "slot": "cabeca"
   },
   "holy-avenger": {
    "chave": "holy-avenger",
@@ -4213,6 +4404,17 @@
    "texto_srd": "You gain a +3 bonus to attack and damage rolls made with this magic weapon. When you hit a fiend or an undead with it, that creature takes an extra 2d10 radiant damage. While you hold the drawn sword, it creates an aura in a 10-foot radius around you. You and all creatures friendly to you in the aura have advantage on saving throws against spells and other magical effects. If you have 17 or more levels in the paladin class, the radius of the aura increases to 30 feet.",
    "sintonizacao_detalhe": "Requires Attunement by a Paladin",
    "base_arma": "longsword",
+   "efeito": {
+    "nota": "+2d10 radiante contra corruptores e mortos-vivos.",
+    "dano_extra": {
+     "dado": "2d10",
+     "tipo": "radiant",
+     "contra": [
+      "corruptor",
+      "morto-vivo"
+     ]
+    }
+   },
    "bonus": 3,
    "variantes": [
     {
@@ -4339,6 +4541,7 @@
     "muito raro",
     "lendário"
    ],
+   "slot": "carregado",
    "variantes": [
     {
      "nome_srd": "Ioun Stone (Absorption)",
@@ -4494,7 +4697,18 @@
    "sintonizacao": true,
    "peso_kg": 1.81,
    "texto_srd": "When you hit a fiend or an undead with this magic weapon, that creature takes an extra 2d6 radiant damage. If the target has 25 hit points or fewer after taking this damage, it must succeed on a DC 15 Wisdom saving throw or be destroyed. On a successful save, the creature becomes frightened of you until the end of your next turn. While you hold this weapon, it sheds bright light in a 20-foot radius and dim light for an additional 20 feet.",
-   "base_arma": "mace"
+   "base_arma": "mace",
+   "efeito": {
+    "nota": "+2d6 radiante contra corruptores e mortos-vivos.",
+    "dano_extra": {
+     "dado": "2d6",
+     "tipo": "radiant",
+     "contra": [
+      "corruptor",
+      "morto-vivo"
+     ]
+    }
+   }
   },
   "mace-of-smiting": {
    "chave": "mace-of-smiting",
@@ -4530,7 +4744,12 @@
    "raridade": "raro",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "You have advantage on saving throws against spells while you wear this cloak."
+   "texto_srd": "You have advantage on saving throws against spells while you wear this cloak.",
+   "slot": "capa",
+   "efeito": {
+    "nota": "Vantagem nas salvaguardas contra magia.",
+    "resistencia_a_magia": true
+   }
   },
   "manual-of-bodily-health": {
    "chave": "manual-of-bodily-health",
@@ -4596,7 +4815,8 @@
    "raridade": "incomum",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "The medallion has 3 charges. While wearing it, you can use an action and expend 1 charge to cast the _detect thoughts_ spell (save DC 13) from it. The medallion regains 1d3 expended charges daily at dawn."
+   "texto_srd": "The medallion has 3 charges. While wearing it, you can use an action and expend 1 charge to cast the _detect thoughts_ spell (save DC 13) from it. The medallion regains 1d3 expended charges daily at dawn.",
+   "slot": "amuleto"
   },
   "mirror-of-life-trapping": {
    "chave": "mirror-of-life-trapping",
@@ -4623,6 +4843,11 @@
    "sintonizacao": false,
    "peso_kg": 9.07,
    "texto_srd": "Mithral is a light, flexible metal. A mithral chain shirt or breastplate can be worn under normal clothes. If the armor normally imposes disadvantage on Dexterity (Stealth) checks or has a Strength requirement, the mithral version of the armor doesn't.",
+   "efeito": {
+    "nota": "Sem Força mínima e sem desvantagem em Furtividade.",
+    "sem_forca_minima": true,
+    "sem_desvantagem_furtividade": true
+   },
    "qualquer_armadura": true,
    "variantes": [
     {
@@ -4668,7 +4893,8 @@
    "raridade": "incomum",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "While wearing this necklace, you can breathe normally in any environment, and you have advantage on saving throws made against harmful gases and vapors (such as _cloudkill_ and _stinking cloud_ effects, inhaled poisons, and the breath weapons of some dragons)."
+   "texto_srd": "While wearing this necklace, you can breathe normally in any environment, and you have advantage on saving throws made against harmful gases and vapors (such as _cloudkill_ and _stinking cloud_ effects, inhaled poisons, and the breath weapons of some dragons).",
+   "slot": "amuleto"
   },
   "necklace-of-fireballs": {
    "chave": "necklace-of-fireballs",
@@ -4679,7 +4905,8 @@
    "raridade": "raro",
    "sintonizacao": false,
    "peso_kg": 0.0,
-   "texto_srd": "This necklace has 1d6 + 3 beads hanging from it. You can use an action to detach a bead and throw it up to 60 feet away. When it reaches the end of its trajectory, the bead detonates as a 3rd-level _fireball_ spell (save DC 15). You can hurl multiple beads, or even the whole necklace, as one action. When you do so, increase the level of the _fireball_ by 1 for each bead beyond the first."
+   "texto_srd": "This necklace has 1d6 + 3 beads hanging from it. You can use an action to detach a bead and throw it up to 60 feet away. When it reaches the end of its trajectory, the bead detonates as a 3rd-level _fireball_ spell (save DC 15). You can hurl multiple beads, or even the whole necklace, as one action. When you do so, increase the level of the _fireball_ by 1 for each bead beyond the first.",
+   "slot": "amuleto"
   },
   "necklace-of-prayer-beads": {
    "chave": "necklace-of-prayer-beads",
@@ -4693,7 +4920,8 @@
    "sintonizacao": true,
    "peso_kg": 0.0,
    "texto_srd": "This necklace has 1d4 + 2 magic beads made from aquamarine, black pearl, or topaz. It also has many nonmagical beads made from stones such as amber, bloodstone, citrine, coral, jade, pearl, or quartz. If a magic bead is removed from the necklace, that bead loses its magic. Six types of magic beads exist. The GM decides the type of each bead on the necklace or determines it randomly. A necklace can have more than one bead of the same type. To use one, you must be wearing the necklace. Each bead contains a spell that you can cast from it as a bonus action (using your spell save DC if a save is necessary). Once a magic bead's spell is cast, that bead can't be used again until the next dawn. | d20 | Bead of... | Spell | |-------|--------------|-----------------------------------------------| | 1-6 | Blessing | Bless | | 7-12 | Curing | Cure wounds (2nd level) or lesser restoration | | 13-16 | Favor | Greater restoration | | 17-18 | Smiting | Branding smite | | 19 | Summons | Planar ally | | 20 | Wind walking | Wind walk |",
-   "sintonizacao_detalhe": "requires attunement by a cleric, druid, or paladin"
+   "sintonizacao_detalhe": "requires attunement by a cleric, druid, or paladin",
+   "slot": "amuleto"
   },
   "nine-lives-stealer": {
    "chave": "nine-lives-stealer",
@@ -4807,7 +5035,8 @@
    "raridade": "incomum",
    "sintonizacao": false,
    "peso_kg": 0.0,
-   "texto_srd": "You are immune to contracting any disease while you wear this pendant. If you are already infected with a disease, the effects of the disease are suppressed you while you wear the pendant."
+   "texto_srd": "You are immune to contracting any disease while you wear this pendant. If you are already infected with a disease, the effects of the disease are suppressed you while you wear the pendant.",
+   "slot": "amuleto"
   },
   "periapt-of-proof-against-poison": {
    "chave": "periapt-of-proof-against-poison",
@@ -4818,7 +5047,14 @@
    "raridade": "raro",
    "sintonizacao": false,
    "peso_kg": 0.0,
-   "texto_srd": "This delicate silver chain has a brilliant-cut black gem pendant. While you wear it, poisons have no effect on you. You are immune to the poisoned condition and have immunity to poison damage."
+   "texto_srd": "This delicate silver chain has a brilliant-cut black gem pendant. While you wear it, poisons have no effect on you. You are immune to the poisoned condition and have immunity to poison damage.",
+   "slot": "amuleto",
+   "efeito": {
+    "nota": "Imune a dano de veneno.",
+    "imunidades": [
+     "poison"
+    ]
+   }
   },
   "periapt-of-wound-closure": {
    "chave": "periapt-of-wound-closure",
@@ -4829,7 +5065,8 @@
    "raridade": "incomum",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "While you wear this pendant, you stabilize whenever you are dying at the start of your turn. In addition, whenever you roll a Hit Die to regain hit points, double the number of hit points it restores."
+   "texto_srd": "While you wear this pendant, you stabilize whenever you are dying at the start of your turn. In addition, whenever you roll a Hit Die to regain hit points, double the number of hit points it restores.",
+   "slot": "amuleto"
   },
   "philter-of-love": {
    "chave": "philter-of-love",
@@ -5183,7 +5420,8 @@
    "raridade": "raro",
    "sintonizacao": false,
    "peso_kg": 0.0,
-   "texto_srd": "This ring has 3 charges, and it regains 1d3 expended charges daily at dawn. While wearing the ring, you can use an action to expend 1 of its charges to cast one of the following spells: * _Animal friendship_ (save DC 13) * _Fear_ (save DC 13), targeting only beasts that have an Intelligence of 3 or lower * _Speak with animals_"
+   "texto_srd": "This ring has 3 charges, and it regains 1d3 expended charges daily at dawn. While wearing the ring, you can use an action to expend 1 of its charges to cast one of the following spells: * _Animal friendship_ (save DC 13) * _Fear_ (save DC 13), targeting only beasts that have an Intelligence of 3 or lower * _Speak with animals_",
+   "slot": "anel"
   },
   "ring-of-djinni-summoning": {
    "chave": "ring-of-djinni-summoning",
@@ -5194,7 +5432,8 @@
    "raridade": "lendário",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "While wearing this ring, you can speak its command word as an action to summon a particular djinni from the Elemental Plane of Air. The djinni appears in an unoccupied space you choose within 120 feet of you. It remains as long as you concentrate (as if concentrating on a spell), to a maximum of 1 hour, or until it drops to 0 hit points. It then returns to its home plane. While summoned, the djinni is friendly to you and your companions. It obeys any commands you give it, no matter what language you use. If you fail to command it, the djinni defends itself against attackers but takes no other actions. After the djinni departs, it can't be summoned again for 24 hours, and the ring becomes nonmagical if the djinni dies."
+   "texto_srd": "While wearing this ring, you can speak its command word as an action to summon a particular djinni from the Elemental Plane of Air. The djinni appears in an unoccupied space you choose within 120 feet of you. It remains as long as you concentrate (as if concentrating on a spell), to a maximum of 1 hour, or until it drops to 0 hit points. It then returns to its home plane. While summoned, the djinni is friendly to you and your companions. It obeys any commands you give it, no matter what language you use. If you fail to command it, the djinni defends itself against attackers but takes no other actions. After the djinni departs, it can't be summoned again for 24 hours, and the ring becomes nonmagical if the djinni dies.",
+   "slot": "anel"
   },
   "ring-of-elemental-command": {
    "chave": "ring-of-elemental-command",
@@ -5205,7 +5444,8 @@
    "raridade": "lendário",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "This ring is linked to one of the four Elemental Planes. The GM chooses or randomly determines the linked plane. While wearing this ring, you have advantage on attack rolls against elementals from the linked plane, and they have disadvantage on attack rolls against you. In addition, you have access to properties based on the linked plane. The ring has 5 charges. It regains 1d4 + 1 expended charges daily at dawn. Spells cast from the ring have a save DC of 17. **_Ring of Air Elemental Command_**. You can expend 2 of the ring's charges to cast _dominate monster_ on an air elemental. In addition, when you fall, you descend 60 feet per round and take no damage from falling. You can also speak and understand Auran. If you help slay an air elemental while attuned to the ring, you gain access to the following additional properties: * You have resistance to lightning damage. * You have a flying speed equal to your walking speed and can hover. * You can cast the following spells from the ring, expending the necessary number of charges: _chain lightning_ (3 charges), _gust of wind_ (2 charges), or _wind wall_ (1 charge). **_Ring of Earth Elemental Command_**. You can expend 2 of the ring's charges to cast _dominate monster_ on an earth elemental. In addition, you can move in difficult terrain that is composed of rubble, rocks, or dirt as if it were normal terrain. You can also speak and understand Terran. If you help slay an earth elemental while attuned to the ring, you gain access to the following additional properties: * You have resistance to acid damage. * You can move through solid earth or rock as if those areas were difficult terrain. If you end your turn there, you are shunted out to the nearest unoccupied space you last occupied. * You can cast the following spells from the ring, expending the necessary number of charges: _stone shape_ (2 charges), _stoneskin_ (3 charges), or _wall of stone_ (3 charges). **_Ring of Fire Elemental Command_**. You can expend 2 of the ring's charges to cast _dominate monster_ on a fire elemental. In addition, you have resistance to fire damage. You can also speak and understand Ignan. If you help slay a fire elemental while attuned to the ring, you gain access to the following additional properties: * You are immune to fire damage. * You can cast the following spells from the ring, expending the necessary number of charges: _burning hands_ (1 charge), _fireball_ (2 charges), and _wall of fire_ (3 charges). **_Ring of Water Elemental Command_**. You can expend 2 of the ring's charges to cast _dominate monster_ on a water elemental. In addition, you can stand on and walk across liquid surfaces as if they were solid ground. You can also speak and understand Aquan. If you help slay a water elemental while attuned to the ring, you gain access to the following additional properties: * You can breathe underwater and have a swimming speed equal to your walking speed. * You can cast the following spells from the ring, expending the necessary number of charges: _create or destroy water_ (1 charge), _control water_ (3 charges), _ice storm_ (2 charges), or _wall of ice_ (3 charges)."
+   "texto_srd": "This ring is linked to one of the four Elemental Planes. The GM chooses or randomly determines the linked plane. While wearing this ring, you have advantage on attack rolls against elementals from the linked plane, and they have disadvantage on attack rolls against you. In addition, you have access to properties based on the linked plane. The ring has 5 charges. It regains 1d4 + 1 expended charges daily at dawn. Spells cast from the ring have a save DC of 17. **_Ring of Air Elemental Command_**. You can expend 2 of the ring's charges to cast _dominate monster_ on an air elemental. In addition, when you fall, you descend 60 feet per round and take no damage from falling. You can also speak and understand Auran. If you help slay an air elemental while attuned to the ring, you gain access to the following additional properties: * You have resistance to lightning damage. * You have a flying speed equal to your walking speed and can hover. * You can cast the following spells from the ring, expending the necessary number of charges: _chain lightning_ (3 charges), _gust of wind_ (2 charges), or _wind wall_ (1 charge). **_Ring of Earth Elemental Command_**. You can expend 2 of the ring's charges to cast _dominate monster_ on an earth elemental. In addition, you can move in difficult terrain that is composed of rubble, rocks, or dirt as if it were normal terrain. You can also speak and understand Terran. If you help slay an earth elemental while attuned to the ring, you gain access to the following additional properties: * You have resistance to acid damage. * You can move through solid earth or rock as if those areas were difficult terrain. If you end your turn there, you are shunted out to the nearest unoccupied space you last occupied. * You can cast the following spells from the ring, expending the necessary number of charges: _stone shape_ (2 charges), _stoneskin_ (3 charges), or _wall of stone_ (3 charges). **_Ring of Fire Elemental Command_**. You can expend 2 of the ring's charges to cast _dominate monster_ on a fire elemental. In addition, you have resistance to fire damage. You can also speak and understand Ignan. If you help slay a fire elemental while attuned to the ring, you gain access to the following additional properties: * You are immune to fire damage. * You can cast the following spells from the ring, expending the necessary number of charges: _burning hands_ (1 charge), _fireball_ (2 charges), and _wall of fire_ (3 charges). **_Ring of Water Elemental Command_**. You can expend 2 of the ring's charges to cast _dominate monster_ on a water elemental. In addition, you can stand on and walk across liquid surfaces as if they were solid ground. You can also speak and understand Aquan. If you help slay a water elemental while attuned to the ring, you gain access to the following additional properties: * You can breathe underwater and have a swimming speed equal to your walking speed. * You can cast the following spells from the ring, expending the necessary number of charges: _create or destroy water_ (1 charge), _control water_ (3 charges), _ice storm_ (2 charges), or _wall of ice_ (3 charges).",
+   "slot": "anel"
   },
   "ring-of-evasion": {
    "chave": "ring-of-evasion",
@@ -5216,7 +5456,8 @@
    "raridade": "raro",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "This ring has 3 charges, and it regains 1d3 expended charges daily at dawn. When you fail a Dexterity saving throw while wearing it, you can use your reaction to expend 1 of its charges to succeed on that saving throw instead."
+   "texto_srd": "This ring has 3 charges, and it regains 1d3 expended charges daily at dawn. When you fail a Dexterity saving throw while wearing it, you can use your reaction to expend 1 of its charges to succeed on that saving throw instead.",
+   "slot": "anel"
   },
   "ring-of-feather-falling": {
    "chave": "ring-of-feather-falling",
@@ -5229,7 +5470,8 @@
    "raridade": "raro",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "When you fall while wearing this ring, you descend 60 feet per round and take no damage from falling."
+   "texto_srd": "When you fall while wearing this ring, you descend 60 feet per round and take no damage from falling.",
+   "slot": "anel"
   },
   "ring-of-free-action": {
    "chave": "ring-of-free-action",
@@ -5240,7 +5482,8 @@
    "raridade": "raro",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "While you wear this ring, difficult terrain doesn't cost you extra movement. In addition, magic can neither reduce your speed nor cause you to be paralyzed or restrained."
+   "texto_srd": "While you wear this ring, difficult terrain doesn't cost you extra movement. In addition, magic can neither reduce your speed nor cause you to be paralyzed or restrained.",
+   "slot": "anel"
   },
   "ring-of-invisibility": {
    "chave": "ring-of-invisibility",
@@ -5251,7 +5494,8 @@
    "raridade": "lendário",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "While wearing this ring, you can turn invisible as an action. Anything you are wearing or carrying is invisible with you. You remain invisible until the ring is removed, until you attack or cast a spell, or until you use a bonus action to become visible again."
+   "texto_srd": "While wearing this ring, you can turn invisible as an action. Anything you are wearing or carrying is invisible with you. You remain invisible until the ring is removed, until you attack or cast a spell, or until you use a bonus action to become visible again.",
+   "slot": "anel"
   },
   "ring-of-jumping": {
    "chave": "ring-of-jumping",
@@ -5262,7 +5506,8 @@
    "raridade": "incomum",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "While wearing this ring, you can cast the _jump_ spell from it as a bonus action at will, but can target only yourself when you do so."
+   "texto_srd": "While wearing this ring, you can cast the _jump_ spell from it as a bonus action at will, but can target only yourself when you do so.",
+   "slot": "anel"
   },
   "ring-of-mind-shielding": {
    "chave": "ring-of-mind-shielding",
@@ -5275,7 +5520,8 @@
    "raridade": "incomum",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "While wearing this ring, you are immune to magic that allows other creatures to read your thoughts, determine whether you are lying, know your alignment, or know your creature type. Creatures can telepathically communicate with you only if you allow it. You can use an action to cause the ring to become invisible until you use another action to make it visible, until you remove the ring, or until you die. If you die while wearing the ring, your soul enters it, unless it already houses a soul. You can remain in the ring or depart for the afterlife. As long as your soul is in the ring, you can telepathically communicate with any creature wearing it. A wearer can't prevent this telepathic communication."
+   "texto_srd": "While wearing this ring, you are immune to magic that allows other creatures to read your thoughts, determine whether you are lying, know your alignment, or know your creature type. Creatures can telepathically communicate with you only if you allow it. You can use an action to cause the ring to become invisible until you use another action to make it visible, until you remove the ring, or until you die. If you die while wearing the ring, your soul enters it, unless it already houses a soul. You can remain in the ring or depart for the afterlife. As long as your soul is in the ring, you can telepathically communicate with any creature wearing it. A wearer can't prevent this telepathic communication.",
+   "slot": "anel"
   },
   "ring-of-protection": {
    "chave": "ring-of-protection",
@@ -5286,7 +5532,13 @@
    "raridade": "raro",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "You gain a +1 bonus to AC and saving throws while wearing this ring."
+   "texto_srd": "You gain a +1 bonus to AC and saving throws while wearing this ring.",
+   "slot": "anel",
+   "efeito": {
+    "nota": "+1 na CA e nas salvaguardas.",
+    "ca": 1,
+    "save_fixo": 1
+   }
   },
   "ring-of-regeneration": {
    "chave": "ring-of-regeneration",
@@ -5297,7 +5549,8 @@
    "raridade": "muito raro",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "While wearing this ring, you regain 1d6 hit points every 10 minutes, provided that you have at least 1 hit point. If you lose a body part, the ring causes the missing part to regrow and return to full functionality after 1d6 + 1 days if you have at least 1 hit point the whole time."
+   "texto_srd": "While wearing this ring, you regain 1d6 hit points every 10 minutes, provided that you have at least 1 hit point. If you lose a body part, the ring causes the missing part to regrow and return to full functionality after 1d6 + 1 days if you have at least 1 hit point the whole time.",
+   "slot": "anel"
   },
   "ring-of-resistance": {
    "chave": "ring-of-resistance",
@@ -5308,7 +5561,12 @@
    "raridade": "raro",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "You have resistance to one damage type while wearing this ring. The gem in the ring indicates the type, which the GM chooses or determines randomly. | d10 | Damage Type | Gem | |-----|-------------|------------| | 1 | Acid | Pearl | | 2 | Cold | Tourmaline | | 3 | Fire | Garnet | | 4 | Force | Sapphire | | 5 | Lightning | Citrine | | 6 | Necrotic | Jet | | 7 | Poison | Amethyst | | 8 | Psychic | Jade | | 9 | Radiant | Topaz | | 10 | Thunder | Spinel |"
+   "texto_srd": "You have resistance to one damage type while wearing this ring. The gem in the ring indicates the type, which the GM chooses or determines randomly. | d10 | Damage Type | Gem | |-----|-------------|------------| | 1 | Acid | Pearl | | 2 | Cold | Tourmaline | | 3 | Fire | Garnet | | 4 | Force | Sapphire | | 5 | Lightning | Citrine | | 6 | Necrotic | Jet | | 7 | Poison | Amethyst | | 8 | Psychic | Jade | | 9 | Radiant | Topaz | | 10 | Thunder | Spinel |",
+   "slot": "anel",
+   "efeito": {
+    "nota": "Resistência ao tipo de dano do anel (diga no nome: \"Anel de Resistência ao Fogo\").",
+    "resistencia_do_nome": true
+   }
   },
   "ring-of-shooting-stars": {
    "chave": "ring-of-shooting-stars",
@@ -5320,7 +5578,8 @@
    "sintonizacao": true,
    "peso_kg": 0.0,
    "texto_srd": "While wearing this ring in dim light or darkness, you can cast _dancing lights_ and _light_ from the ring at will. Casting either spell from the ring requires an action. The ring has 6 charges for the following other properties. The ring regains 1d6 expended charges daily at dawn. **_Faerie Fire_**. You can expend 1 charge as an action to cast _faerie fire_ from the ring. **_Ball Lightning_**. You can expend 2 charges as an action to create one to four 3-foot-diameter spheres of lightning. The more spheres you create, the less powerful each sphere is individually. Each sphere appears in an unoccupied space you can see within 120 feet of you. The spheres last as long as you concentrate (as if concentrating on a spell), up to 1 minute. Each sphere sheds dim light in a 30-foot radius. As a bonus action, you can move each sphere up to 30 feet, but no farther than 120 feet away from you. When a creature other than you comes within 5 feet of a sphere, the sphere discharges lightning at that creature and disappears. That creature must make a DC 15 Dexterity saving throw. On a failed save, the creature takes lightning damage based on the number of spheres you created. | Spheres | Lightning Damage | |---------|------------------| | 4 | 2d4 | | 3 | 2d6 | | 2 | 5d4 | | 1 | 4d12 | **_Shooting Stars_**. You can expend 1 to 3 charges as an action. For every charge you expend, you launch a glowing mote of light from the ring at a point you can see within 60 feet of you. Each creature within a 15-foot cube originating from that point is showered in sparks and must make a DC 15 Dexterity saving throw, taking 5d4 fire damage on a failed save, or half as much damage on a successful one.",
-   "sintonizacao_detalhe": "requires attunement outdoors at night"
+   "sintonizacao_detalhe": "requires attunement outdoors at night",
+   "slot": "anel"
   },
   "ring-of-spell-storing": {
    "chave": "ring-of-spell-storing",
@@ -5331,7 +5590,8 @@
    "raridade": "raro",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "This ring stores spells cast into it, holding them until the attuned wearer uses them. The ring can store up to 5 levels worth of spells at a time. When found, it contains 1d6 - 1 levels of stored spells chosen by the GM. Any creature can cast a spell of 1st through 5th level into the ring by touching the ring as the spell is cast. The spell has no effect, other than to be stored in the ring. If the ring can't hold the spell, the spell is expended without effect. The level of the slot used to cast the spell determines how much space it uses. While wearing this ring, you can cast any spell stored in it. The spell uses the slot level, spell save DC, spell attack bonus, and spellcasting ability of the original caster, but is otherwise treated as if you cast the spell. The spell cast from the ring is no longer stored in it, freeing up space."
+   "texto_srd": "This ring stores spells cast into it, holding them until the attuned wearer uses them. The ring can store up to 5 levels worth of spells at a time. When found, it contains 1d6 - 1 levels of stored spells chosen by the GM. Any creature can cast a spell of 1st through 5th level into the ring by touching the ring as the spell is cast. The spell has no effect, other than to be stored in the ring. If the ring can't hold the spell, the spell is expended without effect. The level of the slot used to cast the spell determines how much space it uses. While wearing this ring, you can cast any spell stored in it. The spell uses the slot level, spell save DC, spell attack bonus, and spellcasting ability of the original caster, but is otherwise treated as if you cast the spell. The spell cast from the ring is no longer stored in it, freeing up space.",
+   "slot": "anel"
   },
   "ring-of-spell-turning": {
    "chave": "ring-of-spell-turning",
@@ -5342,7 +5602,8 @@
    "raridade": "lendário",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "While wearing this ring, you have advantage on saving throws against any spell that targets only you (not in an area of effect). In addition, if you roll a 20 for the save and the spell is 7th level or lower, the spell has no effect on you and instead targets the caster, using the slot level, spell save DC, attack bonus, and spellcasting ability of the caster."
+   "texto_srd": "While wearing this ring, you have advantage on saving throws against any spell that targets only you (not in an area of effect). In addition, if you roll a 20 for the save and the spell is 7th level or lower, the spell has no effect on you and instead targets the caster, using the slot level, spell save DC, attack bonus, and spellcasting ability of the caster.",
+   "slot": "anel"
   },
   "ring-of-swimming": {
    "chave": "ring-of-swimming",
@@ -5353,7 +5614,8 @@
    "raridade": "incomum",
    "sintonizacao": false,
    "peso_kg": 0.0,
-   "texto_srd": "You have a swimming speed of 40 feet while wearing this ring."
+   "texto_srd": "You have a swimming speed of 40 feet while wearing this ring.",
+   "slot": "anel"
   },
   "ring-of-telekinesis": {
    "chave": "ring-of-telekinesis",
@@ -5364,7 +5626,8 @@
    "raridade": "muito raro",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "While wearing this ring, you can cast the _telekinesis_ spell at will, but you can target only objects that aren't being worn or carried."
+   "texto_srd": "While wearing this ring, you can cast the _telekinesis_ spell at will, but you can target only objects that aren't being worn or carried.",
+   "slot": "anel"
   },
   "ring-of-the-ram": {
    "chave": "ring-of-the-ram",
@@ -5375,7 +5638,8 @@
    "raridade": "raro",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "This ring has 3 charges, and it regains 1d3 expended charges daily at dawn. While wearing the ring, you can use an action to expend 1 to 3 of its charges to attack one creature you can see within 60 feet of you. The ring produces a spectral ram's head and makes its attack roll with a +7 bonus. On a hit, for each charge you spend, the target takes 2d10 force damage and is pushed 5 feet away from you. Alternatively, you can expend 1 to 3 of the ring's charges as an action to try to break an object you can see within 60 feet of you that isn't being worn or carried. The ring makes a Strength check with a +5 bonus for each charge you spend."
+   "texto_srd": "This ring has 3 charges, and it regains 1d3 expended charges daily at dawn. While wearing the ring, you can use an action to expend 1 to 3 of its charges to attack one creature you can see within 60 feet of you. The ring produces a spectral ram's head and makes its attack roll with a +7 bonus. On a hit, for each charge you spend, the target takes 2d10 force damage and is pushed 5 feet away from you. Alternatively, you can expend 1 to 3 of the ring's charges as an action to try to break an object you can see within 60 feet of you that isn't being worn or carried. The ring makes a Strength check with a +5 bonus for each charge you spend.",
+   "slot": "anel"
   },
   "ring-of-three-wishes": {
    "chave": "ring-of-three-wishes",
@@ -5386,7 +5650,8 @@
    "raridade": "lendário",
    "sintonizacao": false,
    "peso_kg": 0.0,
-   "texto_srd": "While wearing this ring, you can use an action to expend 1 of its 3 charges to cast the _wish_ spell from it. The ring becomes nonmagical when you use the last charge."
+   "texto_srd": "While wearing this ring, you can use an action to expend 1 of its 3 charges to cast the _wish_ spell from it. The ring becomes nonmagical when you use the last charge.",
+   "slot": "anel"
   },
   "ring-of-warmth": {
    "chave": "ring-of-warmth",
@@ -5397,7 +5662,8 @@
    "raridade": "incomum",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "While wearing this ring, you have resistance to cold damage. In addition, you and everything you wear and carry are unharmed by temperatures as low as -50 degrees Fahrenheit."
+   "texto_srd": "While wearing this ring, you have resistance to cold damage. In addition, you and everything you wear and carry are unharmed by temperatures as low as -50 degrees Fahrenheit.",
+   "slot": "anel"
   },
   "ring-of-water-walking": {
    "chave": "ring-of-water-walking",
@@ -5408,7 +5674,8 @@
    "raridade": "incomum",
    "sintonizacao": false,
    "peso_kg": 0.0,
-   "texto_srd": "While wearing this ring, you can stand on and move across any liquid surface as if it were solid ground."
+   "texto_srd": "While wearing this ring, you can stand on and move across any liquid surface as if it were solid ground.",
+   "slot": "anel"
   },
   "ring-of-x-ray-vision": {
    "chave": "ring-of-x-ray-vision",
@@ -5419,7 +5686,8 @@
    "raridade": "raro",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "While wearing this ring, you can use an action to speak its command word. When you do so, you can see into and through solid matter for 1 minute. This vision has a radius of 30 feet. To you, solid objects within that radius appear transparent and don't prevent light from passing through them. The vision can penetrate 1 foot of stone, 1 inch of common metal, or up to 3 feet of wood or dirt. Thicker substances block the vision, as does a thin sheet of lead. Whenever you use the ring again before taking a long rest, you must succeed on a DC 15 Constitution saving throw or gain one level of exhaustion."
+   "texto_srd": "While wearing this ring, you can use an action to speak its command word. When you do so, you can see into and through solid matter for 1 minute. This vision has a radius of 30 feet. To you, solid objects within that radius appear transparent and don't prevent light from passing through them. The vision can penetrate 1 foot of stone, 1 inch of common metal, or up to 3 feet of wood or dirt. Thicker substances block the vision, as does a thin sheet of lead. Whenever you use the ring again before taking a long rest, you must succeed on a DC 15 Constitution saving throw or gain one level of exhaustion.",
+   "slot": "anel"
   },
   "robe-of-eyes": {
    "chave": "robe-of-eyes",
@@ -5430,7 +5698,8 @@
    "raridade": "raro",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "This robe is adorned with eyelike patterns. While you wear the robe, you gain the following benefits: * The robe lets you see in all directions, and you have advantage on Wisdom (Perception) checks that rely on sight. * You have darkvision out to a range of 120 feet. * You can see invisible creatures and objects, as well as see into the Ethereal Plane, out to a range of 120 feet. The eyes on the robe can't be closed or averted. Although you can close or avert your own eyes, you are never considered to be doing so while wearing this robe. A _light_ spell cast on the robe or a _daylight_ spell cast within 5 feet of the robe causes you to be blinded for 1 minute. At the end of each of your turns, you can make a Constitution saving throw (DC 11 for _light_ or DC 15 for _daylight_), ending the blindness on a success."
+   "texto_srd": "This robe is adorned with eyelike patterns. While you wear the robe, you gain the following benefits: * The robe lets you see in all directions, and you have advantage on Wisdom (Perception) checks that rely on sight. * You have darkvision out to a range of 120 feet. * You can see invisible creatures and objects, as well as see into the Ethereal Plane, out to a range of 120 feet. The eyes on the robe can't be closed or averted. Although you can close or avert your own eyes, you are never considered to be doing so while wearing this robe. A _light_ spell cast on the robe or a _daylight_ spell cast within 5 feet of the robe causes you to be blinded for 1 minute. At the end of each of your turns, you can make a Constitution saving throw (DC 11 for _light_ or DC 15 for _daylight_), ending the blindness on a success.",
+   "slot": "capa"
   },
   "robe-of-scintillating-colors": {
    "chave": "robe-of-scintillating-colors",
@@ -5441,7 +5710,8 @@
    "raridade": "muito raro",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "This robe has 3 charges, and it regains 1d3 expended charges daily at dawn. While you wear it, you can use an action and expend 1 charge to cause the garment to display a shifting pattern of dazzling hues until the end of your next turn. During this time, the robe sheds bright light in a 30-foot radius and dim light for an additional 30 feet. Creatures that can see you have disadvantage on attack rolls against you. In addition, any creature in the bright light that can see you when the robe's power is activated must succeed on a DC 15 Wisdom saving throw or become stunned until the effect ends."
+   "texto_srd": "This robe has 3 charges, and it regains 1d3 expended charges daily at dawn. While you wear it, you can use an action and expend 1 charge to cause the garment to display a shifting pattern of dazzling hues until the end of your next turn. During this time, the robe sheds bright light in a 30-foot radius and dim light for an additional 30 feet. Creatures that can see you have disadvantage on attack rolls against you. In addition, any creature in the bright light that can see you when the robe's power is activated must succeed on a DC 15 Wisdom saving throw or become stunned until the effect ends.",
+   "slot": "capa"
   },
   "robe-of-stars": {
    "chave": "robe-of-stars",
@@ -5452,7 +5722,8 @@
    "raridade": "muito raro",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "This black or dark blue robe is embroidered with small white or silver stars. You gain a +1 bonus to saving throws while you wear it. Six stars, located on the robe's upper front portion, are particularly large. While wearing this robe, you can use an action to pull off one of the stars and use it to cast _magic missile_ as a 5th-level spell. Daily at dusk, 1d6 removed stars reappear on the robe. While you wear the robe, you can use an action to enter the Astral Plane along with everything you are wearing and carrying. You remain there until you use an action to return to the plane you were on. You reappear in the last space you occupied, or if that space is occupied, the nearest unoccupied space."
+   "texto_srd": "This black or dark blue robe is embroidered with small white or silver stars. You gain a +1 bonus to saving throws while you wear it. Six stars, located on the robe's upper front portion, are particularly large. While wearing this robe, you can use an action to pull off one of the stars and use it to cast _magic missile_ as a 5th-level spell. Daily at dusk, 1d6 removed stars reappear on the robe. While you wear the robe, you can use an action to enter the Astral Plane along with everything you are wearing and carrying. You remain there until you use an action to return to the plane you were on. You reappear in the last space you occupied, or if that space is occupied, the nearest unoccupied space.",
+   "slot": "capa"
   },
   "robe-of-the-archmagi": {
    "chave": "robe-of-the-archmagi",
@@ -5467,7 +5738,8 @@
    "sintonizacao": true,
    "peso_kg": 0.0,
    "texto_srd": "This elegant garment is made from exquisite cloth of white, gray, or black and adorned with silvery runes. The robe's color corresponds to the alignment for which the item was created. A white robe was made for good, gray for neutral, and black for evil. You can't attune to a _robe of the archmagi_ that doesn't correspond to your alignment. You gain these benefits while wearing the robe: * If you aren't wearing armor, your base Armor Class is 15 + your Dexterity modifier. * You have advantage on saving throws against spells and other magical effects. * Your spell save DC and spell attack bonus each increase by 2.",
-   "sintonizacao_detalhe": "requires attunement by a sorcerer, warlock, or wizard"
+   "sintonizacao_detalhe": "requires attunement by a sorcerer, warlock, or wizard",
+   "slot": "capa"
   },
   "robe-of-useful-items": {
    "chave": "robe-of-useful-items",
@@ -5480,7 +5752,8 @@
    "raridade": "incomum",
    "sintonizacao": false,
    "peso_kg": 0.0,
-   "texto_srd": "This robe has cloth patches of various shapes and colors covering it. While wearing the robe, you can use an action to detach one of the patches, causing it to become the object or creature it represents. Once the last patch is removed, the robe becomes an ordinary garment. The robe has two of each of the following patches: * Dagger * Bullseye lantern (filled and lit) * Steel mirror * 10-foot pole * Hempen rope (50 feet, coiled) * Sack In addition, the robe has 4d4 other patches. The GM chooses the patches or determines them randomly. | d100 | Patch | |--------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------| | 01-08 | Bag of 100 gp | | 09-15 | Silver coffer (1 foot long, 6 inches wide and deep) worth 500 gp | | 16-22 | Iron door (up to 10 feet wide and 10 feet high, barred on one side of your choice), which you can place in an opening you can reach; it conforms to fit the opening, attaching and hinging itself | | 23-30 | 10 gems worth 100 gp each | | 31-44 | Wooden ladder (24 feet long) | | 45-51 | A riding horse with saddle bags | | 52-59 | Pit (a cube 10 feet on a side), which you can place on the ground within 10 feet of you | | 60-68 | 4 potions of healing | | 69-75 | Rowboat (12 feet long) | | 76-83 | Spell scroll containing one spell of 1st to 3rd level | | 84-90 | 2 mastiffs | | 91-96 | Window (2 feet by 4 feet, up to 2 feet deep), which you can place on a vertical surface you can reach | | 97-100 | Portable ram |"
+   "texto_srd": "This robe has cloth patches of various shapes and colors covering it. While wearing the robe, you can use an action to detach one of the patches, causing it to become the object or creature it represents. Once the last patch is removed, the robe becomes an ordinary garment. The robe has two of each of the following patches: * Dagger * Bullseye lantern (filled and lit) * Steel mirror * 10-foot pole * Hempen rope (50 feet, coiled) * Sack In addition, the robe has 4d4 other patches. The GM chooses the patches or determines them randomly. | d100 | Patch | |--------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------| | 01-08 | Bag of 100 gp | | 09-15 | Silver coffer (1 foot long, 6 inches wide and deep) worth 500 gp | | 16-22 | Iron door (up to 10 feet wide and 10 feet high, barred on one side of your choice), which you can place in an opening you can reach; it conforms to fit the opening, attaching and hinging itself | | 23-30 | 10 gems worth 100 gp each | | 31-44 | Wooden ladder (24 feet long) | | 45-51 | A riding horse with saddle bags | | 52-59 | Pit (a cube 10 feet on a side), which you can place on the ground within 10 feet of you | | 60-68 | 4 potions of healing | | 69-75 | Rowboat (12 feet long) | | 76-83 | Spell scroll containing one spell of 1st to 3rd level | | 84-90 | 2 mastiffs | | 91-96 | Window (2 feet by 4 feet, up to 2 feet deep), which you can place on a vertical surface you can reach | | 97-100 | Portable ram |",
+   "slot": "capa"
   },
   "rod-of-absorption": {
    "chave": "rod-of-absorption",
@@ -5570,7 +5843,8 @@
    "raridade": "lendário",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "If you hold this beetle-shaped medallion in your hand for 1 round, an inscription appears on its surface revealing its magical nature. It provides two benefits while it is on your person: * You have advantage on saving throws against spells. * The scarab has 12 charges. If you fail a saving throw against a necromancy spell or a harmful effect originating from an undead creature, you can use your reaction to expend 1 charge and turn the failed save into a successful one. The scarab crumbles into powder and is destroyed when its last charge is expended."
+   "texto_srd": "If you hold this beetle-shaped medallion in your hand for 1 round, an inscription appears on its surface revealing its magical nature. It provides two benefits while it is on your person: * You have advantage on saving throws against spells. * The scarab has 12 charges. If you fail a saving throw against a necromancy spell or a harmful effect originating from an undead creature, you can use your reaction to expend 1 charge and turn the failed save into a successful one. The scarab crumbles into powder and is destroyed when its last charge is expended.",
+   "slot": "amuleto"
   },
   "scimitar-of-speed": {
    "chave": "scimitar-of-speed",
@@ -5606,7 +5880,8 @@
    "raridade": "incomum",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "While you wear these light shoes, you can move up, down, and across vertical surfaces and upside down along ceilings, while leaving your hands free. You have a climbing speed equal to your walking speed. However, the slippers don't allow you to move this way on a slippery surface, such as one covered by ice or oil."
+   "texto_srd": "While you wear these light shoes, you can move up, down, and across vertical surfaces and upside down along ceilings, while leaving your hands free. You have a climbing speed equal to your walking speed. However, the slippers don't allow you to move this way on a slippery surface, such as one covered by ice or oil.",
+   "slot": "botas"
   },
   "sovereign-glue": {
    "chave": "sovereign-glue",
@@ -5880,7 +6155,13 @@
    "raridade": "incomum",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "While this polished agate is on your person, you gain a +1 bonus to ability checks and saving throws."
+   "texto_srd": "While this polished agate is on your person, you gain a +1 bonus to ability checks and saving throws.",
+   "slot": "carregado",
+   "efeito": {
+    "nota": "+1 nos testes de atributo e nas salvaguardas.",
+    "save_fixo": 1,
+    "teste_dado": 1
+   }
   },
   "sun-blade": {
    "chave": "sun-blade",
@@ -5895,6 +6176,16 @@
    "peso_kg": 1.36,
    "texto_srd": "This item appears to be a longsword hilt. While grasping the hilt, you can use a bonus action to cause a blade of pure radiance to spring into existence, or make the blade disappear. While the blade exists, this magic longsword has the finesse property. If you are proficient with shortswords or longswords, you are proficient with the _sun blade_. You gain a +2 bonus to attack and damage rolls made with this weapon, which deals radiant damage instead of slashing damage. When you hit an undead with it, that target takes an extra 1d8 radiant damage. The sword's luminous blade emits bright light in a 15-foot radius and dim light for an additional 15 feet. The light is sunlight. While the blade persists, you can use an action to expand or reduce its radius of bright and dim light by 5 feet each, to a maximum of 30 feet each or a minimum of 10 feet each.",
    "base_arma": "longsword",
+   "efeito": {
+    "nota": "+1d8 radiante contra mortos-vivos.",
+    "dano_extra": {
+     "dado": "1d8",
+     "tipo": "radiant",
+     "contra": [
+      "morto-vivo"
+     ]
+    }
+   },
    "bonus": 2
   },
   "sword-of-life-stealing": {
@@ -5997,7 +6288,8 @@
    "sintonizacao": true,
    "peso_kg": 0.0,
    "texto_srd": "This talisman is a mighty symbol of goodness. A creature that is neither good nor evil in alignment takes 6d6 radiant damage upon touching the talisman. An evil creature takes 8d6 radiant damage upon touching the talisman. Either sort of creature takes the damage again each time it ends its turn holding or carrying the talisman. If you are a good cleric or paladin, you can use the talisman as a holy symbol, and you gain a +2 bonus to spell attack rolls while you wear or hold it. The talisman has 7 charges. If you are wearing or holding it, you can use an action to expend 1 charge from it and choose one creature you can see on the ground within 120 feet of you. If the target is of evil alignment, a flaming fissure opens under it. The target must succeed on a DC 20 Dexterity saving throw or fall into the fissure and be destroyed, leaving no remains. The fissure then closes, leaving no trace of its existence. When you expend the last charge, the talisman disperses into motes of golden light and is destroyed.",
-   "sintonizacao_detalhe": "requires attunement by a creature of good alignment"
+   "sintonizacao_detalhe": "requires attunement by a creature of good alignment",
+   "slot": "amuleto"
   },
   "talisman-of-the-sphere": {
    "chave": "talisman-of-the-sphere",
@@ -6008,7 +6300,8 @@
    "raridade": "lendário",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "When you make an Intelligence (Arcana) check to control a _sphere of annihilation_ while you are holding this talisman, you double your proficiency bonus on the check. In addition, when you start your turn with control over a _sphere of annihilation_, you can use an action to levitate it 10 feet plus a number of additional feet equal to 10 × your Intelligence modifier."
+   "texto_srd": "When you make an Intelligence (Arcana) check to control a _sphere of annihilation_ while you are holding this talisman, you double your proficiency bonus on the check. In addition, when you start your turn with control over a _sphere of annihilation_, you can use an action to levitate it 10 feet plus a number of additional feet equal to 10 × your Intelligence modifier.",
+   "slot": "amuleto"
   },
   "talisman-of-ultimate-evil": {
    "chave": "talisman-of-ultimate-evil",
@@ -6020,7 +6313,8 @@
    "sintonizacao": true,
    "peso_kg": 0.0,
    "texto_srd": "This item symbolizes unrepentant evil. A creature that is neither good nor evil in alignment takes 6d6 necrotic damage upon touching the talisman. A good creature takes 8d6 necrotic damage upon touching the talisman. Either sort of creature takes the damage again each time it ends its turn holding or carrying the talisman. If you are an evil cleric or paladin, you can use the talisman as a holy symbol, and you gain a +2 bonus to spell attack rolls while you wear or hold it. The talisman has 6 charges. If you are wearing or holding it, you can use an action to expend 1 charge from the talisman and choose one creature you can see on the ground within 120 feet of you. If the target is of good alignment, a flaming fissure opens under it. The target must succeed on a DC 20 Dexterity saving throw or fall into the fissure and be destroyed, leaving no remains. The fissure then closes, leaving no trace of its existence. When you expend the last charge, the talisman dissolves into foul-smelling slime and is destroyed.",
-   "sintonizacao_detalhe": "requires attunement by a creature of evil alignment"
+   "sintonizacao_detalhe": "requires attunement by a creature of evil alignment",
+   "slot": "amuleto"
   },
   "tome-of-clear-thought": {
    "chave": "tome-of-clear-thought",
@@ -6480,7 +6774,8 @@
    "raridade": "incomum",
    "sintonizacao": true,
    "peso_kg": 0.0,
-   "texto_srd": "While you wear these boots, you have a flying speed equal to your walking speed. You can use the boots to fly for up to 4 hours, all at once or in several shorter flights, each one using a minimum of 1 minute from the duration. If you are flying when the duration expires, you descend at a rate of 30 feet per round until you land. The boots regain 2 hours of flying capability for every 12 hours they aren't in use."
+   "texto_srd": "While you wear these boots, you have a flying speed equal to your walking speed. You can use the boots to fly for up to 4 hours, all at once or in several shorter flights, each one using a minimum of 1 minute from the duration. If you are flying when the duration expires, you descend at a rate of 30 feet per round until you land. The boots regain 2 hours of flying capability for every 12 hours they aren't in use.",
+   "slot": "botas"
   },
   "wings-of-flying": {
    "chave": "wings-of-flying",

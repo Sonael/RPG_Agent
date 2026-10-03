@@ -344,3 +344,28 @@ def test_mobile_fechar_fica_na_tela(navegador):
     pg, _ = navegador(cap.MOCHILA, viewport={"width": 375, "height": 812})
     caixa = pg.locator(".inv-fechar").bounding_box()
     assert caixa and caixa["y"] + caixa["height"] <= pg.evaluate("window.innerHeight")
+
+
+# ---- sintonia --------------------------------------------------------------
+
+def test_sintonizar_marca_o_item_e_conta_a_vaga(pagina):
+    pg, _ = pagina
+    manto = _item('Manto Élfico')
+    assert 'pede sintonia' in pg.inner_text(manto)
+    # Os slots de item mágico não aparecem vazios.
+    assert pg.locator(_slot('botas')).count() == 0 and pg.locator(_slot('armadura')).count() == 1
+    _clicar(pg, f"{manto} .inv-btn-sintonizar", 1200)
+    assert 'sintonizado' in pg.inner_text(manto)
+    assert pg.locator(f"{manto} .inv-btn-dessintonizar").count() == 1
+    assert 'Sintonia: 1/3' in pg.inner_text('#inv-slots')
+    # Sintonizar identifica: o efeito aparece no cartão.
+    assert 'Vantagem em Furtividade.' in pg.inner_text(manto)
+
+
+def test_desfazer_a_sintonia(pagina):
+    pg, _ = pagina
+    manto = _item('Manto Élfico')
+    _clicar(pg, f"{manto} .inv-btn-sintonizar", 1200)
+    _clicar(pg, f"{manto} .inv-btn-dessintonizar", 1000)
+    assert 'pede sintonia' in pg.inner_text(manto)
+    assert 'Sintonia:' not in pg.inner_text('#inv-slots')
