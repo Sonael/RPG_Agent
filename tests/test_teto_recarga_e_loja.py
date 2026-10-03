@@ -297,7 +297,7 @@ def test_dois_pontos_na_descricao_nao_comem_o_preco(campanha):
     """Texto livre tem ':', e o preço vem antes do '|' justamente por isso."""
     td.open_shop("Bazar", "Talismã:40|efeito: +1 em testes de Sabedoria")
     linha = td._lojas()["bazar"]["estoque"][0]
-    assert linha["preco"] == 40
+    assert linha["preco_pc"] == 4000
     assert linha["descricao"] == "efeito: +1 em testes de Sabedoria"
 
 

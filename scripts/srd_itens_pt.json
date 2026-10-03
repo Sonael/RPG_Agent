@@ -1,0 +1,2394 @@
+{
+ "_leia": "Nomes em português dos itens do SRD 5.1 e as revisões feitas à mão. É a fonte que scripts/gerar_itens.py junta com o Open5e v2 para gerar rpg/dados/srd_itens.json. Edite aqui, nunca o JSON gerado.",
+ "comuns": {
+  "battleaxe": {
+   "nome": "Machado de Batalha",
+   "aliases": []
+  },
+  "blowgun": {
+   "nome": "Zarabatana",
+   "aliases": []
+  },
+  "club": {
+   "nome": "Clava",
+   "aliases": [
+    "porrete"
+   ]
+  },
+  "crossbow-hand": {
+   "nome": "Besta de Mão",
+   "aliases": []
+  },
+  "crossbow-heavy": {
+   "nome": "Besta Pesada",
+   "aliases": []
+  },
+  "crossbow-light": {
+   "nome": "Besta Leve",
+   "aliases": [
+    "besta"
+   ]
+  },
+  "dagger": {
+   "nome": "Adaga",
+   "aliases": [
+    "faca",
+    "punhal"
+   ]
+  },
+  "dart": {
+   "nome": "Dardo",
+   "aliases": [
+    "dardos"
+   ]
+  },
+  "flail": {
+   "nome": "Mangual",
+   "aliases": []
+  },
+  "glaive": {
+   "nome": "Glaive",
+   "aliases": [
+    "archa"
+   ]
+  },
+  "greataxe": {
+   "nome": "Machado Grande",
+   "aliases": [
+    "machado de duas mãos"
+   ]
+  },
+  "greatclub": {
+   "nome": "Clava Grande",
+   "aliases": [
+    "porrete grande"
+   ]
+  },
+  "greatsword": {
+   "nome": "Espada Grande",
+   "aliases": [
+    "montante",
+    "espada de duas mãos"
+   ]
+  },
+  "halberd": {
+   "nome": "Alabarda",
+   "aliases": []
+  },
+  "handaxe": {
+   "nome": "Machadinha",
+   "aliases": [
+    "machado de mão",
+    "machado"
+   ]
+  },
+  "javelin": {
+   "nome": "Azagaia",
+   "aliases": [
+    "lança curta",
+    "javelin"
+   ]
+  },
+  "lance": {
+   "nome": "Lança de Montaria",
+   "aliases": [
+    "lança de cavalaria"
+   ]
+  },
+  "light-hammer": {
+   "nome": "Martelo Leve",
+   "aliases": [
+    "martelo de mão"
+   ]
+  },
+  "longbow": {
+   "nome": "Arco Longo",
+   "aliases": []
+  },
+  "longsword": {
+   "nome": "Espada Longa",
+   "aliases": []
+  },
+  "mace": {
+   "nome": "Maça",
+   "aliases": []
+  },
+  "maul": {
+   "nome": "Malho",
+   "aliases": [
+    "marreta de guerra"
+   ]
+  },
+  "morningstar": {
+   "nome": "Maça-Estrela",
+   "aliases": [
+    "estrela da manhã",
+    "maça estrela"
+   ]
+  },
+  "net": {
+   "nome": "Rede",
+   "aliases": []
+  },
+  "pike": {
+   "nome": "Pique",
+   "aliases": [
+    "pica",
+    "lança longa"
+   ]
+  },
+  "quarterstaff": {
+   "nome": "Bordão",
+   "aliases": [
+    "cajado",
+    "bastão",
+    "bastão druídico"
+   ]
+  },
+  "rapier": {
+   "nome": "Rapieira",
+   "aliases": [
+    "florete"
+   ]
+  },
+  "scimitar": {
+   "nome": "Cimitarra",
+   "aliases": []
+  },
+  "shortbow": {
+   "nome": "Arco Curto",
+   "aliases": [
+    "arco"
+   ]
+  },
+  "shortsword": {
+   "nome": "Espada Curta",
+   "aliases": []
+  },
+  "sickle": {
+   "nome": "Foice Curta",
+   "aliases": [
+    "foice"
+   ]
+  },
+  "sling": {
+   "nome": "Funda",
+   "aliases": []
+  },
+  "spear": {
+   "nome": "Lança",
+   "aliases": []
+  },
+  "trident": {
+   "nome": "Tridente",
+   "aliases": []
+  },
+  "war-pick": {
+   "nome": "Picareta de Guerra",
+   "aliases": []
+  },
+  "warhammer": {
+   "nome": "Martelo de Guerra",
+   "aliases": []
+  },
+  "whip": {
+   "nome": "Chicote",
+   "aliases": []
+  },
+  "arrow-bow": {
+   "nome": "Flecha",
+   "aliases": []
+  },
+  "blowgun-needles": {
+   "nome": "Agulha de Zarabatana",
+   "aliases": [
+    "agulha"
+   ]
+  },
+  "crossbow-bolt": {
+   "nome": "Virote",
+   "aliases": []
+  },
+  "sling-bullets": {
+   "nome": "Bala de Funda",
+   "aliases": []
+  },
+  "padded-armor": {
+   "nome": "Armadura Acolchoada",
+   "aliases": [
+    "acolchoada"
+   ]
+  },
+  "leather-armor": {
+   "nome": "Armadura de Couro",
+   "aliases": [
+    "roupa de couro"
+   ]
+  },
+  "studded-leather-armor": {
+   "nome": "Armadura de Couro Batido",
+   "aliases": [
+    "couro batido",
+    "armadura de couro tachado"
+   ]
+  },
+  "hide-armor": {
+   "nome": "Armadura de Peles",
+   "aliases": [
+    "gibão de peles"
+   ]
+  },
+  "chain-shirt": {
+   "nome": "Camisão de Malha",
+   "aliases": [
+    "camisa de malha",
+    "corselete",
+    "armadura de osso"
+   ]
+  },
+  "scale-mail": {
+   "nome": "Brunea",
+   "aliases": [
+    "armadura de escamas"
+   ]
+  },
+  "breastplate": {
+   "nome": "Peitoral",
+   "aliases": []
+  },
+  "half-plate": {
+   "nome": "Meia Armadura",
+   "aliases": [
+    "meia-armadura"
+   ]
+  },
+  "ring-mail": {
+   "nome": "Cota de Anéis",
+   "aliases": [
+    "armadura de aros"
+   ]
+  },
+  "chain-mail": {
+   "nome": "Cota de Malha",
+   "aliases": [
+    "armadura de cota de malha"
+   ]
+  },
+  "splint-armor": {
+   "nome": "Armadura de Talas",
+   "aliases": [
+    "talas"
+   ]
+  },
+  "plate-armor": {
+   "nome": "Armadura de Placas",
+   "aliases": [
+    "armadura completa",
+    "cota de placas"
+   ]
+  },
+  "shield": {
+   "nome": "Escudo",
+   "aliases": [
+    "escudo de madeira",
+    "escudo de metal",
+    "escudo reforçado",
+    "escudo sagrado"
+   ]
+  },
+  "abacus": {
+   "nome": "Ábaco",
+   "aliases": []
+  },
+  "acid-vial": {
+   "nome": "Ácido (frasco)",
+   "aliases": [
+    "frasco de ácido"
+   ]
+  },
+  "alchemists-fire-flask": {
+   "nome": "Fogo Alquímico (frasco)",
+   "aliases": [
+    "frasco de fogo alquímico",
+    "fogo de alquimista"
+   ]
+  },
+  "amulet": {
+   "nome": "Amuleto Sagrado (foco)",
+   "aliases": []
+  },
+  "antitoxin-vial": {
+   "nome": "Antitoxina (frasco)",
+   "aliases": [
+    "antídoto"
+   ]
+  },
+  "backpack": {
+   "nome": "Mochila",
+   "aliases": []
+  },
+  "ball-bearings-bag-of-1000": {
+   "nome": "Rolamentos (saco com 1.000)",
+   "aliases": [
+    "esferas de metal"
+   ]
+  },
+  "barrel": {
+   "nome": "Barril",
+   "aliases": []
+  },
+  "basket": {
+   "nome": "Cesto",
+   "aliases": [
+    "cesta"
+   ]
+  },
+  "bedroll": {
+   "nome": "Saco de Dormir",
+   "aliases": []
+  },
+  "bell": {
+   "nome": "Sino",
+   "aliases": [
+    "sineta"
+   ]
+  },
+  "blanket": {
+   "nome": "Cobertor",
+   "aliases": [
+    "manta"
+   ]
+  },
+  "block-and-tackle": {
+   "nome": "Roldana",
+   "aliases": [
+    "polia",
+    "talha"
+   ]
+  },
+  "book": {
+   "nome": "Livro",
+   "aliases": []
+  },
+  "bottle-glass": {
+   "nome": "Garrafa de Vidro",
+   "aliases": [
+    "garrafa"
+   ]
+  },
+  "bucket": {
+   "nome": "Balde",
+   "aliases": []
+  },
+  "caltrops-bag-of-20": {
+   "nome": "Estrepes (saco com 20)",
+   "aliases": []
+  },
+  "candle": {
+   "nome": "Vela",
+   "aliases": []
+  },
+  "case-crossbow-bolt": {
+   "nome": "Estojo de Virotes",
+   "aliases": []
+  },
+  "case-map-or-scroll": {
+   "nome": "Estojo de Mapas e Pergaminhos",
+   "aliases": [
+    "estojo de pergaminhos",
+    "porta-mapas"
+   ]
+  },
+  "chain-10-feet": {
+   "nome": "Corrente (3 m)",
+   "aliases": []
+  },
+  "chalk-1-piece": {
+   "nome": "Giz",
+   "aliases": []
+  },
+  "chest": {
+   "nome": "Baú",
+   "aliases": []
+  },
+  "climbers-kit": {
+   "nome": "Kit de Escalada",
+   "aliases": []
+  },
+  "clothes-common": {
+   "nome": "Roupas Comuns",
+   "aliases": []
+  },
+  "clothes-costume": {
+   "nome": "Fantasia",
+   "aliases": [
+    "roupas de fantasia"
+   ]
+  },
+  "clothes-fine": {
+   "nome": "Roupas Finas",
+   "aliases": []
+  },
+  "clothes-travelers": {
+   "nome": "Roupas de Viajante",
+   "aliases": []
+  },
+  "component-pouch": {
+   "nome": "Bolsa de Componentes",
+   "aliases": []
+  },
+  "crowbar": {
+   "nome": "Pé de Cabra",
+   "aliases": []
+  },
+  "crystal": {
+   "nome": "Cristal (foco arcano)",
+   "aliases": []
+  },
+  "emblem": {
+   "nome": "Emblema Sagrado (foco)",
+   "aliases": []
+  },
+  "fishing-tackle": {
+   "nome": "Equipamento de Pesca",
+   "aliases": [
+    "vara de pescar"
+   ]
+  },
+  "flask-or-tankard": {
+   "nome": "Caneca",
+   "aliases": []
+  },
+  "grappling-hook": {
+   "nome": "Gancho de Escalada",
+   "aliases": [
+    "arpéu"
+   ]
+  },
+  "hammer": {
+   "nome": "Martelo",
+   "aliases": []
+  },
+  "hammer-sledge": {
+   "nome": "Marreta",
+   "aliases": []
+  },
+  "healers-kit": {
+   "nome": "Kit de Curandeiro",
+   "aliases": [
+    "kit médico",
+    "kit de primeiros socorros"
+   ]
+  },
+  "holy-water-flask": {
+   "nome": "Água Benta (frasco)",
+   "aliases": [
+    "frasco de água benta"
+   ]
+  },
+  "hourglass": {
+   "nome": "Ampulheta",
+   "aliases": []
+  },
+  "hunting-trap": {
+   "nome": "Armadilha de Caça",
+   "aliases": []
+  },
+  "ink-1-ounce-bottle": {
+   "nome": "Tinta (vidro)",
+   "aliases": [
+    "vidro de tinta"
+   ]
+  },
+  "ink-pen": {
+   "nome": "Pena de Escrever",
+   "aliases": [
+    "caneta"
+   ]
+  },
+  "jug-or-pitcher": {
+   "nome": "Jarro",
+   "aliases": []
+  },
+  "ladder-10-foot": {
+   "nome": "Escada (3 m)",
+   "aliases": []
+  },
+  "lamp": {
+   "nome": "Lamparina",
+   "aliases": []
+  },
+  "lamp-oil-flask": {
+   "nome": "Frasco de Óleo",
+   "aliases": [
+    "óleo de lamparina"
+   ]
+  },
+  "lantern-bullseye": {
+   "nome": "Lanterna Furta-Fogo",
+   "aliases": [
+    "lanterna direcional"
+   ]
+  },
+  "lantern-hooded": {
+   "nome": "Lanterna Coberta",
+   "aliases": [
+    "lanterna",
+    "lampião"
+   ]
+  },
+  "lock": {
+   "nome": "Cadeado",
+   "aliases": [
+    "fechadura"
+   ]
+  },
+  "magnifying-glass": {
+   "nome": "Lupa",
+   "aliases": [
+    "lente de aumento"
+   ]
+  },
+  "manacles": {
+   "nome": "Algemas",
+   "aliases": [
+    "grilhões"
+   ]
+  },
+  "mess-kit": {
+   "nome": "Kit de Refeição",
+   "aliases": []
+  },
+  "mirror-steel": {
+   "nome": "Espelho de Aço",
+   "aliases": [
+    "espelho"
+   ]
+  },
+  "orb": {
+   "nome": "Orbe (foco arcano)",
+   "aliases": []
+  },
+  "paper-one-sheet": {
+   "nome": "Papel (folha)",
+   "aliases": []
+  },
+  "parchment-one-sheet": {
+   "nome": "Pergaminho em Branco (folha)",
+   "aliases": []
+  },
+  "perfume-vial": {
+   "nome": "Perfume",
+   "aliases": []
+  },
+  "pick-miners": {
+   "nome": "Picareta de Mineiro",
+   "aliases": [
+    "picareta"
+   ]
+  },
+  "piton": {
+   "nome": "Pitão",
+   "aliases": [
+    "grampo de escalada"
+   ]
+  },
+  "pole-10-foot": {
+   "nome": "Vara (3 m)",
+   "aliases": []
+  },
+  "pot-iron": {
+   "nome": "Panela de Ferro",
+   "aliases": [
+    "caldeirão"
+   ]
+  },
+  "pouch": {
+   "nome": "Bolsa",
+   "aliases": [
+    "algibeira"
+   ]
+  },
+  "quiver": {
+   "nome": "Aljava",
+   "aliases": []
+  },
+  "ram-portable": {
+   "nome": "Aríete Portátil",
+   "aliases": [
+    "aríete"
+   ]
+  },
+  "rations-1-day": {
+   "nome": "Ração (1 dia)",
+   "aliases": [
+    "ração de viagem",
+    "rações de viagem"
+   ]
+  },
+  "reliquary": {
+   "nome": "Relicário (foco)",
+   "aliases": []
+  },
+  "robes": {
+   "nome": "Vestes",
+   "aliases": [
+    "robe"
+   ]
+  },
+  "rope-hempen-50-feet": {
+   "nome": "Corda de Cânhamo (15 m)",
+   "aliases": [
+    "corda"
+   ]
+  },
+  "rope-silk-50-feet": {
+   "nome": "Corda de Seda (15 m)",
+   "aliases": []
+  },
+  "sack": {
+   "nome": "Saco",
+   "aliases": []
+  },
+  "scale-merchants": {
+   "nome": "Balança de Mercador",
+   "aliases": [
+    "balança"
+   ]
+  },
+  "sealing-wax": {
+   "nome": "Cera de Lacre",
+   "aliases": [
+    "lacre"
+   ]
+  },
+  "shovel": {
+   "nome": "Pá",
+   "aliases": []
+  },
+  "signal-whistle": {
+   "nome": "Apito",
+   "aliases": []
+  },
+  "soap": {
+   "nome": "Sabão",
+   "aliases": []
+  },
+  "spellbook": {
+   "nome": "Grimório",
+   "aliases": [
+    "livro de magias"
+   ]
+  },
+  "spike-iron": {
+   "nome": "Cravo de Ferro",
+   "aliases": []
+  },
+  "sprig-of-mistletoe": {
+   "nome": "Ramo de Visco (foco)",
+   "aliases": [
+    "visco"
+   ]
+  },
+  "spyglass": {
+   "nome": "Luneta",
+   "aliases": []
+  },
+  "tent": {
+   "nome": "Barraca (2 pessoas)",
+   "aliases": [
+    "tenda"
+   ]
+  },
+  "tinderbox": {
+   "nome": "Pederneira",
+   "aliases": [
+    "isqueiro"
+   ]
+  },
+  "torch": {
+   "nome": "Tocha",
+   "aliases": []
+  },
+  "totem": {
+   "nome": "Totem (foco)",
+   "aliases": []
+  },
+  "vial": {
+   "nome": "Frasco",
+   "aliases": [
+    "frasco vazio"
+   ]
+  },
+  "waterskin": {
+   "nome": "Odre",
+   "aliases": [
+    "cantil"
+   ]
+  },
+  "whetstone": {
+   "nome": "Pedra de Amolar",
+   "aliases": []
+  },
+  "wooden-staff": {
+   "nome": "Cajado de Madeira (foco)",
+   "aliases": []
+  },
+  "signet-ring": {
+   "nome": "Anel de Sinete",
+   "aliases": [
+    "sinete"
+   ]
+  },
+  "rod": {
+   "nome": "Cetro (foco arcano)",
+   "aliases": []
+  },
+  "staff": {
+   "nome": "Cajado Arcano (foco)",
+   "aliases": []
+  },
+  "wand": {
+   "nome": "Varinha Arcana (foco)",
+   "aliases": []
+  },
+  "yew-wand": {
+   "nome": "Varinha de Teixo (foco)",
+   "aliases": []
+  },
+  "alchemists-supplies": {
+   "nome": "Suprimentos de Alquimista",
+   "aliases": []
+  },
+  "bagpipes": {
+   "nome": "Gaita de Foles",
+   "aliases": []
+  },
+  "brewers-supplies": {
+   "nome": "Suprimentos de Cervejeiro",
+   "aliases": []
+  },
+  "calligraphers-supplies": {
+   "nome": "Suprimentos de Calígrafo",
+   "aliases": []
+  },
+  "carpenters-tools": {
+   "nome": "Ferramentas de Carpinteiro",
+   "aliases": []
+  },
+  "cartographers-tools": {
+   "nome": "Ferramentas de Cartógrafo",
+   "aliases": []
+  },
+  "cobblers-tools": {
+   "nome": "Ferramentas de Sapateiro",
+   "aliases": []
+  },
+  "cooks-utensils": {
+   "nome": "Utensílios de Cozinheiro",
+   "aliases": []
+  },
+  "dice-set": {
+   "nome": "Jogo de Dados",
+   "aliases": []
+  },
+  "disguise-kit": {
+   "nome": "Kit de Disfarce",
+   "aliases": []
+  },
+  "drum": {
+   "nome": "Tambor",
+   "aliases": []
+  },
+  "dulcimer": {
+   "nome": "Saltério",
+   "aliases": []
+  },
+  "flute": {
+   "nome": "Flauta",
+   "aliases": []
+  },
+  "forgery-kit": {
+   "nome": "Kit de Falsificação",
+   "aliases": []
+  },
+  "glassblowers-tools": {
+   "nome": "Ferramentas de Vidreiro",
+   "aliases": []
+  },
+  "herbalism-kit": {
+   "nome": "Kit de Herbalismo",
+   "aliases": [
+    "kit de herborista"
+   ]
+  },
+  "horn": {
+   "nome": "Trompa",
+   "aliases": []
+  },
+  "jewelers-tools": {
+   "nome": "Ferramentas de Joalheiro",
+   "aliases": []
+  },
+  "leatherworkers-tools": {
+   "nome": "Ferramentas de Coureiro",
+   "aliases": []
+  },
+  "lute": {
+   "nome": "Alaúde",
+   "aliases": []
+  },
+  "lyre": {
+   "nome": "Lira",
+   "aliases": []
+  },
+  "masons-tools": {
+   "nome": "Ferramentas de Pedreiro",
+   "aliases": []
+  },
+  "navigators-tools": {
+   "nome": "Ferramentas de Navegador",
+   "aliases": []
+  },
+  "painters-supplies": {
+   "nome": "Suprimentos de Pintor",
+   "aliases": []
+  },
+  "pan-flute": {
+   "nome": "Flauta de Pã",
+   "aliases": []
+  },
+  "playing-card-set": {
+   "nome": "Baralho",
+   "aliases": []
+  },
+  "poisoners-kit": {
+   "nome": "Kit de Envenenador",
+   "aliases": []
+  },
+  "potters-tools": {
+   "nome": "Ferramentas de Oleiro",
+   "aliases": []
+  },
+  "shawm": {
+   "nome": "Charamela",
+   "aliases": []
+  },
+  "smiths-tools": {
+   "nome": "Ferramentas de Ferreiro",
+   "aliases": []
+  },
+  "thieves-tools": {
+   "nome": "Ferramentas de Ladrão",
+   "aliases": [
+    "kit de ladrão",
+    "gazuas"
+   ]
+  },
+  "tinkers-tools": {
+   "nome": "Ferramentas de Funileiro",
+   "aliases": []
+  },
+  "viol": {
+   "nome": "Viola",
+   "aliases": []
+  },
+  "weavers-tools": {
+   "nome": "Ferramentas de Tecelão",
+   "aliases": []
+  },
+  "woodcarvers-tools": {
+   "nome": "Ferramentas de Entalhador",
+   "aliases": []
+  },
+  "canvas": {
+   "nome": "Lona (1 m²)",
+   "aliases": []
+  },
+  "chicken": {
+   "nome": "Galinha",
+   "aliases": []
+  },
+  "cinnamon": {
+   "nome": "Canela (450 g)",
+   "aliases": []
+  },
+  "cloves": {
+   "nome": "Cravo-da-Índia (450 g)",
+   "aliases": []
+  },
+  "copper": {
+   "nome": "Cobre em Barra (450 g)",
+   "aliases": []
+  },
+  "cotton-cloth": {
+   "nome": "Tecido de Algodão (1 m²)",
+   "aliases": []
+  },
+  "cow": {
+   "nome": "Vaca",
+   "aliases": []
+  },
+  "flour": {
+   "nome": "Farinha (450 g)",
+   "aliases": []
+  },
+  "ginger": {
+   "nome": "Gengibre (450 g)",
+   "aliases": []
+  },
+  "goat": {
+   "nome": "Cabra",
+   "aliases": []
+  },
+  "gold": {
+   "nome": "Ouro em Barra (450 g)",
+   "aliases": []
+  },
+  "iron": {
+   "nome": "Ferro em Barra (450 g)",
+   "aliases": []
+  },
+  "linen": {
+   "nome": "Linho (1 m²)",
+   "aliases": []
+  },
+  "ox": {
+   "nome": "Boi",
+   "aliases": []
+  },
+  "pepper": {
+   "nome": "Pimenta (450 g)",
+   "aliases": []
+  },
+  "pig": {
+   "nome": "Porco",
+   "aliases": []
+  },
+  "platinum": {
+   "nome": "Platina em Barra (450 g)",
+   "aliases": []
+  },
+  "saffron": {
+   "nome": "Açafrão (450 g)",
+   "aliases": []
+  },
+  "salt": {
+   "nome": "Sal (450 g)",
+   "aliases": []
+  },
+  "sheep": {
+   "nome": "Ovelha",
+   "aliases": []
+  },
+  "silk": {
+   "nome": "Seda (1 m²)",
+   "aliases": []
+  },
+  "silver": {
+   "nome": "Prata em Barra (450 g)",
+   "aliases": []
+  },
+  "wheat": {
+   "nome": "Trigo (450 g)",
+   "aliases": []
+  },
+  "assassins-blood": {
+   "nome": "Sangue de Assassino",
+   "aliases": []
+  },
+  "burnt-othur-fumes": {
+   "nome": "Fumaça de Othur Queimado",
+   "aliases": []
+  },
+  "crawler-mucus": {
+   "nome": "Muco de Rastejador",
+   "aliases": []
+  },
+  "drow-poison": {
+   "nome": "Veneno Drow",
+   "aliases": []
+  },
+  "essense-of-either": {
+   "nome": "Essência de Éter",
+   "aliases": []
+  },
+  "malice": {
+   "nome": "Malícia",
+   "aliases": []
+  },
+  "midnight-tears": {
+   "nome": "Lágrimas da Meia-Noite",
+   "aliases": []
+  },
+  "oil-of-taggit": {
+   "nome": "Óleo de Taggit",
+   "aliases": []
+  },
+  "pale-tincture": {
+   "nome": "Tintura Pálida",
+   "aliases": []
+  },
+  "poison-basic": {
+   "nome": "Veneno Básico (frasco)",
+   "aliases": []
+  },
+  "purple-worm-poison": {
+   "nome": "Veneno de Verme Púrpura",
+   "aliases": []
+  },
+  "serpent-venom": {
+   "nome": "Veneno de Serpente",
+   "aliases": []
+  },
+  "torpor": {
+   "nome": "Torpor",
+   "aliases": []
+  },
+  "truth-serum": {
+   "nome": "Soro da Verdade",
+   "aliases": []
+  },
+  "wyvern-poison": {
+   "nome": "Veneno de Serpe",
+   "aliases": []
+  },
+  "carriage": {
+   "nome": "Carruagem",
+   "aliases": []
+  },
+  "cart": {
+   "nome": "Carroça",
+   "aliases": []
+  },
+  "chariot": {
+   "nome": "Biga",
+   "aliases": []
+  },
+  "sled": {
+   "nome": "Trenó",
+   "aliases": []
+  },
+  "wagon": {
+   "nome": "Carroção",
+   "aliases": []
+  },
+  "galley": {
+   "nome": "Galé",
+   "aliases": []
+  },
+  "keelboat": {
+   "nome": "Barcaça",
+   "aliases": []
+  },
+  "longship": {
+   "nome": "Barco Longo",
+   "aliases": [
+    "drakkar"
+   ]
+  },
+  "rowboat": {
+   "nome": "Bote a Remo",
+   "aliases": []
+  },
+  "sailing-ship": {
+   "nome": "Navio a Vela",
+   "aliases": []
+  },
+  "warship": {
+   "nome": "Navio de Guerra",
+   "aliases": []
+  }
+ },
+ "ignorar": {
+  "acid": "cópia vazia de acid-vial (preço e peso 0)",
+  "copper-piece": "moeda",
+  "silver-piece": "moeda",
+  "electrum-piece": "moeda",
+  "gold-piece": "moeda",
+  "platinum-piece": "moeda"
+ },
+ "revisoes_comuns": {
+  "greatsword": {
+   "peso_lb": 6,
+   "_porque": "Open5e v2 dá 0 lb; o SRD 5.1 dá 6 lb."
+  },
+  "blanket": {
+   "peso_lb": 3,
+   "_porque": "Open5e v2 dá 0 lb; o SRD 5.1 dá 3 lb."
+  },
+  "crossbow-hand": {
+   "nome_srd": "Hand crossbow",
+   "_porque": "o nome que os stat blocks usam"
+  },
+  "crossbow-heavy": {
+   "nome_srd": "Heavy crossbow",
+   "_porque": "o nome que os stat blocks usam; e o Open5e v2 está sem Ammunition (o SRD 5.1 dá Munição).",
+   "propriedades_mais": [
+    "municao"
+   ]
+  },
+  "crossbow-light": {
+   "nome_srd": "Light crossbow",
+   "_porque": "o nome que os stat blocks usam; e o Open5e v2 está sem Two-Handed (o SRD 5.1 dá Duas Mãos).",
+   "propriedades_mais": [
+    "duas_maos"
+   ]
+  },
+  "lance": {
+   "_porque": "Desvantagem contra alvo a 1,5 m; duas mãos quando não montado."
+  },
+  "net": {
+   "_porque": "Sem dano: o alvo atingido fica Impedido (regra especial)."
+  },
+  "whip": {
+   "propriedades_mais": [
+    "acuidade"
+   ],
+   "_porque": "Open5e v2 sem Finesse; o SRD 5.1 dá Acuidade e Alcance ao chicote."
+  },
+  "handaxe": {
+   "propriedades_mais": [
+    "arremesso"
+   ],
+   "_porque": "Open5e v2 sem Thrown (só o alcance 20/60); o SRD 5.1 dá Arremesso."
+  },
+  "trident": {
+   "propriedades_menos": [
+    "duas_maos"
+   ],
+   "_porque": "Open5e v2 marca Two-Handed; no SRD 5.1 o tridente é de Arremesso e Versátil."
+  },
+  "shortsword": {
+   "tipo_dano": "piercing",
+   "_porque": "Open5e v2 dá cortante; no SRD 5.1 a espada curta é perfurante."
+  }
+ },
+ "magicos": {
+  "Adamantine Armor": {
+   "nome": "Armadura de Adamante",
+   "aliases": [
+    "armadura de adamantina"
+   ],
+   "qualquer_armadura": true
+  },
+  "Amulet of Health": {
+   "nome": "Amuleto da Saúde",
+   "aliases": []
+  },
+  "Amulet of Proof against Detection and Location": {
+   "nome": "Amuleto contra Detecção e Localização",
+   "aliases": []
+  },
+  "Amulet of the Planes": {
+   "nome": "Amuleto dos Planos",
+   "aliases": []
+  },
+  "Animated Shield": {
+   "nome": "Escudo Animado",
+   "aliases": [],
+   "base_armadura": "shield"
+  },
+  "Apparatus of the Crab": {
+   "nome": "Aparato do Caranguejo",
+   "aliases": []
+  },
+  "Armor of Invulnerability": {
+   "nome": "Armadura da Invulnerabilidade",
+   "aliases": [],
+   "base_armadura": "plate"
+  },
+  "Armor of Resistance": {
+   "nome": "Armadura de Resistência",
+   "aliases": [],
+   "qualquer_armadura": true
+  },
+  "Armor of Vulnerability": {
+   "nome": "Armadura da Vulnerabilidade",
+   "aliases": [],
+   "base_armadura": "plate"
+  },
+  "Arrow-Catching Shield": {
+   "nome": "Escudo Apanha-Flechas",
+   "aliases": [
+    "escudo apanha flechas"
+   ],
+   "base_armadura": "shield"
+  },
+  "Arrow of Slaying": {
+   "nome": "Flecha Assassina",
+   "aliases": [
+    "flecha da morte"
+   ]
+  },
+  "Bag of Beans": {
+   "nome": "Bolsa de Feijões",
+   "aliases": []
+  },
+  "Bag of Devouring": {
+   "nome": "Bolsa Devoradora",
+   "aliases": []
+  },
+  "Bag of Holding": {
+   "nome": "Bolsa de Contenção",
+   "aliases": [
+    "bolsa sem fundo"
+   ]
+  },
+  "Bag of Tricks": {
+   "nome": "Bolsa de Truques",
+   "aliases": []
+  },
+  "Bead of Force": {
+   "nome": "Conta de Força",
+   "aliases": []
+  },
+  "Belt of Cloud Giant Strength": {
+   "nome": "Cinto de Força do Gigante das Nuvens",
+   "aliases": []
+  },
+  "Belt of Dwarvenkind": {
+   "nome": "Cinto dos Anões",
+   "aliases": [
+    "cinto anão"
+   ]
+  },
+  "Belt of Fire Giant Strength": {
+   "nome": "Cinto de Força do Gigante do Fogo",
+   "aliases": []
+  },
+  "Belt of Frost Giant Strength": {
+   "nome": "Cinto de Força do Gigante do Gelo",
+   "aliases": []
+  },
+  "Belt of Hill Giant Strength": {
+   "nome": "Cinto de Força do Gigante da Colina",
+   "aliases": []
+  },
+  "Belt of Stone Giant Strength": {
+   "nome": "Cinto de Força do Gigante de Pedra",
+   "aliases": []
+  },
+  "Belt of Storm Giant Strength": {
+   "nome": "Cinto de Força do Gigante da Tempestade",
+   "aliases": []
+  },
+  "Boots of Elvenkind": {
+   "nome": "Botas Élficas",
+   "aliases": [
+    "botas dos elfos"
+   ]
+  },
+  "Boots of Levitation": {
+   "nome": "Botas da Levitação",
+   "aliases": []
+  },
+  "Boots of Speed": {
+   "nome": "Botas da Velocidade",
+   "aliases": []
+  },
+  "Boots of Striding and Springing": {
+   "nome": "Botas de Passos Largos e Saltos",
+   "aliases": []
+  },
+  "Boots of the Winterlands": {
+   "nome": "Botas das Terras Invernais",
+   "aliases": []
+  },
+  "Bowl of Commanding Water Elementals": {
+   "nome": "Tigela de Comandar Elementais da Água",
+   "aliases": []
+  },
+  "Bracers of Archery": {
+   "nome": "Braçadeiras de Arquearia",
+   "aliases": []
+  },
+  "Bracers of Defense": {
+   "nome": "Braçadeiras de Defesa",
+   "aliases": []
+  },
+  "Brazier of Commanding Fire Elementals": {
+   "nome": "Braseiro de Comandar Elementais do Fogo",
+   "aliases": []
+  },
+  "Brooch of Shielding": {
+   "nome": "Broche Protetor",
+   "aliases": [
+    "broche de blindagem"
+   ]
+  },
+  "Broom of Flying": {
+   "nome": "Vassoura Voadora",
+   "aliases": []
+  },
+  "Candle of Invocation": {
+   "nome": "Vela da Invocação",
+   "aliases": []
+  },
+  "Cape of the Mountebank": {
+   "nome": "Capa do Charlatão",
+   "aliases": []
+  },
+  "Carpet of Flying": {
+   "nome": "Tapete Voador",
+   "aliases": []
+  },
+  "Censer of Controlling Air Elementals": {
+   "nome": "Incensário de Controlar Elementais do Ar",
+   "aliases": []
+  },
+  "Chime of Opening": {
+   "nome": "Sino da Abertura",
+   "aliases": []
+  },
+  "Circlet of Blasting": {
+   "nome": "Diadema Explosivo",
+   "aliases": []
+  },
+  "Cloak of Arachnida": {
+   "nome": "Manto da Aranha",
+   "aliases": []
+  },
+  "Cloak of Displacement": {
+   "nome": "Manto do Deslocamento",
+   "aliases": []
+  },
+  "Cloak of Elvenkind": {
+   "nome": "Manto Élfico",
+   "aliases": [
+    "capa élfica",
+    "manto dos elfos"
+   ]
+  },
+  "Cloak of Protection": {
+   "nome": "Manto de Proteção",
+   "aliases": [
+    "capa de proteção"
+   ]
+  },
+  "Cloak of the Bat": {
+   "nome": "Manto do Morcego",
+   "aliases": []
+  },
+  "Cloak of the Manta Ray": {
+   "nome": "Manto da Arraia",
+   "aliases": []
+  },
+  "Crystal Ball": {
+   "nome": "Bola de Cristal",
+   "aliases": []
+  },
+  "Crystal Ball of Mind Reading": {
+   "nome": "Bola de Cristal da Leitura da Mente",
+   "aliases": []
+  },
+  "Crystal Ball of Telepathy": {
+   "nome": "Bola de Cristal da Telepatia",
+   "aliases": []
+  },
+  "Crystal Ball of True Seeing": {
+   "nome": "Bola de Cristal da Visão Verdadeira",
+   "aliases": []
+  },
+  "Cube of Force": {
+   "nome": "Cubo de Força",
+   "aliases": []
+  },
+  "Cubic Gate": {
+   "nome": "Portão Cúbico",
+   "aliases": []
+  },
+  "Dagger of Venom": {
+   "nome": "Adaga Venenosa",
+   "aliases": [
+    "adaga do veneno"
+   ],
+   "base_arma": "dagger",
+   "bonus": 1
+  },
+  "Dancing Sword": {
+   "nome": "Espada Dançante",
+   "aliases": [],
+   "base_arma": "longsword"
+  },
+  "Decanter of Endless Water": {
+   "nome": "Decantador de Água Infinita",
+   "aliases": [
+    "jarro de água infinita"
+   ]
+  },
+  "Deck of Illusions": {
+   "nome": "Baralho das Ilusões",
+   "aliases": []
+  },
+  "Deck of Many Things": {
+   "nome": "Baralho das Muitas Coisas",
+   "aliases": [
+    "baralho do destino"
+   ]
+  },
+  "Defender": {
+   "nome": "Defensora",
+   "aliases": [
+    "espada defensora"
+   ],
+   "base_arma": "longsword",
+   "bonus": 3
+  },
+  "Demon Armor": {
+   "nome": "Armadura Demoníaca",
+   "aliases": [],
+   "base_armadura": "plate",
+   "bonus": 1
+  },
+  "Dimensional Shackles": {
+   "nome": "Grilhões Dimensionais",
+   "aliases": [
+    "algemas dimensionais"
+   ]
+  },
+  "Dragon Scale Mail": {
+   "nome": "Cota de Escamas de Dragão",
+   "aliases": [
+    "armadura de escamas de dragão"
+   ],
+   "base_armadura": "scale mail",
+   "bonus": 1
+  },
+  "Dragon Slayer": {
+   "nome": "Matadora de Dragões",
+   "aliases": [
+    "matador de dragões"
+   ],
+   "base_arma": "longsword",
+   "bonus": 1
+  },
+  "Dust of Disappearance": {
+   "nome": "Pó do Desaparecimento",
+   "aliases": []
+  },
+  "Dust of Dryness": {
+   "nome": "Pó da Secura",
+   "aliases": []
+  },
+  "Dust of Sneezing and Choking": {
+   "nome": "Pó de Espirro e Engasgo",
+   "aliases": []
+  },
+  "Dwarven Plate": {
+   "nome": "Placas Anãs",
+   "aliases": [
+    "armadura de placas anã"
+   ],
+   "base_armadura": "plate",
+   "bonus": 2
+  },
+  "Dwarven Thrower": {
+   "nome": "Arremessador Anão",
+   "aliases": [
+    "martelo arremessador anão"
+   ],
+   "base_arma": "warhammer",
+   "bonus": 3
+  },
+  "Efficient Quiver": {
+   "nome": "Aljava Eficiente",
+   "aliases": []
+  },
+  "Efreeti Bottle": {
+   "nome": "Garrafa de Efreeti",
+   "aliases": []
+  },
+  "Elemental Gem": {
+   "nome": "Gema Elemental",
+   "aliases": []
+  },
+  "Elven Chain": {
+   "nome": "Cota Élfica",
+   "aliases": [
+    "cota de malha élfica"
+   ],
+   "base_armadura": "chain shirt",
+   "bonus": 1
+  },
+  "Eversmoking Bottle": {
+   "nome": "Garrafa Fumegante",
+   "aliases": []
+  },
+  "Eyes of Charming": {
+   "nome": "Olhos do Encanto",
+   "aliases": []
+  },
+  "Eyes of Minute Seeing": {
+   "nome": "Olhos da Visão Minuciosa",
+   "aliases": []
+  },
+  "Eyes of the Eagle": {
+   "nome": "Olhos da Águia",
+   "aliases": []
+  },
+  "Feather Token": {
+   "nome": "Pena Mágica",
+   "aliases": [
+    "símbolo de pena"
+   ]
+  },
+  "Figurine of Wondrous Power": {
+   "nome": "Figura de Poder Maravilhoso",
+   "aliases": []
+  },
+  "Flame Tongue": {
+   "nome": "Língua de Fogo",
+   "aliases": [
+    "língua flamejante"
+   ],
+   "base_arma": "longsword"
+  },
+  "Folding Boat": {
+   "nome": "Barco Dobrável",
+   "aliases": []
+  },
+  "Frost Brand": {
+   "nome": "Marca Gélida",
+   "aliases": [
+    "marca de gelo"
+   ],
+   "base_arma": "longsword"
+  },
+  "Gauntlets of Ogre Power": {
+   "nome": "Manoplas de Força de Ogro",
+   "aliases": [
+    "manoplas do poder do ogro"
+   ]
+  },
+  "Gem of Brightness": {
+   "nome": "Gema do Brilho",
+   "aliases": []
+  },
+  "Gem of Seeing": {
+   "nome": "Gema da Visão",
+   "aliases": []
+  },
+  "Giant Slayer": {
+   "nome": "Matadora de Gigantes",
+   "aliases": [
+    "matador de gigantes"
+   ],
+   "qualquer_arma": true,
+   "bonus": 1
+  },
+  "Glamoured Studded Leather": {
+   "nome": "Couro Batido Encantado",
+   "aliases": [],
+   "base_armadura": "studded leather",
+   "bonus": 1
+  },
+  "Gloves of Missile Snaring": {
+   "nome": "Luvas de Apanhar Projéteis",
+   "aliases": []
+  },
+  "Gloves of Swimming and Climbing": {
+   "nome": "Luvas de Natação e Escalada",
+   "aliases": []
+  },
+  "Goggles of Night": {
+   "nome": "Óculos da Noite",
+   "aliases": [
+    "óculos de visão noturna"
+   ]
+  },
+  "Hammer of Thunderbolts": {
+   "nome": "Martelo dos Raios",
+   "aliases": [],
+   "base_arma": "maul",
+   "bonus": 1
+  },
+  "Handy Haversack": {
+   "nome": "Mochila Prática",
+   "aliases": [
+    "mochila útil"
+   ]
+  },
+  "Hat of Disguise": {
+   "nome": "Chapéu do Disfarce",
+   "aliases": []
+  },
+  "Headband of Intellect": {
+   "nome": "Faixa do Intelecto",
+   "aliases": []
+  },
+  "Helm of Brilliance": {
+   "nome": "Elmo do Brilho",
+   "aliases": []
+  },
+  "Helm of Comprehending Languages": {
+   "nome": "Elmo da Compreensão de Idiomas",
+   "aliases": []
+  },
+  "Helm of Telepathy": {
+   "nome": "Elmo da Telepatia",
+   "aliases": []
+  },
+  "Helm of Teleportation": {
+   "nome": "Elmo do Teletransporte",
+   "aliases": []
+  },
+  "Holy Avenger": {
+   "nome": "Vingador Sagrado",
+   "aliases": [],
+   "base_arma": "longsword",
+   "bonus": 3
+  },
+  "Horn of Blasting": {
+   "nome": "Trompa da Explosão",
+   "aliases": []
+  },
+  "Horn of Valhalla": {
+   "nome": "Trompa de Valhalla",
+   "aliases": []
+  },
+  "Horseshoes of a Zephyr": {
+   "nome": "Ferraduras do Zéfiro",
+   "aliases": []
+  },
+  "Horseshoes of Speed": {
+   "nome": "Ferraduras da Velocidade",
+   "aliases": []
+  },
+  "Immovable Rod": {
+   "nome": "Bastão Imóvel",
+   "aliases": [
+    "haste imóvel"
+   ]
+  },
+  "Instant Fortress": {
+   "nome": "Fortaleza Instantânea",
+   "aliases": []
+  },
+  "Ioun Stone": {
+   "nome": "Pedra Ioun",
+   "aliases": []
+  },
+  "Iron Bands of Binding": {
+   "nome": "Faixas de Ferro da Prisão",
+   "aliases": []
+  },
+  "Iron Flask": {
+   "nome": "Frasco de Ferro",
+   "aliases": []
+  },
+  "Javelin of Lightning": {
+   "nome": "Azagaia do Relâmpago",
+   "aliases": [
+    "dardo do relâmpago"
+   ],
+   "base_arma": "javelin"
+  },
+  "Lantern of Revealing": {
+   "nome": "Lanterna da Revelação",
+   "aliases": []
+  },
+  "Luck Blade": {
+   "nome": "Lâmina da Sorte",
+   "aliases": [],
+   "base_arma": "longsword",
+   "bonus": 1
+  },
+  "Mace of Disruption": {
+   "nome": "Maça da Ruptura",
+   "aliases": [],
+   "base_arma": "mace"
+  },
+  "Mace of Smiting": {
+   "nome": "Maça da Punição",
+   "aliases": [],
+   "base_arma": "mace",
+   "bonus": 1
+  },
+  "Mace of Terror": {
+   "nome": "Maça do Terror",
+   "aliases": [],
+   "base_arma": "mace"
+  },
+  "Mantle of Spell Resistance": {
+   "nome": "Manto de Resistência à Magia",
+   "aliases": []
+  },
+  "Manual of Bodily Health": {
+   "nome": "Manual da Saúde Corporal",
+   "aliases": []
+  },
+  "Manual of Gainful Exercise": {
+   "nome": "Manual do Exercício Proveitoso",
+   "aliases": []
+  },
+  "Manual of Golems": {
+   "nome": "Manual dos Golens",
+   "aliases": []
+  },
+  "Manual of Quickness of Action": {
+   "nome": "Manual da Rapidez de Ação",
+   "aliases": []
+  },
+  "Marvelous Pigments": {
+   "nome": "Pigmentos Maravilhosos",
+   "aliases": []
+  },
+  "Medallion of Thoughts": {
+   "nome": "Medalhão dos Pensamentos",
+   "aliases": []
+  },
+  "Mirror of Life Trapping": {
+   "nome": "Espelho Aprisionador",
+   "aliases": [
+    "espelho aprisionador de vidas"
+   ]
+  },
+  "Mithral Armor": {
+   "nome": "Armadura de Mithral",
+   "aliases": [
+    "armadura de mitral"
+   ],
+   "qualquer_armadura": true
+  },
+  "Necklace of Adaptation": {
+   "nome": "Colar da Adaptação",
+   "aliases": []
+  },
+  "Necklace of Fireballs": {
+   "nome": "Colar de Bolas de Fogo",
+   "aliases": []
+  },
+  "Necklace of Prayer Beads": {
+   "nome": "Colar de Contas de Oração",
+   "aliases": [
+    "rosário"
+   ]
+  },
+  "Nine Lives Stealer": {
+   "nome": "Roubadora de Nove Vidas",
+   "aliases": [],
+   "base_arma": "longsword",
+   "bonus": 2
+  },
+  "Oathbow": {
+   "nome": "Arco do Juramento",
+   "aliases": [],
+   "base_arma": "longbow"
+  },
+  "Oil of Etherealness": {
+   "nome": "Óleo da Etereidade",
+   "aliases": [
+    "óleo etéreo"
+   ]
+  },
+  "Oil of Sharpness": {
+   "nome": "Óleo da Afiação",
+   "aliases": [
+    "óleo de afiação"
+   ]
+  },
+  "Oil of Slipperiness": {
+   "nome": "Óleo Escorregadio",
+   "aliases": []
+  },
+  "Orb of Dragonkind": {
+   "nome": "Orbe dos Dragões",
+   "aliases": []
+  },
+  "Pearl of Power": {
+   "nome": "Pérola do Poder",
+   "aliases": []
+  },
+  "Periapt of Health": {
+   "nome": "Periapto da Saúde",
+   "aliases": []
+  },
+  "Periapt of Proof against Poison": {
+   "nome": "Periapto contra Veneno",
+   "aliases": []
+  },
+  "Periapt of Wound Closure": {
+   "nome": "Periapto do Fechamento de Feridas",
+   "aliases": []
+  },
+  "Philter of Love": {
+   "nome": "Filtro do Amor",
+   "aliases": [
+    "vinho do amor"
+   ]
+  },
+  "Pipes of Haunting": {
+   "nome": "Flauta Assombrada",
+   "aliases": []
+  },
+  "Pipes of the Sewers": {
+   "nome": "Flauta dos Esgotos",
+   "aliases": []
+  },
+  "Plate Armor of Etherealness": {
+   "nome": "Armadura de Placas da Etereidade",
+   "aliases": [],
+   "base_armadura": "plate"
+  },
+  "Portable Hole": {
+   "nome": "Buraco Portátil",
+   "aliases": []
+  },
+  "Potion of Animal Friendship": {
+   "nome": "Poção de Amizade Animal",
+   "aliases": []
+  },
+  "Potion of Clairvoyance": {
+   "nome": "Poção de Clarividência",
+   "aliases": []
+  },
+  "Potion of Climbing": {
+   "nome": "Poção de Escalada",
+   "aliases": []
+  },
+  "Potion of Cloud Giant Strength": {
+   "nome": "Poção de Força do Gigante das Nuvens",
+   "aliases": []
+  },
+  "Potion of Diminution": {
+   "nome": "Poção de Diminuição",
+   "aliases": []
+  },
+  "Potion of Fire Giant Strength": {
+   "nome": "Poção de Força do Gigante do Fogo",
+   "aliases": [],
+   "tipo": "Potion"
+  },
+  "Potion of Flying": {
+   "nome": "Poção de Voo",
+   "aliases": []
+  },
+  "Potion of Frost Giant Strength": {
+   "nome": "Poção de Força do Gigante do Gelo",
+   "aliases": []
+  },
+  "Potion of Gaseous Form": {
+   "nome": "Poção de Forma Gasosa",
+   "aliases": []
+  },
+  "Potion of Greater Healing": {
+   "nome": "Poção de Cura Maior",
+   "aliases": [
+    "poção de cura grande"
+   ]
+  },
+  "Potion of Growth": {
+   "nome": "Poção de Crescimento",
+   "aliases": []
+  },
+  "Potion of Healing": {
+   "nome": "Poção de Cura",
+   "aliases": [
+    "poção de vida",
+    "poção curativa"
+   ],
+   "preco_po": 50
+  },
+  "Potion of Heroism": {
+   "nome": "Poção de Heroísmo",
+   "aliases": []
+  },
+  "Potion of Hill Giant Strength": {
+   "nome": "Poção de Força do Gigante da Colina",
+   "aliases": [
+    "poção de força do gigante"
+   ]
+  },
+  "Potion of Invisibility": {
+   "nome": "Poção de Invisibilidade",
+   "aliases": []
+  },
+  "Potion of Mind Reading": {
+   "nome": "Poção de Leitura da Mente",
+   "aliases": []
+  },
+  "Potion of Poison": {
+   "nome": "Poção de Veneno",
+   "aliases": []
+  },
+  "Potion of Resistance": {
+   "nome": "Poção de Resistência",
+   "aliases": []
+  },
+  "Potion of Speed": {
+   "nome": "Poção de Velocidade",
+   "aliases": []
+  },
+  "Potion of Stone Giant Strength": {
+   "nome": "Poção de Força do Gigante de Pedra",
+   "aliases": []
+  },
+  "Potion of Storm Giant Strength": {
+   "nome": "Poção de Força do Gigante da Tempestade",
+   "aliases": []
+  },
+  "Potion of Superior Healing": {
+   "nome": "Poção de Cura Superior",
+   "aliases": []
+  },
+  "Potion of Supreme Healing": {
+   "nome": "Poção de Cura Suprema",
+   "aliases": []
+  },
+  "Potion of Water Breathing": {
+   "nome": "Poção de Respiração Aquática",
+   "aliases": []
+  },
+  "Restorative Ointment": {
+   "nome": "Unguento Restaurador",
+   "aliases": [
+    "pomada restauradora"
+   ]
+  },
+  "Ring of Animal Influence": {
+   "nome": "Anel de Influência Animal",
+   "aliases": []
+  },
+  "Ring of Djinni Summoning": {
+   "nome": "Anel de Convocação de Djinni",
+   "aliases": []
+  },
+  "Ring of Elemental Command": {
+   "nome": "Anel de Comando Elemental",
+   "aliases": []
+  },
+  "Ring of Evasion": {
+   "nome": "Anel de Evasão",
+   "aliases": []
+  },
+  "Ring of Feather Falling": {
+   "nome": "Anel de Queda Suave",
+   "aliases": [
+    "anel de queda de pena"
+   ]
+  },
+  "Ring of Free Action": {
+   "nome": "Anel de Ação Livre",
+   "aliases": []
+  },
+  "Ring of Invisibility": {
+   "nome": "Anel de Invisibilidade",
+   "aliases": []
+  },
+  "Ring of Jumping": {
+   "nome": "Anel de Salto",
+   "aliases": []
+  },
+  "Ring of Mind Shielding": {
+   "nome": "Anel de Blindagem Mental",
+   "aliases": [
+    "anel de escudo mental"
+   ]
+  },
+  "Ring of Protection": {
+   "nome": "Anel de Proteção",
+   "aliases": []
+  },
+  "Ring of Regeneration": {
+   "nome": "Anel de Regeneração",
+   "aliases": []
+  },
+  "Ring of Resistance": {
+   "nome": "Anel de Resistência",
+   "aliases": []
+  },
+  "Ring of Shooting Stars": {
+   "nome": "Anel de Estrelas Cadentes",
+   "aliases": []
+  },
+  "Ring of Spell Storing": {
+   "nome": "Anel de Armazenar Magia",
+   "aliases": []
+  },
+  "Ring of Spell Turning": {
+   "nome": "Anel de Reflexão de Magia",
+   "aliases": []
+  },
+  "Ring of Swimming": {
+   "nome": "Anel de Natação",
+   "aliases": []
+  },
+  "Ring of Telekinesis": {
+   "nome": "Anel de Telecinesia",
+   "aliases": []
+  },
+  "Ring of the Ram": {
+   "nome": "Anel do Carneiro",
+   "aliases": []
+  },
+  "Ring of Three Wishes": {
+   "nome": "Anel dos Três Desejos",
+   "aliases": []
+  },
+  "Ring of Warmth": {
+   "nome": "Anel do Calor",
+   "aliases": []
+  },
+  "Ring of Water Walking": {
+   "nome": "Anel de Andar sobre as Águas",
+   "aliases": []
+  },
+  "Ring of X-ray Vision": {
+   "nome": "Anel de Visão de Raio X",
+   "aliases": []
+  },
+  "Robe of Eyes": {
+   "nome": "Túnica dos Olhos",
+   "aliases": []
+  },
+  "Robe of Scintillating Colors": {
+   "nome": "Túnica das Cores Cintilantes",
+   "aliases": []
+  },
+  "Robe of Stars": {
+   "nome": "Túnica das Estrelas",
+   "aliases": []
+  },
+  "Robe of the Archmagi": {
+   "nome": "Túnica do Arquimago",
+   "aliases": [
+    "robe do arquimago",
+    "manto do arquimago"
+   ]
+  },
+  "Robe of Useful Items": {
+   "nome": "Túnica dos Itens Úteis",
+   "aliases": [
+    "robe dos itens úteis"
+   ]
+  },
+  "Rod of Absorption": {
+   "nome": "Cetro da Absorção",
+   "aliases": []
+  },
+  "Rod of Alertness": {
+   "nome": "Cetro do Alerta",
+   "aliases": []
+  },
+  "Rod of Lordly Might": {
+   "nome": "Cetro do Poder Senhorial",
+   "aliases": [],
+   "base_arma": "mace",
+   "bonus": 3
+  },
+  "Rod of Rulership": {
+   "nome": "Cetro do Domínio",
+   "aliases": []
+  },
+  "Rod of Security": {
+   "nome": "Cetro da Segurança",
+   "aliases": []
+  },
+  "Rope of Climbing": {
+   "nome": "Corda de Escalada",
+   "aliases": []
+  },
+  "Rope of Entanglement": {
+   "nome": "Corda de Enredar",
+   "aliases": []
+  },
+  "Scarab of Protection": {
+   "nome": "Escaravelho de Proteção",
+   "aliases": []
+  },
+  "Scimitar of Speed": {
+   "nome": "Cimitarra da Velocidade",
+   "aliases": [],
+   "base_arma": "scimitar",
+   "bonus": 2
+  },
+  "Shield of Missile Attraction": {
+   "nome": "Escudo de Atração de Projéteis",
+   "aliases": [],
+   "base_armadura": "shield"
+  },
+  "Slippers of Spider Climbing": {
+   "nome": "Sapatilhas de Escalada da Aranha",
+   "aliases": []
+  },
+  "Sovereign Glue": {
+   "nome": "Cola Soberana",
+   "aliases": []
+  },
+  "Spell Scroll": {
+   "nome": "Pergaminho de Magia",
+   "aliases": []
+  },
+  "Spellguard Shield": {
+   "nome": "Escudo Guardião de Magia",
+   "aliases": [],
+   "base_armadura": "shield"
+  },
+  "Sphere of Annihilation": {
+   "nome": "Esfera da Aniquilação",
+   "aliases": [
+    "esfera de anulação",
+    "esfera da anulacao"
+   ]
+  },
+  "Staff of Charming": {
+   "nome": "Cajado do Encanto",
+   "aliases": []
+  },
+  "Staff of Fire": {
+   "nome": "Cajado do Fogo",
+   "aliases": []
+  },
+  "Staff of Frost": {
+   "nome": "Cajado do Gelo",
+   "aliases": []
+  },
+  "Staff of Healing": {
+   "nome": "Cajado da Cura",
+   "aliases": []
+  },
+  "Staff of Power": {
+   "nome": "Cajado do Poder",
+   "aliases": [],
+   "base_arma": "quarterstaff",
+   "bonus": 2
+  },
+  "Staff of Striking": {
+   "nome": "Cajado do Golpe",
+   "aliases": [],
+   "base_arma": "quarterstaff",
+   "bonus": 3
+  },
+  "Staff of Swarming Insects": {
+   "nome": "Cajado dos Insetos",
+   "aliases": []
+  },
+  "Staff of the Magi": {
+   "nome": "Cajado do Mago",
+   "aliases": [
+    "cajado dos magos"
+   ],
+   "base_arma": "quarterstaff",
+   "bonus": 2
+  },
+  "Staff of the Python": {
+   "nome": "Cajado da Píton",
+   "aliases": []
+  },
+  "Staff of the Woodlands": {
+   "nome": "Cajado da Floresta",
+   "aliases": [],
+   "base_arma": "quarterstaff",
+   "bonus": 2
+  },
+  "Staff of Thunder and Lightning": {
+   "nome": "Cajado do Trovão e Relâmpago",
+   "aliases": [],
+   "base_arma": "quarterstaff",
+   "bonus": 2
+  },
+  "Staff of Withering": {
+   "nome": "Cajado do Definhamento",
+   "aliases": [],
+   "base_arma": "quarterstaff"
+  },
+  "Stone of Controlling Earth Elementals": {
+   "nome": "Pedra de Controlar Elementais da Terra",
+   "aliases": []
+  },
+  "Stone of Good Luck": {
+   "nome": "Pedra da Sorte",
+   "aliases": []
+  },
+  "Sun Blade": {
+   "nome": "Lâmina Solar",
+   "aliases": [
+    "lâmina do sol"
+   ],
+   "base_arma": "longsword",
+   "bonus": 2
+  },
+  "Sword of Life Stealing": {
+   "nome": "Espada Roubadora de Vida",
+   "aliases": [],
+   "base_arma": "longsword"
+  },
+  "Sword of Sharpness": {
+   "nome": "Espada Afiada",
+   "aliases": [],
+   "base_arma": "longsword"
+  },
+  "Sword of Wounding": {
+   "nome": "Espada do Ferimento",
+   "aliases": [],
+   "base_arma": "longsword"
+  },
+  "Talisman of Pure Good": {
+   "nome": "Talismã do Bem Puro",
+   "aliases": []
+  },
+  "Talisman of the Sphere": {
+   "nome": "Talismã da Esfera",
+   "aliases": []
+  },
+  "Talisman of Ultimate Evil": {
+   "nome": "Talismã do Mal Supremo",
+   "aliases": []
+  },
+  "Tome of Clear Thought": {
+   "nome": "Tomo do Pensamento Claro",
+   "aliases": []
+  },
+  "Tome of Leadership and Influence": {
+   "nome": "Tomo da Liderança e Influência",
+   "aliases": []
+  },
+  "Tome of Understanding": {
+   "nome": "Tomo da Compreensão",
+   "aliases": []
+  },
+  "Trident of Fish Command": {
+   "nome": "Tridente de Comando de Peixes",
+   "aliases": [],
+   "base_arma": "trident"
+  },
+  "Universal Solvent": {
+   "nome": "Solvente Universal",
+   "aliases": []
+  },
+  "Vicious Weapon": {
+   "nome": "Arma Cruel",
+   "aliases": [
+    "arma viciosa"
+   ],
+   "qualquer_arma": true
+  },
+  "Vorpal Sword": {
+   "nome": "Espada Vorpal",
+   "aliases": [],
+   "base_arma": "longsword",
+   "bonus": 3
+  },
+  "Wand of Binding": {
+   "nome": "Varinha da Prisão",
+   "aliases": [
+    "varinha de amarração"
+   ]
+  },
+  "Wand of Enemy Detection": {
+   "nome": "Varinha de Detecção de Inimigos",
+   "aliases": []
+  },
+  "Wand of Fear": {
+   "nome": "Varinha do Medo",
+   "aliases": []
+  },
+  "Wand of Fireballs": {
+   "nome": "Varinha de Bolas de Fogo",
+   "aliases": []
+  },
+  "Wand of Lightning Bolts": {
+   "nome": "Varinha de Relâmpagos",
+   "aliases": []
+  },
+  "Wand of Magic Detection": {
+   "nome": "Varinha de Detecção de Magia",
+   "aliases": []
+  },
+  "Wand of Magic Missiles": {
+   "nome": "Varinha de Mísseis Mágicos",
+   "aliases": []
+  },
+  "Wand of Paralysis": {
+   "nome": "Varinha de Paralisia",
+   "aliases": []
+  },
+  "Wand of Polymorph": {
+   "nome": "Varinha de Metamorfose",
+   "aliases": [
+    "varinha de polimorfia"
+   ]
+  },
+  "Wand of Secrets": {
+   "nome": "Varinha dos Segredos",
+   "aliases": []
+  },
+  "Wand of the War Mage": {
+   "nome": "Varinha do Mago de Guerra",
+   "aliases": []
+  },
+  "Wand of Web": {
+   "nome": "Varinha de Teia",
+   "aliases": []
+  },
+  "Wand of Wonder": {
+   "nome": "Varinha das Maravilhas",
+   "aliases": [
+    "varinha de prodígios"
+   ]
+  },
+  "Well of Many Worlds": {
+   "nome": "Poço dos Muitos Mundos",
+   "aliases": []
+  },
+  "Wind Fan": {
+   "nome": "Leque do Vento",
+   "aliases": []
+  },
+  "Winged Boots": {
+   "nome": "Botas Aladas",
+   "aliases": []
+  },
+  "Wings of Flying": {
+   "nome": "Asas de Voo",
+   "aliases": []
+  }
+ },
+ "sinteticos": {
+  "weapon-plus": {
+   "nome": "Arma +N",
+   "nome_srd": "Weapon, +1, +2, or +3",
+   "tipo": "arma",
+   "raridade_por_bonus": {
+    "1": "incomum",
+    "2": "raro",
+    "3": "muito raro"
+   },
+   "texto_srd": "You have a bonus to attack and damage rolls made with this magic weapon. The bonus is determined by the weapon's rarity."
+  },
+  "armor-plus": {
+   "nome": "Armadura +N",
+   "nome_srd": "Armor, +1, +2, or +3",
+   "tipo": "armadura",
+   "raridade_por_bonus": {
+    "1": "raro",
+    "2": "muito raro",
+    "3": "lendário"
+   },
+   "texto_srd": "You have a bonus to AC while wearing this armor. The bonus is determined by its rarity."
+  },
+  "shield-plus": {
+   "nome": "Escudo +N",
+   "nome_srd": "Shield, +1, +2, or +3",
+   "tipo": "escudo",
+   "raridade_por_bonus": {
+    "1": "incomum",
+    "2": "raro",
+    "3": "muito raro"
+   },
+   "texto_srd": "While holding this shield, you have a bonus to AC determined by the shield's rarity. This bonus is in addition to the shield's normal bonus to AC."
+  },
+  "ammunition-plus": {
+   "nome": "Munição +N",
+   "nome_srd": "Ammunition, +1, +2, or +3",
+   "tipo": "munição",
+   "raridade_por_bonus": {
+    "1": "incomum",
+    "2": "raro",
+    "3": "muito raro"
+   },
+   "texto_srd": "You have a bonus to attack and damage rolls made with this piece of magic ammunition. The bonus is determined by the rarity of the ammunition. Once it hits a target, the ammunition is no longer magical."
+  }
+ }
+}

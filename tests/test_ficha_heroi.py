@@ -76,8 +76,12 @@ def test_bonus_da_pericia_e_o_do_make_skill_check(grupo, monkeypatch):
 def test_ataque_com_as_contas_do_attack_roll(grupo):
     ataque = _p("Alden")["ataques"][0]
     assert ataque["arma"] == "espada longa"
-    assert (ataque["atributo"], ataque["acerto"], ataque["dano"]) == ("FOR", "+6", "1d8+3")
+    # Sem escudo, a espada longa (versátil) vai nas duas mãos: 1d10.
+    assert (ataque["atributo"], ataque["acerto"], ataque["dano"]) == ("FOR", "+6", "1d10+3")
     assert ataque["tipo"] == "cortante" and ataque["alcance"] == "corpo a corpo"
+    # Com escudo, uma mão só: 1d8, como no attack_roll.
+    memory.campaign["characters"]["alden"]["sheet"].setdefault("equipamentos", {})["escudo"] = "Escudo"
+    assert _p("Alden")["ataques"][0]["dano"] == "1d8+3"
 
 
 def test_arquearia_e_critico_aprimorado_aparecem(grupo):

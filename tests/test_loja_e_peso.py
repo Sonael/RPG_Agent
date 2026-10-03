@@ -3,14 +3,15 @@ test_loja_e_peso.py
 
 Três defeitos que só apareceram quando simulei um grupo entrando numa forja.
 
-1. O SRD é EM INGLÊS. `_preco_do_srd` e `_peso_do_srd` consultavam a Open5e
-   com o nome em português, então "Espada Longa" devolvia zero resultados e
+1. O SRD é EM INGLÊS. O preço e o peso eram consultados no Open5e com o nome
+   em português, então "Espada Longa" devolvia zero resultados e
    `open_shop` recusava o estoque inteiro:
 
        Nenhum item com preço. O SRD não conhece: Espada Longa,
           Machado de Batalha, Cota de Malha, Escudo, Adaga.
 
-   `WEAPON_PT_TO_EN` já existia no arquivo e nenhuma das duas funções usava.
+   Hoje o nome em português é procurado no compêndio local (rpg/itens.py),
+   sem rede, e o preço é em peças de cobre.
 
 2. Armadura não pesava. `_peso_do_srd` era código MORTO — definido, nunca
    chamado — e a rota /armor/ do Open5e devolve 'weight' vazio nas 13
@@ -49,12 +50,13 @@ from conftest import criar_ficha
     ("Armadura de Placas", "plate"),
 ])
 def test_traduz_para_o_srd(pt, en):
-    assert td._traduzir_para_srd(pt) == en
+    assert td._itens.nome_em_ingles(pt) == en
 
 
 def test_quem_ja_escreveu_em_ingles_continua_funcionando():
-    assert td._traduzir_para_srd("longsword") == "longsword"
-    assert td._traduzir_para_srd("Poção de Cura") == "Poção de Cura"
+    assert td._itens.nome_em_ingles("longsword") == "longsword"
+    assert td._itens.nome_em_ingles("Chain Mail") == "chain mail"
+    assert td._itens.nome_em_ingles("Bugiganga do Vhar") == ""
 
 
 def test_toda_armadura_da_tabela_aponta_para_um_srd_existente():
@@ -67,31 +69,40 @@ def test_toda_armadura_da_tabela_aponta_para_um_srd_existente():
 
 
 # ---------------------------------------------------------------------------
-# 2. Preço de armadura sai da tabela local, sem rede
+# 2. Preço sai do compêndio local, sem rede, em peças de cobre
 # ---------------------------------------------------------------------------
 # A suíte roda offline (conftest). Se estes passarem, o preço não veio da API.
 
-@pytest.mark.parametrize("nome,po", [
-    ("Escudo",                   10),
-    ("Cota de Malha",            75),
-    ("Meia Armadura",           750),
-    ("Armadura de Placas",     1500),
-    ("Armadura de Couro Batido", 45),
-    ("Corselete",                50),
-    ("Espada Longa",             15),
-    ("Espada Grande",            50),
-    ("Machado de Batalha",       10),
-    ("Adaga",                     2),
-    ("Rapieira",                 25),
-    ("Besta Pesada",             50),
-    ("Clava",                     1),   # 1 pp no SRD: arredonda para 1 po
+@pytest.mark.parametrize("nome,pc", [
+    ("Escudo",                  1000),
+    ("Cota de Malha",           7500),
+    ("Meia Armadura",          75000),
+    ("Armadura de Placas",    150000),
+    ("Armadura de Couro Batido", 4500),
+    ("Corselete",               5000),
+    ("Espada Longa",            1500),
+    ("Espada Grande",           5000),
+    ("Machado de Batalha",      1000),
+    ("Adaga",                    200),
+    ("Rapieira",                2500),
+    ("Besta Pesada",            5000),
+    # Abaixo de 1 po o preço é o do SRD, não 1 po arredondado.
+    ("Clava",                     10),    # 1 pp
+    ("Tocha",                      1),    # 1 pc
+    ("Ração",                     50),    # 5 pp
+    ("Corda de Cânhamo",         100),
+    # Equipamento de aventura não tinha preço nenhum.
+    ("Kit de Curandeiro",        500),
+    ("Poção de Cura",           5000),    # 50 po, do Livro do Jogador
 ])
-def test_preco_offline_sem_rede(nome, po):
-    assert td._preco_do_srd(nome) == po
+def test_preco_offline_sem_rede(nome, pc):
+    assert td._preco_pc_do_srd(nome) == pc
 
 
 def test_item_desconhecido_nao_inventa_preco():
-    assert td._preco_do_srd("Lâmina Rúnica de Vhar") is None
+    assert td._preco_pc_do_srd("Lâmina Rúnica de Vhar") is None
+    # Arma mágica não custa o preço da arma comum.
+    assert td._preco_pc_do_srd("Espada Longa +1") is None
 
 
 def test_a_loja_abre_sem_o_mestre_informar_um_preco(campanha):
@@ -134,9 +145,13 @@ def test_o_que_o_mestre_gravou_no_item_manda():
     assert td._peso_do_item({"nome": "Cota de Malha", "peso": 2}) == 2.0
 
 
-def test_item_comum_ainda_usa_a_aproximacao():
-    assert td._peso_do_item({"nome": "Corda de Cânhamo"}) == 4.5
-    assert td._peso_do_item({"nome": "Poção de Cura"}) == 0.25
+def test_equipamento_de_aventura_pesa_o_do_srd():
+    assert td._peso_do_item({"nome": "Corda de Cânhamo"}) == pytest.approx(4.54, abs=0.01)
+    assert td._peso_do_item({"nome": "Poção de Cura"}) == pytest.approx(0.23, abs=0.01)
+
+
+def test_fora_do_srd_ainda_usa_a_aproximacao():
+    assert td._peso_do_item({"nome": "Poção Estranha do Vhar"}) == 0.25
 
 
 def test_desconhecido_cai_no_ultimo_recurso():
@@ -196,7 +211,7 @@ def test_reabrir_atualiza_preco_do_item_que_ja_existe(campanha):
 
     estoque = td._lojas()["bazar"]["estoque"]
     assert len(estoque) == 1
-    assert estoque[0]["preco"] == 25
+    assert estoque[0]["preco_pc"] == 2500
 
 
 def test_o_que_o_grupo_comprou_continua_comprado(campanha, povoar):

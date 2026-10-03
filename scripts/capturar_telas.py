@@ -441,17 +441,17 @@ LOJA = {
             "nome": "Forja do Torbin",
             "local": "Oakhaven",
             "estoque": [
-                {"nome": "Espada Longa",       "preco": 15,  "qtd": 99,
+                {"nome": "Espada Longa",       "preco_pc": 1500,  "qtd": 99,
                  "descricao": ""},
-                {"nome": "Machado de Batalha", "preco": 10,  "qtd": 3,
+                {"nome": "Machado de Batalha", "preco_pc": 1000,  "qtd": 3,
                  "descricao": ""},
-                {"nome": "Escudo",             "preco": 10,  "qtd": 2,
+                {"nome": "Escudo",             "preco_pc": 1000,  "qtd": 2,
                  "descricao": ""},
-                {"nome": "Cota de Malha",      "preco": 75,  "qtd": 1,
+                {"nome": "Cota de Malha",      "preco_pc": 7500,  "qtd": 1,
                  "descricao": ""},
-                {"nome": "Meia Armadura",      "preco": 750, "qtd": 1,
+                {"nome": "Meia Armadura",      "preco_pc": 75000, "qtd": 1,
                  "descricao": ""},
-                {"nome": "Martelo do Velho Torbin", "preco": 40, "qtd": 1,
+                {"nome": "Martelo do Velho Torbin", "preco_pc": 4000, "qtd": 1,
                  "descricao": "o martelo do pai dele; não faz nada, é lembrança"},
             ],
         },
@@ -510,9 +510,9 @@ LOJA_DUAS = copy.deepcopy(LOJA)
 LOJA_DUAS["lojas"]["boticario da mira"] = {
     "nome": "Boticário da Mira", "local": "Oakhaven",
     "estoque": [
-        {"nome": "Poção de Cura", "preco": 50, "qtd": 3,
+        {"nome": "Poção de Cura", "preco_pc": 5000, "qtd": 3,
          "descricao": "recupera 2d4+2 pontos de vida"},
-        {"nome": "Antídoto", "preco": 50, "qtd": 2,
+        {"nome": "Antídoto", "preco_pc": 5000, "qtd": 2,
          "descricao": "vantagem contra veneno por 1 hora"},
     ],
 }
@@ -624,9 +624,9 @@ CIDADE = {
     },
     "lojas": {
         "forja de cliviate": {"nome": "Forja de Cliviate", "local": "Cliviate",
-                              "estoque": [{"nome": "Espada Longa", "preco": 15, "qtd": 99, "descricao": ""}]},
+                              "estoque": [{"nome": "Espada Longa", "preco_pc": 1500, "qtd": 99, "descricao": ""}]},
         "boticario da mira": {"nome": "Boticário da Mira", "local": "Cliviate",
-                              "estoque": [{"nome": "Poção de Cura", "preco": 50, "qtd": 3, "descricao": ""}]},
+                              "estoque": [{"nome": "Poção de Cura", "preco_pc": 5000, "qtd": 3, "descricao": ""}]},
     },
     "characters": {
         # Brom tem ficha cheia: atitude com o porquê, o que o grupo sabe, a

@@ -728,77 +728,15 @@ SPELL_LEVEL_OVERRIDE: dict[str, int] = {
     "true resurrection": 9, "wish": 9, "power word kill": 9, "foresight": 9,
 }
 
-# ── Tradução PT→EN para busca de armas no Open5e ────────────────────────────
-WEAPON_PT_TO_EN: dict[str, str] = {
-    "espada longa":        "longsword",
-    "espada curta":        "shortsword",
-    "espada grande":       "greatsword",
-    "machado":             "handaxe",
-    "machado de mão":      "handaxe",
-    "machado grande":      "greataxe",
-    "machado de batalha":  "battleaxe",
-    "adaga":               "dagger",
-    "arco curto":          "shortbow",
-    "arco longo":          "longbow",
-    "besta leve":          "light crossbow",
-    "besta de mão":        "hand crossbow",
-    "besta pesada":        "heavy crossbow",
-    "lança":               "spear",
-    "alabarda":            "halberd",
-    "maça":                "mace",
-    "martelo de guerra":   "warhammer",
-    "martelo de mão":      "light hammer",
-    "cajado":              "quarterstaff",
-    "bastão":              "quarterstaff",
-    "bastão druídico":     "quarterstaff",
-    "funda":               "sling",
-    "javelin":             "javelin",
-    "lança curta":         "javelin",
-    "tridente":            "trident",
-    "cimitarra":           "scimitar",
-    "foice":               "sickle",
-    "chicote":             "whip",
-    "rapieira":            "rapier",
-    "florete":             "rapier",
-    "clava":               "club",
-    "porrete":             "club",
-    "bordão":              "quarterstaff",
-    "dardos":              "dart",
-    "faca":                "dagger",
-}
+# ── Armas, armaduras e itens: o compêndio local (rpg/itens.py) ───────────
+# Dano, propriedades, CA, preço e peso vêm de rpg/dados/srd_itens.json, gerado
+# do SRD e revisado à mão (scripts/gerar_itens.py). As tabelas que moravam
+# aqui (WEAPON_PT_TO_EN, _ARMAS_SRD) tinham o preço das armas sem o dano e
+# cobriam 30 das 37; o dano vinha do Open5e em tempo de jogo, pelo nome. Sem
+# rede, toda arma causava 1d6; com rede, "Espada Longa +1" também (o "+1"
+# quebrava a busca), e a arma mágica batia menos que a comum.
+from rpg import itens as _itens
 
-# Custo (po) e peso (lb) do SRD 5e por arma, em inglês — a chave é o que
-# WEAPON_PT_TO_EN devolve. Localmente e não pela API porque a loja não pode
-# depender de a Open5e estar de pé: um HTTP 0 lá fora fazia open_shop recusar
-# o estoque inteiro. Os valores conferem com a rota /weapons/.
-#
-# Abaixo de 1 po (clava, funda, dardo) o motor cobra 1 po: a bolsa da loja
-# trabalha em ouro inteiro, e arredondar para zero daria item de graça.
-_ARMAS_SRD: dict[str, tuple[float, float]] = {
-    # Corpo a corpo simples
-    "club": (0.1, 2), "dagger": (2, 1), "greatclub": (0.2, 10),
-    "handaxe": (5, 2), "javelin": (0.5, 2), "light hammer": (2, 2),
-    "mace": (5, 4), "quarterstaff": (0.2, 4), "sickle": (1, 2),
-    "spear": (1, 3),
-    # À distância simples
-    "light crossbow": (25, 5), "dart": (0.05, 0.25), "shortbow": (25, 2),
-    "sling": (0.1, 0),
-    # Corpo a corpo marcial
-    "battleaxe": (10, 4), "flail": (10, 2), "glaive": (20, 6),
-    "greataxe": (30, 7), "greatsword": (50, 6), "halberd": (20, 6),
-    "lance": (10, 6), "longsword": (15, 3), "maul": (10, 10),
-    "morningstar": (15, 4), "pike": (5, 18), "rapier": (25, 2),
-    "scimitar": (25, 3), "shortsword": (10, 2), "trident": (5, 4),
-    "war pick": (5, 2), "warhammer": (15, 2), "whip": (2, 3),
-    # À distância marcial
-    "blowgun": (10, 1), "hand crossbow": (75, 3), "heavy crossbow": (50, 18),
-    "longbow": (50, 2), "net": (1, 3),
-}
-
-
-def _arma_conhecida(nome: str) -> tuple[float, float] | None:
-    """(custo em po, peso em lb) quando o nome é uma arma do SRD."""
-    return _ARMAS_SRD.get(_traduzir_para_srd(nome).lower())
 
 # ── Tradução PT→EN para busca de raças no Open5e ─────────────────────────────
 RACE_PT_TO_EN: dict[str, str] = {
@@ -1418,12 +1356,34 @@ TWO_HANDED_WEAPONS = {
     "espada grande", "espada de duas mãos", "greatsword",
     "machado grande", "greataxe",
     "maul", "marreta", "alabarda", "halberd",
-    "lança", "pike", "pica",
+    "pike", "pica",
     "glaive", "lança serrilhada",
     "arco longo", "longbow", "besta pesada", "heavy crossbow",
-    "cajado quarterstaff",  # quando empunhado a duas mãos
     "maça grande", "maul de guerra",
 }
+
+
+def _arma_de_duas_maos(nome: str) -> bool:
+    """
+    A arma pede as duas mãos? O compêndio decide; a lista acima só vale para
+    nome fora do SRD. Antes era a lista, por pedaço do nome: "lança" estava
+    nela, e a Lança e a Lança Curta (azagaia) perdiam o Duelo e ganhavam a
+    Grande Arma — no SRD a lança é versátil e a azagaia, de uma mão.
+    """
+    a = _itens.arma(nome)
+    if a:
+        return "duas_maos" in a["propriedades"]
+    n = _norm_txt(nome or "")
+    return bool(n) and any(_norm_txt(w) in n for w in TWO_HANDED_WEAPONS)
+
+
+def _arma_de_tiro(nome: str) -> bool:
+    """Arco, besta, funda, zarabatana, dardo, rede: o compêndio, e a lista para o resto."""
+    a = _itens.arma(nome)
+    if a:
+        return a["distancia"]
+    n = (nome or "").lower()
+    return bool(n) and any(r in n for r in RANGED_WEAPONS)
 
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -2250,6 +2210,9 @@ def _arma_da_outra_mao(ch: dict, ja_usada: str) -> str:
 
 
 def _arma_leve(nome: str) -> bool:
+    a = _itens.arma(nome)
+    if a:
+        return "leve" in a["propriedades"] and not a["distancia"]
     n = _norm_txt(nome or "")
     return any(_norm_txt(w) in n for w in LIGHT_WEAPONS) and not any(r in n for r in RANGED_WEAPONS)
 
@@ -2333,8 +2296,13 @@ def _get_control_effect(hab: dict) -> dict | None:
 def _weapon_attr(weapon_name: str, sheet: dict) -> tuple[str, int]:
     """Ranged→DEX. Finesse→max(FOR,DEX). Melee→FOR."""
     w = weapon_name.lower().strip()
-    is_ranged  = any(r in w for r in RANGED_WEAPONS)
-    is_finesse = any(f in w for f in FINESSE_WEAPONS)
+    a = _itens.arma(weapon_name)
+    if a:
+        is_ranged  = a["distancia"]
+        is_finesse = "acuidade" in a["propriedades"]
+    else:
+        is_ranged  = any(r in w for r in RANGED_WEAPONS)
+        is_finesse = any(f in w for f in FINESSE_WEAPONS)
     str_mod = _modifier(sheet.get("forca", 10))
     dex_mod = _modifier(sheet.get("destreza", 10))
     if is_ranged:
@@ -3133,163 +3101,52 @@ def dado_efetivo(hab: dict, char: dict | None = None) -> str:
     return dado_de_cura_no_texto(texto) if _is_healing_ability(hab) else dado_de_dano_no_texto(texto)
 
 # ---------------------------------------------------------------------------
-# Tabela de armaduras — usada por equip_item para recalcular CA
-# dex_bonus: "full" = add all DEX mod | "cap2" = max +2 | "none" = ignore DEX
+# Armaduras — a CA sai do compêndio (rpg/itens.py)
+# dex_bonus: "full" = DEX inteira | "cap2" = no máximo +2 | "none" = sem DEX
 # ---------------------------------------------------------------------------
 
-# Nome em pt-BR → estatística. Cada armadura do SRD aparece uma vez com o nome
-# oficial e depois com os apelidos que o mestre digita; todos apontam para a
-# mesma entrada de _ARMADURAS_SRD pelo campo 'srd'.
+# Nome em português → estatística, DERIVADO do compêndio (só leitura). Cada
+# armadura aparece com o nome oficial e com os apelidos que o mestre digita; o
+# assistente de criação usa os mesmos nomes (test_loja_e_peso confere). Para
+# corrigir, edite scripts/srd_itens_pt.json e gere de novo.
 #
-# Três nomes estavam com a estatística de OUTRA armadura — em pt-BR "Cota de
-# Malha" é chain mail (CA 16, pesada), e a tabela dava a ela CA 14 média, que
-# é brunea. Quem tinha as estatísticas certas era "armadura de cota de malha",
-# um nome que ninguém digita. Os apelidos antigos continuam todos aqui: nenhum
-# personagem salvo perde a armadura, só passa a receber a estatística certa.
+# Antes esta era uma tabela à mão, e três nomes tinham a estatística de OUTRA
+# armadura ("Cota de Malha" com CA 14 de brunea). Os apelidos antigos estão
+# todos no compêndio: nenhum personagem salvo perde a armadura.
 ARMOR_TABLE: dict[str, dict] = {
-    # ── Armadura leve — soma o modificador de DES inteiro
-    "armadura acolchoada":       {"ca_base": 11, "dex_bonus": "full",   "slot": "armadura", "srd": "padded"},
-    "acolchoada":                {"ca_base": 11, "dex_bonus": "full",   "slot": "armadura", "srd": "padded"},
-    "armadura de couro":         {"ca_base": 11, "dex_bonus": "full",   "slot": "armadura", "srd": "leather"},
-    "roupa de couro":            {"ca_base": 11, "dex_bonus": "full",   "slot": "armadura", "srd": "leather"},
-    "armadura de couro batido":  {"ca_base": 12, "dex_bonus": "full",   "slot": "armadura", "srd": "studded leather"},
-    "couro batido":              {"ca_base": 12, "dex_bonus": "full",   "slot": "armadura", "srd": "studded leather"},
-    "armadura de couro tachado": {"ca_base": 12, "dex_bonus": "full",   "slot": "armadura", "srd": "studded leather"},
-    # ── Armadura média — DES no máximo +2
-    "armadura de peles":         {"ca_base": 12, "dex_bonus": "cap2",   "slot": "armadura", "srd": "hide"},
-    "gibão de peles":            {"ca_base": 12, "dex_bonus": "cap2",   "slot": "armadura", "srd": "hide"},
-    "camisão de malha":          {"ca_base": 13, "dex_bonus": "cap2",   "slot": "armadura", "srd": "chain shirt"},
-    "camisa de malha":           {"ca_base": 13, "dex_bonus": "cap2",   "slot": "armadura", "srd": "chain shirt"},
-    "corselete":                 {"ca_base": 13, "dex_bonus": "cap2",   "slot": "armadura", "srd": "chain shirt"},
-    "armadura de osso":          {"ca_base": 13, "dex_bonus": "cap2",   "slot": "armadura", "srd": "chain shirt"},
-    "brunea":                    {"ca_base": 14, "dex_bonus": "cap2",   "slot": "armadura", "srd": "scale mail"},
-    "armadura de escamas":       {"ca_base": 14, "dex_bonus": "cap2",   "slot": "armadura", "srd": "scale mail"},
-    "peitoral":                  {"ca_base": 14, "dex_bonus": "cap2",   "slot": "armadura", "srd": "breastplate"},
-    "meia armadura":             {"ca_base": 15, "dex_bonus": "cap2",   "slot": "armadura", "srd": "half plate"},
-    "meia-armadura":             {"ca_base": 15, "dex_bonus": "cap2",   "slot": "armadura", "srd": "half plate"},
-    # ── Armadura pesada — ignora DES
-    "cota de anéis":             {"ca_base": 14, "dex_bonus": "none",   "slot": "armadura", "srd": "ring mail"},
-    "armadura de aros":          {"ca_base": 14, "dex_bonus": "none",   "slot": "armadura", "srd": "ring mail"},
-    "cota de malha":             {"ca_base": 16, "dex_bonus": "none",   "slot": "armadura", "srd": "chain mail"},
-    "armadura de cota de malha": {"ca_base": 16, "dex_bonus": "none",   "slot": "armadura", "srd": "chain mail"},
-    "armadura de talas":         {"ca_base": 17, "dex_bonus": "none",   "slot": "armadura", "srd": "splint"},
-    "talas":                     {"ca_base": 17, "dex_bonus": "none",   "slot": "armadura", "srd": "splint"},
-    "armadura de placas":        {"ca_base": 18, "dex_bonus": "none",   "slot": "armadura", "srd": "plate"},
-    "armadura completa":         {"ca_base": 18, "dex_bonus": "none",   "slot": "armadura", "srd": "plate"},
-    "cota de placas":            {"ca_base": 18, "dex_bonus": "none",   "slot": "armadura", "srd": "plate"},
-    # ── Escudo (bônus +2 fixo — empilha com armadura)
-    "escudo":                    {"ca_base": 2,  "dex_bonus": "shield", "slot": "escudo",   "srd": "shield"},
-    "escudo de madeira":         {"ca_base": 2,  "dex_bonus": "shield", "slot": "escudo",   "srd": "shield"},
-    "escudo de metal":           {"ca_base": 2,  "dex_bonus": "shield", "slot": "escudo",   "srd": "shield"},
-    "escudo reforçado":          {"ca_base": 2,  "dex_bonus": "shield", "slot": "escudo",   "srd": "shield"},
-    "escudo sagrado":            {"ca_base": 2,  "dex_bonus": "shield", "slot": "escudo",   "srd": "shield"},
+    nome.lower(): {"ca_base": e["armadura"]["ca_base"], "dex_bonus": e["armadura"]["dex"],
+                   "slot": "escudo" if e["categoria"] == "escudo" else "armadura",
+                   "srd": e["nome_srd"].lower()}
+    for e in _itens.comuns().values() if e["categoria"] in ("armadura", "escudo")
+    for nome in (e["nome"], *e.get("aliases", []))
+}
+
+# Custo (po) e peso (lb) por armadura do SRD, pelo nome em inglês.
+_ARMADURAS_SRD: dict[str, tuple[float, float]] = {
+    e["nome_srd"].lower(): (e["preco_pc"] / 100, round(e["peso_kg"] / 0.4536))
+    for e in _itens.comuns().values() if e["categoria"] in ("armadura", "escudo")
 }
 
 
 def _armadura_na_tabela(nome: str) -> dict | None:
     """
-    Entrada de ARMOR_TABLE para um nome, ignorando caixa e ACENTO.
+    A armadura ou o escudo com este nome, ignorando caixa e acento:
+    {ca_base, dex_bonus, slot, srd, bonus, forca_min, furtividade_desvantagem}.
 
-    Os três call sites faziam `ARMOR_TABLE.get(nome.lower())`, casamento
-    exato. Isso já era frágil e ficou pior com os nomes certos entrando na
-    tabela: quem escrevesse "Camisao de Malha" ou "Cota de Aneis" sem acento
-    não equipava armadura nenhuma e ficava com CA 10 + DES, em silêncio.
+    Aceita o nome em inglês ("Chain Mail"), o bônus mágico ("Cota de Malha
+    +1", "Escudo +2") e o item mágico feito de armadura ("Placas Anãs",
+    "Cota de Malha de Mithral"). Antes, armadura mágica não equipava, e o nome
+    em inglês ia ao Open5e, que devolvia o primeiro resultado da busca sem
+    conferir o nome: "Chain Mail" equipava com CA 10 + DES inteira.
     """
-    alvo = _norm_txt(nome)
-    if not alvo:
+    a = _itens.armadura(nome)
+    if not a:
         return None
-    for chave, dados in ARMOR_TABLE.items():
-        if _norm_txt(chave) == alvo:
-            return dados
-    return None
-
-# Custo (po) e peso (lb) do SRD 5e por armadura. A rota /armor/ do Open5e NÃO
-# traz o campo 'weight' — verificado nas 13 armaduras: peso vazio em todas —
-# então esta tabela é a única fonte de peso de armadura que existe.
-#
-# A chave 'srd' de ARMOR_TABLE acima aponta para cá pela CA que o motor
-# realmente concede, não pelo nome. Duas entradas têm nome fora do padrão
-# ("cota de malha" está com estatística de escamas, "cota de placas" com a de
-# cota de malha); casar pelo nome faria alguém pagar 75 po por CA 14. Casar
-# pela CA garante que preço e proteção andem juntos.
-_ARMADURAS_SRD: dict[str, tuple[int, float]] = {
-    "padded":          (5, 8),
-    "leather":         (10, 10),
-    "studded leather": (45, 13),
-    "hide":            (10, 12),
-    "chain shirt":     (50, 20),
-    "scale mail":      (50, 45),
-    "breastplate":     (400, 20),
-    "half plate":      (750, 40),
-    "ring mail":       (30, 40),
-    "chain mail":      (75, 55),
-    "splint":          (200, 60),
-    "plate":           (1500, 65),
-    "shield":          (10, 6),
-}
-
-
-def _armadura_conhecida(nome: str) -> tuple[int, float] | None:
-    """(custo em po, peso em lb) quando o nome é uma armadura de ARMOR_TABLE."""
-    dados = _armadura_na_tabela(nome)
-    return _ARMADURAS_SRD.get(dados.get("srd", "")) if dados else None
-
-
-def _traduzir_para_srd(nome: str) -> str:
-    """
-    Nome em inglês para consultar o Open5e. O SRD é EM INGLÊS: buscar
-    'Espada Longa' devolve zero resultados, e era por isso que loja e carga
-    nunca achavam preço nenhum.
-
-    Devolve o próprio nome quando não há tradução — quem já escreveu em inglês
-    continua funcionando.
-    """
-    alvo = _norm_txt(nome)
-    for pt, en in WEAPON_PT_TO_EN.items():
-        if _norm_txt(pt) == alvo:
-            return en
-    armadura = _armadura_na_tabela(nome)
-    if armadura:
-        return armadura.get("srd", nome)
-    return (nome or "").strip()
-
-
-def _fetch_armor_data(armor_name: str) -> dict | None:
-    """
-    Busca dados de armadura no Open5e como fallback quando o item não está em ARMOR_TABLE.
-    Retorna dict no mesmo formato de ARMOR_TABLE ou None se não encontrado.
-    """
-    from rpg.open5e import http as _req   # SRD com cache, sessão e retry
-    slug = armor_name.lower().strip().replace(" ", "-").replace("'", "")
-    for attempt in [
-        lambda: _req.get(f"https://api.open5e.com/v1/armor/{slug}/", timeout=4),
-        lambda: _req.get("https://api.open5e.com/v1/armor/", params={"search": armor_name, "limit": 5}, timeout=4),
-    ]:
-        try:
-            r = attempt()
-            if not r.ok:
-                continue
-            data = r.json()
-            # Endpoint de lista retorna {"results": [...]}
-            if "results" in data:
-                results = data["results"]
-                if not results:
-                    continue
-                data = results[0]
-            ac_data   = data.get("armor_class", {})
-            ca_base   = int(ac_data.get("base", 10) or 10)
-            dex_bonus = ac_data.get("dex_bonus", True)
-            max_bonus = ac_data.get("max_bonus", None)
-            if not dex_bonus:
-                dex_rule = "none"
-            elif max_bonus is not None and int(max_bonus or 0) == 2:
-                dex_rule = "cap2"
-            else:
-                dex_rule = "full"
-            return {"ca_base": ca_base, "dex_bonus": dex_rule, "slot": "armadura"}
-        except Exception:
-            continue
-    return None
+    return {"ca_base": a["ca_base"], "dex_bonus": a["dex"],
+            "slot": "escudo" if a["tipo"] == "escudo" else "armadura",
+            "srd": a["nome_srd"].lower(), "bonus": int(a["bonus"] or 0),
+            "forca_min": a["forca_min"],
+            "furtividade_desvantagem": a["furtividade_desvantagem"]}
 
 
 # ---------------------------------------------------------------------------
@@ -3631,7 +3488,8 @@ def _bypasses_material_resistance(weapon: str) -> bool:
     nome = _norm_txt(weapon)
     if not nome:
         return False
-    if _looks_magic(weapon):
+    a = _itens.arma(weapon)
+    if (a and a["magica"]) or _looks_magic(weapon):
         return True
     return any(_norm_txt(m) in nome for m in _MATERIAIS_ESPECIAIS)
 
@@ -4334,6 +4192,9 @@ def _weapon_is_ranged(weapon: str) -> bool:
     w = _norm_txt(weapon or "")
     if not w:
         return False
+    a = _itens.arma(weapon)
+    if a and a["distancia"]:
+        return True
     if any(_norm_txt(r) in w for r in RANGED_WEAPONS):
         return True
     return any(t in w for t in ("arco", "besta", "dardo", "funda", "azagaia",
@@ -5421,7 +5282,7 @@ def _recalculate_ca(char: dict) -> None:
     """
     Recalcula a CA do personagem com base nos equipamentos ativos.
     Hierarquia: armadura equipada > CA base (10 + DES).
-    Escudo sempre soma +2.
+    Escudo sempre soma +2. Armadura e escudo mágicos somam o próprio +N.
     """
     s    = char["sheet"]
     dex  = _modifier(s["destreza"])
@@ -5430,7 +5291,9 @@ def _recalculate_ca(char: dict) -> None:
     armor_name  = (equip.get("armadura") or "").lower()
     shield_name = (equip.get("escudo")   or "").lower()
 
-    armor_data  = _armadura_na_tabela(armor_name) or _fetch_armor_data(armor_name)
+    armor_data  = _armadura_na_tabela(armor_name)
+    if armor_data and armor_data["slot"] != "armadura":
+        armor_data = None
     shield_data = _armadura_na_tabela(shield_name)
 
     if armor_data:
@@ -5442,6 +5305,8 @@ def _recalculate_ca(char: dict) -> None:
             new_ca = ca_base + min(2, dex)
         else:  # "none"
             new_ca = ca_base
+        # Armadura mágica: o +1 da "Cota de Malha +1", o +2 das Placas Anãs.
+        new_ca += armor_data["bonus"]
     else:
         # Sem armadura: CA padrão 10 + DES. Duas habilidades põem outra conta
         # no lugar dela, e nenhuma se soma à outra: fica a maior.
@@ -5456,7 +5321,7 @@ def _recalculate_ca(char: dict) -> None:
         new_ca = max(contas)
 
     if shield_data and shield_data["dex_bonus"] == "shield":
-        new_ca += shield_data["ca_base"]
+        new_ca += shield_data["ca_base"] + shield_data["bonus"]
 
     # ── Estilo de Combate: Defesa → +1 CA enquanto usando QUALQUER armadura.
     if armor_data and _has_combat_style(char, "Defesa"):
@@ -5631,34 +5496,41 @@ def _apply_race_bonuses(char: dict, sheet: dict, race_name: str) -> dict[str, in
 
 def _fetch_weapon_data(weapon_name: str) -> tuple[int, int] | None:
     """
-    Busca o dado de dano real de uma arma no Open5e.
-    Retorna (n_dice, sides) ou None se não encontrar.
-    Ex: "espada longa" → (1, 8)  |  "arco longo" → (1, 8)
+    O dado de dano de uma arma do SRD: (n_dados, faces), ou None quando o nome
+    não é de arma do SRD (ou a arma não causa dano, como a Rede).
+    Ex: "Espada Longa" → (1, 8); "Espada Longa +1" → (1, 8); "Defensora" → (1, 8).
+
+    Vem do compêndio local (rpg/itens.py), sem rede.
     """
-    from rpg.open5e import http as _req   # SRD com cache, sessão e retry
-    en_name = WEAPON_PT_TO_EN.get(weapon_name.lower().strip(), weapon_name.lower().strip())
-    slug    = en_name.replace(" ", "-").replace("'", "")
-    try:
-        r = _req.get(f"https://api.open5e.com/v1/weapons/{slug}/", timeout=4)
-        if r.ok and r.json().get("damage_dice"):
-            n, s, _ = _parse_dice(r.json()["damage_dice"])
-            return n, s
-    except Exception:
-        pass
-    try:
-        r = _req.get("https://api.open5e.com/v1/weapons/",
-                     params={"search": en_name, "limit": 3}, timeout=4)
-        if r.ok:
-            results = r.json().get("results", [])
-            for res in results:
-                if en_name.lower() in res.get("name","").lower():
-                    dice = res.get("damage_dice", "")
-                    if dice:
-                        n, s, _ = _parse_dice(dice)
-                        return n, s
-    except Exception:
-        pass
-    return None
+    a = _itens.arma(weapon_name)
+    if not a or "d" not in (a.get("dado") or ""):
+        return (1, 1) if a and a.get("dado") == "1" else None
+    n, s, _ = _parse_dice(a["dado"])
+    return n, s
+
+
+def _versatil_a_duas_maos(char: dict, weapon: str, mao_inabil: bool = False) -> tuple[int, int] | None:
+    """
+    O dado da arma VERSÁTIL empunhada com as duas mãos (espada longa 1d10,
+    lança 1d8), ou None. Vale quando a outra mão está livre: sem escudo, sem
+    outra arma equipada. Com o Estilo Duelo o motor mantém uma mão só, porque
+    o +2 do Duelo rende mais que o dado maior.
+    """
+    if mao_inabil:
+        return None
+    a = _itens.arma(weapon)
+    if not a or "versatil" not in a["propriedades"] or a["distancia"] or not a.get("versatil"):
+        return None
+    eq = ((char or {}).get("sheet") or {}).get("equipamentos") or {}
+    if eq.get("escudo"):
+        return None
+    if any(v and _norm_txt(v) != _norm_txt(weapon)
+           for s, v in eq.items() if s in ("arma_principal", "arma_secundaria")):
+        return None
+    if _get_feature_choice(char, "Estilo de Combate") == "Duelo":
+        return None
+    n, s, _ = _parse_dice(a["versatil"])
+    return n, s
 
 
 # ── Magias iniciais padrão por classe (fallback offline) ─────────────────────
@@ -6863,6 +6735,11 @@ def _weapon_damage_type(weapon: str) -> str:
     nome = _norm_txt(weapon)
     if not nome:
         return ""
+    # O SRD primeiro: "Machadinha" e "Maça-Estrela" não estavam nas listas
+    # de palavras, e o golpe saía sem tipo — sem resistência nem vulnerabilidade.
+    a = _itens.arma(weapon)
+    if a and a.get("tipo_dano"):
+        return a["tipo_dano"]
     for tipo, palavras in _WEAPON_DAMAGE_TYPE:
         if any(p in nome for p in (_norm_txt(x) for x in palavras)):
             return tipo
@@ -6894,6 +6771,9 @@ def _bonus_magico_da_arma(char: dict, weapon: str) -> int:
     O +1/+2/+3 de uma arma mágica, do nome ("Espada Longa +1") ou da descrição
     gravada no inventário ("+2 em ataque e dano"). Zero quando não há.
     """
+    a = _itens.arma(weapon)
+    if a and a["bonus"]:
+        return int(a["bonus"])
     achado = _MAGICO_NO_NOME.search(weapon or "")
     if achado:
         return int(achado.group(1))
@@ -7296,6 +7176,7 @@ def attack_roll(
     #   3. arma do SRD, buscada por nome.
     # O passo 2 é o que impede "bite"/"claw" (que não existem em /weapons/)
     # de cair no fallback genérico de 1d6 e achatar o dano de todo monstro.
+    _nota_versatil = ""
     if not matched_hab or not matched_hab.get("dado"):
         npc_dice = _npc_attack_dice(sa, weapon)
         if npc_dice:
@@ -7304,6 +7185,10 @@ def attack_roll(
             weapon_data = _fetch_weapon_data(weapon)
             if weapon_data:
                 damage_dice_count, damage_dice_sides = weapon_data
+            _versatil = _versatil_a_duas_maos(attacker, weapon, _mao_inabil)
+            if _versatil:
+                damage_dice_count, damage_dice_sides = _versatil
+                _nota_versatil = f"{weapon} nas duas mãos ({_versatil[0]}d{_versatil[1]})"
 
     # Artes Marciais: o monge sem armadura usa DES quando é melhor e o dado
     # de artes marciais nos golpes desarmados e nas armas de monge.
@@ -7332,7 +7217,7 @@ def attack_roll(
     prof = sa.get("proficiencia", _proficiency_bonus(sa.get("nivel", 1))) if is_proficient else 0
 
     # ── Verificação automática de condições ─────────────────────────────────
-    cond_notes = []
+    cond_notes = [_nota_versatil] if _nota_versatil else []
 
     # Atacante tem condição que força desvantagem?
     if _has_condition_effect(attacker, "attack_disadvantage"):
@@ -7378,8 +7263,10 @@ def attack_roll(
     # ── Bônus por Estilo de Combate / Inimigo Favorecido ────────────────────
     # Calcula UMA vez e reusa para a linha de log e para o cálculo final.
     weapon_l   = (weapon or "").lower()
-    is_ranged  = any(r in weapon_l for r in RANGED_WEAPONS)
-    is_2h_wpn  = any(w in weapon_l for w in TWO_HANDED_WEAPONS)
+    is_ranged  = _arma_de_tiro(weapon)
+    # A versátil nas duas mãos conta como arma de duas mãos para a Grande Arma.
+    is_2h_wpn  = _arma_de_duas_maos(weapon) or bool(
+        not matched_hab and _versatil_a_duas_maos(attacker, weapon, _mao_inabil))
     has_off    = bool(sa.get("equipamentos", {}).get("arma_secundaria"))
     style      = _get_feature_choice(attacker, "Estilo de Combate")
     style_atk_bonus = 0   # +2 atk (Arquearia)
@@ -8874,7 +8761,7 @@ def _slots_para_item(nome: str) -> list[str]:
     if armadura:
         return [armadura["slot"]]
     base = _norm_txt(nome)
-    if _arma_conhecida(nome) or any(_norm_txt(k) in base for k in _WEAPON_KEYWORDS):
+    if _itens.arma(nome) or any(_norm_txt(k) in base for k in _WEAPON_KEYWORDS):
         return ["arma_principal", "arma_secundaria"]
     if any(k in base for k in _PALAVRAS_DE_AMULETO):
         return ["amuleto"]
@@ -8939,7 +8826,7 @@ def equip_item(char_name: str, item_name: str, slot: str = "") -> str:
     # Armadura e escudo mexem na CA: só entra o que o motor sabe o que é. Com
     # slot explícito isto era livre, e "Bugiganga do Vhar" ia para o corpo.
     if slot in ("armadura", "escudo"):
-        dados = armor_entry or (_fetch_armor_data(item["nome"]) if slot == "armadura" else None)
+        dados = armor_entry
         if not dados or dados.get("slot", "armadura") != slot:
             return (f"Erro: '{item['nome']}' não é {'armadura' if slot == 'armadura' else 'escudo'} "
                     f"que o motor conheça — a CA não teria de onde vir.")
@@ -9456,73 +9343,11 @@ def _precisa_de_conferencia(item_name: str, description: str = "") -> bool:
 
 # ── Nomes de item mágico: português → SRD ───────────────────────────────────
 #
-# O SRD é em inglês. "Manto Élfico" não achava "Cloak of Elvenkind" e virava
-# homebrew. A tradução gera CANDIDATOS; nenhum é aceito sem que o SRD confirme
-# o nome exato (_consultar_item_srd), então uma tradução errada só deixa de
-# achar — nunca troca o item por outro.
-#
-# Nomes inteiros, para o que não se compõe palavra a palavra. Chaves já
-# normalizadas (sem acento, minúsculas).
-_ITEM_MAGICO_PT_TO_EN: dict[str, str] = {
-    "manto elfico": "Cloak of Elvenkind", "capa elfica": "Cloak of Elvenkind",
-    "manto dos elfos": "Cloak of Elvenkind", "botas elficas": "Boots of Elvenkind",
-    "botas dos elfos": "Boots of Elvenkind", "cota elfica": "Elven Chain",
-    "cota de malha elfica": "Elven Chain", "cinto anao": "Belt of Dwarvenkind",
-    "cinto dos anoes": "Belt of Dwarvenkind", "placas anas": "Dwarven Plate",
-    "armadura de placas ana": "Dwarven Plate", "arremessador anao": "Dwarven Thrower",
-    "martelo arremessador anao": "Dwarven Thrower",
-    "bolsa devoradora": "Bag of Devouring", "bolsa de contencao": "Bag of Holding",
-    "bolsa sem fundo": "Bag of Holding", "bolsa de truques": "Bag of Tricks",
-    "bolsa de feijoes": "Bag of Beans", "mochila pratica": "Handy Haversack",
-    "mochila util": "Handy Haversack", "aljava eficiente": "Efficient Quiver",
-    "buraco portatil": "Portable Hole", "tapete voador": "Carpet of Flying",
-    "vassoura voadora": "Broom of Flying", "bola de cristal": "Crystal Ball",
-    "pergaminho de magia": "Spell Scroll", "barco dobravel": "Folding Boat",
-    "fortaleza instantanea": "Instant Fortress", "bastao imovel": "Immovable Rod",
-    "haste imovel": "Immovable Rod", "cola soberana": "Sovereign Glue",
-    "solvente universal": "Universal Solvent", "unguento restaurador": "Restorative Ointment",
-    "pomada restauradora": "Restorative Ointment", "pedra da sorte": "Stone of Good Luck (Luckstone)",
-    "pedra ioun": "Ioun Stone", "gema elemental": "Elemental Gem",
-    "garrafa de efreeti": "Efreeti Bottle", "garrafa fumegante": "Eversmoking Bottle",
-    "frasco de ferro": "Iron Flask", "espelho aprisionador": "Mirror of Life Trapping",
-    "baralho das ilusoes": "Deck of Illusions", "baralho do destino": "Deck of Many Things",
-    "baralho das muitas coisas": "Deck of Many Things", "esfera da anulacao": "Sphere of Annihilation",
-    "esfera de anulacao": "Sphere of Annihilation", "portao cubico": "Cubic Gate",
-    "cubo de forca": "Cube of Force", "conta de forca": "Bead of Force",
-    "figura de poder maravilhoso": "Figurine of Wondrous Power", "pigmentos maravilhosos": "Marvelous Pigments",
-    "pena magica": "Feather Token", "leque do vento": "Wind Fan", "botas aladas": "Winged Boots",
-    "asas de voo": "Wings of Flying", "vinho do amor": "Philter of Love", "filtro do amor": "Philter of Love",
-    "armadura de mithral": "Mithral Armor", "armadura de mitral": "Mithral Armor",
-    "armadura de adamantina": "Adamantine Armor", "armadura demoniaca": "Demon Armor",
-    "cota de escamas de dragao": "Dragon Scale Mail", "armadura de escamas de dragao": "Dragon Scale Mail",
-    "couro batido encantado": "Glamoured Studded Leather", "escudo animado": "Animated Shield",
-    "escudo apanha flechas": "Arrow-Catching Shield", "escudo guardiao de magia": "Spellguard Shield",
-    "machado berserker": "Berserker Axe", "machado do berserker": "Berserker Axe",
-    "lingua de fogo": "Flame Tongue", "lingua flamejante": "Flame Tongue", "marca gelida": "Frost Brand",
-    "marca de gelo": "Frost Brand", "espada dancante": "Dancing Sword", "defensora": "Defender",
-    "espada defensora": "Defender", "matadora de dragoes": "Dragon Slayer", "matador de dragoes": "Dragon Slayer",
-    "matadora de gigantes": "Giant Slayer", "matador de gigantes": "Giant Slayer",
-    "vingador sagrado": "Holy Avenger", "lamina da sorte": "Luck Blade", "lamina solar": "Sun Blade",
-    "lamina do sol": "Sun Blade", "espada vorpal": "Vorpal Sword", "roubadora de nove vidas": "Nine Lives Stealer",
-    "arco do juramento": "Oathbow", "arma cruel": "Vicious Weapon", "arma viciosa": "Vicious Weapon",
-    "adaga venenosa": "Dagger of Venom", "flecha assassina": "Arrow of Slaying",
-    "flecha da morte": "Arrow of Slaying", "azagaia do relampago": "Javelin of Lightning",
-    "dardo do relampago": "Javelin of Lightning", "tridente de comando de peixes": "Trident of Fish Command",
-    "martelo dos raios": "Hammer of Thunderbolts", "orbe dos dragoes": "Orb of Dragonkind",
-    "pedra de controlar elementais da terra": "Stone of Controlling Earth Elementals",
-    "grilhoes dimensionais": "Dimensional Shackles", "algemas dimensionais": "Dimensional Shackles",
-    "faixas de ferro da prisao": "Iron Bands of Binding", "aparato do caranguejo": "Apparatus of the Crab",
-    "vela da invocacao": "Candle of Invocation", "sino da abertura": "Chime of Opening",
-    "decantador de agua infinita": "Decanter of Endless Water", "jarro de agua infinita": "Decanter of Endless Water",
-    "poco dos muitos mundos": "Well of Many Worlds", "robe dos itens uteis": "Robe of Useful Items",
-    "tunica dos itens uteis": "Robe of Useful Items", "tunica das cores cintilantes": "Robe of Scintillating Colors",
-    "colar de contas de oracao": "Necklace of Prayer Beads", "rosario": "Necklace of Prayer Beads",
-    "varinha do mago de guerra": "Wand of the War Mage, +1, +2, or +3",
-    "cajado do mago": "Staff of the Magi", "cajado dos magos": "Staff of the Magi",
-    "tunica do arquimago": "Robe of the Archmagi", "robe do arquimago": "Robe of the Archmagi",
-    "manto do arquimago": "Robe of the Archmagi",
-}
-
+# Os nomes inteiros ("Manto Élfico" → Cloak of Elvenkind) estão no compêndio
+# (rpg/itens.py, scripts/srd_itens_pt.json), com os apelidos. O que fica aqui é
+# a COMPOSIÇÃO, que pega a variação que ninguém cadastrou: "Anel da Proteção",
+# "Varinha das Bolas de Fogo". Ela só gera candidatos; nenhum é aceito sem que
+# o compêndio tenha o nome exato.
 # "Cabeça de complemento": o grosso do SRD é "Ring of X", "Wand of X"...
 _ITEM_CABECA_PT_TO_EN: dict[str, tuple[str, ...]] = {
     "anel": ("Ring",), "varinha": ("Wand",), "cajado": ("Staff",), "bastao": ("Rod", "Staff"),
@@ -9599,58 +9424,25 @@ _ITEM_COMPLEMENTO_PT_TO_EN: dict[str, str] = {
     "escudo": "Shielding", "blindagem": "Shielding", "abertura": "Opening", "zefir": "a Zephyr",
 }
 
-_SRD_ITEMS_URL = "https://api.open5e.com/v1/magicitems/"
-
-
 def _candidatos_srd(item_name: str) -> list[str]:
-    """Nomes em inglês a tentar no SRD, do mais provável ao menos."""
-    bruto = (item_name or "").strip()
-    alvo = _norm_txt(bruto)
+    """Nomes em inglês compostos por "Cabeça de Complemento" ('Anel da X' → 'Ring of X')."""
+    alvo = _norm_txt(_itens.separar_bonus(item_name or "")[0])
     candidatos: list[str] = []
-
-    def _add(nome: str) -> None:
-        if nome and nome not in candidatos:
-            candidatos.append(nome)
-
-    # "Espada Longa +1": o SRD tem uma entrada só para arma com bônus.
-    sem_bonus = re.sub(r"\s*\+\s*[1-3]\b", "", bruto).strip()
-    if sem_bonus != bruto:
-        if _arma_conhecida(sem_bonus) or _norm_txt(sem_bonus) in ("arma", "weapon"):
-            _add("Weapon, +1, +2, or +3")
-        alvo_sem = _norm_txt(sem_bonus)
-        if alvo_sem in _ITEM_MAGICO_PT_TO_EN:
-            _add(_ITEM_MAGICO_PT_TO_EN[alvo_sem])
-
-    if alvo in _ITEM_MAGICO_PT_TO_EN:
-        _add(_ITEM_MAGICO_PT_TO_EN[alvo])
-
     m = re.match(r"^(\S+)\s+(?:de|da|do|das|dos)\s+(.+)$", alvo)
     if m:
         cabecas = _ITEM_CABECA_PT_TO_EN.get(m.group(1), ())
         resto = re.sub(r"^(?:o|a|os|as)\s+", "", m.group(2))
         complemento = _ITEM_COMPLEMENTO_PT_TO_EN.get(resto)
         if cabecas and complemento:
-            for cabeca in cabecas:
-                _add(f"{cabeca} of {complemento}")
-
-    # Quem já escreveu em inglês continua funcionando.
-    _add(bruto)
+            candidatos = [f"{cabeca} of {complemento}" for cabeca in cabecas]
     return candidatos
-
-
-def _slug_srd(nome: str) -> str:
-    s = _norm_txt(nome).replace("'", "")
-    s = re.sub(r"[^a-z0-9]+", "-", s)
-    return s.strip("-")
 
 
 def _mesmo_item(nome_srd: str, candidato: str) -> bool:
     """
     O nome do SRD é o candidato? Casamento EXATO (sem caixa, acento e
     pontuação), aceitando o parêntese: "Stone of Good Luck (Luckstone)" casa
-    com "Stone of Good Luck" e com "Luckstone". Nunca por palavras em comum:
-    a busca do Open5e procura também nas descrições, e "longsword" devolvia a
-    Excalibur.
+    com "Stone of Good Luck" e com "Luckstone". Nunca por palavras em comum.
     """
     def limpo(t: str) -> str:
         return re.sub(r"[^a-z0-9]+", " ", _norm_txt(t)).strip()
@@ -9663,76 +9455,47 @@ def _mesmo_item(nome_srd: str, candidato: str) -> bool:
     return bool(m) and b in (limpo(m.group(1)), limpo(m.group(2)))
 
 
-def _consultar_item_srd(item_name: str) -> tuple[dict | None, bool]:
+def _item_magico_do_srd(item_name: str) -> dict | None:
     """
-    Procura o item no SRD oficial (wotc-srd). Devolve (dados, consultou):
-      dados     — o item, só quando o nome confere exatamente;
-      consultou — False quando nenhuma requisição teve resposta (offline, rede
-                  caída). "Não achei" e "não consegui perguntar" são coisas
-                  diferentes, e só a primeira pode marcar o item como homebrew.
+    O item mágico do SRD com este nome, do compêndio local (rpg/itens.py), ou
+    None. "Espada Longa +2" é a Arma +N rara; "Anel da Proteção" acha o Anel
+    de Proteção pela composição.
+
+    Antes era o Open5e v1 em tempo de jogo, com o nome traduzido: cada item
+    novo custava até seis consultas, e a rede caída deixava a dúvida entre
+    "não existe" e "não consegui perguntar".
     """
-    from rpg.open5e import http as _req   # SRD com cache, sessão e retry
-
-    _edbg(f"  [OPEN5E] Buscando item mágico '{item_name}' na base SRD (grounding)…")
-    candidatos = _candidatos_srd(item_name)
-    consultou = False
-
-    for cand in candidatos:
-        r = _req.get(f"{_SRD_ITEMS_URL}{_slug_srd(cand)}/", timeout=5)
-        consultou = consultou or bool(r.status_code)
-        if r.ok:
-            d = r.json() or {}
-            if (d.get("document__slug") or "wotc-srd") == "wotc-srd" and _mesmo_item(d.get("name", ""), cand):
-                _edbg(f"  [OPEN5E] '{item_name}' é '{d.get('name')}' no SRD")
-                return d, True
-
-    # O slug nem sempre é o nome ("Stone of Good Luck (Luckstone)"). A busca
-    # fica restrita ao SRD e só aceita nome exato.
-    for cand in candidatos[:3]:
-        r = _req.get(_SRD_ITEMS_URL, params={"search": cand, "limit": 10,
-                                             "document__slug": "wotc-srd"}, timeout=5)
-        consultou = consultou or bool(r.status_code)
-        if r.ok:
-            for d in (r.json() or {}).get("results", []) or []:
-                if _mesmo_item(d.get("name", ""), cand):
-                    _edbg(f"  [OPEN5E] '{item_name}' é '{d.get('name')}' no SRD")
-                    return d, True
-
-    _edbg(f"  [OPEN5E] '{item_name}' não encontrado no SRD"
-          + ("" if consultou else " (sem resposta do Open5e)"))
-    return None, consultou
+    e = _itens.magico(item_name)
+    if e:
+        return e
+    _base, bonus = _itens.separar_bonus(item_name or "")
+    for cand in _candidatos_srd(item_name):
+        e = _itens.magico(f"{cand} +{bonus}" if bonus else cand)
+        if e:
+            return e
+    return None
 
 
-def _search_open5e_item(item_name: str) -> dict | None:
-    """O item do SRD cujo nome confere com `item_name`, ou None."""
-    return _consultar_item_srd(item_name)[0]
+def _resumo_do_magico(e: dict) -> str:
+    """'Anel — raro, requer sintonização.' A linha que a Mochila mostra, em português."""
+    return _itens.resumo_magico(e)
 
 
-_RARIDADE_PT = {"common": "comum", "uncommon": "incomum", "rare": "raro",
-                "very rare": "muito raro", "legendary": "lendário", "artifact": "artefato"}
-_TIPO_ITEM_PT = (("wondrous", "item maravilhoso"), ("armor", "armadura"), ("weapon", "arma"),
-                 ("ring", "anel"), ("rod", "bastão"), ("staff", "cajado"), ("wand", "varinha"),
-                 ("potion", "poção"), ("scroll", "pergaminho"))
-
-
-def _tipo_item_pt(tipo: str) -> str:
-    t = (tipo or "").lower()
-    return next((pt for en, pt in _TIPO_ITEM_PT if t.startswith(en)), tipo or "")
-
-
-def _raridade_pt(raridade: str) -> str:
-    r = (raridade or "").lower().strip()
-    return next((pt for en, pt in sorted(_RARIDADE_PT.items(), key=lambda x: -len(x[0]))
-                 if r.startswith(en)), raridade or "")
+def _dados_srd_do_item(e: dict) -> dict:
+    """O que a Mochila guarda do SRD num item: em português, sem o texto em inglês."""
+    return {"nome": e["nome"], "tipo": e.get("tipo", ""), "raridade": e.get("raridade", ""),
+            "sintonizacao": bool(e.get("sintonizacao"))}
 
 
 def identify_item(char_name: str, item_name: str) -> str:
     """
-    Identifica um item mágico buscando seus dados reais no Open5e (SRD D&D 5e).
-    Use quando o grupo encontrar um item desconhecido ou após usar a magia Identificar.
+    Identifica um item mágico pelo SRD de D&D 5e. Use quando o grupo estudar
+    o item (um descanso curto com ele), usar a magia Identificar, ou alguém
+    que o conhece contar o que ele é.
 
-    Retorna raridade, tipo, propriedades, attunement e descrição completa.
-    Se o item não existir no SRD, informa que é customizado/homebrew.
+    Devolve o nome no SRD, tipo, raridade, sintonização e o texto do SRD (em
+    inglês: traduza ao narrar). Se o item não existir no SRD, informa que é
+    item próprio da campanha.
 
     Args:
         char_name: Nome do personagem que possui o item.
@@ -9742,49 +9505,28 @@ def identify_item(char_name: str, item_name: str) -> str:
     if not char:
         return err
 
-    result, consultou = _consultar_item_srd(item_name)
-    inv = char.get("inventario", [])
-    alvo = next((i for i in inv if isinstance(i, dict)
-                 and _norm_txt(i.get("nome", "")) == _norm_txt(item_name)), None)
+    e = _item_magico_do_srd(item_name)
+    alvo = _item_do_inventario(char, item_name)
 
-    if result:
-        name     = result.get("name", item_name)
-        rarity   = result.get("rarity", "Desconhecida")
-        type_    = result.get("type", "")
-        attune   = result.get("requires_attunement", "")
-        desc_raw = result.get("desc", "Sem descrição disponível.")
-        desc     = " ".join(desc_raw.split())[:400]
-        sintoniza = bool(attune) and attune not in ("", "no", "false", False)
-        attune_str = " · Requer sintonização" if sintoniza else ""
-
+    if e:
         # O item conferido fica marcado: a Mochila só oferece "Identificar"
-        # para o que ainda não passou pelo SRD.
+        # para o que ainda não foi estudado, e mostra o que foi achado.
         if alvo:
-            alvo["descricao"] = f"[{rarity}] {desc[:200]}"
             alvo["custom"] = False          # conferido e canônico
             alvo["identificado"] = True
-            alvo["nome_srd"] = name
-            # Em português, para a Mochila dizer o que foi achado.
-            alvo["srd"] = {"tipo": _tipo_item_pt(type_), "raridade": _raridade_pt(rarity),
-                           "sintonizacao": sintoniza}
+            alvo["nome_srd"] = e["nome_srd"]
+            alvo["srd"] = _dados_srd_do_item(e)
+            if not (alvo.get("descricao") or "").strip():
+                alvo["descricao"] = _resumo_do_magico(e)
             memory.save_campaign()
-
-        cabeca = (f"**{item_name}** é **{name}** no SRD" if not _mesmo_item(name, item_name)
-                  else f"**{name}**")
-        return (
-            f"{cabeca}\n"
-            f"   Tipo: {type_} · Raridade: {rarity}{attune_str}\n"
-            f"   {desc}"
-        )
-
-    if not consultou:
-        # Sem resposta do Open5e não se sabe se o item existe. Marcar como
-        # homebrew aqui escondia o botão para sempre por causa de uma queda
-        # de rede.
-        return (
-            f"Erro: não foi possível consultar o SRD agora (sem resposta do "
-            f"Open5e). '{item_name}' continua a identificar; tente de novo."
-        )
+        cabeca = (f"**{item_name}** é **{e['nome']}** ({e['nome_srd']}) no SRD"
+                  if not _mesmo_item(e["nome"], item_name) else f"**{e['nome']}** ({e['nome_srd']})")
+        sint = " · requer sintonização" if e.get("sintonizacao") else ""
+        bonus = f" · +{e['bonus']}" if e.get("bonus") else ""
+        texto = " ".join(_itens.texto_srd(e, item_name).split())[:700]
+        return (f"{cabeca}\n"
+                f"   Tipo: {e.get('tipo', '')} · Raridade: {e.get('raridade', '')}{bonus}{sint}\n"
+                f"   Texto do SRD (em inglês; narre em português): {texto}")
 
     if alvo:
         # Fora do SRD: a mesma marca que add_item dá, e conferido.
@@ -9793,7 +9535,7 @@ def identify_item(char_name: str, item_name: str) -> str:
         memory.save_campaign()
     nivel = (char.get("sheet") or {}).get("nivel", 1)
     return (
-        f"Aviso: '{item_name}' não encontrado no banco D&D 5e (SRD).\n"
+        f"Aviso: '{item_name}' não existe no SRD de D&D 5e.\n"
         f"   Este parece ser um item customizado/homebrew.\n"
         f"   Certifique-se de que seus efeitos são balanceados para "
         f"um grupo nível {nivel}. Ajuste a descrição se necessário."
@@ -9803,33 +9545,45 @@ def identify_item(char_name: str, item_name: str) -> str:
 def add_item(char_name: str, item_name: str, quantity: int = 1, description: str = "") -> str:
     """
     Adiciona um item ao inventário do personagem (empilha se já existir).
-    Se o item parecer mágico, busca automaticamente no Open5e:
-    • Encontrado no SRD → usa dados reais (raridade, propriedades).
-    • Não encontrado → aceita como customizado e emite aviso de balanço.
+    Todo item é conferido no SRD de D&D 5e:
+    • item mágico do SRD → entra com tipo e raridade, ainda por identificar
+      (o grupo descobre o que é estudando o item ou com a magia Identificar);
+    • não está no SRD → aceito como item da campanha, com aviso de balanço se
+      a descrição prometer efeito mecânico.
 
     Args:
         char_name:   Nome do personagem.
         item_name:   Nome do item (ex: 'Poção de Cura', 'Espada Longa +1').
-        quantity:    Quantidade a adicionar (padrão: 1).
+        quantity:    Quantidade a adicionar (padrão: 1). Com 0, só troca a
+                     descrição de um item que o personagem já tem (o ferreiro
+                     que tempera a lâmina).
         description: Descrição das propriedades do item (opcional).
     """
     char = memory.campaign["characters"].get(memory.char_key(char_name))
     if not char:
         return f"Personagem '{char_name}' não encontrado."
+    try:
+        quantity = int(quantity)
+    except (TypeError, ValueError):
+        quantity = -1
 
     char.setdefault("inventario", [])
     inv = char["inventario"]
 
-    # Verifica se o item já existe (empilha)
-    existing = next((i for i in inv if i["nome"].lower() == item_name.lower()), None)
+    # Empilha pelo nome sem caixa e sem acento, como o resto do motor procura:
+    # "Pocao de cura" e "Poção de Cura" eram duas pilhas.
+    existing = _item_do_inventario(char, item_name)
+    if quantity < 0 or (quantity == 0 and not (existing and description)):
+        return (f"Erro: quantidade inválida ({quantity}). Para tirar itens do "
+                f"inventário, use remove_item; com 0, só se troca a descrição "
+                f"de um item que o personagem já tem.")
     if existing:
-        existing["qtd"] += quantity
+        existing["qtd"] = int(existing.get("qtd", 1) or 1) + quantity
         if description:
             existing["descricao"] = description
         memory.save_campaign()
-        return f"{char['name']} agora tem {existing['qtd']}x {item_name}."
+        return f"{char['name']} agora tem {existing['qtd']}x {existing['nome']}."
 
-    # Novo item — verifica se parece mágico
     nivel = (char.get("sheet") or {}).get("nivel", 1)
     item_dict, warning = _conferir_item_novo(item_name, description, nivel)
     item_dict["qtd"] = quantity
@@ -9849,55 +9603,54 @@ def _conferir_item_novo(item_name: str, description: str = "", nivel: int = 1) -
     item_dict: dict = {"nome": item_name, "descricao": description}
     warning = ""
 
-    # A conferência dispara pelo NOME mágico OU pelo EFEITO descrito. Só o
-    # nome não bastava: uma "Bússola de Osso que dá vantagem em Sobrevivência"
-    # não tem uma única palavra mágica e mexe na regra do mesmo jeito.
-    if _precisa_de_conferencia(item_name, description):
-        srd_data = _search_open5e_item(item_name)
-        if srd_data:
-            # Item canônico do SRD — enriquece com dados reais
-            rarity   = srd_data.get("rarity", "")
-            desc_raw = srd_data.get("desc", "")
-            desc_srd = " ".join(desc_raw.split())[:200] if desc_raw else ""
-            attune   = srd_data.get("requires_attunement", "")
-            attune_s = " (requer sintonização)" if attune not in ("", "no", "false", False) else ""
-            item_dict["descricao"] = f"[{rarity}{attune_s}] {desc_srd or description}"
-            item_dict["custom"]    = False
+    # O compêndio é local: todo item passa por ele, sem custo. Antes a
+    # consulta ia à rede, e por isso só disparava para nome mágico ou efeito
+    # descrito — a "Bolsa de Contenção" (sem palavra mágica) passava direto.
+    srd_data = _item_magico_do_srd(item_name)
+    if srd_data:
+        item_dict["custom"] = False
+        item_dict["nome_srd"] = srd_data["nome_srd"]
+        item_dict["srd"] = _dados_srd_do_item(srd_data)
+        # O que o item faz fica para quando o grupo o estudar (identify_item).
+        # O comum (Poção de Cura, Pergaminho de truque) todo mundo reconhece.
+        item_dict["identificado"] = srd_data.get("raridade") == "comum"
+        if not (description or "").strip() and item_dict["identificado"]:
+            item_dict["descricao"] = _resumo_do_magico(srd_data)
+    elif _precisa_de_conferencia(item_name, description):
+        # Fora do SRD: fica marcado. A marca é FATO, não julgamento — vale
+        # tanto para um item de sabor quanto para um que mexe na regra.
+        item_dict["custom"] = True
+        if _tem_efeito_mecanico(item_name, description):
+            # Este o motor vai cobrar: item inventado COM regra é o que
+            # desequilibra a mesa sem ninguém perceber.
+            item_dict["efeito_mecanico"] = True
+            warning = (
+                f"\nAviso: '{item_name}' NÃO EXISTE no SRD de D&D 5e e a "
+                f"descrição promete efeito mecânico.\n"
+                f"   Ou troque por um item real do SRD, ou declare aqui "
+                f"por que ele é equilibrado para um grupo de nível {nivel} "
+                f"— e prefira efeitos pequenos (+1, 1d4, uma vez por "
+                f"descanso) a números redondos e grandes."
+            )
+        elif not (description or "").strip():
+            # Nome mágico e NENHUMA descrição: não dá para dizer se é
+            # sabor ou se quebra a mesa. Isso não é "sabor", é lacuna —
+            # e era o buraco por onde a loja passava, porque buy_item
+            # chamava add_item sem descrição nenhuma.
+            item_dict["efeito_desconhecido"] = True
+            warning = (
+                f"\nAviso: '{item_name}' NÃO EXISTE no SRD e entrou sem "
+                f"descrição. Diga o que ele faz — mesmo que seja nada — "
+                f"com add_item(..., description='...') ou "
+                f"justify_custom_item(). Sem isso não há como saber se "
+                f"é lembrança de família ou espada +3."
+            )
         else:
-            # Fora do SRD: fica marcado. A marca é FATO, não julgamento — vale
-            # tanto para um item de sabor quanto para um que mexe na regra.
-            item_dict["custom"] = True
-            if _tem_efeito_mecanico(item_name, description):
-                # Este o motor vai cobrar: item inventado COM regra é o que
-                # desequilibra a mesa sem ninguém perceber.
-                item_dict["efeito_mecanico"] = True
-                warning = (
-                    f"\nAviso: '{item_name}' NÃO EXISTE no SRD de D&D 5e e a "
-                    f"descrição promete efeito mecânico.\n"
-                    f"   Ou troque por um item real do SRD, ou declare aqui "
-                    f"por que ele é equilibrado para um grupo de nível {nivel} "
-                    f"— e prefira efeitos pequenos (+1, 1d4, uma vez por "
-                    f"descanso) a números redondos e grandes."
-                )
-            elif not (description or "").strip():
-                # Nome mágico e NENHUMA descrição: não dá para dizer se é
-                # sabor ou se quebra a mesa. Isso não é "sabor", é lacuna —
-                # e era o buraco por onde a loja passava, porque buy_item
-                # chamava add_item sem descrição nenhuma.
-                item_dict["efeito_desconhecido"] = True
-                warning = (
-                    f"\nAviso: '{item_name}' NÃO EXISTE no SRD e entrou sem "
-                    f"descrição. Diga o que ele faz — mesmo que seja nada — "
-                    f"com add_item(..., description='...') ou "
-                    f"justify_custom_item(). Sem isso não há como saber se "
-                    f"é lembrança de família ou espada +3."
-                )
-            else:
-                warning = (
-                    f"\n'{item_name}' não está no SRD — registrado como "
-                    f"item próprio da sua campanha. Sem efeito mecânico "
-                    f"declarado, então é sabor: nada a balancear."
-                )
+            warning = (
+                f"\n'{item_name}' não está no SRD — registrado como "
+                f"item próprio da sua campanha. Sem efeito mecânico "
+                f"declarado, então é sabor: nada a balancear."
+            )
     return item_dict, warning
 
 
@@ -10652,9 +10405,9 @@ def _ataque_da_ficha(char: dict, arma: str) -> dict:
     s = char.get("sheet") or {}
     atributo, mod = _weapon_attr(arma, s)
     prof = int(s.get("proficiencia", _proficiency_bonus(int(s.get("nivel", 1) or 1))) or 2)
-    nome_l = arma.lower()
-    distancia = any(r in nome_l for r in RANGED_WEAPONS)
-    duas_maos = any(w in nome_l for w in TWO_HANDED_WEAPONS)
+    distancia = _arma_de_tiro(arma)
+    versatil = _versatil_a_duas_maos(char, arma)
+    duas_maos = _arma_de_duas_maos(arma) or bool(versatil)
     estilo = _get_feature_choice(char, "Estilo de Combate")
     bonus_acerto, bonus_dano, notas = 0, 0, []
     if estilo == "Arquearia" and distancia:
@@ -10671,7 +10424,14 @@ def _ataque_da_ficha(char: dict, arma: str) -> dict:
         notas.append(f"crítico com {critico} ou mais")
 
     dado = ""
-    dados = _npc_attack_dice(s, arma) or _fetch_weapon_data(arma)
+    dados = _npc_attack_dice(s, arma) or versatil or _fetch_weapon_data(arma)
+    if versatil:
+        notas.append("nas duas mãos")
+    magico = _bonus_magico_da_arma(char, arma)
+    if magico:
+        bonus_acerto += magico
+        bonus_dano += magico
+        notas.append(f"+{magico} mágica")
     if dados:
         n, faces = dados
         extra = mod + bonus_dano
@@ -10807,9 +10567,9 @@ def hero_snapshot(char_name: str = "") -> dict:
 # número de ouro de cabeça. Duas consequências chatas — saque nunca era uma
 # ESCOLHA (leva tudo), e o preço de um item variava conforme o humor da cena.
 #
-# PESO vem do SRD quando o item existe lá (armas e armaduras trazem `weight`
-# e `cost` de verdade), e de uma tabela curta para o resto. Em quilos, porque
-# a mesa é em português — o SRD dá libras e a conversão é feita aqui.
+# PESO e PREÇO vêm do compêndio do SRD (rpg/itens.py) quando o item existe
+# lá, e de uma tabela curta para o resto. Em quilos e em peças de cobre: a
+# mesa é em português, e uma tocha custa 1 pc, não 1 po.
 #
 # CAPACIDADE segue o 5e: FOR × 7,5 kg. Acima da metade disso o personagem
 # fica SOBRECARREGADO (desvantagem em testes e ataques de FOR/DES/CON);
@@ -10818,8 +10578,8 @@ def hero_snapshot(char_name: str = "") -> dict:
 
 _LB_PARA_KG = 0.4536
 
-# Fallback para o que não está no SRD ou não tem peso lá. Só o que aparece de
-# verdade numa mesa — inventar uma tabela completa seria peso morto.
+# Aproximação para o que não está no SRD ("Poção Estranha", "Grimório do
+# Mestre Vhar"): só o que aparece de verdade numa mesa.
 _PESO_PADRAO_KG = {
     "poção": 0.25, "pocao": 0.25, "frasco": 0.25, "ampola": 0.25,
     "pergaminho": 0.05, "rolo": 0.05, "livro": 2.3, "grimório": 1.4,
@@ -10833,53 +10593,19 @@ _PESO_PADRAO_KG = {
 }
 
 
-def _peso_do_srd(nome: str) -> float | None:
-    """
-    Peso em kg vindo do SRD. Só a rota /weapons/ preenche 'weight' — /armor/
-    devolve o campo vazio nas 13 armaduras, e é por isso que armadura sai de
-    _ARMADURAS_SRD e não daqui.
-    """
-    busca = _traduzir_para_srd(nome)
-    from rpg.open5e import http as _req
-    for rota in ("weapons", "armor"):
-        try:
-            r = _req.get(f"https://api.open5e.com/v1/{rota}/",
-                         params={"search": busca, "limit": 3}, timeout=4)
-            if not r.ok:
-                continue
-            for item in (r.json().get("results") or []):
-                bruto = (item.get("weight") or "").strip()
-                if not bruto:
-                    continue
-                numero = "".join(c for c in bruto if c.isdigit() or c == ".")
-                if numero:
-                    return round(float(numero) * _LB_PARA_KG, 2)
-        except Exception:
-            continue
-    return None
-
-
 def _peso_do_item(item: dict) -> float:
     """
     Peso de UMA unidade, em kg, nesta ordem:
 
         1. o que o mestre gravou no item;
-        2. arma e armadura, das tabelas locais (para armadura é a única fonte
-           que existe: /armor/ do Open5e devolve 'weight' vazio nas 13);
-        3. a tabela de aproximação, que cobre o resto do que aparece numa mesa
-           e não custa rede;
-        4. o SRD traduzido, para equipamento exótico que nada acima pega;
-        5. 0,5 kg — pequeno e honesto, não faz a mochila estourar sozinha.
+        2. o compêndio do SRD (rpg/itens.py): o item, ou a arma ou armadura
+           de que ele é feito ("Espada Longa +1" pesa a espada longa);
+        3. a tabela de aproximação, para o que não está no SRD;
+        4. 0,5 kg — pequeno e honesto, não faz a mochila estourar sozinha.
 
-    O SRD vem em 4º de propósito. check_encumbrance() roda no caminho da
-    requisição e passa por todo o inventário: consultar a rede antes das
-    tabelas poria dois GETs de 4s por item entre o jogador e a resposta.
-
-    A versão anterior nunca chamava o SRD — o docstring prometia e o código
-    pulava direto para a aproximação. Isso importava pouco para arma e muito
-    para armadura: uma Cota de Malha (20 kg) pesava os 0,5 kg do último
-    recurso, e o sistema de carga, feito justamente para que armadura pesada
-    seja uma escolha, era cego para armadura.
+    Nada aqui vai à rede. Antes, o 3º passo era o Open5e: a Mochila e a Loja
+    passavam pelo inventário inteiro e cada item desconhecido custava até duas
+    consultas de 4 s, entre o jogador e a tela.
     """
     if item.get("peso") is not None:
         try:
@@ -10888,17 +10614,15 @@ def _peso_do_item(item: dict) -> float:
             pass
 
     bruto = item.get("nome", "")
-    conhecido = _armadura_conhecida(bruto) or _arma_conhecida(bruto)
-    if conhecido:
-        return round(conhecido[1] * _LB_PARA_KG, 2)
+    do_srd = _itens.peso_kg(bruto)
+    if do_srd is not None:
+        return do_srd
 
     nome = _norm_txt(bruto)
     for termo, kg in _PESO_PADRAO_KG.items():
         if _norm_txt(termo) in nome:
             return kg
-
-    do_srd = _peso_do_srd(bruto)
-    return do_srd if do_srd is not None else 0.5
+    return 0.5
 
 
 def _capacidade_kg(sheet: dict) -> float:
@@ -10977,11 +10701,16 @@ _TIPO_DE_ARMADURA = {"full": "leve", "cap2": "média", "none": "pesada", "shield
 
 def _a_identificar(item: dict) -> bool:
     """
-    Item que parece mágico e nunca foi conferido no SRD. add_item confere na
-    entrada (e grava `custom`); item vindo do editor, do wizard ou de saque
-    antigo não passou por lá.
+    Item mágico do SRD que o grupo ainda não estudou, ou item que parece
+    mágico e nunca foi conferido. add_item confere na entrada (e grava
+    `custom` e `srd`); item vindo do editor, do wizard ou de saque antigo não
+    passou por lá.
     """
-    if item.get("identificado") or "custom" in item:
+    if item.get("identificado"):
+        return False
+    if item.get("srd"):
+        return True
+    if "custom" in item:
         return False
     return _looks_magic(item.get("nome", ""), item.get("descricao", ""))
 
@@ -11121,8 +10850,9 @@ def inventory_snapshot(char_name: str = "") -> dict:
         if dados:
             # "base": a CA do cabeçalho já soma a Destreza, e "CA 13" ao lado de
             # uma CA 14 parecia conta errada.
-            detalhe = (f"+{dados['ca_base']} CA" if dados["dex_bonus"] == "shield"
-                       else f"CA base {dados['ca_base']} · {_TIPO_DE_ARMADURA.get(dados['dex_bonus'], '')}")
+            detalhe = (f"+{dados['ca_base'] + dados['bonus']} CA" if dados["dex_bonus"] == "shield"
+                       else f"CA base {dados['ca_base']} · {_TIPO_DE_ARMADURA.get(dados['dex_bonus'], '')}"
+                       + (f" · +{dados['bonus']} mágica" if dados["bonus"] else ""))
         equipados.append({"slot": slot, "rotulo": _ROTULO_DO_SLOT[slot],
                           "item": nome or "", "detalhe": detalhe,
                           # Equipado sem estar na mochila: ficha antiga ou do
@@ -11155,7 +10885,8 @@ def inventory_snapshot(char_name: str = "") -> dict:
             "nome": nome, "qtd": qtd, "descricao": it.get("descricao", ""),
             "peso": round(peso, 2), "peso_total": round(peso * qtd, 2),
             "custom": bool(it.get("custom")),
-            "nome_srd": it.get("nome_srd", ""),
+            # O nome oficial, em português, só depois de identificado.
+            "nome_srd": ((it.get("srd") or {}).get("nome") or "") if it.get("identificado") else "",
             "equipado_em": [_ROTULO_DO_SLOT[x] for x in em if x in _ROTULO_DO_SLOT],
             "opcoes_de_equipar": opcoes,
             "a_identificar": _a_identificar(it),
@@ -11203,7 +10934,29 @@ def inventory_action(action: str, char: str = "", item: str = "", slot: str = ""
     elif a == "largar":
         msg = remove_item(char, item, 1)
     elif a == "identificar":
+        # Identificar custa o que custa no 5e: a poção, um gole; o resto, um
+        # descanso curto estudando o item (1 hora no relógio). O botão era de
+        # graça e a hora não passava.
+        dono_i = next((c for c in _grupo_com_ficha()
+                       if _norm_txt(c.get("name", "")) == _norm_txt(char)), None)
+        gravado_i = _item_do_inventario(dono_i, item) if dono_i else None
+        if gravado_i is None:
+            return {"ok": False, "message": f"Erro: {char} não tem '{item}'.",
+                    "snapshot": inventory_snapshot(char)}
+        pocao = ((gravado_i.get("srd") or {}).get("tipo") == "poção"
+                 or bool(_efeito_de_item(gravado_i.get("nome", ""))))
+        if not pocao and _em_combate():
+            return {"ok": False,
+                    "message": "Aviso: estudar um item leva uma hora; não dá no meio da luta.",
+                    "snapshot": inventory_snapshot(char)}
         msg = identify_item(char, item)
+        como = ""
+        if not msg.lstrip().startswith("Erro:"):
+            if pocao:
+                como = f"{dono_i['name']} provou um gole."
+            else:
+                avancar_minutos(60, f"{dono_i['name']} estudou {gravado_i['nome']}")
+                como = f"{dono_i['name']} estudou o item por uma hora."
         # "Aviso: não está no SRD" é resultado da conferência, não recusa.
         ok = not msg.lstrip().startswith("Erro:")
         # O que foi achado vem do item gravado, não do texto do mestre: a tela
@@ -11213,11 +10966,13 @@ def inventory_action(action: str, char: str = "", item: str = "", slot: str = ""
         gravado = next((i for i in ((dono or {}).get("inventario") or [])
                         if isinstance(i, dict) and _norm_txt(i.get("nome", "")) == _norm_txt(item)),
                        {})
-        resultado = {"item": item, "consultou": ok,
+        srd_i = gravado.get("srd") or {}
+        resultado = {"item": item, "consultou": ok, "como": como,
                      "encontrado": ok and bool(gravado.get("nome_srd")),
-                     "nome_srd": gravado.get("nome_srd", "") if ok else "",
-                     **({"tipo": "", "raridade": "", "sintonizacao": False}
-                        | (gravado.get("srd") or {} if ok else {}))}
+                     "nome_srd": srd_i.get("nome", "") if ok else "",
+                     "tipo": srd_i.get("tipo", "") if ok else "",
+                     "raridade": srd_i.get("raridade", "") if ok else "",
+                     "sintonizacao": bool(srd_i.get("sintonizacao")) if ok else False}
         return {"ok": ok, "message": msg, "resultado": resultado,
                 "snapshot": inventory_snapshot(char)}
     else:
@@ -11231,7 +10986,11 @@ def inventory_action(action: str, char: str = "", item: str = "", slot: str = ""
 # ── Loja ───────────────────────────────────────────────────────────────────
 
 def _lojas() -> dict:
-    return memory.campaign.setdefault("lojas", {})
+    lojas = memory.campaign.setdefault("lojas", {})
+    for loja in lojas.values():
+        for linha in (loja or {}).get("estoque") or []:
+            _preco_pc_da_linha(linha)
+    return lojas
 
 
 # ── Atitude do lojista no preço ────────────────────────────────────────────
@@ -11392,7 +11151,7 @@ def haggle(char_name: str, shop_name: str = "") -> str:
 
 
 def _preco_com_atitude(preco: int, loja: dict) -> int:
-    """Preço pedido por uma unidade: a atitude do dono e a pechincha da visita."""
+    """Preço pedido por uma unidade, em cobre: a atitude do dono e a pechincha da visita."""
     ajuste = _atitude_da_loja(loja)
     fator = (ajuste["compra"] if ajuste else 1.0) * _fator_de_pechincha(loja)
     if fator == 1.0:
@@ -11401,7 +11160,7 @@ def _preco_com_atitude(preco: int, loja: dict) -> int:
 
 
 def _ganho_com_atitude(tabela: int, loja: dict) -> int:
-    """O que a loja paga por uma unidade: metade da tabela, com a atitude."""
+    """O que a loja paga por uma unidade, em cobre: metade da tabela, com a atitude."""
     base = max(1, int(tabela) // 2)
     ajuste = _atitude_da_loja(loja)
     if not ajuste:
@@ -11409,53 +11168,98 @@ def _ganho_com_atitude(tabela: int, loja: dict) -> int:
     return max(1, int(round(base * ajuste["venda"])))
 
 
-def _preco_do_srd(nome: str) -> int | None:
+def _preco_pc_do_srd(nome: str) -> int | None:
     """
-    Preço em PEÇAS DE OURO vindo do SRD. None quando não há.
+    Preço de tabela em PEÇAS DE COBRE, do compêndio do SRD. None quando não há.
 
-    Arma e armadura saem das tabelas locais, sem rede. O que sobra vai ao
-    Open5e com o nome TRADUZIDO — buscar 'Espada Longa' numa API em inglês
-    devolvia zero, e a loja recusava o estoque inteiro.
+    Antes era ouro inteiro: tudo abaixo de 1 po custava 1 po (a tocha de 1 pc,
+    a ração de 5 pp, a clava de 1 pp), e 20 tochas saíam por 20 po. Equipamento
+    de aventura não tinha preço nenhum.
     """
-    armadura = _armadura_conhecida(nome)
-    if armadura:
-        return armadura[0]
+    return _itens.preco_pc(nome)
 
-    arma = _arma_conhecida(nome)
-    if arma:
-        return max(1, int(round(arma[0])))
 
-    busca = _traduzir_para_srd(nome)
-    from rpg.open5e import http as _req
-    for rota in ("weapons", "armor"):
-        try:
-            r = _req.get(f"https://api.open5e.com/v1/{rota}/",
-                         params={"search": busca, "limit": 3}, timeout=4)
-            if not r.ok:
-                continue
-            for item in (r.json().get("results") or []):
-                bruto = (item.get("cost") or "").strip().lower()
-                if not bruto:
-                    continue
-                numero = "".join(c for c in bruto if c.isdigit() or c == ".")
-                if not numero:
-                    continue
-                valor = float(numero)
-                if "sp" in bruto:      # prata
-                    valor /= 10
-                elif "cp" in bruto:    # cobre
-                    valor /= 100
-                return max(1, int(round(valor)))
-        except Exception:
-            continue
+_PRECO_RE = re.compile(r"^\s*(\d+(?:[.,]\d+)?)\s*(po|pp|pc|ouro|prata|cobre|gp|sp|cp)?\s*$",
+                       re.IGNORECASE)
+_PECAS_POR_MOEDA = {"po": 100, "ouro": 100, "gp": 100, "pp": 10, "prata": 10, "sp": 10,
+                    "pc": 1, "cobre": 1, "cp": 1}
+
+
+def _ler_preco_pc(texto: str) -> int | None:
+    """'50' → 5000 (ouro é o padrão); '5 pp' → 50; '2pc' → 2; '0.5' → 50."""
+    m = _PRECO_RE.match(str(texto or ""))
+    if not m:
+        return None
+    valor = float(m.group(1).replace(",", "."))
+    return max(0, int(round(valor * _PECAS_POR_MOEDA[(m.group(2) or "po").lower()])))
+
+
+def _fmt_pc(pc: int) -> str:
+    """1550 → '15 po 5 pp'; 5 → '5 pc'; 0 → '0 pc'."""
+    po, resto = divmod(max(0, int(pc)), 100)
+    pp, pc_ = divmod(resto, 10)
+    partes = [f"{po} po" if po else "", f"{pp} pp" if pp else "", f"{pc_} pc" if pc_ else ""]
+    return " ".join(p for p in partes if p) or "0 pc"
+
+
+def _preco_pc_da_linha(linha: dict) -> int:
+    """
+    O preço de uma linha do estoque, em cobre. Loja salva antes da troca
+    guardava `preco` em ouro inteiro: a linha é convertida na primeira leitura.
+    """
+    if "preco_pc" not in linha:
+        linha["preco_pc"] = int(linha.pop("preco", 0) or 0) * 100
+    return int(linha.get("preco_pc") or 0)
+
+
+# Tesouro (gema, obra de arte, mercadoria) vale o preço cheio: no 5e ele é
+# quase moeda. Só equipamento usado sai pela metade.
+_PALAVRAS_DE_TESOURO = ("gema", "joia", "rubi", "safira", "esmeralda", "diamante", "perola",
+                        "ametista", "topazio", "opala", "onix", "jade", "obra de arte",
+                        "estatueta", "tapecaria", "lingote", "barra de ouro", "barra de prata")
+_VALOR_ESCRITO = re.compile(r"(\d+(?:[.,]\d+)?)\s*(po|pp|pc)\b", re.IGNORECASE)
+
+
+def _e_tesouro(item: dict) -> bool:
+    if item.get("tesouro"):
+        return True
+    e = _itens.comum(item.get("nome", ""))
+    if e:
+        return e["categoria"] == "mercadoria"
+    nome = _norm_txt(item.get("nome", ""))
+    return any(p in nome for p in _PALAVRAS_DE_TESOURO)
+
+
+def _valor_de_referencia_pc(item: dict) -> int | None:
+    """
+    Quanto vale UMA unidade, em cobre: o valor gravado no item (`valor_po` ou
+    `valor`, que o mestre põe em gema e obra de arte), o preço do SRD, ou o
+    valor escrito no nome ou na descrição ("Rubi (50 po)"). None quando nada
+    disso existe: a loja não chuta valor.
+    """
+    for campo in ("valor_po", "valor"):
+        v = item.get(campo)
+        if v not in (None, ""):
+            try:
+                return max(0, int(round(float(v) * 100)))
+            except (TypeError, ValueError):
+                pass
+    nome = item.get("nome", "")
+    srd = _preco_pc_do_srd(nome)
+    if srd:
+        return srd
+    for texto in (nome, item.get("descricao", "") or ""):
+        m = _VALOR_ESCRITO.search(texto)
+        if m:
+            return _ler_preco_pc(f"{m.group(1)} {m.group(2)}")
     return None
 
 
 def open_shop(shop_name: str, items: str, location: str = "", owner: str = "") -> str:
     """
-    Monta uma loja com estoque e preços. Arma e armadura com nome em português
-    já saem com o custo oficial do SRD ('Espada Longa' → 15 po); para o resto,
-    informe o preço.
+    Monta uma loja com estoque e preços. O que é do SRD (armas, armaduras,
+    equipamento de aventura, ferramentas, a Poção de Cura) já sai com o custo
+    oficial ('Espada Longa' → 15 po, 'Tocha' → 1 pc); para o resto, informe.
 
     Chamar de novo com o mesmo nome de loja ACRESCENTA ao estoque — item já
     existente tem preço e quantidade atualizados, o resto continua lá.
@@ -11466,9 +11270,10 @@ def open_shop(shop_name: str, items: str, location: str = "", owner: str = "") -
     Args:
         shop_name: Nome da loja ('Forja do Torbin').
         items:     Itens separados por ';'. Formato por item:
-                   "nome" ou "nome:preço_em_ouro" ou "nome:preço:quantidade",
-                   com descrição opcional depois de '|'.
-                   Ex: "Espada Longa; Poção de Cura:50:3; Corda de Seda:10"
+                   "nome" ou "nome:preço" ou "nome:preço:quantidade",
+                   com descrição opcional depois de '|'. O preço é em ouro
+                   ("50"), ou com a moeda ("5 pp", "2 pc").
+                   Ex: "Espada Longa; Poção de Cura:50:3; Vela:1 pc"
                    Ex: "Amuleto do Corvo:75:1|dá vantagem em Furtividade"
                    Descreva SEMPRE o que não for item do SRD — a descrição
                    vai junto para o inventário de quem comprar, e é por ela
@@ -11499,14 +11304,9 @@ def open_shop(shop_name: str, items: str, location: str = "", owner: str = "") -
         nome   = partes[0]
         if not nome:
             continue
-        preco = None
-        if len(partes) > 1 and partes[1]:
-            try:
-                preco = max(0, int(float(partes[1])))
-            except ValueError:
-                preco = None
+        preco = _ler_preco_pc(partes[1]) if len(partes) > 1 and partes[1] else None
         if preco is None:
-            preco = _preco_do_srd(nome)
+            preco = _preco_pc_do_srd(nome)
         if preco is None:
             sem_preco.append(nome)
             continue
@@ -11514,13 +11314,13 @@ def open_shop(shop_name: str, items: str, location: str = "", owner: str = "") -
             qtd = max(1, int(partes[2])) if len(partes) > 2 and partes[2] else 99
         except ValueError:
             qtd = 99
-        estoque.append({"nome": nome, "preco": preco, "qtd": qtd,
+        estoque.append({"nome": nome, "preco_pc": preco, "qtd": qtd,
                         "descricao": descricao})
 
     if not estoque:
         return ("Nenhum item com preço. O SRD não conhece: "
                 + ", ".join(sem_preco) + ". Informe o preço no formato "
-                "'nome:preço' (ex: 'Amuleto do Corvo:75').") if sem_preco else \
+                "'nome:preço' (ex: 'Amuleto do Corvo:75', 'Vela:1 pc').") if sem_preco else \
                "Informe ao menos um item."
 
     # Chamar open_shop de novo ACRESCENTA ao estoque; antes substituía, e uma
@@ -11562,7 +11362,8 @@ def open_shop(shop_name: str, items: str, location: str = "", owner: str = "") -
         antigo = next((i for i in loja["estoque"]
                        if _norm_txt(i["nome"]) == _norm_txt(item["nome"])), None)
         if antigo:
-            antigo["preco"] = item["preco"]
+            antigo.pop("preco", None)
+            antigo["preco_pc"] = item["preco_pc"]
             antigo["qtd"]   = item["qtd"]
             if item.get("descricao"):
                 antigo["descricao"] = item["descricao"]
@@ -11578,7 +11379,7 @@ def open_shop(shop_name: str, items: str, location: str = "", owner: str = "") -
     for i in loja["estoque"]:
         q = "" if i["qtd"] >= 99 else f"  (x{i['qtd']})"
         marca = "  ← novo" if i["nome"] in novos and ja_existia else ""
-        linhas.append(f"   • {i['nome']} — {i['preco']} po{q}{marca}")
+        linhas.append(f"   • {i['nome']} — {_fmt_pc(_preco_pc_da_linha(i))}{q}{marca}")
     if repostos and ja_existia:
         linhas.append("   ↻ Preço/estoque atualizados: " + ", ".join(repostos))
     if sem_preco:
@@ -11602,7 +11403,7 @@ def list_shop(shop_name: str) -> str:
               + (f" — {loja['local']}" if loja.get("local") else "")]
     for i in loja["estoque"]:
         q = "" if i["qtd"] >= 99 else f"  (restam {i['qtd']})"
-        linhas.append(f"   • {i['nome']} — {i['preco']} po{q}")
+        linhas.append(f"   • {i['nome']} — {_fmt_pc(_preco_pc_da_linha(i))}{q}")
     return "\n".join(linhas)
 
 
@@ -11623,23 +11424,31 @@ def list_shop(shop_name: str) -> str:
 
 def _linha_de_venda(char: dict, item: dict, loja: dict) -> dict | None:
     """
-    O que o personagem consegue vender e por quanto. None quando não há preço
-    de referência — a loja não chuta valor de item sem tabela.
+    O que o personagem consegue vender e por quanto (em cobre). None quando
+    não há valor de referência — a loja não chuta valor de item sem tabela.
+
+    Equipamento sai pela METADE da tabela, com a atitude do lojista; tesouro
+    (gema, obra de arte, mercadoria) pelo valor cheio. Antes a loja só sabia o
+    preço de arma e armadura: a poção e o rubi achados no saque não vendiam.
     """
     nome = item.get("nome", "")
     if not nome:
         return None
     na_loja = next((i for i in loja.get("estoque", [])
                     if _norm_txt(i["nome"]) == _norm_txt(nome)), None)
-    tabela = na_loja["preco"] if na_loja else _preco_do_srd(nome)
+    tabela = _preco_pc_da_linha(na_loja) if na_loja else _valor_de_referencia_pc(item)
     if not tabela or tabela <= 0:
         return None
+    tesouro = _e_tesouro(item)
+    ganho = int(tabela) if tesouro else _ganho_com_atitude(tabela, loja)
     return {
         "nome":    nome,
         "qtd":     int(item.get("qtd", 1) or 1),
-        "tabela":  int(tabela),
-        # A loja paga METADE, com o que a atitude do dono muda.
-        "ganho":   _ganho_com_atitude(tabela, loja),
+        "tabela_pc": int(tabela),
+        "ganho_pc":  ganho,
+        "tabela_texto": _fmt_pc(tabela),
+        "ganho_texto":  _fmt_pc(ganho),
+        "tesouro": tesouro,
         "peso":    round(_peso_do_item(item), 2),
         "custom":  bool(item.get("custom")),
     }
@@ -11688,6 +11497,7 @@ def shop_snapshot(shop_name: str = "", buyer: str = "") -> dict:
             "prata":  int(sh.get("prata", 0) or 0),
             "cobre":  int(sh.get("cobre", 0) or 0),
             "bolsa_em_cobre": _cobre_total(sh),
+            "bolsa_texto": _fmt_pc(_cobre_total(sh)),
             "carga":      round(carga, 1),
             "capacidade": round(cap, 1),
             "meia_capacidade": round(cap / 2, 1),
@@ -11703,17 +11513,21 @@ def shop_snapshot(shop_name: str = "", buyer: str = "") -> dict:
     estoque = []
     if escolhida:
         for i in escolhida.get("estoque", []):
+            tabela = _preco_pc_da_linha(i)
+            pedido = _preco_com_atitude(tabela, escolhida)
             estoque.append({
                 "nome":      i["nome"],
-                # `preco` é o que a tela mostra e o que buy_item cobra: já com
-                # a atitude. `tabela` fica ao lado para a tela explicar.
-                "preco":     _preco_com_atitude(i["preco"], escolhida),
-                "tabela":    int(i["preco"]),
+                # `preco_pc` é o que a tela mostra e o que buy_item cobra: já
+                # com a atitude. `tabela_pc` fica ao lado para a tela explicar.
+                "preco_pc":  pedido,
+                "tabela_pc": tabela,
+                "preco_texto":  _fmt_pc(pedido),
+                "tabela_texto": _fmt_pc(tabela),
                 "qtd":       int(i["qtd"]),
                 "ilimitado": int(i["qtd"]) >= 99,
                 "descricao": i.get("descricao", ""),
                 "peso":      round(_peso_do_item({"nome": i["nome"]}), 2),
-                "custom":    _preco_do_srd(i["nome"]) is None,
+                "custom":    not (_itens.comum(i["nome"]) or _itens.magico(i["nome"])),
             })
 
     return {
@@ -11842,6 +11656,14 @@ def _cobre_total(sheet: dict) -> int:
             + int(sheet.get("cobre", 0) or 0))
 
 
+def _receber(sheet: dict, cobre: int) -> None:
+    """Põe `cobre` na bolsa, nas moedas maiores: 1550 pc viram 15 po e 5 pp."""
+    po, resto = divmod(max(0, int(cobre)), 100)
+    sheet["ouro"]  = int(sheet.get("ouro", 0) or 0) + po
+    sheet["prata"] = int(sheet.get("prata", 0) or 0) + resto // 10
+    sheet["cobre"] = int(sheet.get("cobre", 0) or 0) + resto % 10
+
+
 def _pagar(sheet: dict, cobre: int) -> bool:
     """Debita `cobre` da bolsa, trocando moeda quando preciso. False se falta."""
     total = _cobre_total(sheet)
@@ -11886,13 +11708,12 @@ def buy_item(char_name: str, shop_name: str, item_name: str, quantity: int = 1) 
         return f"Aviso: {loja['nome']} tem só {linha['qtd']}x {linha['nome']}."
 
     sheet = char["sheet"]
-    unitario = _preco_com_atitude(linha["preco"], loja)
-    custo_cobre = unitario * 100 * qtd
-    if not _pagar(sheet, custo_cobre):
-        tem = _cobre_total(sheet)
+    tabela = _preco_pc_da_linha(linha)
+    unitario = _preco_com_atitude(tabela, loja)
+    custo = unitario * qtd
+    if not _pagar(sheet, custo):
         return (f"Erro: {char['name']} não tem como pagar: "
-                f"{unitario * qtd} po pedidos, "
-                f"{tem // 100} po e {(tem % 100) // 10} pp na bolsa.")
+                f"{_fmt_pc(custo)} pedidos, {_fmt_pc(_cobre_total(sheet))} na bolsa.")
 
     linha["qtd"] -= qtd
     if linha["qtd"] <= 0:
@@ -11903,6 +11724,10 @@ def buy_item(char_name: str, shop_name: str, item_name: str, quantity: int = 1) 
     # de Vhar" comprada ficava marcada como custom mas sem efeito declarado,
     # e o verificador não cobrava nada.
     add_item(char["name"], linha["nome"], qtd, linha.get("descricao", ""))
+    # A loja sabe o que vende: o que sai do balcão não chega "a identificar".
+    comprado = _item_do_inventario(char, linha["nome"])
+    if comprado and comprado.get("srd"):
+        comprado["identificado"] = True
 
     estado, carga, cap = _estado_de_carga(char)
     aviso = ""
@@ -11912,10 +11737,10 @@ def buy_item(char_name: str, shop_name: str, item_name: str, quantity: int = 1) 
     ajuste = _atitude_da_loja(loja)
     nota_atitude = ""
     if ajuste:
-        nota_atitude = (f" (tabela {linha['preco'] * qtd} po, {ajuste['pct']:+d}% — "
+        nota_atitude = (f" (tabela {_fmt_pc(tabela * qtd)}, {ajuste['pct']:+d}% — "
                         f"{ajuste['dono']} está {ajuste['rotulo']})")
     return (f"{char['name']} comprou {qtd}x {linha['nome']} por "
-            f"{unitario * qtd} po em {loja['nome']}{nota_atitude}.\n"
+            f"{_fmt_pc(custo)} em {loja['nome']}{nota_atitude}.\n"
             f"   Bolsa: {sheet['ouro']} po, {sheet['prata']} pp, {sheet['cobre']} pc{aviso}")
 
 
@@ -11923,7 +11748,9 @@ def sell_item(char_name: str, shop_name: str, item_name: str, quantity: int = 1)
     """
     Vende um item para uma loja. Pela regra da mesa, a loja paga METADE do
     preço de tabela — é o que impede o inventário de virar uma torneira de
-    ouro (comprar e revender pelo mesmo valor seria dinheiro de graça).
+    ouro (comprar e revender pelo mesmo valor seria dinheiro de graça). Tesouro
+    (gema, obra de arte, mercadoria) vale o preço cheio. O pagamento vem nas
+    moedas certas: metade de uma clava são 5 pc, não 1 po.
 
     Args:
         char_name: Quem vende.
@@ -11954,14 +11781,14 @@ def sell_item(char_name: str, shop_name: str, item_name: str, quantity: int = 1)
 
     na_loja = next((i for i in loja["estoque"]
                     if _norm_txt(i["nome"]) == _norm_txt(item_name)), None)
-    tabela  = na_loja["preco"] if na_loja else (_preco_do_srd(item["nome"]) or 0)
-    if tabela <= 0:
+    linha = _linha_de_venda(char, item, loja)
+    if not linha:
         return (f"Aviso: Sem preço de referência para '{item['nome']}'. "
                 f"Ponha o item na loja com open_shop() informando o preço.")
 
-    ganho = _ganho_com_atitude(tabela, loja) * qtd
+    ganho = linha["ganho_pc"] * qtd
     sheet = char["sheet"]
-    sheet["ouro"] = int(sheet.get("ouro", 0) or 0) + ganho
+    _receber(sheet, ganho)
 
     item["qtd"] = int(item.get("qtd", 1) or 1) - qtd
     if item["qtd"] <= 0:
@@ -11976,9 +11803,11 @@ def sell_item(char_name: str, shop_name: str, item_name: str, quantity: int = 1)
     # mais. `pct` é sempre do ponto de vista do preço pedido.
     ajuste = _atitude_da_loja(loja)
     nota_atitude = (f", {-ajuste['pct']:+d}% pela relação com {ajuste['dono']}"
-                    if ajuste else "")
-    return (f"{char['name']} vendeu {qtd}x {item_name} por {ganho} po "
-            f"(metade da tabela: {tabela} po{nota_atitude}) em {loja['nome']}.\n"
+                    if ajuste and not linha["tesouro"] else "")
+    regra = ("tesouro: valor cheio" if linha["tesouro"]
+             else f"metade da tabela: {linha['tabela_texto']}{nota_atitude}")
+    return (f"{char['name']} vendeu {qtd}x {item_name} por {_fmt_pc(ganho)} "
+            f"({regra}) em {loja['nome']}.\n"
             f"   Bolsa: {sheet['ouro']} po, {sheet.get('prata', 0)} pp, "
             f"{sheet.get('cobre', 0)} pc{nota_equip}")
 
@@ -17536,7 +17365,7 @@ def _combatant_weapons(ch: dict) -> list[dict]:
         if not isinstance(it, dict):
             continue
         inm = (it.get("nome") or "")
-        if any(kw in inm.lower() for kw in _WEAPON_KEYWORDS):
+        if _itens.arma(inm) or any(kw in inm.lower() for kw in _WEAPON_KEYWORDS):
             _add(inm, "inventário")
     _add("Ataque desarmado", "desarmado")
     return out

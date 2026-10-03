@@ -283,13 +283,13 @@
   // A frase do resultado sai dos dados (`resultado`), não do texto do mestre.
   function fraseDaIdentificacao(r) {
     if (!r.encontrado) {
-      return `${r.item} não está no SRD de D&D 5e: ficou marcado como item próprio da campanha.`;
+      return `${r.como ? r.como + ' ' : ''}${r.item} não está no SRD de D&D 5e: ficou marcado como item próprio da campanha.`;
     }
     const detalhes = [r.tipo, r.raridade, r.sintonizacao ? 'requer sintonização' : '']
       .filter(Boolean).join(', ');
     const nome = r.nome_srd && r.nome_srd.toLowerCase() !== r.item.toLowerCase()
       ? `${r.item} é ${r.nome_srd} no SRD` : `${r.item} está no SRD`;
-    return `${nome}${detalhes ? ` (${detalhes})` : ''}. A descrição foi atualizada.`;
+    return `${r.como ? r.como + ' ' : ''}${nome}${detalhes ? ` (${detalhes})` : ''}.`;
   }
 
   async function agir(payload, opts) {

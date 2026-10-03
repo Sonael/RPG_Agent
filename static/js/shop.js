@@ -197,7 +197,7 @@
   }
 
   function cartaoCompra(i, c) {
-    const caro  = c ? (c.bolsa_em_cobre < i.preco * 100) : true;
+    const caro  = c ? (c.bolsa_em_cobre < i.preco_pc) : true;
     const resta = i.ilimitado ? '' : `<span class="shp-resta">restam ${i.qtd}</span>`;
     const selo  = i.custom
       ? `<span class="shp-selo-custom" title="Fora do SRD — item próprio da campanha">próprio da campanha</span>`
@@ -212,13 +212,13 @@
         </div>
         ${desc}
         <div class="shp-item-linha">
-          <span class="shp-preco">${i.preco} po${
-            i.tabela && i.tabela !== i.preco
-              ? ` <small title="Tabela ${i.tabela} po — o resto é a relação com o lojista">de ${i.tabela}</small>`
+          <span class="shp-preco">${esc(i.preco_texto)}${
+            i.tabela_pc && i.tabela_pc !== i.preco_pc
+              ? ` <small title="Tabela ${esc(i.tabela_texto)} — o resto é a relação com o lojista">de ${esc(i.tabela_texto)}</small>`
               : ''}</span>
           <span class="shp-peso">${i.peso} kg</span>
           <button class="shp-btn" ${caro ? 'disabled' : ''}
-                  title="${caro ? 'Ouro insuficiente' : 'Comprar 1'}"
+                  title="${caro ? 'Dinheiro insuficiente' : 'Comprar 1'}"
                   onclick="window.Shop._comprar('${esc(i.nome).replace(/'/g, "\\'")}', 1)">
             Comprar
           </button>
@@ -237,8 +237,10 @@
           ${selo}<span class="shp-resta">você tem ${i.qtd}</span>
         </div>
         <div class="shp-item-linha">
-          <span class="shp-preco">${i.ganho} po
-            <small title="A loja paga metade da tabela">de ${i.tabela}</small></span>
+          <span class="shp-preco">${esc(i.ganho_texto)}
+            ${i.tesouro
+              ? '<small title="Gema, obra de arte e mercadoria valem o preço cheio">tesouro</small>'
+              : `<small title="A loja paga metade da tabela">de ${esc(i.tabela_texto)}</small>`}</span>
           <span class="shp-peso">${i.peso} kg</span>
           <button class="shp-btn shp-btn-vender"
                   onclick="window.Shop._vender('${esc(i.nome).replace(/'/g, "\\'")}', 1)">

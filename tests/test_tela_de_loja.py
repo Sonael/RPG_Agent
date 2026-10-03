@@ -52,7 +52,7 @@ def test_snapshot_traz_estoque_com_preco_e_peso(forja):
     assert snap["loja"]["nome"] == "Forja do Torbin"
 
     cota = next(i for i in snap["estoque"] if i["nome"] == "Cota de Malha")
-    assert cota["preco"] == 75
+    assert cota["preco_pc"] == 7500
     assert cota["peso"] == pytest.approx(24.95, abs=0.05)
 
 
@@ -96,19 +96,23 @@ def test_troca_de_comprador(forja):
 
 def test_so_lista_o_que_a_loja_sabe_avaliar(forja):
     """
-    Corda de Cânhamo não tem preço de tabela. Mostrá-la com um botão que
-    sempre recusa seria pior que não mostrar.
+    Item sem preço de tabela não aparece: mostrá-lo com um botão que sempre
+    recusa seria pior que não mostrar. A Corda de Cânhamo, que antes caía
+    aqui, hoje tem o preço do SRD (1 po).
     """
+    forja["inventario"].append({"nome": "Bugiganga do Vhar", "qtd": 1, "descricao": ""})
     nomes = [i["nome"] for i in td.shop_snapshot()["inventario"]]
     assert "Espada Curta" in nomes
-    assert "Corda de Cânhamo" not in nomes
+    assert "Corda de Cânhamo" in nomes
+    assert "Bugiganga do Vhar" not in nomes
 
 
 def test_a_loja_paga_metade_da_tabela(forja):
     linha = next(i for i in td.shop_snapshot()["inventario"]
                  if i["nome"] == "Espada Curta")
-    assert linha["tabela"] == 10
-    assert linha["ganho"] == 5
+    assert linha["tabela_pc"] == 1000
+    assert linha["ganho_pc"] == 500
+    assert (linha["tabela_texto"], linha["ganho_texto"]) == ("10 po", "5 po")
     assert linha["qtd"] == 2
 
 

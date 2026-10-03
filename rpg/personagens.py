@@ -85,12 +85,18 @@ def _loja_do_personagem(nome: str, local: str) -> dict | None:
         "nome":  escolhida.get("nome", ""),
         "dono":  dono,
         "local": escolhida.get("local", "") or "",
-        "estoque": [{"nome": i.get("nome", ""),
-                     "preco": td._preco_com_atitude(int(i.get("preco", 0) or 0), escolhida),
-                     "tabela": int(i.get("preco", 0) or 0),
-                     "qtd": int(i.get("qtd", 0) or 0)}
-                    for i in (escolhida.get("estoque") or [])],
+        "estoque": [_linha_do_estoque(i, escolhida) for i in (escolhida.get("estoque") or [])],
     }
+
+
+def _linha_do_estoque(i: dict, loja: dict) -> dict:
+    """Uma linha do estoque, com o preço que este lojista cobra do grupo (em cobre e em texto)."""
+    from rpg import tools_dnd as td
+    tabela = td._preco_pc_da_linha(i)
+    pedido = td._preco_com_atitude(tabela, loja)
+    return {"nome": i.get("nome", ""), "preco_pc": pedido, "tabela_pc": tabela,
+            "preco_texto": td._fmt_pc(pedido), "tabela_texto": td._fmt_pc(tabela),
+            "qtd": int(i.get("qtd", 0) or 0)}
 
 
 def _efeitos_da_atitude(valor: int) -> list[str]:

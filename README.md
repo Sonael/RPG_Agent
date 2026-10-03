@@ -721,16 +721,67 @@ slots; casos comuns cobertos). Resumo:
   para a busca de arma no SRD. Sem esse passo, esses nomes não existem em
   `/weapons/`, tomam 404 e o motor usava o fallback genérico de 1d6, o que
   achatava o dano de **todo** inimigo do jogo.
-- `_fetch_weapon_data` busca dano/tipo de armas no Open5e (PT→EN via
-  `WEAPON_PT_TO_EN`).
-- `_weapon_attr` decide DEX×STR (ranged→DEX, finesse→max, melee→STR). As
-  listas `RANGED_WEAPONS` e `FINESSE_WEAPONS` têm os nomes em português **e**
+- `_fetch_weapon_data` lê o dano da arma no compêndio local de itens (ver
+  abaixo), sem rede: "Espada Longa +1" é a espada longa (1d8) com +1.
+- Arma **versátil** (espada longa, lança, bordão, machado de batalha) usa o
+  dado maior quando a outra mão está livre: sem escudo e sem outra arma
+  equipada (`_versatil_a_duas_maos`). Com o Estilo Duelo o motor mantém uma
+  mão só, porque o +2 rende mais que o dado. Nas duas mãos ela também conta
+  para a Grande Arma.
+- `_weapon_attr` decide DEX×STR (ranged→DEX, finesse→max, melee→STR) pelas
+  propriedades do SRD no compêndio. Para nome fora do SRD, as listas
+  `RANGED_WEAPONS` e `FINESSE_WEAPONS` têm os nomes em português **e**
   em inglês: a arma do monstro chega do stat block como "scimitar" ou
   "shortbow", e só com os nomes em português o goblin (FOR 8, DES 14) atacava
   de cimitarra e de arco com a Força, acertando com +1 em vez do +4 do livro.
   "Rapieira" também faltava (a lista tinha "rapier"), e a rapieira do ladino e
   do bardo usava a Força. `test_atributo_da_arma.py` trava os dois idiomas.
-- `ARMOR_TABLE` fixa CA base e bônus de DEX por tipo de armadura.
+- `ARMOR_TABLE` (nome em português → CA base e regra de DES) é derivada do
+  compêndio. `_armadura_na_tabela` aceita o nome em inglês, o bônus mágico
+  ("Cota de Malha +1", "Escudo +2") e o item mágico feito de armadura
+  ("Placas Anãs"); `_recalculate_ca` soma o +N da armadura e do escudo.
+
+### O compêndio de itens (`rpg/itens.py`)
+
+Os itens do SRD 5.1 em tabela local, como as magias: 37 armas, 12 armaduras e o
+escudo, o equipamento de aventura, as ferramentas, as mercadorias, os venenos
+e 255 itens mágicos. Os dados ficam em `rpg/dados/srd_itens.json`, gerado por
+`scripts/gerar_itens.py` a partir do Open5e v2 (`scripts/srd_bruto/`) e de
+`scripts/srd_itens_pt.json` (nomes em português, apelidos, as bases das armas
+e armaduras mágicas e cada correção com o seu porquê). Toda correção vai para
+`scripts/srd_itens_relatorio.txt`, e `test_o_gerador_reproduz_o_compendio`
+confere que o JSON versionado é o que o gerador produz.
+
+Antes, o motor sabia de itens por umas quinze tabelas feitas à mão, cada uma
+com um pedaço, e completava o resto perguntando ao Open5e v1 em tempo de jogo,
+com nome em português. Medido antes da troca:
+
+- sem rede, **toda** arma causava 1d6 (a tabela local tinha o preço, não o
+  dano); com rede, "Espada Longa +1" também causava 1d6 + 1, porque o "+1"
+  quebrava a busca, e a arma mágica batia menos que a comum;
+- Mangual, Maça-Estrela, Azagaia, Machadinha e Rede não tinham tradução;
+- "Lança" e "Lança Curta" contavam como armas de duas mãos (perdiam o Duelo
+  e ganhavam a Grande Arma);
+- armadura e escudo mágicos não equipavam, e "Chain Mail" equipava como
+  CA 10 + DES inteira (a busca aceitava o primeiro resultado sem conferir);
+- tocha, corda, ração e a Poção de Cura não tinham preço;
+- a Mochila e a Loja faziam até duas consultas de 4 s por item desconhecido.
+
+O Open5e v2 também erra: o chicote vinha sem Acuidade, a machadinha sem
+Arremesso, a besta pesada sem Munição, a besta leve sem Duas Mãos, o tridente
+com Duas Mãos e a espada curta como cortante. As correções estão no arquivo de
+revisões, conferidas contra a tabela de armas do SRD 5.1.
+
+Como um nome vira item: o bônus sai do nome primeiro ("+1", "(+2)"); depois
+o nome exato (português, inglês, apelido, sem acento, plural ou singular, com
+ou sem o parêntese: "Rações", "Ração (1 dia)", "Flechas (20)"); para arma e
+armadura, o item mágico feito delas (a Defensora é uma espada longa +3); por
+fim a arma ou armadura **dentro** do nome, a mais longa primeiro ("Espada Curta
+de Prata", "Cota de Malha de Mithral"). Item conhecido que não é arma (o
+Bastão Imóvel) não vira arma por ter "bastão" no nome.
+
+O editor de ficha busca itens no compêndio (`/api/dnd/items/search`), com
+nome e resumo em português.
 
 ### Camada de acesso ao SRD (`rpg/open5e.py`)
 
@@ -765,8 +816,19 @@ Os call sites usam `from open5e import http as _req`: a resposta expõe
   monge. `learn_ability` recalcula quando concede uma dessas duas: antes a CA
   só mudaria quando o personagem vestisse ou tirasse alguma coisa.
 - `modify_currency(char, "ouro"|"prata"|"cobre", amount)`.
-- `identify_item` busca o item no SRD via Open5e, distingue **mágicos
-  canônicos** de **customizados** e marca pra IA não exceder no efeito.
+- `add_item` confere **todo** item no compêndio (antes, só o de nome mágico,
+  porque a consulta custava rede: a Bolsa de Contenção passava direto). Item
+  mágico do SRD entra com tipo e raridade e **por identificar**, menos o comum
+  (a Poção de Cura); o que sai da loja já vem identificado. A pilha é pelo
+  nome sem caixa e sem acento ("Pocao de cura" e "Poção de Cura" eram duas),
+  e quantidade negativa é recusada; com 0, só se troca a descrição de um item
+  que o personagem já tem (o ferreiro que tempera a lâmina).
+- `identify_item` devolve ao Mestre o nome no SRD, tipo, raridade e o texto do
+  SRD em inglês, para ele narrar em português. A Mochila nunca grava esse
+  texto: a descrição do item é a do mestre, ou uma linha em português
+  ("Anel — raro, requer sintonização."). Pela Mochila, identificar custa o que
+  custa no 5e: a poção, um gole; o resto, uma hora estudando o item (o relógio
+  anda), e não dá no meio da luta.
 
 ### Carga e loja
 
@@ -775,21 +837,27 @@ armaduras de placas e uma bigorna, e "comprar" era o mestre digitar um número
 de ouro de cabeça. Duas consequências chatas — saque nunca era **escolha**
 (leva tudo), e o preço do mesmo item variava conforme o humor da cena.
 
-Peso e preço de **arma e armadura** saem de duas tabelas locais com os valores
-do SRD (`_ARMAS_SRD`, `_ARMADURAS_SRD`), e a conversão de libra para quilo é
-feita no motor. Fora delas, uma tabela curta de aproximação só do que aparece
-numa mesa (poção, corda, tocha); depois disso o Open5e; e 0,5 kg como último
-recurso.
+Peso e preço saem do compêndio de itens (ver acima), em quilos e em **peças de
+cobre**. Fora dele, uma tabela curta de aproximação só do que aparece numa mesa
+("Poção Estranha"); e 0,5 kg como último recurso. Nada disso vai à rede.
 
-As tabelas são locais por dois motivos concretos, os dois medidos:
+O preço era em ouro inteiro: tudo abaixo de 1 po custava 1 po (a tocha de
+1 pc, a ração de 5 pp, a clava de 1 pp), e 20 tochas saíam por 20 po. Hoje a
+loja guarda `preco_pc` (loja salva com `preco` em ouro é convertida na
+primeira leitura), o mestre escreve o preço em ouro ou com a moeda ("5 pp",
+"2 pc"), e a venda paga nas moedas certas (metade de uma clava são 5 pc).
+Tesouro (gema, obra de arte, mercadoria) vende pelo valor cheio; o valor vem
+do item (`valor_po`), do SRD ou do nome ("Rubi (50 po)"). A poção achada no
+saque também vende, pela metade da tabela.
+
+A tabela era local, e não o Open5e, por dois motivos concretos, os dois medidos:
 
 - **O SRD é em inglês.** As consultas iam com o nome em português, então
   `open_shop("Forja do Torbin", "Espada Longa; Cota de Malha; Escudo")`
   respondia *"Nenhum item com preço. O SRD não conhece: Espada Longa, …"* e
-  recusava o estoque inteiro. `_traduzir_para_srd` resolve o caso geral
-  (reusa o `WEAPON_PT_TO_EN` que já existia e o novo campo `srd` de
-  `ARMOR_TABLE`), mas a tabela local torna a loja independente da API estar
-  no ar — um `HTTP 0` da Open5e não pode fechar o comércio da campanha.
+  recusava o estoque inteiro. Hoje o nome em português é procurado no
+  compêndio, e a loja não depende de a API estar no ar — um `HTTP 0` da
+  Open5e não pode fechar o comércio da campanha.
 - **`/v1/armor/` não tem peso.** O campo `weight` volta vazio nas 13
   armaduras; conferido uma a uma. Não existe fonte remota para isso.
 
@@ -1955,36 +2023,26 @@ equip_item de item que não existe          "'Espada Inexistente' não está..."
 Três defeitos no botão, e mais um na conferência que vinha junto:
 
 - **O SRD é em inglês.** "Manto Élfico" não achava "Cloak of Elvenkind" e saía
-  como item da campanha. `_candidatos_srd` gera os nomes em inglês a tentar:
-  - nomes inteiros para o que não se compõe (`_ITEM_MAGICO_PT_TO_EN`: Bolsa
-    Devoradora, Língua de Fogo, Pedra da Sorte...);
-  - "cabeça de complemento" para o grosso do SRD (`_ITEM_CABECA_PT_TO_EN` ×
-    `_ITEM_COMPLEMENTO_PT_TO_EN`: Anel de Proteção → Ring of Protection);
-  - arma com bônus ("Espada Longa +1") → "Weapon, +1, +2, or +3";
-  - e o próprio nome, para quem já escreve em inglês.
-
-  Todos os nomes em inglês dos dois dicionários foram conferidos contra os 237
-  itens do SRD no Open5e.
-- **A busca aceitava qualquer resultado.** A busca textual do Open5e procura
-  também nas descrições ("longsword" devolvia a Excalibur's Scabbard). O
-  código ficava com o resultado de mais palavras em comum mesmo quando
-  nenhuma coincidia, e gravava a descrição de outro item. Agora
-  `_consultar_item_srd` só aceita o item do SRD oficial (`wotc-srd`, a busca
-  vai filtrada por documento) cujo nome confere **exatamente** com um
-  candidato (`_mesmo_item`, que também aceita o parêntese de "Stone of Good
-  Luck (Luckstone)"). Uma tradução errada só deixa de achar; nunca troca o
+  como item da campanha. Hoje o nome em português está no compêndio de itens,
+  com os apelidos; `_candidatos_srd` ainda compõe "cabeça de complemento"
+  (`_ITEM_CABECA_PT_TO_EN` × `_ITEM_COMPLEMENTO_PT_TO_EN`: "Anel da Proteção"
+  → Ring of Protection) para a variação que ninguém cadastrou.
+- **A busca aceitava qualquer resultado.** A busca textual do Open5e procurava
+  também nas descrições ("longsword" devolvia a Excalibur's Scabbard), e o
+  código gravava a descrição de outro item. Hoje o nome só casa **exatamente**
+  com um item do compêndio (`_mesmo_item` ainda aceita o parêntese de "Stone of
+  Good Luck (Luckstone)"). Uma tradução errada só deixa de achar; nunca troca o
   item por outro.
-- **Sem conexão não é homebrew.** Com o Open5e fora do ar, o item era marcado
-  como "próprio da campanha" e o botão sumia para sempre. Agora
-  `identify_item` responde `Erro:` com "tente de novo" e não marca nada. Só um
-  "não existe" de verdade marca.
+- **Sem conexão não era homebrew.** Com o Open5e fora do ar, o item era
+  marcado como "próprio da campanha" e o botão sumia para sempre. Com o
+  compêndio local a pergunta deixou de existir: não há rede no caminho.
 - **O clique não dava sinal.** A consulta leva de meio a um segundo e pouco,
   e nesse tempo a tela não mudava. Agora o botão vira "Consultando…" com um
   indicador girando, o rodapé diz "Consultando o SRD de D&D 5e para Manto
   Élfico…", e os outros botões ficam desabilitados até a resposta. No fim, o
-  rodapé diz o resultado em português ("Manto Élfico é Cloak of Elvenkind no
-  SRD (item maravilhoso, incomum, requer sintonização)"), o item ganha a
-  marca "SRD: Cloak of Elvenkind" e fica destacado por um instante.
+  rodapé diz o resultado em português ("Aria estudou o item por uma hora.
+  Anel de prata é Anel de Proteção no SRD (anel, raro, requer sintonização)"),
+  o item ganha a marca com o nome oficial em português e fica destacado.
 
 A tela continua passando por `identify_item`. O resultado em dados
 (`resultado` na resposta de `inventory_action`) sai do item gravado (`nome_srd`

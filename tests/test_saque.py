@@ -15,7 +15,7 @@ from conftest import criar_ficha, iniciar_combate
 @pytest.fixture
 def grupo(campanha, povoar, monkeypatch):
     # Sem rede: nada de SRD na conferência de item.
-    monkeypatch.setattr(td, "_search_open5e_item", lambda nome: None)
+    monkeypatch.setattr(td, "_item_magico_do_srd", lambda nome: None)
     alden = criar_ficha("Alden", grupo=True, forca=10)       # capacidade 68 kg
     alden["inventario"] = [{"nome": "Adaga", "qtd": 1, "descricao": ""}]
     # Lyra de FOR 4: metade da capacidade em 13,6 kg, a cota (25 kg) pesa.

@@ -1,0 +1,1577 @@
+[
+ {
+  "key": "srd_battleaxe",
+  "document": {
+   "name": "System Reference Document 5.1",
+   "key": "srd-2014",
+   "type": "SOURCE",
+   "display_name": "5e 2014 Rules",
+   "publisher": {
+    "name": "Wizards of the Coast",
+    "key": "wizards-of-the-coast"
+   },
+   "gamesystem": {
+    "name": "5th Edition 2014",
+    "key": "5e-2014"
+   },
+   "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+  },
+  "properties": [
+   {
+    "property": {
+     "name": "Versatile",
+     "type": null,
+     "desc": "This weapon can be used with one or two hands. A damage value in parentheses appears with the property—the damage when the weapon is used with two hands to make a melee attack."
+    },
+    "detail": "1d10"
+   }
+  ],
+  "damage_type": {
+   "name": "Slashing",
+   "key": "slashing"
+  },
+  "distance_unit": "feet",
+  "name": "Battleaxe",
+  "damage_dice": "1d8",
+  "range": 0,
+  "long_range": 0,
+  "is_simple": false,
+  "is_improvised": false
+ },
+ {
+  "key": "srd_blowgun",
+  "document": {
+   "name": "System Reference Document 5.1",
+   "key": "srd-2014",
+   "type": "SOURCE",
+   "display_name": "5e 2014 Rules",
+   "publisher": {
+    "name": "Wizards of the Coast",
+    "key": "wizards-of-the-coast"
+   },
+   "gamesystem": {
+    "name": "5th Edition 2014",
+    "key": "5e-2014"
+   },
+   "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+  },
+  "properties": [
+   {
+    "property": {
+     "name": "Ammunition",
+     "type": null,
+     "desc": "You can use a weapon that has the ammunition property to make a ranged attack only if you have ammunition to fire from the weapon. Each time you attack with the weapon, you expend one piece of ammunition. Drawing the ammunition from a quiver, case, or other container is part of the attack (you need a free hand to load a one-­‐‑handed weapon). At the end of the battle, you can recover half your expended ammunition by taking a minute to search the battlefield.\n\nIf you use a weapon that has the ammunition property to make a melee attack, you treat the weapon as an improvised weapon (see “Improvised Weapons” later in the section). A sling must be loaded to deal any damage when used in this way."
+    },
+    "detail": "range 25/100"
+   },
+   {
+    "property": {
+     "name": "Loading",
+     "type": null,
+     "desc": "Because of the time required to load this weapon, you can fire only one piece of ammunition from it when you use an action, bonus action, or reaction to fire it, regardless of the number of attacks you can normally make."
+    },
+    "detail": null
+   }
+  ],
+  "damage_type": {
+   "name": "Piercing",
+   "key": "piercing"
+  },
+  "distance_unit": "feet",
+  "name": "Blowgun",
+  "damage_dice": "1",
+  "range": 25,
+  "long_range": 100,
+  "is_simple": false,
+  "is_improvised": false
+ },
+ {
+  "key": "srd_club",
+  "document": {
+   "name": "System Reference Document 5.1",
+   "key": "srd-2014",
+   "type": "SOURCE",
+   "display_name": "5e 2014 Rules",
+   "publisher": {
+    "name": "Wizards of the Coast",
+    "key": "wizards-of-the-coast"
+   },
+   "gamesystem": {
+    "name": "5th Edition 2014",
+    "key": "5e-2014"
+   },
+   "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+  },
+  "properties": [
+   {
+    "property": {
+     "name": "Light",
+     "type": null,
+     "desc": "A light weapon is small and easy to handle, making it ideal for use when fighting with two weapons."
+    },
+    "detail": null
+   }
+  ],
+  "damage_type": {
+   "name": "Bludgeoning",
+   "key": "bludgeoning"
+  },
+  "distance_unit": "feet",
+  "name": "Club",
+  "damage_dice": "1d4",
+  "range": 0,
+  "long_range": 0,
+  "is_simple": true,
+  "is_improvised": false
+ },
+ {
+  "key": "srd_crossbow-hand",
+  "document": {
+   "name": "System Reference Document 5.1",
+   "key": "srd-2014",
+   "type": "SOURCE",
+   "display_name": "5e 2014 Rules",
+   "publisher": {
+    "name": "Wizards of the Coast",
+    "key": "wizards-of-the-coast"
+   },
+   "gamesystem": {
+    "name": "5th Edition 2014",
+    "key": "5e-2014"
+   },
+   "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+  },
+  "properties": [
+   {
+    "property": {
+     "name": "Ammunition",
+     "type": null,
+     "desc": "You can use a weapon that has the ammunition property to make a ranged attack only if you have ammunition to fire from the weapon. Each time you attack with the weapon, you expend one piece of ammunition. Drawing the ammunition from a quiver, case, or other container is part of the attack (you need a free hand to load a one-­‐‑handed weapon). At the end of the battle, you can recover half your expended ammunition by taking a minute to search the battlefield.\n\nIf you use a weapon that has the ammunition property to make a melee attack, you treat the weapon as an improvised weapon (see “Improvised Weapons” later in the section). A sling must be loaded to deal any damage when used in this way."
+    },
+    "detail": "range 30/120"
+   },
+   {
+    "property": {
+     "name": "Light",
+     "type": null,
+     "desc": "A light weapon is small and easy to handle, making it ideal for use when fighting with two weapons."
+    },
+    "detail": null
+   },
+   {
+    "property": {
+     "name": "Loading",
+     "type": null,
+     "desc": "Because of the time required to load this weapon, you can fire only one piece of ammunition from it when you use an action, bonus action, or reaction to fire it, regardless of the number of attacks you can normally make."
+    },
+    "detail": null
+   }
+  ],
+  "damage_type": {
+   "name": "Piercing",
+   "key": "piercing"
+  },
+  "distance_unit": "feet",
+  "name": "Crossbow, hand",
+  "damage_dice": "1d6",
+  "range": 30,
+  "long_range": 120,
+  "is_simple": false,
+  "is_improvised": false
+ },
+ {
+  "key": "srd_crossbow-heavy",
+  "document": {
+   "name": "System Reference Document 5.1",
+   "key": "srd-2014",
+   "type": "SOURCE",
+   "display_name": "5e 2014 Rules",
+   "publisher": {
+    "name": "Wizards of the Coast",
+    "key": "wizards-of-the-coast"
+   },
+   "gamesystem": {
+    "name": "5th Edition 2014",
+    "key": "5e-2014"
+   },
+   "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+  },
+  "properties": [
+   {
+    "property": {
+     "name": "Loading",
+     "type": null,
+     "desc": "Because of the time required to load this weapon, you can fire only one piece of ammunition from it when you use an action, bonus action, or reaction to fire it, regardless of the number of attacks you can normally make."
+    },
+    "detail": null
+   },
+   {
+    "property": {
+     "name": "Two-Handed",
+     "type": null,
+     "desc": "This weapon requires two hands when you attack with it."
+    },
+    "detail": null
+   }
+  ],
+  "damage_type": {
+   "name": "Piercing",
+   "key": "piercing"
+  },
+  "distance_unit": "feet",
+  "name": "Crossbow, heavy",
+  "damage_dice": "1d10",
+  "range": 100,
+  "long_range": 400,
+  "is_simple": false,
+  "is_improvised": false
+ },
+ {
+  "key": "srd_crossbow-light",
+  "document": {
+   "name": "System Reference Document 5.1",
+   "key": "srd-2014",
+   "type": "SOURCE",
+   "display_name": "5e 2014 Rules",
+   "publisher": {
+    "name": "Wizards of the Coast",
+    "key": "wizards-of-the-coast"
+   },
+   "gamesystem": {
+    "name": "5th Edition 2014",
+    "key": "5e-2014"
+   },
+   "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+  },
+  "properties": [
+   {
+    "property": {
+     "name": "Ammunition",
+     "type": null,
+     "desc": "You can use a weapon that has the ammunition property to make a ranged attack only if you have ammunition to fire from the weapon. Each time you attack with the weapon, you expend one piece of ammunition. Drawing the ammunition from a quiver, case, or other container is part of the attack (you need a free hand to load a one-­‐‑handed weapon). At the end of the battle, you can recover half your expended ammunition by taking a minute to search the battlefield.\n\nIf you use a weapon that has the ammunition property to make a melee attack, you treat the weapon as an improvised weapon (see “Improvised Weapons” later in the section). A sling must be loaded to deal any damage when used in this way."
+    },
+    "detail": "range 80/320"
+   },
+   {
+    "property": {
+     "name": "Loading",
+     "type": null,
+     "desc": "Because of the time required to load this weapon, you can fire only one piece of ammunition from it when you use an action, bonus action, or reaction to fire it, regardless of the number of attacks you can normally make."
+    },
+    "detail": null
+   }
+  ],
+  "damage_type": {
+   "name": "Piercing",
+   "key": "piercing"
+  },
+  "distance_unit": "feet",
+  "name": "Crossbow, light",
+  "damage_dice": "1d8",
+  "range": 80,
+  "long_range": 320,
+  "is_simple": true,
+  "is_improvised": false
+ },
+ {
+  "key": "srd_dagger",
+  "document": {
+   "name": "System Reference Document 5.1",
+   "key": "srd-2014",
+   "type": "SOURCE",
+   "display_name": "5e 2014 Rules",
+   "publisher": {
+    "name": "Wizards of the Coast",
+    "key": "wizards-of-the-coast"
+   },
+   "gamesystem": {
+    "name": "5th Edition 2014",
+    "key": "5e-2014"
+   },
+   "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+  },
+  "properties": [
+   {
+    "property": {
+     "name": "Finesse",
+     "type": null,
+     "desc": "When making an attack with a finesse weapon, you use your choice of your Strength or Dexterity modifier for the attack and damage rolls. You must use the same modifier for both rolls."
+    },
+    "detail": null
+   },
+   {
+    "property": {
+     "name": "Light",
+     "type": null,
+     "desc": "A light weapon is small and easy to handle, making it ideal for use when fighting with two weapons."
+    },
+    "detail": null
+   },
+   {
+    "property": {
+     "name": "Thrown",
+     "type": null,
+     "desc": "If a weapon has the thrown property, you can throw the weapon to make a ranged attack. If the weapon is a melee weapon, you use the same ability modifier for that attack roll and damage roll that you would use for a melee attack with the weapon. For example, if you throw a handaxe, you use your Strength, but if you throw a dagger, you can use either your Strength or your Dexterity, since the dagger has the finesse property."
+    },
+    "detail": "range 20/60"
+   }
+  ],
+  "damage_type": {
+   "name": "Piercing",
+   "key": "piercing"
+  },
+  "distance_unit": "feet",
+  "name": "Dagger",
+  "damage_dice": "1d4",
+  "range": 20,
+  "long_range": 60,
+  "is_simple": true,
+  "is_improvised": false
+ },
+ {
+  "key": "srd_dart",
+  "document": {
+   "name": "System Reference Document 5.1",
+   "key": "srd-2014",
+   "type": "SOURCE",
+   "display_name": "5e 2014 Rules",
+   "publisher": {
+    "name": "Wizards of the Coast",
+    "key": "wizards-of-the-coast"
+   },
+   "gamesystem": {
+    "name": "5th Edition 2014",
+    "key": "5e-2014"
+   },
+   "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+  },
+  "properties": [
+   {
+    "property": {
+     "name": "Finesse",
+     "type": null,
+     "desc": "When making an attack with a finesse weapon, you use your choice of your Strength or Dexterity modifier for the attack and damage rolls. You must use the same modifier for both rolls."
+    },
+    "detail": null
+   },
+   {
+    "property": {
+     "name": "Thrown",
+     "type": null,
+     "desc": "If a weapon has the thrown property, you can throw the weapon to make a ranged attack. If the weapon is a melee weapon, you use the same ability modifier for that attack roll and damage roll that you would use for a melee attack with the weapon. For example, if you throw a handaxe, you use your Strength, but if you throw a dagger, you can use either your Strength or your Dexterity, since the dagger has the finesse property."
+    },
+    "detail": "range 20/60"
+   }
+  ],
+  "damage_type": {
+   "name": "Piercing",
+   "key": "piercing"
+  },
+  "distance_unit": "feet",
+  "name": "Dart",
+  "damage_dice": "1d4",
+  "range": 20,
+  "long_range": 60,
+  "is_simple": true,
+  "is_improvised": false
+ },
+ {
+  "key": "srd_flail",
+  "document": {
+   "name": "System Reference Document 5.1",
+   "key": "srd-2014",
+   "type": "SOURCE",
+   "display_name": "5e 2014 Rules",
+   "publisher": {
+    "name": "Wizards of the Coast",
+    "key": "wizards-of-the-coast"
+   },
+   "gamesystem": {
+    "name": "5th Edition 2014",
+    "key": "5e-2014"
+   },
+   "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+  },
+  "properties": [],
+  "damage_type": {
+   "name": "Bludgeoning",
+   "key": "bludgeoning"
+  },
+  "distance_unit": "feet",
+  "name": "Flail",
+  "damage_dice": "1d8",
+  "range": 0,
+  "long_range": 0,
+  "is_simple": false,
+  "is_improvised": false
+ },
+ {
+  "key": "srd_glaive",
+  "document": {
+   "name": "System Reference Document 5.1",
+   "key": "srd-2014",
+   "type": "SOURCE",
+   "display_name": "5e 2014 Rules",
+   "publisher": {
+    "name": "Wizards of the Coast",
+    "key": "wizards-of-the-coast"
+   },
+   "gamesystem": {
+    "name": "5th Edition 2014",
+    "key": "5e-2014"
+   },
+   "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+  },
+  "properties": [
+   {
+    "property": {
+     "name": "Reach",
+     "type": null,
+     "desc": "This weapon adds 5 feet to your reach when you attack with it, as well as when determining your reach for opportunity attacks with it."
+    },
+    "detail": null
+   },
+   {
+    "property": {
+     "name": "Two-Handed",
+     "type": null,
+     "desc": "This weapon requires two hands when you attack with it."
+    },
+    "detail": null
+   }
+  ],
+  "damage_type": {
+   "name": "Slashing",
+   "key": "slashing"
+  },
+  "distance_unit": "feet",
+  "name": "Glaive",
+  "damage_dice": "1d10",
+  "range": 0,
+  "long_range": 0,
+  "is_simple": false,
+  "is_improvised": false
+ },
+ {
+  "key": "srd_greataxe",
+  "document": {
+   "name": "System Reference Document 5.1",
+   "key": "srd-2014",
+   "type": "SOURCE",
+   "display_name": "5e 2014 Rules",
+   "publisher": {
+    "name": "Wizards of the Coast",
+    "key": "wizards-of-the-coast"
+   },
+   "gamesystem": {
+    "name": "5th Edition 2014",
+    "key": "5e-2014"
+   },
+   "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+  },
+  "properties": [
+   {
+    "property": {
+     "name": "Two-Handed",
+     "type": null,
+     "desc": "This weapon requires two hands when you attack with it."
+    },
+    "detail": null
+   }
+  ],
+  "damage_type": {
+   "name": "Slashing",
+   "key": "slashing"
+  },
+  "distance_unit": "feet",
+  "name": "Greataxe",
+  "damage_dice": "1d12",
+  "range": 0,
+  "long_range": 0,
+  "is_simple": false,
+  "is_improvised": false
+ },
+ {
+  "key": "srd_greatclub",
+  "document": {
+   "name": "System Reference Document 5.1",
+   "key": "srd-2014",
+   "type": "SOURCE",
+   "display_name": "5e 2014 Rules",
+   "publisher": {
+    "name": "Wizards of the Coast",
+    "key": "wizards-of-the-coast"
+   },
+   "gamesystem": {
+    "name": "5th Edition 2014",
+    "key": "5e-2014"
+   },
+   "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+  },
+  "properties": [
+   {
+    "property": {
+     "name": "Two-Handed",
+     "type": null,
+     "desc": "This weapon requires two hands when you attack with it."
+    },
+    "detail": null
+   }
+  ],
+  "damage_type": {
+   "name": "Bludgeoning",
+   "key": "bludgeoning"
+  },
+  "distance_unit": "feet",
+  "name": "Greatclub",
+  "damage_dice": "1d8",
+  "range": 0,
+  "long_range": 0,
+  "is_simple": true,
+  "is_improvised": false
+ },
+ {
+  "key": "srd_greatsword",
+  "document": {
+   "name": "System Reference Document 5.1",
+   "key": "srd-2014",
+   "type": "SOURCE",
+   "display_name": "5e 2014 Rules",
+   "publisher": {
+    "name": "Wizards of the Coast",
+    "key": "wizards-of-the-coast"
+   },
+   "gamesystem": {
+    "name": "5th Edition 2014",
+    "key": "5e-2014"
+   },
+   "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+  },
+  "properties": [
+   {
+    "property": {
+     "name": "Two-Handed",
+     "type": null,
+     "desc": "This weapon requires two hands when you attack with it."
+    },
+    "detail": null
+   }
+  ],
+  "damage_type": {
+   "name": "Slashing",
+   "key": "slashing"
+  },
+  "distance_unit": "feet",
+  "name": "Greatsword",
+  "damage_dice": "2d6",
+  "range": 0,
+  "long_range": 0,
+  "is_simple": false,
+  "is_improvised": false
+ },
+ {
+  "key": "srd_halberd",
+  "document": {
+   "name": "System Reference Document 5.1",
+   "key": "srd-2014",
+   "type": "SOURCE",
+   "display_name": "5e 2014 Rules",
+   "publisher": {
+    "name": "Wizards of the Coast",
+    "key": "wizards-of-the-coast"
+   },
+   "gamesystem": {
+    "name": "5th Edition 2014",
+    "key": "5e-2014"
+   },
+   "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+  },
+  "properties": [
+   {
+    "property": {
+     "name": "Reach",
+     "type": null,
+     "desc": "This weapon adds 5 feet to your reach when you attack with it, as well as when determining your reach for opportunity attacks with it."
+    },
+    "detail": null
+   },
+   {
+    "property": {
+     "name": "Two-Handed",
+     "type": null,
+     "desc": "This weapon requires two hands when you attack with it."
+    },
+    "detail": null
+   }
+  ],
+  "damage_type": {
+   "name": "Slashing",
+   "key": "slashing"
+  },
+  "distance_unit": "feet",
+  "name": "Halberd",
+  "damage_dice": "1d10",
+  "range": 0,
+  "long_range": 0,
+  "is_simple": false,
+  "is_improvised": false
+ },
+ {
+  "key": "srd_handaxe",
+  "document": {
+   "name": "System Reference Document 5.1",
+   "key": "srd-2014",
+   "type": "SOURCE",
+   "display_name": "5e 2014 Rules",
+   "publisher": {
+    "name": "Wizards of the Coast",
+    "key": "wizards-of-the-coast"
+   },
+   "gamesystem": {
+    "name": "5th Edition 2014",
+    "key": "5e-2014"
+   },
+   "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+  },
+  "properties": [
+   {
+    "property": {
+     "name": "Light",
+     "type": null,
+     "desc": "A light weapon is small and easy to handle, making it ideal for use when fighting with two weapons."
+    },
+    "detail": null
+   }
+  ],
+  "damage_type": {
+   "name": "Slashing",
+   "key": "slashing"
+  },
+  "distance_unit": "feet",
+  "name": "Handaxe",
+  "damage_dice": "1d6",
+  "range": 20,
+  "long_range": 60,
+  "is_simple": true,
+  "is_improvised": false
+ },
+ {
+  "key": "srd_javelin",
+  "document": {
+   "name": "System Reference Document 5.1",
+   "key": "srd-2014",
+   "type": "SOURCE",
+   "display_name": "5e 2014 Rules",
+   "publisher": {
+    "name": "Wizards of the Coast",
+    "key": "wizards-of-the-coast"
+   },
+   "gamesystem": {
+    "name": "5th Edition 2014",
+    "key": "5e-2014"
+   },
+   "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+  },
+  "properties": [
+   {
+    "property": {
+     "name": "Thrown",
+     "type": null,
+     "desc": "If a weapon has the thrown property, you can throw the weapon to make a ranged attack. If the weapon is a melee weapon, you use the same ability modifier for that attack roll and damage roll that you would use for a melee attack with the weapon. For example, if you throw a handaxe, you use your Strength, but if you throw a dagger, you can use either your Strength or your Dexterity, since the dagger has the finesse property."
+    },
+    "detail": "range 30/120"
+   }
+  ],
+  "damage_type": {
+   "name": "Piercing",
+   "key": "piercing"
+  },
+  "distance_unit": "feet",
+  "name": "Javelin",
+  "damage_dice": "1d6",
+  "range": 30,
+  "long_range": 120,
+  "is_simple": true,
+  "is_improvised": false
+ },
+ {
+  "key": "srd_lance",
+  "document": {
+   "name": "System Reference Document 5.1",
+   "key": "srd-2014",
+   "type": "SOURCE",
+   "display_name": "5e 2014 Rules",
+   "publisher": {
+    "name": "Wizards of the Coast",
+    "key": "wizards-of-the-coast"
+   },
+   "gamesystem": {
+    "name": "5th Edition 2014",
+    "key": "5e-2014"
+   },
+   "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+  },
+  "properties": [
+   {
+    "property": {
+     "name": "Special (Lance)",
+     "type": null,
+     "desc": "You have disadvantage when you use alance to attack a target within 5 feet of you. Also, a lance requires two hands to wield when you aren’t mounted."
+    },
+    "detail": null
+   },
+   {
+    "property": {
+     "name": "Reach",
+     "type": null,
+     "desc": "This weapon adds 5 feet to your reach when you attack with it, as well as when determining your reach for opportunity attacks with it."
+    },
+    "detail": null
+   }
+  ],
+  "damage_type": {
+   "name": "Piercing",
+   "key": "piercing"
+  },
+  "distance_unit": "feet",
+  "name": "Lance",
+  "damage_dice": "1d12",
+  "range": 0,
+  "long_range": 0,
+  "is_simple": false,
+  "is_improvised": false
+ },
+ {
+  "key": "srd_light-hammer",
+  "document": {
+   "name": "System Reference Document 5.1",
+   "key": "srd-2014",
+   "type": "SOURCE",
+   "display_name": "5e 2014 Rules",
+   "publisher": {
+    "name": "Wizards of the Coast",
+    "key": "wizards-of-the-coast"
+   },
+   "gamesystem": {
+    "name": "5th Edition 2014",
+    "key": "5e-2014"
+   },
+   "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+  },
+  "properties": [
+   {
+    "property": {
+     "name": "Light",
+     "type": null,
+     "desc": "A light weapon is small and easy to handle, making it ideal for use when fighting with two weapons."
+    },
+    "detail": null
+   },
+   {
+    "property": {
+     "name": "Thrown",
+     "type": null,
+     "desc": "If a weapon has the thrown property, you can throw the weapon to make a ranged attack. If the weapon is a melee weapon, you use the same ability modifier for that attack roll and damage roll that you would use for a melee attack with the weapon. For example, if you throw a handaxe, you use your Strength, but if you throw a dagger, you can use either your Strength or your Dexterity, since the dagger has the finesse property."
+    },
+    "detail": "range 20/60"
+   }
+  ],
+  "damage_type": {
+   "name": "Bludgeoning",
+   "key": "bludgeoning"
+  },
+  "distance_unit": "feet",
+  "name": "Light hammer",
+  "damage_dice": "1d4",
+  "range": 20,
+  "long_range": 60,
+  "is_simple": true,
+  "is_improvised": false
+ },
+ {
+  "key": "srd_longbow",
+  "document": {
+   "name": "System Reference Document 5.1",
+   "key": "srd-2014",
+   "type": "SOURCE",
+   "display_name": "5e 2014 Rules",
+   "publisher": {
+    "name": "Wizards of the Coast",
+    "key": "wizards-of-the-coast"
+   },
+   "gamesystem": {
+    "name": "5th Edition 2014",
+    "key": "5e-2014"
+   },
+   "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+  },
+  "properties": [
+   {
+    "property": {
+     "name": "Ammunition",
+     "type": null,
+     "desc": "You can use a weapon that has the ammunition property to make a ranged attack only if you have ammunition to fire from the weapon. Each time you attack with the weapon, you expend one piece of ammunition. Drawing the ammunition from a quiver, case, or other container is part of the attack (you need a free hand to load a one-­‐‑handed weapon). At the end of the battle, you can recover half your expended ammunition by taking a minute to search the battlefield.\n\nIf you use a weapon that has the ammunition property to make a melee attack, you treat the weapon as an improvised weapon (see “Improvised Weapons” later in the section). A sling must be loaded to deal any damage when used in this way."
+    },
+    "detail": "range 150/600"
+   },
+   {
+    "property": {
+     "name": "Two-Handed",
+     "type": null,
+     "desc": "This weapon requires two hands when you attack with it."
+    },
+    "detail": null
+   }
+  ],
+  "damage_type": {
+   "name": "Piercing",
+   "key": "piercing"
+  },
+  "distance_unit": "feet",
+  "name": "Longbow",
+  "damage_dice": "1d8",
+  "range": 150,
+  "long_range": 600,
+  "is_simple": false,
+  "is_improvised": false
+ },
+ {
+  "key": "srd_longsword",
+  "document": {
+   "name": "System Reference Document 5.1",
+   "key": "srd-2014",
+   "type": "SOURCE",
+   "display_name": "5e 2014 Rules",
+   "publisher": {
+    "name": "Wizards of the Coast",
+    "key": "wizards-of-the-coast"
+   },
+   "gamesystem": {
+    "name": "5th Edition 2014",
+    "key": "5e-2014"
+   },
+   "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+  },
+  "properties": [
+   {
+    "property": {
+     "name": "Versatile",
+     "type": null,
+     "desc": "This weapon can be used with one or two hands. A damage value in parentheses appears with the property—the damage when the weapon is used with two hands to make a melee attack."
+    },
+    "detail": "1d10"
+   }
+  ],
+  "damage_type": {
+   "name": "Slashing",
+   "key": "slashing"
+  },
+  "distance_unit": "feet",
+  "name": "Longsword",
+  "damage_dice": "1d8",
+  "range": 0,
+  "long_range": 0,
+  "is_simple": false,
+  "is_improvised": false
+ },
+ {
+  "key": "srd_mace",
+  "document": {
+   "name": "System Reference Document 5.1",
+   "key": "srd-2014",
+   "type": "SOURCE",
+   "display_name": "5e 2014 Rules",
+   "publisher": {
+    "name": "Wizards of the Coast",
+    "key": "wizards-of-the-coast"
+   },
+   "gamesystem": {
+    "name": "5th Edition 2014",
+    "key": "5e-2014"
+   },
+   "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+  },
+  "properties": [],
+  "damage_type": {
+   "name": "Bludgeoning",
+   "key": "bludgeoning"
+  },
+  "distance_unit": "feet",
+  "name": "Mace",
+  "damage_dice": "1d6",
+  "range": 0,
+  "long_range": 0,
+  "is_simple": true,
+  "is_improvised": false
+ },
+ {
+  "key": "srd_maul",
+  "document": {
+   "name": "System Reference Document 5.1",
+   "key": "srd-2014",
+   "type": "SOURCE",
+   "display_name": "5e 2014 Rules",
+   "publisher": {
+    "name": "Wizards of the Coast",
+    "key": "wizards-of-the-coast"
+   },
+   "gamesystem": {
+    "name": "5th Edition 2014",
+    "key": "5e-2014"
+   },
+   "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+  },
+  "properties": [
+   {
+    "property": {
+     "name": "Two-Handed",
+     "type": null,
+     "desc": "This weapon requires two hands when you attack with it."
+    },
+    "detail": null
+   }
+  ],
+  "damage_type": {
+   "name": "Bludgeoning",
+   "key": "bludgeoning"
+  },
+  "distance_unit": "feet",
+  "name": "Maul",
+  "damage_dice": "2d6",
+  "range": 0,
+  "long_range": 0,
+  "is_simple": false,
+  "is_improvised": false
+ },
+ {
+  "key": "srd_morningstar",
+  "document": {
+   "name": "System Reference Document 5.1",
+   "key": "srd-2014",
+   "type": "SOURCE",
+   "display_name": "5e 2014 Rules",
+   "publisher": {
+    "name": "Wizards of the Coast",
+    "key": "wizards-of-the-coast"
+   },
+   "gamesystem": {
+    "name": "5th Edition 2014",
+    "key": "5e-2014"
+   },
+   "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+  },
+  "properties": [],
+  "damage_type": {
+   "name": "Piercing",
+   "key": "piercing"
+  },
+  "distance_unit": "feet",
+  "name": "Morningstar",
+  "damage_dice": "1d8",
+  "range": 0,
+  "long_range": 0,
+  "is_simple": false,
+  "is_improvised": false
+ },
+ {
+  "key": "srd_net",
+  "document": {
+   "name": "System Reference Document 5.1",
+   "key": "srd-2014",
+   "type": "SOURCE",
+   "display_name": "5e 2014 Rules",
+   "publisher": {
+    "name": "Wizards of the Coast",
+    "key": "wizards-of-the-coast"
+   },
+   "gamesystem": {
+    "name": "5th Edition 2014",
+    "key": "5e-2014"
+   },
+   "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+  },
+  "properties": [
+   {
+    "property": {
+     "name": "Special (Net)",
+     "type": null,
+     "desc": "A Large or smaller creature hit by a net is restrained until it is freed. A net has no effect on creatures that are formless, or creatures that are Huge or larger. A creature can use its action to make a DC 10 Strength check, freeing itself or another creature within its reach on a success. Dealing 5 slashing damage to the net (AC 10) also frees the creature without harming it, ending the effect and destroying the net.\n\nWhen you use an action, bonus action, or reaction to attack with a net, you can make only one attack regardless of the number of attacks you can normally make."
+    },
+    "detail": null
+   },
+   {
+    "property": {
+     "name": "Thrown",
+     "type": null,
+     "desc": "If a weapon has the thrown property, you can throw the weapon to make a ranged attack. If the weapon is a melee weapon, you use the same ability modifier for that attack roll and damage roll that you would use for a melee attack with the weapon. For example, if you throw a handaxe, you use your Strength, but if you throw a dagger, you can use either your Strength or your Dexterity, since the dagger has the finesse property."
+    },
+    "detail": "range 5/15"
+   }
+  ],
+  "damage_type": {
+   "name": "Bludgeoning",
+   "key": "bludgeoning"
+  },
+  "distance_unit": "feet",
+  "name": "Net",
+  "damage_dice": "0",
+  "range": 5,
+  "long_range": 15,
+  "is_simple": false,
+  "is_improvised": false
+ },
+ {
+  "key": "srd_pike",
+  "document": {
+   "name": "System Reference Document 5.1",
+   "key": "srd-2014",
+   "type": "SOURCE",
+   "display_name": "5e 2014 Rules",
+   "publisher": {
+    "name": "Wizards of the Coast",
+    "key": "wizards-of-the-coast"
+   },
+   "gamesystem": {
+    "name": "5th Edition 2014",
+    "key": "5e-2014"
+   },
+   "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+  },
+  "properties": [
+   {
+    "property": {
+     "name": "Reach",
+     "type": null,
+     "desc": "This weapon adds 5 feet to your reach when you attack with it, as well as when determining your reach for opportunity attacks with it."
+    },
+    "detail": null
+   },
+   {
+    "property": {
+     "name": "Two-Handed",
+     "type": null,
+     "desc": "This weapon requires two hands when you attack with it."
+    },
+    "detail": null
+   }
+  ],
+  "damage_type": {
+   "name": "Piercing",
+   "key": "piercing"
+  },
+  "distance_unit": "feet",
+  "name": "Pike",
+  "damage_dice": "1d10",
+  "range": 0,
+  "long_range": 0,
+  "is_simple": false,
+  "is_improvised": false
+ },
+ {
+  "key": "srd_quarterstaff",
+  "document": {
+   "name": "System Reference Document 5.1",
+   "key": "srd-2014",
+   "type": "SOURCE",
+   "display_name": "5e 2014 Rules",
+   "publisher": {
+    "name": "Wizards of the Coast",
+    "key": "wizards-of-the-coast"
+   },
+   "gamesystem": {
+    "name": "5th Edition 2014",
+    "key": "5e-2014"
+   },
+   "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+  },
+  "properties": [
+   {
+    "property": {
+     "name": "Versatile",
+     "type": null,
+     "desc": "This weapon can be used with one or two hands. A damage value in parentheses appears with the property—the damage when the weapon is used with two hands to make a melee attack."
+    },
+    "detail": "1d8"
+   }
+  ],
+  "damage_type": {
+   "name": "Bludgeoning",
+   "key": "bludgeoning"
+  },
+  "distance_unit": "feet",
+  "name": "Quarterstaff",
+  "damage_dice": "1d6",
+  "range": 0,
+  "long_range": 0,
+  "is_simple": true,
+  "is_improvised": false
+ },
+ {
+  "key": "srd_rapier",
+  "document": {
+   "name": "System Reference Document 5.1",
+   "key": "srd-2014",
+   "type": "SOURCE",
+   "display_name": "5e 2014 Rules",
+   "publisher": {
+    "name": "Wizards of the Coast",
+    "key": "wizards-of-the-coast"
+   },
+   "gamesystem": {
+    "name": "5th Edition 2014",
+    "key": "5e-2014"
+   },
+   "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+  },
+  "properties": [
+   {
+    "property": {
+     "name": "Finesse",
+     "type": null,
+     "desc": "When making an attack with a finesse weapon, you use your choice of your Strength or Dexterity modifier for the attack and damage rolls. You must use the same modifier for both rolls."
+    },
+    "detail": null
+   }
+  ],
+  "damage_type": {
+   "name": "Piercing",
+   "key": "piercing"
+  },
+  "distance_unit": "feet",
+  "name": "Rapier",
+  "damage_dice": "1d8",
+  "range": 0,
+  "long_range": 0,
+  "is_simple": false,
+  "is_improvised": false
+ },
+ {
+  "key": "srd_scimitar",
+  "document": {
+   "name": "System Reference Document 5.1",
+   "key": "srd-2014",
+   "type": "SOURCE",
+   "display_name": "5e 2014 Rules",
+   "publisher": {
+    "name": "Wizards of the Coast",
+    "key": "wizards-of-the-coast"
+   },
+   "gamesystem": {
+    "name": "5th Edition 2014",
+    "key": "5e-2014"
+   },
+   "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+  },
+  "properties": [
+   {
+    "property": {
+     "name": "Finesse",
+     "type": null,
+     "desc": "When making an attack with a finesse weapon, you use your choice of your Strength or Dexterity modifier for the attack and damage rolls. You must use the same modifier for both rolls."
+    },
+    "detail": null
+   },
+   {
+    "property": {
+     "name": "Light",
+     "type": null,
+     "desc": "A light weapon is small and easy to handle, making it ideal for use when fighting with two weapons."
+    },
+    "detail": null
+   }
+  ],
+  "damage_type": {
+   "name": "Slashing",
+   "key": "slashing"
+  },
+  "distance_unit": "feet",
+  "name": "Scimitar",
+  "damage_dice": "1d6",
+  "range": 0,
+  "long_range": 0,
+  "is_simple": false,
+  "is_improvised": false
+ },
+ {
+  "key": "srd_shortbow",
+  "document": {
+   "name": "System Reference Document 5.1",
+   "key": "srd-2014",
+   "type": "SOURCE",
+   "display_name": "5e 2014 Rules",
+   "publisher": {
+    "name": "Wizards of the Coast",
+    "key": "wizards-of-the-coast"
+   },
+   "gamesystem": {
+    "name": "5th Edition 2014",
+    "key": "5e-2014"
+   },
+   "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+  },
+  "properties": [
+   {
+    "property": {
+     "name": "Ammunition",
+     "type": null,
+     "desc": "You can use a weapon that has the ammunition property to make a ranged attack only if you have ammunition to fire from the weapon. Each time you attack with the weapon, you expend one piece of ammunition. Drawing the ammunition from a quiver, case, or other container is part of the attack (you need a free hand to load a one-­‐‑handed weapon). At the end of the battle, you can recover half your expended ammunition by taking a minute to search the battlefield.\n\nIf you use a weapon that has the ammunition property to make a melee attack, you treat the weapon as an improvised weapon (see “Improvised Weapons” later in the section). A sling must be loaded to deal any damage when used in this way."
+    },
+    "detail": "range 80/320"
+   },
+   {
+    "property": {
+     "name": "Two-Handed",
+     "type": null,
+     "desc": "This weapon requires two hands when you attack with it."
+    },
+    "detail": null
+   }
+  ],
+  "damage_type": {
+   "name": "Piercing",
+   "key": "piercing"
+  },
+  "distance_unit": "feet",
+  "name": "Shortbow",
+  "damage_dice": "1d6",
+  "range": 80,
+  "long_range": 320,
+  "is_simple": true,
+  "is_improvised": false
+ },
+ {
+  "key": "srd_shortsword",
+  "document": {
+   "name": "System Reference Document 5.1",
+   "key": "srd-2014",
+   "type": "SOURCE",
+   "display_name": "5e 2014 Rules",
+   "publisher": {
+    "name": "Wizards of the Coast",
+    "key": "wizards-of-the-coast"
+   },
+   "gamesystem": {
+    "name": "5th Edition 2014",
+    "key": "5e-2014"
+   },
+   "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+  },
+  "properties": [
+   {
+    "property": {
+     "name": "Finesse",
+     "type": null,
+     "desc": "When making an attack with a finesse weapon, you use your choice of your Strength or Dexterity modifier for the attack and damage rolls. You must use the same modifier for both rolls."
+    },
+    "detail": null
+   },
+   {
+    "property": {
+     "name": "Light",
+     "type": null,
+     "desc": "A light weapon is small and easy to handle, making it ideal for use when fighting with two weapons."
+    },
+    "detail": null
+   }
+  ],
+  "damage_type": {
+   "name": "Slashing",
+   "key": "slashing"
+  },
+  "distance_unit": "feet",
+  "name": "Shortsword",
+  "damage_dice": "1d6",
+  "range": 0,
+  "long_range": 0,
+  "is_simple": false,
+  "is_improvised": false
+ },
+ {
+  "key": "srd_sickle",
+  "document": {
+   "name": "System Reference Document 5.1",
+   "key": "srd-2014",
+   "type": "SOURCE",
+   "display_name": "5e 2014 Rules",
+   "publisher": {
+    "name": "Wizards of the Coast",
+    "key": "wizards-of-the-coast"
+   },
+   "gamesystem": {
+    "name": "5th Edition 2014",
+    "key": "5e-2014"
+   },
+   "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+  },
+  "properties": [
+   {
+    "property": {
+     "name": "Light",
+     "type": null,
+     "desc": "A light weapon is small and easy to handle, making it ideal for use when fighting with two weapons."
+    },
+    "detail": null
+   }
+  ],
+  "damage_type": {
+   "name": "Slashing",
+   "key": "slashing"
+  },
+  "distance_unit": "feet",
+  "name": "Sickle",
+  "damage_dice": "1d4",
+  "range": 0,
+  "long_range": 0,
+  "is_simple": true,
+  "is_improvised": false
+ },
+ {
+  "key": "srd_sling",
+  "document": {
+   "name": "System Reference Document 5.1",
+   "key": "srd-2014",
+   "type": "SOURCE",
+   "display_name": "5e 2014 Rules",
+   "publisher": {
+    "name": "Wizards of the Coast",
+    "key": "wizards-of-the-coast"
+   },
+   "gamesystem": {
+    "name": "5th Edition 2014",
+    "key": "5e-2014"
+   },
+   "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+  },
+  "properties": [
+   {
+    "property": {
+     "name": "Ammunition",
+     "type": null,
+     "desc": "You can use a weapon that has the ammunition property to make a ranged attack only if you have ammunition to fire from the weapon. Each time you attack with the weapon, you expend one piece of ammunition. Drawing the ammunition from a quiver, case, or other container is part of the attack (you need a free hand to load a one-­‐‑handed weapon). At the end of the battle, you can recover half your expended ammunition by taking a minute to search the battlefield.\n\nIf you use a weapon that has the ammunition property to make a melee attack, you treat the weapon as an improvised weapon (see “Improvised Weapons” later in the section). A sling must be loaded to deal any damage when used in this way."
+    },
+    "detail": "range 80/320"
+   }
+  ],
+  "damage_type": {
+   "name": "Bludgeoning",
+   "key": "bludgeoning"
+  },
+  "distance_unit": "feet",
+  "name": "Sling",
+  "damage_dice": "1d4",
+  "range": 30,
+  "long_range": 120,
+  "is_simple": true,
+  "is_improvised": false
+ },
+ {
+  "key": "srd_spear",
+  "document": {
+   "name": "System Reference Document 5.1",
+   "key": "srd-2014",
+   "type": "SOURCE",
+   "display_name": "5e 2014 Rules",
+   "publisher": {
+    "name": "Wizards of the Coast",
+    "key": "wizards-of-the-coast"
+   },
+   "gamesystem": {
+    "name": "5th Edition 2014",
+    "key": "5e-2014"
+   },
+   "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+  },
+  "properties": [
+   {
+    "property": {
+     "name": "Thrown",
+     "type": null,
+     "desc": "If a weapon has the thrown property, you can throw the weapon to make a ranged attack. If the weapon is a melee weapon, you use the same ability modifier for that attack roll and damage roll that you would use for a melee attack with the weapon. For example, if you throw a handaxe, you use your Strength, but if you throw a dagger, you can use either your Strength or your Dexterity, since the dagger has the finesse property."
+    },
+    "detail": "range 20/60"
+   },
+   {
+    "property": {
+     "name": "Versatile",
+     "type": null,
+     "desc": "This weapon can be used with one or two hands. A damage value in parentheses appears with the property—the damage when the weapon is used with two hands to make a melee attack."
+    },
+    "detail": "1d8"
+   }
+  ],
+  "damage_type": {
+   "name": "Piercing",
+   "key": "piercing"
+  },
+  "distance_unit": "feet",
+  "name": "Spear",
+  "damage_dice": "1d6",
+  "range": 20,
+  "long_range": 60,
+  "is_simple": true,
+  "is_improvised": false
+ },
+ {
+  "key": "srd_trident",
+  "document": {
+   "name": "System Reference Document 5.1",
+   "key": "srd-2014",
+   "type": "SOURCE",
+   "display_name": "5e 2014 Rules",
+   "publisher": {
+    "name": "Wizards of the Coast",
+    "key": "wizards-of-the-coast"
+   },
+   "gamesystem": {
+    "name": "5th Edition 2014",
+    "key": "5e-2014"
+   },
+   "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+  },
+  "properties": [
+   {
+    "property": {
+     "name": "Two-Handed",
+     "type": null,
+     "desc": "This weapon requires two hands when you attack with it."
+    },
+    "detail": null
+   },
+   {
+    "property": {
+     "name": "Thrown",
+     "type": null,
+     "desc": "If a weapon has the thrown property, you can throw the weapon to make a ranged attack. If the weapon is a melee weapon, you use the same ability modifier for that attack roll and damage roll that you would use for a melee attack with the weapon. For example, if you throw a handaxe, you use your Strength, but if you throw a dagger, you can use either your Strength or your Dexterity, since the dagger has the finesse property."
+    },
+    "detail": "range 20/60"
+   },
+   {
+    "property": {
+     "name": "Versatile",
+     "type": null,
+     "desc": "This weapon can be used with one or two hands. A damage value in parentheses appears with the property—the damage when the weapon is used with two hands to make a melee attack."
+    },
+    "detail": "1d8"
+   }
+  ],
+  "damage_type": {
+   "name": "Piercing",
+   "key": "piercing"
+  },
+  "distance_unit": "feet",
+  "name": "Trident",
+  "damage_dice": "1d6",
+  "range": 20,
+  "long_range": 60,
+  "is_simple": false,
+  "is_improvised": false
+ },
+ {
+  "key": "srd_war-pick",
+  "document": {
+   "name": "System Reference Document 5.1",
+   "key": "srd-2014",
+   "type": "SOURCE",
+   "display_name": "5e 2014 Rules",
+   "publisher": {
+    "name": "Wizards of the Coast",
+    "key": "wizards-of-the-coast"
+   },
+   "gamesystem": {
+    "name": "5th Edition 2014",
+    "key": "5e-2014"
+   },
+   "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+  },
+  "properties": [],
+  "damage_type": {
+   "name": "Piercing",
+   "key": "piercing"
+  },
+  "distance_unit": "feet",
+  "name": "War Pick",
+  "damage_dice": "1d8",
+  "range": 0,
+  "long_range": 0,
+  "is_simple": false,
+  "is_improvised": false
+ },
+ {
+  "key": "srd_warhammer",
+  "document": {
+   "name": "System Reference Document 5.1",
+   "key": "srd-2014",
+   "type": "SOURCE",
+   "display_name": "5e 2014 Rules",
+   "publisher": {
+    "name": "Wizards of the Coast",
+    "key": "wizards-of-the-coast"
+   },
+   "gamesystem": {
+    "name": "5th Edition 2014",
+    "key": "5e-2014"
+   },
+   "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+  },
+  "properties": [
+   {
+    "property": {
+     "name": "Versatile",
+     "type": null,
+     "desc": "This weapon can be used with one or two hands. A damage value in parentheses appears with the property—the damage when the weapon is used with two hands to make a melee attack."
+    },
+    "detail": "1d10"
+   }
+  ],
+  "damage_type": {
+   "name": "Bludgeoning",
+   "key": "bludgeoning"
+  },
+  "distance_unit": "feet",
+  "name": "Warhammer",
+  "damage_dice": "1d8",
+  "range": 0,
+  "long_range": 0,
+  "is_simple": false,
+  "is_improvised": false
+ },
+ {
+  "key": "srd_whip",
+  "document": {
+   "name": "System Reference Document 5.1",
+   "key": "srd-2014",
+   "type": "SOURCE",
+   "display_name": "5e 2014 Rules",
+   "publisher": {
+    "name": "Wizards of the Coast",
+    "key": "wizards-of-the-coast"
+   },
+   "gamesystem": {
+    "name": "5th Edition 2014",
+    "key": "5e-2014"
+   },
+   "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+  },
+  "properties": [
+   {
+    "property": {
+     "name": "Reach",
+     "type": null,
+     "desc": "This weapon adds 5 feet to your reach when you attack with it, as well as when determining your reach for opportunity attacks with it."
+    },
+    "detail": null
+   }
+  ],
+  "damage_type": {
+   "name": "Slashing",
+   "key": "slashing"
+  },
+  "distance_unit": "feet",
+  "name": "Whip",
+  "damage_dice": "1d4",
+  "range": 0,
+  "long_range": 0,
+  "is_simple": false,
+  "is_improvised": false
+ }
+]

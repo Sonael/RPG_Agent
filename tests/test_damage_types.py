@@ -294,7 +294,7 @@ def test_esqueleto_nao_morre_de_veneno(campanha, povoar):
 
 
 def test_attack_roll_aplica_resistencia_do_alvo(campanha, povoar, monkeypatch):
-    """Golem resistente a cortante leva metade do dano da espada."""
+    """Golem resistente a cortante leva metade do dano do machado."""
     povoar(
         criar_ficha("Heroína", grupo=True, vida=50, forca=16),
         criar_ficha("Golem", vida=100, ca=1,
@@ -305,7 +305,9 @@ def test_attack_roll_aplica_resistencia_do_alvo(campanha, povoar, monkeypatch):
                         lambda a, b: 15 if (a, b) == (1, 20) else b)
     monkeypatch.setattr(T, "_fetch_weapon_data", lambda *a, **k: (1, 8))
 
-    saida = T.attack_roll("Heroína", "Golem", "espada longa", 8,
+    # Machadinha: cortante e de uma mão só. A espada longa, sem escudo, iria
+    # nas duas mãos e rolaria o d10 da versátil.
+    saida = T.attack_roll("Heroína", "Golem", "machadinha", 8,
                           end_turn=False, _skip_turn_check=True)
 
     # 1d8 máximo (8) + 3 (FOR 16) = 11 bruto → 5 com resistência.

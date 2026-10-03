@@ -1364,58 +1364,21 @@ def get_class_spells():
 @app.route("/api/dnd/items/search")
 @require_auth
 def search_dnd_items():
-    """Busca itens D&D no Open5e: armas, armaduras e itens mágicos."""
-    from rpg.open5e import http as _req   # SRD com cache, sessão e retry
+    """
+    Busca itens do SRD no compêndio local (rpg/itens.py): armas, armaduras,
+    equipamento e itens mágicos, com nome e resumo em português. Antes ia ao
+    Open5e e devolvia o nome e a descrição em inglês para a ficha.
+    """
+    from rpg import itens
 
     q         = request.args.get("q", "").strip()
     item_type = request.args.get("type", "all")
-
-    if not q or len(q) < 2:
-        return jsonify({"ok": True, "items": []})
-
+    rotulo = {"arma": "arma", "armadura": "armadura", "escudo": "armadura"}
     results = []
-    try:
-        if item_type in ("all", "weapon"):
-            r = _req.get("https://api.open5e.com/v1/weapons/", params={"search": q, "limit": 6}, timeout=5)
-            if r.ok:
-                for it in r.json().get("results", []):
-                    props = it.get("properties", [])
-                    prop_str = ", ".join(props) if isinstance(props, list) else str(props or "")
-                    results.append({
-                        "nome":    it.get("name", ""),
-                        "tipo":    "arma",
-                        "descricao": f"Dano: {it.get('damage_dice','?')}. {prop_str}".strip(". "),
-                        "qtd":     1,
-                    })
-
-        if item_type in ("all", "armor"):
-            r = _req.get("https://api.open5e.com/v1/armor/", params={"search": q, "limit": 6}, timeout=5)
-            if r.ok:
-                for it in r.json().get("results", []):
-                    ac = it.get("armor_class", {}) or {}
-                    base = ac.get("base", "?")
-                    results.append({
-                        "nome":    it.get("name", ""),
-                        "tipo":    "armadura",
-                        "descricao": f"CA base: {base}.",
-                        "qtd":     1,
-                    })
-
-        if item_type in ("all", "magic"):
-            r = _req.get("https://api.open5e.com/v1/magicitems/", params={"search": q, "limit": 6}, timeout=5)
-            if r.ok:
-                for it in r.json().get("results", []):
-                    desc = (it.get("desc", "") or "")
-                    results.append({
-                        "nome":    it.get("name", ""),
-                        "tipo":    "mágico",
-                        "descricao": " ".join(desc.split())[:180],
-                        "qtd":     1,
-                    })
-    except Exception as e:
-        return jsonify({"ok": False, "error": str(e), "items": []})
-
-    return jsonify({"ok": True, "items": results[:18]})
+    for e in itens.buscar(q, item_type):
+        tipo = ("mágico" if "raridade" in e else rotulo.get(e.get("categoria", ""), "item"))
+        results.append({"nome": e["nome"], "tipo": tipo, "descricao": itens.resumo(e), "qtd": 1})
+    return jsonify({"ok": True, "items": results})
 
 
 @app.route("/api/dnd/monsters/search")

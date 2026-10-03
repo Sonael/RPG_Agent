@@ -182,7 +182,6 @@ def test_item_conferido_na_entrada_nao_esta_a_identificar(aria):
 
 
 def test_identificar_fora_do_srd_marca_e_nao_oferece_de_novo(aria, monkeypatch):
-    srd_falso(monkeypatch, {})                       # o Open5e responde 404
     aria["inventario"].append({"nome": "Lâmina Rúnica de Vhar", "qtd": 1, "descricao": ""})
     saida = td.identify_item("Aria", "Lâmina Rúnica de Vhar")
     assert saida.startswith("Aviso:")
@@ -195,50 +194,16 @@ def test_identificar_sem_personagem_tem_prefixo(campanha):
     assert td.identify_item("Ninguém", "Manto").startswith("Erro:")
 
 
-# ---- identificação: nome em português e casamento exato ---------------------
+# ---- identificação: nome em português, casamento exato, sem rede -----------
 #
-# Dois defeitos. O SRD é em inglês e a busca ia com o nome em português:
-# "Manto Élfico" nunca achava "Cloak of Elvenkind" e virava homebrew. E a busca
-# textual do Open5e procura também nas descrições; o código ficava com o
-# resultado de mais palavras em comum mesmo quando nenhuma coincidia, e
-# gravava a descrição de outro item.
+# Três defeitos da época em que a identificação perguntava ao Open5e em tempo
+# de jogo. O SRD é em inglês e a busca ia com o nome em português: "Manto
+# Élfico" virava homebrew. A busca textual procurava também nas descrições, e
+# o código ficava com o resultado de mais palavras em comum ("longsword"
+# devolvia a Excalibur). E a descrição gravada na Mochila era o texto do SRD
+# em inglês. Hoje o nome é procurado no compêndio local (rpg/itens.py).
 
-_CLOAK = {"name": "Cloak of Elvenkind", "type": "Wondrous item", "rarity": "uncommon",
-          "requires_attunement": "requires attunement", "document__slug": "wotc-srd",
-          "desc": "While you wear this cloak with its hood up, Wisdom (Perception) checks..."}
-_SRD = {
-    "cloak-of-elvenkind": _CLOAK,
-    "ring-of-protection": {"name": "Ring of Protection", "type": "Ring", "rarity": "rare",
-                           "requires_attunement": "requires attunement",
-                           "document__slug": "wotc-srd", "desc": "You gain a +1 bonus to AC..."},
-    "weapon-1-2-or-3": {"name": "Weapon, +1, +2, or +3", "type": "Weapon (any)",
-                        "rarity": "uncommon (+1), rare (+2), or very rare (+3)",
-                        "requires_attunement": "", "document__slug": "wotc-srd",
-                        "desc": "You have a bonus to attack and damage rolls..."},
-}
-_EXCALIBUR = {"name": "Excalibur's Scabbard", "type": "Wondrous item", "rarity": "legendary",
-              "document__slug": "a5e", "desc": "A longsword sheath..."}
-
-
-def srd_falso(monkeypatch, itens=None, busca=None, chamadas=None):
-    """Open5e simulado: slug devolve o item ou 404; busca devolve `busca`."""
-    from rpg import open5e
-    itens = _SRD if itens is None else itens
-
-    def falso(url, params=None, timeout=5.0):
-        if chamadas is not None:
-            chamadas.append((url, dict(params or {})))
-        if params and "search" in params:
-            return open5e.Response(True, {"results": list(busca or [])}, 200)
-        slug = url.rstrip("/").rsplit("/", 1)[-1]
-        dados = itens.get(slug)
-        return open5e.Response(bool(dados), dados, 200 if dados else 404)
-
-    monkeypatch.setattr(open5e, "get", falso)
-
-
-def test_manto_elfico_e_o_cloak_of_elvenkind(aria, monkeypatch):
-    srd_falso(monkeypatch)
+def test_manto_elfico_e_o_cloak_of_elvenkind(aria):
     aria["inventario"].append({"nome": "Manto Élfico", "qtd": 1, "descricao": ""})
 
     saida = td.identify_item("Aria", "Manto Élfico")
@@ -246,25 +211,28 @@ def test_manto_elfico_e_o_cloak_of_elvenkind(aria, monkeypatch):
     item = aria["inventario"][-1]
     assert "Cloak of Elvenkind" in saida and not saida.startswith(("Aviso:", "Erro:"))
     assert item["nome_srd"] == "Cloak of Elvenkind" and item["custom"] is False
-    assert item["srd"] == {"tipo": "item maravilhoso", "raridade": "incomum", "sintonizacao": True}
-    assert item["descricao"].startswith("[uncommon]")
+    assert item["srd"] == {"nome": "Manto Élfico", "tipo": "item maravilhoso",
+                           "raridade": "incomum", "sintonizacao": True}
+    # A Mochila fica em português; o texto do SRD vai só para o Mestre.
+    assert item["descricao"] == "Item maravilhoso — incomum, requer sintonização."
+    assert "hood" in saida and "hood" not in item["descricao"]
     assert not td._a_identificar(item)
 
 
 @pytest.mark.parametrize("nome, esperado", [
-    ("Anel de Proteção", "Ring of Protection"),        # cabeça "de" complemento
+    ("Anel de Proteção", "Ring of Protection"),
+    ("Anel da Proteção", "Ring of Protection"),         # cabeça "da" complemento
     ("Espada Longa +1", "Weapon, +1, +2, or +3"),       # arma com bônus
     ("Cloak of Elvenkind", "Cloak of Elvenkind"),       # quem já escreveu em inglês
     ("Capa Élfica", "Cloak of Elvenkind"),
+    ("Poção de Cura Maior", "Potion of Greater Healing"),
 ])
-def test_nomes_que_chegam_ao_srd(nome, esperado, monkeypatch, campanha):
-    srd_falso(monkeypatch)
-    assert (td._search_open5e_item(nome) or {}).get("name") == esperado
+def test_nomes_que_chegam_ao_srd(nome, esperado, campanha):
+    assert (td._item_magico_do_srd(nome) or {}).get("nome_srd") == esperado
 
 
-def test_busca_que_devolve_outro_item_nao_e_aceita(aria, monkeypatch):
-    """O caso da Excalibur: resultado da busca sem o nome pedido."""
-    srd_falso(monkeypatch, itens={}, busca=[_EXCALIBUR, {**_CLOAK, "name": "Cloak of the Bat"}])
+def test_nome_que_nao_e_do_srd_nao_vira_outro_item(aria):
+    """O caso da Excalibur: nada de casar por palavras em comum."""
     aria["inventario"].append({"nome": "Espada Rúnica", "qtd": 1, "descricao": "a original"})
 
     saida = td.identify_item("Aria", "Espada Rúnica")
@@ -275,34 +243,19 @@ def test_busca_que_devolve_outro_item_nao_e_aceita(aria, monkeypatch):
     assert "nome_srd" not in item
 
 
-def test_busca_fica_no_srd_oficial(campanha, monkeypatch):
-    chamadas = []
-    srd_falso(monkeypatch, itens={}, chamadas=chamadas)
-    td._search_open5e_item("Manto Élfico")
-    buscas = [p for _, p in chamadas if "search" in p]
-    assert buscas and all(p.get("document__slug") == "wotc-srd" for p in buscas)
-
-
-def test_item_de_terceiros_com_o_mesmo_slug_nao_conta(campanha, monkeypatch):
-    srd_falso(monkeypatch, itens={"cloak-of-elvenkind": {**_CLOAK, "document__slug": "a5e"}})
-    assert td._search_open5e_item("Manto Élfico") is None
+def test_identificar_nao_vai_a_rede(aria, monkeypatch):
+    from rpg import open5e
+    def proibido(*a, **k):
+        raise AssertionError("a identificação foi à rede")
+    monkeypatch.setattr(open5e, "get", proibido)
+    aria["inventario"].append({"nome": "Manto Élfico", "qtd": 1, "descricao": ""})
+    assert not td.identify_item("Aria", "Manto Élfico").startswith(("Erro:", "Aviso:"))
 
 
 def test_parentese_do_srd_casa_com_os_dois_nomes():
     assert td._mesmo_item("Stone of Good Luck (Luckstone)", "Luckstone")
     assert td._mesmo_item("Stone of Good Luck (Luckstone)", "stone of good luck")
     assert not td._mesmo_item("Cloak of the Bat", "Cloak of Elvenkind")
-
-
-def test_sem_resposta_do_open5e_nao_marca_como_homebrew(aria):
-    """Offline (padrão dos testes): não se sabe se existe, então nada é marcado."""
-    aria["inventario"].append({"nome": "Manto Élfico", "qtd": 1, "descricao": ""})
-
-    saida = td.identify_item("Aria", "Manto Élfico")
-
-    item = aria["inventario"][-1]
-    assert saida.startswith("Erro:") and "tente de novo" in saida
-    assert "custom" not in item and td._a_identificar(item), "o botão sumiu por uma queda de rede"
 
 
 # ---------------------------------------------------------------------------
@@ -369,25 +322,24 @@ def test_acao_recusada_e_ok_falso(aria):
     assert r["ok"] is False and r["snapshot"]["personagem"]["nome"] == "Aria"
 
 
-def test_identificar_fora_do_srd_nao_e_recusa_na_tela(aria, monkeypatch):
-    srd_falso(monkeypatch, {})
+def test_identificar_fora_do_srd_nao_e_recusa_na_tela(aria):
     aria["inventario"].append({"nome": "Lâmina Rúnica de Vhar", "qtd": 1, "descricao": ""})
     r = td.inventory_action("identificar", char="Aria", item="Lâmina Rúnica de Vhar")
     assert r["ok"] is True
     assert r["resultado"]["consultou"] is True and r["resultado"]["encontrado"] is False
 
 
-def test_acao_de_identificar_traz_o_resultado_em_dados(aria, monkeypatch):
-    srd_falso(monkeypatch)
+def test_acao_de_identificar_traz_o_resultado_em_dados(aria):
     aria["inventario"].append({"nome": "Manto Élfico", "qtd": 1, "descricao": ""})
 
     r = td.inventory_action("identificar", char="Aria", item="Manto Élfico")
 
     assert r["resultado"] == {"item": "Manto Élfico", "consultou": True, "encontrado": True,
-                              "nome_srd": "Cloak of Elvenkind", "tipo": "item maravilhoso",
+                              "como": "Aria estudou o item por uma hora.",
+                              "nome_srd": "Manto Élfico", "tipo": "item maravilhoso",
                               "raridade": "incomum", "sintonizacao": True}
     manto = next(i for i in r["snapshot"]["personagem"]["itens"] if i["nome"] == "Manto Élfico")
-    assert manto["nome_srd"] == "Cloak of Elvenkind" and manto["a_identificar"] is False
+    assert manto["a_identificar"] is False
 
 
 # Item de nome mágico que entrou SEM descrição ganha `efeito_desconhecido` na
@@ -417,10 +369,30 @@ def test_a_tela_desenha_a_marca(aria):
     assert "efeito não declarado" in fonte
 
 
-def test_identificar_sem_conexao_e_ok_falso_na_tela(aria):
+def test_estudar_um_item_leva_uma_hora(aria):
+    """No 5e, identificar é um descanso curto com o item. O botão era de graça."""
     aria["inventario"].append({"nome": "Manto Élfico", "qtd": 1, "descricao": ""})
+    antes = td._agora_em_horas()
     r = td.inventory_action("identificar", char="Aria", item="Manto Élfico")
-    assert r["ok"] is False and r["resultado"]["consultou"] is False
+    assert r["ok"] is True
+    assert td._agora_em_horas() == antes + 1
+
+
+def test_pocao_se_identifica_com_um_gole(aria):
+    aria["inventario"].append({"nome": "Poção de Cura Maior", "qtd": 1, "descricao": ""})
+    antes = td._agora_em_horas()
+    r = td.inventory_action("identificar", char="Aria", item="Poção de Cura Maior")
+    assert r["ok"] is True and r["resultado"]["como"] == "Aria provou um gole."
+    assert td._agora_em_horas() == antes
+
+
+def test_estudar_no_meio_da_luta_e_recusado(aria):
+    aria["inventario"].append({"nome": "Manto Élfico", "qtd": 1, "descricao": ""})
+    memory.campaign["combat_state"] = {"is_active": True, "initiative_order": ["Aria"],
+                                       "current_turn_index": 0, "round": 1}
+    r = td.inventory_action("identificar", char="Aria", item="Manto Élfico")
+    assert r["ok"] is False and r["message"].startswith("Aviso:")
+    assert td._a_identificar(aria["inventario"][-1])
 
 
 def test_largar_uma_unidade(aria):

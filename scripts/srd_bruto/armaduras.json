@@ -1,0 +1,314 @@
+[
+ {
+  "key": "srd_breastplate",
+  "ac_display": "14 + Dex modifier (max 2)",
+  "category": "medium",
+  "document": {
+   "name": "System Reference Document 5.1",
+   "key": "srd-2014",
+   "type": "SOURCE",
+   "display_name": "5e 2014 Rules",
+   "publisher": {
+    "name": "Wizards of the Coast",
+    "key": "wizards-of-the-coast"
+   },
+   "gamesystem": {
+    "name": "5th Edition 2014",
+    "key": "5e-2014"
+   },
+   "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+  },
+  "name": "Breastplate",
+  "grants_stealth_disadvantage": false,
+  "strength_score_required": null,
+  "ac_base": 14,
+  "ac_add_dexmod": true,
+  "ac_cap_dexmod": 2
+ },
+ {
+  "key": "srd_chain-mail",
+  "ac_display": "16",
+  "category": "heavy",
+  "document": {
+   "name": "System Reference Document 5.1",
+   "key": "srd-2014",
+   "type": "SOURCE",
+   "display_name": "5e 2014 Rules",
+   "publisher": {
+    "name": "Wizards of the Coast",
+    "key": "wizards-of-the-coast"
+   },
+   "gamesystem": {
+    "name": "5th Edition 2014",
+    "key": "5e-2014"
+   },
+   "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+  },
+  "name": "Chain mail",
+  "grants_stealth_disadvantage": true,
+  "strength_score_required": 13,
+  "ac_base": 16,
+  "ac_add_dexmod": false,
+  "ac_cap_dexmod": null
+ },
+ {
+  "key": "srd_chain-shirt",
+  "ac_display": "13 + Dex modifier (max 2)",
+  "category": "medium",
+  "document": {
+   "name": "System Reference Document 5.1",
+   "key": "srd-2014",
+   "type": "SOURCE",
+   "display_name": "5e 2014 Rules",
+   "publisher": {
+    "name": "Wizards of the Coast",
+    "key": "wizards-of-the-coast"
+   },
+   "gamesystem": {
+    "name": "5th Edition 2014",
+    "key": "5e-2014"
+   },
+   "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+  },
+  "name": "Chain shirt",
+  "grants_stealth_disadvantage": false,
+  "strength_score_required": null,
+  "ac_base": 13,
+  "ac_add_dexmod": true,
+  "ac_cap_dexmod": 2
+ },
+ {
+  "key": "srd_half-plate",
+  "ac_display": "15 + Dex modifier (max 2)",
+  "category": "medium",
+  "document": {
+   "name": "System Reference Document 5.1",
+   "key": "srd-2014",
+   "type": "SOURCE",
+   "display_name": "5e 2014 Rules",
+   "publisher": {
+    "name": "Wizards of the Coast",
+    "key": "wizards-of-the-coast"
+   },
+   "gamesystem": {
+    "name": "5th Edition 2014",
+    "key": "5e-2014"
+   },
+   "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+  },
+  "name": "Half plate",
+  "grants_stealth_disadvantage": true,
+  "strength_score_required": null,
+  "ac_base": 15,
+  "ac_add_dexmod": true,
+  "ac_cap_dexmod": 2
+ },
+ {
+  "key": "srd_hide",
+  "ac_display": "12 + Dex modifier (max 2)",
+  "category": "medium",
+  "document": {
+   "name": "System Reference Document 5.1",
+   "key": "srd-2014",
+   "type": "SOURCE",
+   "display_name": "5e 2014 Rules",
+   "publisher": {
+    "name": "Wizards of the Coast",
+    "key": "wizards-of-the-coast"
+   },
+   "gamesystem": {
+    "name": "5th Edition 2014",
+    "key": "5e-2014"
+   },
+   "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+  },
+  "name": "Hide",
+  "grants_stealth_disadvantage": false,
+  "strength_score_required": null,
+  "ac_base": 12,
+  "ac_add_dexmod": true,
+  "ac_cap_dexmod": 2
+ },
+ {
+  "key": "srd_leather",
+  "ac_display": "11 + Dex modifier",
+  "category": "light",
+  "document": {
+   "name": "System Reference Document 5.1",
+   "key": "srd-2014",
+   "type": "SOURCE",
+   "display_name": "5e 2014 Rules",
+   "publisher": {
+    "name": "Wizards of the Coast",
+    "key": "wizards-of-the-coast"
+   },
+   "gamesystem": {
+    "name": "5th Edition 2014",
+    "key": "5e-2014"
+   },
+   "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+  },
+  "name": "Leather",
+  "grants_stealth_disadvantage": false,
+  "strength_score_required": null,
+  "ac_base": 11,
+  "ac_add_dexmod": true,
+  "ac_cap_dexmod": null
+ },
+ {
+  "key": "srd_padded",
+  "ac_display": "11 + Dex modifier",
+  "category": "light",
+  "document": {
+   "name": "System Reference Document 5.1",
+   "key": "srd-2014",
+   "type": "SOURCE",
+   "display_name": "5e 2014 Rules",
+   "publisher": {
+    "name": "Wizards of the Coast",
+    "key": "wizards-of-the-coast"
+   },
+   "gamesystem": {
+    "name": "5th Edition 2014",
+    "key": "5e-2014"
+   },
+   "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+  },
+  "name": "Padded",
+  "grants_stealth_disadvantage": true,
+  "strength_score_required": null,
+  "ac_base": 11,
+  "ac_add_dexmod": true,
+  "ac_cap_dexmod": null
+ },
+ {
+  "key": "srd_plate",
+  "ac_display": "18",
+  "category": "heavy",
+  "document": {
+   "name": "System Reference Document 5.1",
+   "key": "srd-2014",
+   "type": "SOURCE",
+   "display_name": "5e 2014 Rules",
+   "publisher": {
+    "name": "Wizards of the Coast",
+    "key": "wizards-of-the-coast"
+   },
+   "gamesystem": {
+    "name": "5th Edition 2014",
+    "key": "5e-2014"
+   },
+   "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+  },
+  "name": "Plate",
+  "grants_stealth_disadvantage": true,
+  "strength_score_required": 15,
+  "ac_base": 18,
+  "ac_add_dexmod": false,
+  "ac_cap_dexmod": null
+ },
+ {
+  "key": "srd_ring-mail",
+  "ac_display": "14",
+  "category": "heavy",
+  "document": {
+   "name": "System Reference Document 5.1",
+   "key": "srd-2014",
+   "type": "SOURCE",
+   "display_name": "5e 2014 Rules",
+   "publisher": {
+    "name": "Wizards of the Coast",
+    "key": "wizards-of-the-coast"
+   },
+   "gamesystem": {
+    "name": "5th Edition 2014",
+    "key": "5e-2014"
+   },
+   "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+  },
+  "name": "Ring mail",
+  "grants_stealth_disadvantage": true,
+  "strength_score_required": null,
+  "ac_base": 14,
+  "ac_add_dexmod": false,
+  "ac_cap_dexmod": null
+ },
+ {
+  "key": "srd_scale-mail",
+  "ac_display": "14 + Dex modifier (max 2)",
+  "category": "medium",
+  "document": {
+   "name": "System Reference Document 5.1",
+   "key": "srd-2014",
+   "type": "SOURCE",
+   "display_name": "5e 2014 Rules",
+   "publisher": {
+    "name": "Wizards of the Coast",
+    "key": "wizards-of-the-coast"
+   },
+   "gamesystem": {
+    "name": "5th Edition 2014",
+    "key": "5e-2014"
+   },
+   "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+  },
+  "name": "Scale mail",
+  "grants_stealth_disadvantage": true,
+  "strength_score_required": null,
+  "ac_base": 14,
+  "ac_add_dexmod": true,
+  "ac_cap_dexmod": 2
+ },
+ {
+  "key": "srd_splint",
+  "ac_display": "17",
+  "category": "heavy",
+  "document": {
+   "name": "System Reference Document 5.1",
+   "key": "srd-2014",
+   "type": "SOURCE",
+   "display_name": "5e 2014 Rules",
+   "publisher": {
+    "name": "Wizards of the Coast",
+    "key": "wizards-of-the-coast"
+   },
+   "gamesystem": {
+    "name": "5th Edition 2014",
+    "key": "5e-2014"
+   },
+   "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+  },
+  "name": "Splint",
+  "grants_stealth_disadvantage": true,
+  "strength_score_required": 15,
+  "ac_base": 17,
+  "ac_add_dexmod": false,
+  "ac_cap_dexmod": null
+ },
+ {
+  "key": "srd_studded-leather",
+  "ac_display": "12 + Dex modifier",
+  "category": "light",
+  "document": {
+   "name": "System Reference Document 5.1",
+   "key": "srd-2014",
+   "type": "SOURCE",
+   "display_name": "5e 2014 Rules",
+   "publisher": {
+    "name": "Wizards of the Coast",
+    "key": "wizards-of-the-coast"
+   },
+   "gamesystem": {
+    "name": "5th Edition 2014",
+    "key": "5e-2014"
+   },
+   "permalink": "https://dnd.wizards.com/resources/systems-reference-document"
+  },
+  "name": "Studded leather",
+  "grants_stealth_disadvantage": false,
+  "strength_score_required": null,
+  "ac_base": 12,
+  "ac_add_dexmod": true,
+  "ac_cap_dexmod": null
+ }
+]

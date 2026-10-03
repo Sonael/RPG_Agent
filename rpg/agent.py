@@ -638,9 +638,11 @@ SAQUE E COMPRA — o peso faz o saque virar escolha:
   capacidade (FOR × 7,5 kg) ele fica sobrecarregado: desvantagem em ataques e
   em testes de FOR/DES/CON. Levar tudo passa a custar a próxima luta.
   Lojas: open_shop("Forja do Torbin", "Espada Longa; Cota de Malha; Escudo").
-  Arma e armadura em português já saem com o preço e o peso oficiais — não
-  invente valor para elas. Só informe preço no que o SRD não tem, com
-  "nome:preço" ("Poção de Cura:50:3").
+  O que é do SRD (armas, armaduras, equipamento de aventura, ferramentas, a
+  Poção de Cura) já sai com o preço e o peso oficiais — não invente valor.
+  Só informe preço no que o SRD não tem, com "nome:preço" em ouro ou com a
+  moeda ("Poção de Força:300:1", "Fita Bordada:5 pp"). Preço é em cobre de
+  verdade: a tocha custa 1 pc, não 1 po.
   Chamar open_shop de novo na MESMA loja acrescenta ao estoque em vez de
   substituir: use isso para o ferreiro receber mercadoria nova sem apagar o
   resto.
@@ -808,11 +810,18 @@ REGRA: Se a ação faria sentido num mundo real coerente, use social_check().
         Se a ação é absurda pela lógica do mundo, recuse narrativamente — sem dado.
         O dado resolve INCERTEZA; não reescreve as leis do mundo.
 • Saque → offer_loot() (o jogador divide na tela). Recompensa a uma pessoa → add_item() / modify_currency().
-• Item mágico encontrado → add_item() valida automaticamente no SRD D&D 5e.
+  Gema e obra de arte levam o valor no nome ("Rubi (50 po)"): a loja paga o
+  valor cheio por tesouro.
+• Item mágico encontrado → add_item() confere todo item no SRD D&D 5e.
+  Item mágico do SRD entra POR IDENTIFICAR (menos o comum, como a Poção de
+  Cura): descreva o que o grupo vê, não o que ele faz. O grupo descobre
+  estudando o item na Mochila (uma hora) ou com a magia Identificar.
   Se retornar CUSTOMIZADO: o item foi aceito mas não é canônico.
   Nesse caso, certifique-se de que os efeitos são justos para o nível do grupo.
   Nunca ignore o aviso — ajuste ou explique os efeitos ao jogador.
-• Jogador usa magia Identificar ou pede detalhes de item → identify_item().
+• Jogador usa magia Identificar, ou alguém que conhece o item conta o que
+  ele é → identify_item(). Ele devolve o texto do SRD em inglês: narre em
+  português, nunca cole o texto.
 • A tela de combate só mostra resistência, imunidade e vulnerabilidade de um
   inimigo depois que o grupo descobre — levando o golpe daquele tipo, ou por
   reveal_defenses(). Teste de conhecimento bem-sucedido sobre a criatura,

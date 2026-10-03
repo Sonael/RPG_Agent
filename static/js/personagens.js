@@ -354,8 +354,8 @@
       const estoque = (l.estoque || []).length
         ? `<ul class="psn-estoque">${l.estoque.map(i => `
             <li><span class="psn-estoque-nome">${esc(i.nome)}</span>
-                <span class="psn-estoque-preco">${i.preco} po${
-                  i.preco !== i.tabela ? ` <small>(tabela ${i.tabela})</small>` : ''}</span>
+                <span class="psn-estoque-preco">${esc(i.preco_texto)}${
+                  i.preco_pc !== i.tabela_pc ? ` <small>(tabela ${esc(i.tabela_texto)})</small>` : ''}</span>
                 ${i.qtd < 99 ? `<span class="psn-estoque-qtd">${i.qtd}x</span>` : ''}</li>`).join('')}</ul>`
         : '<p class="lcl-item-desc">Sem estoque aberto.</p>';
       itens.push(`<div class="lcl-item"><div class="lcl-item-cabeca"><span class="lcl-marca lcl-marca-loja">loja</span>

@@ -35,7 +35,8 @@ def _loja():
 
 def _preco():
     snap = td.shop_snapshot("Forja do Torbin", "Lyra")
-    return next(i for i in snap["estoque"] if i["nome"] == "Espada Longa")["preco"]
+    # Em ouro, para ler como o lojista fala; a tela recebe em cobre.
+    return next(i for i in snap["estoque"] if i["nome"] == "Espada Longa")["preco_pc"] / 100
 
 
 def test_sucesso_derruba_o_preco_da_visita(forja, monkeypatch):
@@ -76,7 +77,7 @@ def test_um_no_dado_ofende_o_lojista(forja, monkeypatch):
     assert "ofende" in saida
     # 20 com os 5% da ofensa e mais 5% da atitude, que acabou de cair: o
     # lojista ofendido cobra pelas duas coisas.
-    assert _preco() == 22
+    assert _preco() == 22.05            # em cobre o preço não arredonda para o ouro
     assert tools.atitude_de(memory.campaign["characters"]["torbin"]) == -5
 
 

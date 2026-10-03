@@ -1,0 +1,15 @@
+itens comuns: 231  {'equipamento': 93, 'ferramenta': 35, 'municao': 4, 'veneno': 15, 'arma': 37, 'armadura': 12, 'mercadoria': 23, 'veiculo': 11, 'escudo': 1}
+itens mágicos: 255  {'armadura': 12, 'item maravilhoso': 128, 'escudo': 5, 'munição': 2, 'arma': 26, 'cetro': 6, 'poção': 28, 'anel': 22, 'pergaminho': 1, 'cajado': 12, 'varinha': 13}
+
+blanket: peso 0.000 lb -> 3 lb (Open5e v2 dá 0 lb; o SRD 5.1 dá 3 lb.)
+crossbow-hand: o nome que os stat blocks usam
+crossbow-heavy: o nome que os stat blocks usam; e o Open5e v2 está sem Ammunition (o SRD 5.1 dá Munição).
+crossbow-light: o nome que os stat blocks usam; e o Open5e v2 está sem Two-Handed (o SRD 5.1 dá Duas Mãos).
+greatsword: peso 0.000 lb -> 6 lb (Open5e v2 dá 0 lb; o SRD 5.1 dá 6 lb.)
+handaxe: Open5e v2 sem Thrown (só o alcance 20/60); o SRD 5.1 dá Arremesso.
+lance: Desvantagem contra alvo a 1,5 m; duas mãos quando não montado.
+net: Sem dano: o alvo atingido fica Impedido (regra especial).
+shortsword: Open5e v2 dá cortante; no SRD 5.1 a espada curta é perfurante.
+trident: Open5e v2 marca Two-Handed; no SRD 5.1 o tridente é de Arremesso e Versátil.
+whip: Open5e v2 sem Finesse; o SRD 5.1 dá Acuidade e Alcance ao chicote.
+Potion of Healing: preço 50 po (Livro do Jogador; o SRD não dá preço)

@@ -46,7 +46,7 @@ def _preco_na_tela(nome="Espada Longa"):
 # ---------------------------------------------------------------------------
 
 def test_sem_atitude_o_preco_e_o_da_tabela(forja):
-    assert _preco_na_tela()["preco"] == 20
+    assert _preco_na_tela()["preco_pc"] == 2000
     assert td.shop_snapshot("Forja do Torbin", "Thorn")["atitude"] is None
 
 
@@ -54,7 +54,7 @@ def test_lojista_leal_cobra_menos(forja):
     tools.adjust_attitude("Torbin", 80, "o grupo salvou a filha dele")
     item = _preco_na_tela()
     # 80 pontos = 4 degraus = 20% de desconto.
-    assert (item["preco"], item["tabela"]) == (16, 20)
+    assert (item["preco_pc"], item["tabela_pc"]) == (1600, 2000)
     saida = td.buy_item("Thorn", "Forja do Torbin", "Espada Longa")
     assert "16 po" in saida and "-20%" in saida
     assert memory.campaign["characters"]["thorn"]["sheet"]["ouro"] == 484
@@ -62,7 +62,7 @@ def test_lojista_leal_cobra_menos(forja):
 
 def test_lojista_hostil_cobra_mais(forja):
     tools.adjust_attitude("Torbin", -60, "o grupo roubou a forja")
-    assert _preco_na_tela()["preco"] == 23        # +15%
+    assert _preco_na_tela()["preco_pc"] == 2300        # +15%
     td.buy_item("Thorn", "Forja do Torbin", "Espada Longa")
     assert memory.campaign["characters"]["thorn"]["sheet"]["ouro"] == 477
 
@@ -70,7 +70,7 @@ def test_lojista_hostil_cobra_mais(forja):
 def test_o_desconto_tem_teto(forja):
     tools.adjust_attitude("Torbin", 100, "parceiro de vida")
     # 100 pontos seriam 5 degraus: o teto é justamente 5, ou seja, 25%.
-    assert _preco_na_tela()["preco"] == 15
+    assert _preco_na_tela()["preco_pc"] == 1500
     snap = td.shop_snapshot("Forja do Torbin", "Thorn")
     assert snap["atitude"]["pct"] == -25
 
@@ -96,12 +96,12 @@ def test_atitude_tambem_muda_o_que_a_loja_paga(forja):
 def test_loja_sem_dono_nao_muda_de_preco(forja):
     _loja()["dono"] = ""
     tools.adjust_attitude("Torbin", 100, "parceiro de vida")
-    assert _preco_na_tela()["preco"] == 20
+    assert _preco_na_tela()["preco_pc"] == 2000
 
 
 def test_dono_que_nao_existe_mais_nao_quebra(forja):
     _loja()["dono"] = "Fantasma de Ninguém"
-    assert _preco_na_tela()["preco"] == 20
+    assert _preco_na_tela()["preco_pc"] == 2000
     assert td.buy_item("Thorn", "Forja do Torbin", "Escudo").startswith("Thorn comprou")
 
 
@@ -118,13 +118,13 @@ def test_ficha_do_lojista_traz_o_estoque(forja):
     f = personagens.ficha("Torbin")
     assert f["loja"]["nome"] == "Forja do Torbin" and f["loja"]["dono"] is True
     assert [i["nome"] for i in f["loja"]["estoque"]] == ["Espada Longa", "Escudo"]
-    assert f["loja"]["estoque"][0]["preco"] == 20
+    assert f["loja"]["estoque"][0]["preco_pc"] == 2000
 
 
 def test_estoque_da_ficha_usa_o_preco_da_relacao(forja):
     tools.adjust_attitude("Torbin", 80, "o grupo salvou a filha dele")
     item = personagens.ficha("Torbin")["loja"]["estoque"][0]
-    assert (item["preco"], item["tabela"]) == (16, 20)
+    assert (item["preco_pc"], item["tabela_pc"]) == (1600, 2000)
 
 
 def test_ficha_mostra_o_que_a_atitude_faz(forja):
