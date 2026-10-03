@@ -101,8 +101,9 @@ def test_preco_offline_sem_rede(nome, pc):
 
 def test_item_desconhecido_nao_inventa_preco():
     assert td._preco_pc_do_srd("Lâmina Rúnica de Vhar") is None
-    # Arma mágica não custa o preço da arma comum.
-    assert td._preco_pc_do_srd("Espada Longa +1") is None
+    # Arma mágica não custa o preço da arma comum: custa o da raridade
+    # (incomum, 300 po) mais a espada (15 po).
+    assert td._preco_pc_do_srd("Espada Longa +1") == 31500
 
 
 def test_a_loja_abre_sem_o_mestre_informar_um_preco(campanha):
@@ -226,8 +227,10 @@ def test_o_que_o_grupo_comprou_continua_comprado(campanha, povoar):
 
     td.open_shop("Forja", "Espada Longa:15")
 
-    assert "Escudo" not in _nomes("Forja")             # esgotado continua esgotado
-    assert _nomes("Forja") == ["Adaga", "Espada Longa"]
+    # Esgotado continua esgotado (zero até a reposição da semana) e some da tela.
+    escudo = next(i for i in td._lojas()["forja"]["estoque"] if i["nome"] == "Escudo")
+    assert escudo["qtd"] == 0
+    assert [i["nome"] for i in td.shop_snapshot("Forja", "Aria")["estoque"]] == ["Adaga", "Espada Longa"]
 
 
 def test_local_da_loja_nao_se_perde_ao_reabrir(campanha):

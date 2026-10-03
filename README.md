@@ -1024,8 +1024,38 @@ válida que encerra o assunto. `buy_item` entrou em `_ITEM_TOOLS` para que a
 conferência rode no turno da compra, e em `stateful` para que a rodada de
 correção não cobre o ouro do jogador duas vezes pelo mesmo item.
 
-**O motor não tem categoria de loja.** Uma forja vendendo poção passa sem
-aviso: `open_shop` só cuida de preço, estoque e bolsa. Quem mantém a coerência
+**Loja gerada pelo tipo e pelo porte.** `open_shop(..., kind="forja",
+size="cidade")` monta o estoque do SRD sozinho (`_gerar_estoque`): a forja tem
+as armas e as armaduras que cabem no porte (no vilarejo, só armas simples e
+armadura leve; placas, só na metrópole) e munição; o armazém, o equipamento de
+aventura; o boticário, poções e antitoxina; o templo, água benta e pergaminhos
+de magia de clérigo; a loja arcana, focos, grimórios, pergaminhos de mago e
+itens mágicos; o joalheiro, anéis e amuletos. O porte (vilarejo, vila, cidade,
+metrópole) decide a raridade máxima à venda (comum, comum, incomum, raro),
+quantos itens mágicos há (de 0-1 a 4-7) e quanto o lojista tem para comprar
+do grupo (50, 200, 1.000 e 5.000 po). O sorteio é repetível pela semente (o
+nome da loja e a semana): a mesma forja, na mesma semana, tem as mesmas
+espadas. `items` continua valendo, para o que o mestre quiser a mais.
+
+- **Preço de item mágico pela raridade** (`_preco_de_raridade_pc`, faixas do
+  Guia do Mestre: 75, 300, 2.500, 25.000 e 100.000 po), metade para
+  consumível; o pergaminho pela raridade do círculo; a arma e a armadura +N
+  somam o preço da base. A loja passou a vender e a comprar item mágico.
+- **Bolsa do lojista** (só na loja com porte): comprar enche, vender esvazia,
+  e o que ele não tem para pagar ele recusa. A tela mostra quanto ele tem e
+  trava o botão de vender o que passa disso.
+- **Reposição** (`_repor_se_passou_a_semana`, a cada 7 dias do relógio, na
+  próxima leitura das lojas): a loja gerada sorteia o estoque da semana; a
+  montada à mão volta às quantidades de quando foi aberta; a bolsa volta a
+  pelo menos a de base. O esgotado fica na prateleira com zero (e some da tela)
+  até lá.
+- **Recompra:** o que o grupo vende fica na prateleira, pelo preço de tabela.
+- **Só onde o grupo está** (`_loja_daqui`): `buy_item`, `sell_item` e
+  `haggle` recusam a loja de outra cidade; dentro da mesma cidade (a taverna
+  que fica nela) vale.
+
+**Sem `kind`, o motor não confere o estoque.** Uma forja vendendo poção passa
+sem aviso: `open_shop` só cuida de preço, estoque e bolsa. Quem mantém a coerência
 é o mestre, e a instrução dele diz isso explicitamente. O SRD traz `category`
 (`Martial Melee Weapons`, `Medium Armor`), então dá para conferir um dia —
 `test_forja_pode_vender_pocao` existe para avisar quando esse limite mudar.

@@ -395,3 +395,23 @@ def test_pilula_no_desktop_continua_no_canto(pagina):
     distancia = pg.evaluate(
         "() => window.innerHeight - document.querySelector('#shp-reopen').getBoundingClientRect().bottom")
     assert abs(distancia - 20) <= 1, f"desktop mudou: {distancia}px da borda"
+
+
+def test_lojista_sem_dinheiro_trava_a_venda(pagina):
+    """A bolsa do lojista aparece na aba vender, e o que ele não paga fica travado."""
+    import copy
+    import requests
+    import capturar_telas as cap
+    pg, _ = pagina
+    estado = copy.deepcopy(cap.LOJA)
+    loja = estado["lojas"]["forja do torbin"]
+    loja.update({"bolsa_pc": 300, "bolsa_base_pc": 300})      # 3 po
+    requests.post(f"{pg.url_base}/__estado", json=estado, timeout=10)
+    # A tela abre uma vez por visita: em vez de recarregar, ela relê o estado.
+    pg.evaluate("window.Shop._quem('Helena')")
+    pg.wait_for_timeout(600)
+    pg.click("#shp-aba-vender")
+    pg.wait_for_timeout(400)
+    assert "tem 3 po para comprar" in pg.inner_text("#shp-lista")
+    assert pg.is_disabled(_botao(pg, "Espada Curta"))            # vale 5 po para ele
+    assert pg.is_enabled(_botao(pg, "Adaga"))                    # vale 1 po

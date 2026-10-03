@@ -393,7 +393,8 @@ def test_estoque_esgotado(campanha, povoar):
     td.open_shop("Loja", "Adaga:5:1")
 
     assert "comprou" in td.buy_item("Aria", "Loja", "Adaga", 1)
-    assert "não está à venda" in td.buy_item("Aria", "Loja", "Adaga", 1)
+    # Esgotado: fica na loja com zero até a reposição da semana.
+    assert "esgotou" in td.buy_item("Aria", "Loja", "Adaga", 1)
 
 
 def test_venda_paga_metade(campanha, povoar):

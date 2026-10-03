@@ -11584,11 +11584,187 @@ def inventory_action(action: str, char: str = "", item: str = "", slot: str = ""
 
 # ── Loja ───────────────────────────────────────────────────────────────────
 
+# ── Loja gerada pelo tipo e pelo porte do lugar ────────────────────────────
+# O mestre digitava o estoque inteiro de cabeça, e uma aldeia vendia espada
+# +3. Com `kind` e `size`, open_shop monta o estoque do SRD: o que uma forja,
+# um armazém, um boticário, um templo, uma loja arcana ou um joalheiro têm,
+# e quanto de mágico cabe no porte do lugar.
+_PORTES = {
+    # porte: (raridade máxima à venda, itens mágicos (mín, máx), bolsa do lojista em po)
+    "vilarejo":  ("comum", (0, 1), 50),
+    "vila":      ("comum", (1, 2), 200),
+    "cidade":    ("incomum", (2, 4), 1000),
+    "metropole": ("raro", (4, 7), 5000),
+}
+_APELIDOS_DE_PORTE = {"aldeia": "vilarejo", "povoado": "vilarejo", "vilarejo": "vilarejo",
+                      "vila": "vila", "cidade pequena": "vila", "cidade": "cidade",
+                      "metropole": "metropole", "capital": "metropole", "cidade grande": "metropole"}
+_SIMPLES_SO = ("club", "dagger", "handaxe", "javelin", "light-hammer", "mace", "quarterstaff",
+               "sickle", "spear", "crossbow-light", "dart", "shortbow", "sling")
+_ARMADURAS_POR_PORTE = {
+    "vilarejo": ("padded-armor", "leather-armor", "hide-armor", "shield"),
+    "vila": ("padded-armor", "leather-armor", "studded-leather-armor", "hide-armor", "chain-shirt",
+             "scale-mail", "ring-mail", "chain-mail", "shield"),
+    "cidade": ("padded-armor", "leather-armor", "studded-leather-armor", "hide-armor", "chain-shirt",
+               "scale-mail", "breastplate", "half-plate", "ring-mail", "chain-mail", "splint-armor",
+               "shield"),
+}
+_ARMADURAS_POR_PORTE["metropole"] = _ARMADURAS_POR_PORTE["cidade"] + ("plate-armor",)
+# Estoque comum de cada tipo: (chave do compêndio, quantidade; 99 = sempre tem).
+_ESTOQUE_COMUM = {
+    "armazem": [("backpack", 99), ("bedroll", 99), ("blanket", 99), ("candle", 99), ("chalk-1-piece", 99),
+                ("crowbar", 5), ("grappling-hook", 3), ("hammer", 5), ("lamp", 5), ("lamp-oil-flask", 99),
+                ("lantern-hooded", 3), ("mess-kit", 99), ("piton", 99), ("pole-10-foot", 5),
+                ("pouch", 99), ("rations-1-day", 99), ("rope-hempen-50-feet", 99), ("sack", 99),
+                ("tinderbox", 99), ("torch", 99), ("waterskin", 99), ("whetstone", 99),
+                ("clothes-common", 99), ("clothes-travelers", 99), ("healers-kit", 3),
+                ("climbers-kit", 1), ("chain-10-feet", 3), ("lock", 2), ("manacles", 2),
+                ("arrow-bow", 99), ("crossbow-bolt", 99), ("sling-bullets", 99)],
+    "boticario": [("antitoxin-vial", 4), ("acid-vial", 3), ("alchemists-fire-flask", 3),
+                  ("healers-kit", 3), ("herbalism-kit", 1), ("vial", 99), ("perfume-vial", 5), ("soap", 99)],
+    "templo": [("holy-water-flask", 4), ("healers-kit", 3), ("amulet", 3), ("emblem", 3),
+               ("reliquary", 2), ("candle", 99), ("robes", 5)],
+    "arcana": [("component-pouch", 3), ("crystal", 2), ("orb", 2), ("rod", 1), ("staff", 2), ("wand", 2),
+               ("spellbook", 2), ("ink-1-ounce-bottle", 5), ("ink-pen", 99),
+               ("parchment-one-sheet", 99), ("case-map-or-scroll", 5)],
+    "joalheiro": [("signet-ring", 3), ("jewelers-tools", 1), ("magnifying-glass", 1), ("scale-merchants", 2)],
+}
+_TIPOS_DE_LOJA = {"forja", "armazem", "boticario", "templo", "arcana", "joalheiro"}
+_APELIDOS_DE_TIPO = {"ferreiro": "forja", "ferraria": "forja", "armeiro": "forja", "forja": "forja",
+                     "armazem": "armazem", "emporio": "armazem", "mercado": "armazem", "mercador": "armazem",
+                     "boticario": "boticario", "alquimista": "boticario", "herbalista": "boticario",
+                     "templo": "templo", "santuario": "templo", "arcana": "arcana", "magia": "arcana",
+                     "loja de magia": "arcana", "joalheiro": "joalheiro", "joalheria": "joalheiro"}
+
+
+def _porte(texto: str) -> str:
+    return _APELIDOS_DE_PORTE.get(_norm_txt(texto or ""), "")
+
+
+def _tipo_de_loja(texto: str) -> str:
+    return _APELIDOS_DE_TIPO.get(_norm_txt(texto or ""), "")
+
+
+def _raridade_cabe(raridade: str, porte: str) -> bool:
+    teto = _PORTES[porte][0]
+    return (raridade in _ORDEM_DE_RARIDADE
+            and _ORDEM_DE_RARIDADE.index(raridade) <= _ORDEM_DE_RARIDADE.index(teto))
+
+
+def _linha_de_estoque(nome: str, preco: int, qtd: int, descricao: str = "") -> dict:
+    return {"nome": nome, "preco_pc": int(preco), "qtd": int(qtd), "base": int(qtd), "descricao": descricao}
+
+
+def _gerar_estoque(tipo: str, porte: str, semente: str) -> list[dict]:
+    """
+    O estoque do SRD que uma loja deste tipo tem num lugar deste porte. A
+    semente (o nome da loja e a reposição) torna o sorteio repetível: a mesma
+    forja, na mesma semana, tem as mesmas espadas.
+    """
+    from rpg import compendio
+    sorte = random.Random(semente)
+    comuns = _itens.comuns()
+    linhas: list[dict] = []
+
+    def comum(chave: str, qtd: int) -> None:
+        e = comuns.get(chave)
+        if e and e.get("preco_pc"):
+            linhas.append(_linha_de_estoque(e["nome"], e["preco_pc"], qtd))
+
+    if tipo == "forja":
+        for chave, e in comuns.items():
+            if e["categoria"] == "arma" and (porte != "vilarejo" or chave in _SIMPLES_SO):
+                comum(chave, sorte.randint(1, 3))
+        for chave in _ARMADURAS_POR_PORTE[porte]:
+            comum(chave, sorte.randint(1, 2))
+        for chave in ("arrow-bow", "crossbow-bolt", "sling-bullets"):
+            comum(chave, 99)
+    else:
+        for chave, qtd in _ESTOQUE_COMUM.get(tipo, []):
+            comum(chave, qtd)
+    if tipo in ("boticario", "templo"):
+        linhas.append(_linha_de_estoque("Poção de Cura", 5000, sorte.randint(2, 5)))
+
+    # O que é mágico, dentro da raridade do porte.
+    candidatos: list[str] = []
+    if tipo == "forja":
+        candidatos = [f"{comuns[k]['nome']} +1" for k in ("longsword", "shortsword", "dagger", "longbow",
+                                                          "battleaxe", "warhammer", "rapier")]
+        candidatos += ["Escudo +1"]
+    elif tipo == "boticario":
+        candidatos = [e["nome"] for e in _itens.magicos().values() if e.get("tipo") == "poção"
+                      and e["chave"] not in ("potion-of-healing", "potion-of-poison")]
+    elif tipo in ("templo", "arcana"):
+        classe = "clérigo" if tipo == "templo" else "mago"
+        for m in compendio.magias_da_classe(classe, 9):
+            candidatos.append(f"Pergaminho de {m['nome']}")
+        if tipo == "arcana":
+            candidatos += [e["nome"] for e in _itens.magicos().values()
+                           if e.get("tipo") in ("varinha", "anel", "item maravilhoso", "cajado")
+                           and not e.get("sintetico")]
+    elif tipo == "joalheiro":
+        candidatos = [e["nome"] for e in _itens.magicos().values()
+                      if e.get("tipo") == "anel" or e.get("slot") == "amuleto"]
+    cabem = [n for n in candidatos if _raridade_do_item(n) and _raridade_cabe(_raridade_do_item(n), porte)
+             and _preco_de_raridade_pc(n)]
+    minimo, maximo = _PORTES[porte][1]
+    for nome in sorte.sample(cabem, min(len(cabem), sorte.randint(minimo, maximo))):
+        linhas.append(_linha_de_estoque(nome, _preco_de_raridade_pc(nome), 1))
+    return linhas
+
+
+_REPOSICAO_H = 7 * 24        # a loja se repõe uma vez por semana
+
+
+def _repor_se_passou_a_semana(loja: dict) -> None:
+    """
+    Uma semana depois, a loja se repõe: a gerada sorteia o estoque da semana
+    de novo; a montada à mão volta às quantidades de quando foi aberta. A
+    bolsa do lojista volta a pelo menos o que ele tinha.
+    """
+    agora = _agora_em_horas()
+    if loja.get("reposta_em") is None:
+        loja["reposta_em"] = agora
+        return
+    semanas = (agora - int(loja["reposta_em"])) // _REPOSICAO_H
+    if semanas <= 0:
+        return
+    loja["reposta_em"] = int(loja["reposta_em"]) + semanas * _REPOSICAO_H
+    loja["semana"] = int(loja.get("semana", 0) or 0) + semanas
+    if loja.get("tipo") and loja.get("porte") in _PORTES:
+        manuais = [l for l in loja.get("estoque") or [] if l.get("manual")]
+        loja["estoque"] = _gerar_estoque(loja["tipo"], loja["porte"],
+                                         f"{_norm_txt(loja['nome'])}:{loja['semana']}") + manuais
+    for linha in loja.get("estoque") or []:
+        if int(linha.get("base", 0) or 0) > int(linha.get("qtd", 0) or 0):
+            linha["qtd"] = int(linha["base"])
+    if loja.get("bolsa_base_pc") is not None:
+        loja["bolsa_pc"] = max(int(loja.get("bolsa_pc", 0) or 0), int(loja["bolsa_base_pc"]))
+
+
+def _loja_daqui(loja: dict) -> bool:
+    """
+    O grupo está na loja? No lugar dela, dentro dele (a taverna da mesma
+    cidade), ou um dos dois sem lugar definido. buy_item vendia de uma loja de
+    outra cidade, sem o grupo sair do lugar.
+    """
+    from rpg import locais as _locais_l
+    aqui = memory.campaign.get("current_location", "") or ""
+    onde = loja.get("local", "") or ""
+    if not aqui or not onde:
+        return True
+    if _norm_txt(aqui) in (_norm_txt(onde), _norm_txt(loja.get("nome", ""))):
+        return True
+    return _locais_l.esta_dentro(aqui, onde) or _locais_l.esta_dentro(aqui, loja.get("nome", ""))
+
+
 def _lojas() -> dict:
     lojas = memory.campaign.setdefault("lojas", {})
     for loja in lojas.values():
         for linha in (loja or {}).get("estoque") or []:
             _preco_pc_da_linha(linha)
+        if isinstance(loja, dict):
+            _repor_se_passou_a_semana(loja)
     return lojas
 
 
@@ -11694,6 +11870,8 @@ def haggle(char_name: str, shop_name: str = "") -> str:
     if not loja:
         return f"Aviso: Loja '{shop_name}' não encontrada."
 
+    if not _loja_daqui(loja):
+        return f"Aviso: {loja['nome']} fica em {loja.get('local')}; o grupo não está lá."
     if _pechincha_valida(loja):
         return (f"Nota: já pechincharam em {loja['nome']} nesta visita. "
                 f"O lojista não vai baixar o preço de novo agora.")
@@ -11767,15 +11945,56 @@ def _ganho_com_atitude(tabela: int, loja: dict) -> int:
     return max(1, int(round(base * ajuste["venda"])))
 
 
+# Preço de item mágico pela raridade (faixas do Guia do Mestre: comum 50-100
+# po, incomum 101-500, raro 501-5.000, muito raro 5.001-50.000, lendário
+# 50.001+). O SRD não dá preço a item mágico, e a loja recusava vender ou
+# comprar a Varinha de Teia. Consumível (poção, pergaminho, munição) custa a
+# metade, como no Guia de Xanathar.
+_PRECO_POR_RARIDADE_PO = {"comum": 75, "incomum": 300, "raro": 2500, "muito raro": 25000,
+                          "lendário": 100000}
+_ORDEM_DE_RARIDADE = ["comum", "incomum", "raro", "muito raro", "lendário", "artefato"]
+# Pergaminho de magia: a raridade sai do círculo (SRD, Spell Scroll).
+_RARIDADE_DO_PERGAMINHO = {0: "comum", 1: "comum", 2: "incomum", 3: "incomum", 4: "raro",
+                           5: "raro", 6: "muito raro", 7: "muito raro", 8: "muito raro", 9: "lendário"}
+
+
+def _raridade_do_item(nome: str) -> str:
+    """A raridade de um item mágico do SRD (ou de um pergaminho de magia), ou ''."""
+    magia = _magia_do_pergaminho(nome)
+    if magia:
+        return _RARIDADE_DO_PERGAMINHO[int(magia.get("nivel", 0) or 0)]
+    magico = _magico_por_nome(nome or "")
+    return (magico or {}).get("raridade", "")
+
+
+def _preco_de_raridade_pc(nome: str) -> int | None:
+    """Preço de tabela de um item mágico, em cobre: o fixo (Poção de Cura) ou o da raridade."""
+    if _magia_do_pergaminho(nome):
+        return _PRECO_POR_RARIDADE_PO[_raridade_do_item(nome)] * 100 // 2
+    magico = _magico_por_nome(nome or "")
+    if not magico:
+        return None
+    if magico.get("preco_pc"):
+        return int(magico["preco_pc"])
+    po = _PRECO_POR_RARIDADE_PO.get(magico.get("raridade", ""))
+    if not po:
+        return None                       # artefato não tem preço
+    pc = po * 100
+    if magico.get("tipo") in ("poção", "pergaminho", "munição"):
+        pc //= 2
+    base = _itens.arma(nome) or _itens.armadura(nome)
+    return pc + (int(base["preco_pc"]) if base else 0)
+
+
 def _preco_pc_do_srd(nome: str) -> int | None:
     """
     Preço de tabela em PEÇAS DE COBRE, do compêndio do SRD. None quando não há.
 
     Antes era ouro inteiro: tudo abaixo de 1 po custava 1 po (a tocha de 1 pc,
     a ração de 5 pp, a clava de 1 pp), e 20 tochas saíam por 20 po. Equipamento
-    de aventura não tinha preço nenhum.
+    de aventura não tinha preço nenhum. Item mágico tem o preço da raridade.
     """
-    return _itens.preco_pc(nome)
+    return _itens.preco_pc(nome) or _preco_de_raridade_pc(nome)
 
 
 _PRECO_RE = re.compile(r"^\s*(\d+(?:[.,]\d+)?)\s*(po|pp|pc|ouro|prata|cobre|gp|sp|cp)?\s*$",
@@ -11854,7 +12073,8 @@ def _valor_de_referencia_pc(item: dict) -> int | None:
     return None
 
 
-def open_shop(shop_name: str, items: str, location: str = "", owner: str = "") -> str:
+def open_shop(shop_name: str, items: str = "", location: str = "", owner: str = "",
+              kind: str = "", size: str = "") -> str:
     """
     Monta uma loja com estoque e preços. O que é do SRD (armas, armaduras,
     equipamento de aventura, ferramentas, a Poção de Cura) já sai com o custo
@@ -11884,10 +12104,27 @@ def open_shop(shop_name: str, items: str, location: str = "", owner: str = "") -
         owner:     Nome do personagem que atende ('Torbin'). A atitude dele
                    mexe no preço: 5% a cada 20 pontos, até 25% para menos ou
                    para mais, e a ficha dele passa a mostrar o estoque.
+        kind:      Tipo da loja, para o motor montar o estoque do SRD sozinho:
+                   forja, armazem, boticario, templo, arcana, joalheiro. Com
+                   kind, `items` é opcional (o que você quiser A MAIS).
+        size:      Porte do lugar: vilarejo, vila, cidade ou metropole. Decide
+                   quanto de mágico há à venda (vilarejo e vila: só comum;
+                   cidade: até incomum; metrópole: até raro) e quanto o
+                   lojista tem para comprar do grupo. A loja se repõe a cada
+                   semana do relógio.
     """
     nome_loja = (shop_name or "").strip()
     if not nome_loja:
         return "A loja precisa de um nome."
+
+    tipo, porte = _tipo_de_loja(kind), _porte(size)
+    if kind and not tipo:
+        return (f"Erro: tipo de loja '{kind}' desconhecido. Use: "
+                f"{', '.join(sorted(_TIPOS_DE_LOJA))}.")
+    if size and not porte:
+        return f"Erro: porte '{size}' desconhecido. Use: vilarejo, vila, cidade ou metropole."
+    if tipo and not porte:
+        porte = "vila"
 
     estoque = []
     sem_preco = []
@@ -11913,10 +12150,13 @@ def open_shop(shop_name: str, items: str, location: str = "", owner: str = "") -
             qtd = max(1, int(partes[2])) if len(partes) > 2 and partes[2] else 99
         except ValueError:
             qtd = 99
-        estoque.append({"nome": nome, "preco_pc": preco, "qtd": qtd,
-                        "descricao": descricao})
+        estoque.append({"nome": nome, "preco_pc": preco, "qtd": qtd, "base": qtd,
+                        "descricao": descricao, "manual": True})
 
-    if not estoque:
+    gerado = []
+    if tipo:
+        gerado = _gerar_estoque(tipo, porte, f"{_norm_txt(nome_loja)}:0")
+    if not estoque and not gerado:
         return ("Nenhum item com preço. O SRD não conhece: "
                 + ", ".join(sem_preco) + ". Informe o preço no formato "
                 "'nome:preço' (ex: 'Amuleto do Corvo:75', 'Vela:1 pc').") if sem_preco else \
@@ -11932,6 +12172,12 @@ def open_shop(shop_name: str, items: str, location: str = "", owner: str = "") -
         _lojas()[chave] = loja
     if owner:
         loja["dono"] = owner.strip()
+    if tipo:
+        loja["tipo"], loja["porte"] = tipo, porte
+    if porte and loja.get("bolsa_base_pc") is None:
+        loja["bolsa_base_pc"] = _PORTES[porte][2] * 100
+        loja["bolsa_pc"] = loja["bolsa_base_pc"]
+    loja.setdefault("reposta_em", _agora_em_horas())
     if location or not loja.get("local"):
         loja["local"] = location or memory.campaign.get("current_location", "")
 
@@ -11957,6 +12203,9 @@ def open_shop(shop_name: str, items: str, location: str = "", owner: str = "") -
                        f"não informe location.")
 
     novos, repostos = [], []
+    for item in gerado:
+        if not any(_norm_txt(i["nome"]) == _norm_txt(item["nome"]) for i in loja["estoque"]):
+            loja["estoque"].append(item)
     for item in estoque:
         antigo = next((i for i in loja["estoque"]
                        if _norm_txt(i["nome"]) == _norm_txt(item["nome"])), None)
@@ -11964,6 +12213,8 @@ def open_shop(shop_name: str, items: str, location: str = "", owner: str = "") -
             antigo.pop("preco", None)
             antigo["preco_pc"] = item["preco_pc"]
             antigo["qtd"]   = item["qtd"]
+            antigo["base"]  = item["qtd"]
+            antigo["manual"] = True
             if item.get("descricao"):
                 antigo["descricao"] = item["descricao"]
             repostos.append(item["nome"])
@@ -11974,6 +12225,8 @@ def open_shop(shop_name: str, items: str, location: str = "", owner: str = "") -
 
     cabeca = (f"**{nome_loja}** atualizada" if ja_existia
               else f"**{nome_loja}** aberta")
+    if loja.get("tipo"):
+        cabeca += f" ({loja['tipo']}, {loja['porte']})"
     linhas = [cabeca + (f" em {loja['local']}" if loja.get("local") else "") + ":"]
     for i in loja["estoque"]:
         q = "" if i["qtd"] >= 99 else f"  (x{i['qtd']})"
@@ -11984,6 +12237,8 @@ def open_shop(shop_name: str, items: str, location: str = "", owner: str = "") -
     if sem_preco:
         linhas.append("   Sem preço (fora do SRD, não entraram): "
                       + ", ".join(sem_preco))
+    if loja.get("bolsa_pc") is not None:
+        linhas.append(f"   O lojista tem {_fmt_pc(loja['bolsa_pc'])} para comprar do grupo.")
     return "\n".join(linhas) + aviso_local
 
 
@@ -12001,7 +12256,10 @@ def list_shop(shop_name: str) -> str:
     linhas = [f"**{loja['nome']}**"
               + (f" — {loja['local']}" if loja.get("local") else "")]
     for i in loja["estoque"]:
-        q = "" if i["qtd"] >= 99 else f"  (restam {i['qtd']})"
+        if int(i.get("qtd", 0) or 0) <= 0:
+            q = "  (esgotado até a reposição)"
+        else:
+            q = "" if i["qtd"] >= 99 else f"  (restam {i['qtd']})"
         linhas.append(f"   • {i['nome']} — {_fmt_pc(_preco_pc_da_linha(i))}{q}")
     return "\n".join(linhas)
 
@@ -12112,6 +12370,8 @@ def shop_snapshot(shop_name: str = "", buyer: str = "") -> dict:
     estoque = []
     if escolhida:
         for i in escolhida.get("estoque", []):
+            if int(i.get("qtd", 0) or 0) <= 0:
+                continue                   # esgotado até a reposição
             tabela = _preco_pc_da_linha(i)
             pedido = _preco_com_atitude(tabela, escolhida)
             estoque.append({
@@ -12133,6 +12393,12 @@ def shop_snapshot(shop_name: str = "", buyer: str = "") -> dict:
         "tem_loja":  bool(escolhida),
         "loja_aqui": bool(aqui),
         "dono":      (escolhida or {}).get("dono", ""),
+        "tipo":      (escolhida or {}).get("tipo", ""),
+        "porte":     (escolhida or {}).get("porte", ""),
+        # Quanto o lojista tem para comprar do grupo (None: sem limite).
+        "bolsa_loja_pc": (escolhida or {}).get("bolsa_pc"),
+        "bolsa_loja_texto": (_fmt_pc(escolhida["bolsa_pc"])
+                             if escolhida and escolhida.get("bolsa_pc") is not None else ""),
         "atitude":   _atitude_da_loja(escolhida) if escolhida else None,
         "pechincha": (_pechincha_valida(escolhida) if escolhida else None),
         # TODAS as lojas deste local. Antes a tela só conhecia aqui[0]: com uma
@@ -12293,6 +12559,9 @@ def buy_item(char_name: str, shop_name: str, item_name: str, quantity: int = 1) 
     if not loja:
         return f"Aviso: Loja '{shop_name}' não encontrada."
 
+    if not _loja_daqui(loja):
+        return (f"Aviso: {loja['nome']} fica em {loja.get('local')}; o grupo está em "
+                f"{memory.campaign.get('current_location')}. Para comprar, é preciso ir até lá.")
     linha = next((i for i in loja["estoque"]
                   if _norm_txt(i["nome"]) == _norm_txt(item_name)), None)
     if not linha:
@@ -12304,6 +12573,9 @@ def buy_item(char_name: str, shop_name: str, item_name: str, quantity: int = 1) 
     except (TypeError, ValueError):
         qtd = 1
     if linha["qtd"] < qtd:
+        if linha["qtd"] <= 0:
+            return (f"Aviso: {linha['nome']} esgotou em {loja['nome']}; a loja se repõe "
+                    f"a cada semana.")
         return f"Aviso: {loja['nome']} tem só {linha['qtd']}x {linha['nome']}."
 
     sheet = char["sheet"]
@@ -12315,8 +12587,12 @@ def buy_item(char_name: str, shop_name: str, item_name: str, quantity: int = 1) 
                 f"{_fmt_pc(custo)} pedidos, {_fmt_pc(_cobre_total(sheet))} na bolsa.")
 
     linha["qtd"] -= qtd
-    if linha["qtd"] <= 0:
+    if linha["qtd"] <= 0 and not int(linha.get("base", 0) or 0):
         loja["estoque"].remove(linha)
+    elif linha["qtd"] <= 0:
+        linha["qtd"] = 0                  # esgotado: volta na reposição da semana
+    if loja.get("bolsa_pc") is not None:
+        loja["bolsa_pc"] = int(loja["bolsa_pc"]) + custo
     _registrar_negocio("compra", char["name"], loja["nome"], linha["nome"], qtd)
     # A descrição VAI JUNTO. Sem ela o add_item não tem o que auditar, e a
     # loja virava desvio da conferência de item inventado: uma "Lâmina Rúnica
@@ -12364,6 +12640,9 @@ def sell_item(char_name: str, shop_name: str, item_name: str, quantity: int = 1)
     if not loja:
         return f"Aviso: Loja '{shop_name}' não encontrada."
 
+    if not _loja_daqui(loja):
+        return (f"Aviso: {loja['nome']} fica em {loja.get('local')}; o grupo está em "
+                f"{memory.campaign.get('current_location')}. Para vender, é preciso ir até lá.")
     inv  = char.get("inventario") or []
     item = next((i for i in inv
                  if isinstance(i, dict)
@@ -12386,8 +12665,14 @@ def sell_item(char_name: str, shop_name: str, item_name: str, quantity: int = 1)
                 f"Ponha o item na loja com open_shop() informando o preço.")
 
     ganho = linha["ganho_pc"] * qtd
+    if loja.get("bolsa_pc") is not None and ganho > int(loja["bolsa_pc"]):
+        return (f"Aviso: {loja.get('dono') or 'o lojista'} só tem {_fmt_pc(loja['bolsa_pc'])} "
+                f"para pagar, e {qtd}x {item['nome']} valem {_fmt_pc(ganho)} para ele. "
+                f"Venda menos, ou procure uma loja maior.")
     sheet = char["sheet"]
     _receber(sheet, ganho)
+    if loja.get("bolsa_pc") is not None:
+        loja["bolsa_pc"] = int(loja["bolsa_pc"]) - ganho
 
     item["qtd"] = int(item.get("qtd", 1) or 1) - qtd
     if item["qtd"] <= 0:
@@ -12395,6 +12680,11 @@ def sell_item(char_name: str, shop_name: str, item_name: str, quantity: int = 1)
     nota_equip = _desequipar_o_que_saiu(char, item["nome"])
     if na_loja:
         na_loja["qtd"] = min(99, na_loja["qtd"] + qtd)
+    else:
+        # O que o grupo vende fica na prateleira, pelo preço de tabela.
+        loja["estoque"].append({"nome": item["nome"], "preco_pc": linha["tabela_pc"], "qtd": qtd,
+                                "base": 0, "descricao": item.get("descricao", "") or "",
+                                "manual": True})
     _registrar_negocio("venda", char["name"], loja["nome"], item["nome"], qtd)
     memory.save_campaign()
 

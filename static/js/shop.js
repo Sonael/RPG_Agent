@@ -226,7 +226,9 @@
       </div>`;
   }
 
-  function cartaoVenda(i) {
+  function cartaoVenda(i, snap) {
+    const bolsa = snap && snap.bolsa_loja_pc;
+    const semDinheiro = bolsa !== null && bolsa !== undefined && i.ganho_pc > bolsa;
     const selo = i.custom
       ? `<span class="shp-selo-custom" title="Fora do SRD — item próprio da campanha">próprio da campanha</span>`
       : '';
@@ -242,7 +244,8 @@
               ? '<small title="Gema, obra de arte e mercadoria valem o preço cheio">tesouro</small>'
               : `<small title="A loja paga metade da tabela">de ${esc(i.tabela_texto)}</small>`}</span>
           <span class="shp-peso">${i.peso} kg</span>
-          <button class="shp-btn shp-btn-vender"
+          <button class="shp-btn shp-btn-vender" ${semDinheiro ? 'disabled' : ''}
+                  title="${semDinheiro ? 'O lojista não tem dinheiro para pagar isso' : 'Vender 1'}"
                   onclick="window.Shop._vender('${esc(i.nome).replace(/'/g, "\\'")}', 1)">
             Vender
           </button>
@@ -264,7 +267,10 @@
 
     const inv = snap.inventario || [];
     el.innerHTML = inv.length
-      ? inv.map(cartaoVenda).join('')
+      ? (_last.bolsa_loja_texto
+          ? `<div class="shp-bolsa-loja">${esc(_last.dono || 'O lojista')} tem ${esc(_last.bolsa_loja_texto)} para comprar.</div>`
+          : '')
+        + inv.map(i => cartaoVenda(i, snap)).join('')
       : `<div class="shp-vazio">Nada aqui tem preço de tabela.<br>
            <small>A loja só compra o que sabe avaliar — peça ao mestre para
            pôr o item à venda com um preço.</small></div>`;

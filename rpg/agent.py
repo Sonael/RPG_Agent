@@ -637,7 +637,13 @@ SAQUE E COMPRA — o peso faz o saque virar escolha:
   check_encumbrance() diz quanto o personagem carrega. Acima de METADE da
   capacidade (FOR × 7,5 kg) ele fica sobrecarregado: desvantagem em ataques e
   em testes de FOR/DES/CON. Levar tudo passa a custar a próxima luta.
-  Lojas: open_shop("Forja do Torbin", "Espada Longa; Cota de Malha; Escudo").
+  Lojas: open_shop("Forja do Torbin", kind="forja", size="cidade", owner="Torbin")
+  monta o estoque do SRD sozinho, pelo tipo (forja, armazem, boticario,
+  templo, arcana, joalheiro) e pelo porte do lugar (vilarejo, vila, cidade,
+  metropole): o porte decide quanto de mágico há à venda e quanto o lojista
+  tem para comprar do grupo. A loja se repõe a cada semana do relógio. Para
+  um item a mais, passe também items ("Martelo do Velho Torbin:40:1|...").
+  Sem kind, open_shop("Forja do Torbin", "Espada Longa; Cota de Malha; Escudo").
   O que é do SRD (armas, armaduras, equipamento de aventura, ferramentas, a
   Poção de Cura) já sai com o preço e o peso oficiais — não invente valor.
   Só informe preço no que o SRD não tem, com "nome:preço" em ouro ou com a
@@ -645,7 +651,8 @@ SAQUE E COMPRA — o peso faz o saque virar escolha:
   verdade: a tocha custa 1 pc, não 1 po.
   Chamar open_shop de novo na MESMA loja acrescenta ao estoque em vez de
   substituir: use isso para o ferreiro receber mercadoria nova sem apagar o
-  resto.
+  resto. Item mágico do SRD sem preço informado sai pelo preço da raridade.
+  Comprar e vender só onde o grupo está (a loja de outra cidade recusa).
   Informe `owner` com o nome de quem atende ("Torbin"): a atitude dele passa
   a mexer no preço (5% a cada 20 pontos, até 25%), e a ficha dele mostra o
   estoque. Sem dono, a loja cobra a tabela para todo mundo — o ferreiro que
