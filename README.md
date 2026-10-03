@@ -866,6 +866,27 @@ eram "efeito desconhecido — descreva em Ação Livre".
   balas e agulhas gastas; a arma de arremesso jogada de longe (a azagaia na
   zona vizinha) sai da mão e é recolhida no fim da luta. `end_combat` diz quem
   recolheu o quê.
+- **Saque sugerido pelo motor** (`saque.sugerir_saque`): o que os inimigos
+  caídos carregavam — as armas do stat block, a armadura (o `armor_desc` do
+  Open5e, que `spawn_monster` passou a gravar), o inventário, um punhado da
+  munição — e moedas pelo ND, numa escala própria do jogo, só para quem vive
+  como gente (fera, limo, planta, constructo e elemental não carregam moeda).
+  Vai no resumo da vitória como uma chamada pronta de `offer_loot`, que o
+  Mestre ajusta; fora da luta, `suggest_loot`.
+- **Item mágico disfarçado:** "o que se vê = o que é" em `offer_loot` e
+  `add_item` ("Anel de prata com runas = Anel de Proteção"). O grupo leva o
+  anel de prata; nada na Mochila, no saque ou na ficha mostra o nome
+  verdadeiro. Identificar ou sintonizar revela (`_revelar`): o item ganha o
+  nome no inventário, nos slots e na sintonia. Até lá ele é o que parece — o
+  anel não protege, a poção não se bebe pelo efeito (prova-se um gole para
+  saber).
+- **Dar a…:** `give_item` (ferramenta do Mestre) e o seletor na Mochila passam
+  um item entre o grupo, com tudo o que ele tem (cargas, usos); sai do corpo
+  de quem deu, e quem recebe vê o aviso da carga. Fora da luta.
+- **Platina e electro:** `offer_loot(platinum=, electrum=)`, `modify_currency`
+  ("platina", "electro"), a divisão do saque e as telas. A compra paga com
+  ouro, prata e cobre; a platina só se quebra (e vira troco) quando eles não
+  bastam.
 - **Defeito do lote 2 corrigido aqui:** `end_combat` regravava a lista de
   efeitos a partir de `_efeitos`, que inclui os efeitos dos itens vestidos; o
   Anel de Proteção ficava gravado na ficha e valia sem o anel.

@@ -36,8 +36,10 @@ class _MotorTardio:
 
 td = _MotorTardio()
 
-_MOEDAS = ("ouro", "prata", "cobre")
-_ABREV = {"ouro": "po", "prata": "pp", "cobre": "pc"}
+# Da maior para a menor. Platina (10 po) e electro (5 pp) existem no 5e e o
+# saque não tinha onde pô-las: o tesouro de um mago virava ouro na conta.
+_MOEDAS = ("platina", "ouro", "electro", "prata", "cobre")
+_ABREV = {"platina": "pl", "ouro": "po", "electro": "pe", "prata": "pp", "cobre": "pc"}
 
 
 # ---------------------------------------------------------------------------
@@ -128,7 +130,7 @@ def _ler_itens(items: str) -> list[tuple[str, int, str]]:
 
 
 def offer_loot(items: str = "", gold: int = 0, silver: int = 0, copper: int = 0,
-               source: str = "") -> str:
+               source: str = "", platinum: int = 0, electrum: int = 0) -> str:
     """
     Abre a TELA DE SAQUE: o que caiu (dos inimigos, de um baú, de um corpo)
     fica no chão e o JOGADOR decide quem do grupo leva o quê, vendo a carga de
@@ -143,17 +145,25 @@ def offer_loot(items: str = "", gold: int = 0, silver: int = 0, copper: int = 0,
         items:  Itens separados por ';', com quantidade opcional após ':' e
                 descrição opcional após o segundo ':'.
                 Ex: "Espada Curta; Poção de Cura:2; Anel de Osso:1:lembrança, não faz nada"
+                Item mágico disfarçado: "o que o grupo vê = o que ele é".
+                Ex: "Anel de prata com runas = Anel de Proteção" — o grupo
+                leva o anel de prata e só descobre o que ele é ao
+                identificar (ou sintonizar). Gema e obra de arte com o valor
+                no nome: "Rubi (50 po)".
         gold:   Peças de ouro no saque.
         silver: Peças de prata.
         copper: Peças de cobre.
         source: De onde vem (ex: "os bandidos da estrada", "o baú do capitão").
+        platinum: Peças de platina (10 po cada).
+        electrum: Peças de electro (5 pp cada).
     """
     if td._em_combate():
         return "Erro: Há um combate em andamento. Abra o saque depois que a luta acabar."
     if not _grupo():
         return "Erro: Nenhum personagem com ficha no grupo para dividir o saque."
     lidos = _ler_itens(items)
-    moedas = {"ouro": max(0, int(gold or 0)), "prata": max(0, int(silver or 0)),
+    moedas = {"platina": max(0, int(platinum or 0)), "ouro": max(0, int(gold or 0)),
+              "electro": max(0, int(electrum or 0)), "prata": max(0, int(silver or 0)),
               "cobre": max(0, int(copper or 0))}
     if not lidos and not any(moedas.values()):
         return "Aviso: O saque está vazio. Informe itens ou moedas."
@@ -172,8 +182,9 @@ def offer_loot(items: str = "", gold: int = 0, silver: int = 0, copper: int = 0,
     nivel = max((int((c.get("sheet") or {}).get("nivel", 1) or 1) for c in _grupo()), default=1)
     avisos, entrou = [], []
     for nome, qtd, desc in lidos:
+        visivel = td._separar_disfarce(nome)[0]
         existente = next((it for it in saque["itens"]
-                          if td._norm_txt(it.get("nome", "")) == td._norm_txt(nome)), None)
+                          if td._norm_txt(it.get("nome", "")) == td._norm_txt(visivel)), None)
         if existente:
             existente["qtd"] = int(existente.get("qtd", 0)) + qtd
             entrou.append(f"{existente['nome']} ×{qtd}")
@@ -184,10 +195,11 @@ def offer_loot(items: str = "", gold: int = 0, silver: int = 0, copper: int = 0,
         ficha["qtd"] = qtd
         ficha["id"] = int(saque.get("proximo_item", 1))
         saque["proximo_item"] = ficha["id"] + 1
-        ficha["peso"] = td._peso_do_item({"nome": nome})
+        ficha["peso"] = td._peso_do_item({"nome": ficha.get("nome_verdadeiro") or ficha["nome"]})
         ficha["divisao"] = {}
         saque["itens"].append(ficha)
-        entrou.append(f"{nome} ×{qtd} ({ficha['peso']:g} kg cada)")
+        entrou.append(f"{ficha['nome']} ×{qtd} ({ficha['peso']:g} kg cada)"
+                      + (" — disfarçado até identificar" if ficha.get("nome_verdadeiro") else ""))
         if aviso:
             avisos.append(aviso.strip())
     for k in _MOEDAS:
@@ -205,6 +217,134 @@ def offer_loot(items: str = "", gold: int = 0, silver: int = 0, copper: int = 0,
     linhas.append("   Aguarde [SAQUE RESOLVIDO NA TELA] para narrar.")
     linhas.extend(avisos)
     return "\n".join(linhas)
+
+
+# ---------------------------------------------------------------------------
+# Saque sugerido: o que os inimigos derrotados carregavam
+# ---------------------------------------------------------------------------
+# O mestre inventava o saque do zero no fim da luta, e o bandido de arco curto
+# e armadura de couro caía sem deixar nem o arco. O motor sabe o que cada um
+# carregava: as armas do stat block, a armadura (o "armor_desc" do Open5e), o
+# inventário, e moedas pelo ND. A sugestão vai no resumo da luta; o mestre
+# ajusta e chama offer_loot.
+
+# Quem carrega moeda: gente e quem vive como gente. Fera, limo, planta,
+# constructo e elemental, não.
+_TIPOS_COM_MOEDAS = {"humanoide", "gigante", "corruptor", "dragao", "fada", "celestial", ""}
+
+# Moedas por criatura, pela faixa de ND: (dado, multiplicador, moeda). Uma
+# escala própria do jogo, crescendo com o perigo; a platina só a partir do
+# ND 11.
+_MOEDAS_POR_ND = (
+    (0.5, [("2d6", 1, "prata"), ("1d6", 1, "cobre")]),
+    (4, [("2d6", 1, "ouro"), ("2d6", 1, "prata")]),
+    (10, [("4d6", 10, "ouro"), ("1d6", 10, "prata")]),
+    (16, [("2d6", 100, "ouro"), ("1d6", 10, "platina")]),
+    (99, [("2d6", 1000, "ouro"), ("1d6", 100, "platina")]),
+)
+
+
+def _nd(sheet: dict) -> float:
+    bruto = str((sheet or {}).get("cr", "") or "").strip()
+    try:
+        if "/" in bruto:
+            a, b = bruto.split("/", 1)
+            return float(a) / float(b)
+        return float(bruto or 0)
+    except (ValueError, ZeroDivisionError):
+        return 0.0
+
+
+def _moedas_da_criatura(ch: dict) -> dict:
+    from rpg import tracos
+    s = ch.get("sheet") or {}
+    if tracos.tipo_de_criatura(ch) not in _TIPOS_COM_MOEDAS:
+        return {}
+    nd = _nd(s)
+    faixa = next(f for teto, f in _MOEDAS_POR_ND if nd <= teto)
+    saida: dict[str, int] = {}
+    for dado, mult, moeda in faixa:
+        v, _txt = td._rolar_expr(dado)
+        saida[moeda] = saida.get(moeda, 0) + max(0, v) * mult
+    return saida
+
+
+def _equipamento_da_criatura(ch: dict) -> list[str]:
+    """As armas e armaduras do SRD que a criatura usava, em português."""
+    s = ch.get("sheet") or {}
+    nomes = []
+    for ataque in s.get("ataques") or []:
+        a = td._itens.arma((ataque or {}).get("nome", "") if isinstance(ataque, dict) else str(ataque))
+        if a and a["nome"] not in nomes:
+            nomes.append(a["nome"])
+    for slot in ("arma_principal", "arma_secundaria", "armadura", "escudo"):
+        nome = (s.get("equipamentos") or {}).get(slot) or (s.get(slot) if slot.startswith("arma") else "")
+        dados = (td._itens.arma(nome) or td._itens.armadura(nome)) if nome else None
+        if dados and dados["nome"] not in nomes:
+            nomes.append(dados["nome"])
+    for parte in str(s.get("armadura_desc") or "").split(","):
+        r = td._itens.armadura(parte.strip())
+        if r and r["nome"] not in nomes:
+            nomes.append(r["nome"])
+    return nomes
+
+
+def sugerir_saque(nomes: list[str]) -> dict:
+    """
+    {itens: [(nome, qtd)], moedas: {...}, chamada: 'offer_loot(...)'} do que
+    os inimigos `nomes` carregavam. Munição: um punhado das flechas (o resto
+    se perdeu na luta).
+    """
+    itens: dict[str, int] = {}
+    moedas: dict[str, int] = {}
+    chars = memory.campaign.get("characters") or {}
+    for nome in nomes:
+        ch = chars.get(memory.char_key(nome))
+        if not ch or memory.is_party_member(ch):
+            continue
+        for item in _equipamento_da_criatura(ch):
+            itens[item] = itens.get(item, 0) + 1
+            a = td._itens.arma(item)
+            if a and a.get("municao"):
+                mun = td._itens.comuns()[a["municao"]]["nome"]
+                v, _t = td._rolar_expr("2d6")
+                itens[mun] = itens.get(mun, 0) + max(1, v)
+        for it in ch.get("inventario") or []:
+            if isinstance(it, dict) and it.get("nome"):
+                itens[it["nome"]] = itens.get(it["nome"], 0) + int(it.get("qtd", 1) or 1)
+        for k, v in _moedas_da_criatura(ch).items():
+            moedas[k] = moedas.get(k, 0) + v
+    lista = sorted(itens.items())
+    texto = "; ".join(f"{n}:{q}" if q > 1 else n for n, q in lista)
+    params = {"platina": "platinum", "ouro": "gold", "electro": "electrum",
+              "prata": "silver", "cobre": "copper"}
+    args = [f'"{texto}"'] + [f"{params[k]}={v}" for k, v in moedas.items() if v]
+    return {"itens": lista, "moedas": moedas, "chamada": f"offer_loot({', '.join(args)})"}
+
+
+def suggest_loot(enemies: str = "") -> str:
+    """
+    Sugere o saque do que os inimigos carregavam: as armas e a armadura do
+    stat block, o inventário deles e moedas pelo ND. Use antes de
+    offer_loot, fora do resumo da luta (o corpo achado na estrada, o
+    acampamento saqueado). Ajuste à vontade: acrescente o tesouro da história
+    e o item mágico que a cena pede.
+
+    Args:
+        enemies: Nomes separados por vírgula (vazio: os inimigos caídos da
+                 última luta).
+    """
+    if enemies.strip():
+        nomes = [n.strip() for n in enemies.split(",") if n.strip()]
+    else:
+        nomes = [c.get("name", "") for c in (memory.campaign.get("characters") or {}).values()
+                 if isinstance(c, dict) and not memory.is_party_member(c)
+                 and (c.get("status") or "").lower() in td.DEFEATED_STATUSES]
+    s = sugerir_saque(nomes)
+    if not s["itens"] and not s["moedas"]:
+        return "Nota: nada a sugerir — essas criaturas não carregavam nada."
+    return (f"Saque sugerido ({', '.join(nomes)}):\n   " + s["chamada"]
+            + "\n   Ajuste e chame offer_loot. Nada foi entregue ainda.")
 
 
 # ---------------------------------------------------------------------------

@@ -212,7 +212,7 @@
       d.vulnerabilidades.length ? `Vulnerabilidade: ${d.vulnerabilidades.map(esc).join(', ')}` : '',
     ].filter(Boolean);
     return `<div class="hro-slots">${slots}</div>
-      <p class="hro-linha">${m.ouro} po · ${m.prata} pp · ${m.cobre} pc
+      <p class="hro-linha">${m.platina ? `${m.platina} pl · ` : ''}${m.ouro} po${m.electro ? ` · ${m.electro} pe` : ''} · ${m.prata} pp · ${m.cobre} pc
         · ${p.itens} ${p.itens === 1 ? 'item' : 'itens'} na mochila
         · carga ${p.carga.kg}/${p.carga.capacidade} kg</p>
       ${defesas.length ? `<p class="hro-linha">${defesas.join(' · ')}</p>` : ''}`;

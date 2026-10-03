@@ -40,7 +40,7 @@ const STATE_TOOLS = new Set([
   'learn_spell',
   // Mochila: o que entra, sai ou é conferido aparece com ela aberta.
   'add_item', 'remove_item', 'identify_item', 'buy_item', 'sell_item',
-  'attune_item', 'end_attunement', 'use_magic_item',
+  'attune_item', 'end_attunement', 'use_magic_item', 'give_item',
   // Fechamento do turno: a relação mudou, e a ficha aberta tem de mostrar.
   'relacao',
 ]);
@@ -409,7 +409,8 @@ const TOOL_LABEL = {
   open_shop: 'abrindo a loja', list_shop: 'vendo a loja', buy_item: 'comprando item',
   sell_item: 'vendendo item', haggle: 'pechinchando', identify_item: 'identificando item',
   attune_item: 'sintonizando o item', end_attunement: 'desfazendo a sintonia',
-  use_magic_item: 'usando item mágico',
+  use_magic_item: 'usando item mágico', give_item: 'passando um item',
+  suggest_loot: 'sugerindo o saque',
   justify_custom_item: 'justificando o item', list_custom_items: 'listando itens próprios',
   // Mundo e tempo
   advance_time: 'adiantando o relógio', get_world_time: 'vendo a hora',

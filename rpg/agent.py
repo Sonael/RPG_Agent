@@ -817,6 +817,12 @@ REGRA: Se a ação faria sentido num mundo real coerente, use social_check().
         Se a ação é absurda pela lógica do mundo, recuse narrativamente — sem dado.
         O dado resolve INCERTEZA; não reescreve as leis do mundo.
 • Saque → offer_loot() (o jogador divide na tela). Recompensa a uma pessoa → add_item() / modify_currency().
+  O resumo da luta já traz o SAQUE SUGERIDO pelo motor (o que os caídos
+  carregavam e as moedas pelo ND); fora da luta, suggest_loot(). Ajuste e use.
+  Item mágico DISFARÇADO: "o que se vê = o que é" ("Anel de prata com runas =
+  Anel de Proteção"); o grupo leva o anel e descobre ao identificar ou se
+  sintonizar. Moedas: platinum (10 po) e electrum (5 pp) também.
+  Passar item entre o grupo: give_item() (o jogador também passa pela Mochila).
   Gema e obra de arte levam o valor no nome ("Rubi (50 po)"): a loja paga o
   valor cheio por tesouro.
 • Item mágico encontrado → add_item() confere todo item no SRD D&D 5e.

@@ -369,3 +369,15 @@ def test_desfazer_a_sintonia(pagina):
     _clicar(pg, f"{manto} .inv-btn-dessintonizar", 1000)
     assert 'pede sintonia' in pg.inner_text(manto)
     assert 'Sintonia:' not in pg.inner_text('#inv-slots')
+
+
+# ---- dar a… ----------------------------------------------------------------
+
+def test_dar_a_tocha_a_alguem_do_grupo(pagina):
+    pg, _ = pagina
+    sel = f"{_item('Tocha')} .inv-dar"
+    quem = pg.eval_on_selector(sel, "s => s.options[1].value")
+    pg.select_option(sel, quem)
+    pg.wait_for_timeout(1000)
+    assert f'deu 1x Tocha a {quem}' in pg.inner_text('#inv-msg')
+    assert '×4' in pg.inner_text(f"{_item('Tocha')} .inv-item-nome")

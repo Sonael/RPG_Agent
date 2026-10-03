@@ -3963,6 +3963,11 @@ body.inventory-on { overflow: hidden; }
 .inv-btn-dessintonizar { border-color: var(--inv-line); color: var(--inv-muted); font-weight: 400; }
 .inv-sintonia-conta { font-size: 0.8rem; color: var(--inv-muted); text-align: right; }
 .shp-bolsa-loja { font-size: 0.82rem; opacity: .85; margin: 0 0 var(--esp-2); }
+.inv-dar {
+  font-family: 'Lora', serif; font-size: 0.82rem; border-radius: 6px;
+  padding: var(--esp-1) var(--esp-2); border: 1px solid var(--inv-gold);
+  background: var(--inv-paper); color: var(--inv-dark);
+}
 .inv-item-acoes { display: flex; gap: var(--esp-2); flex-wrap: wrap; margin-top: var(--esp-2); }
 .inv-btn {
   font-family: 'Lora', serif; font-weight: 700; font-size: 0.82rem;

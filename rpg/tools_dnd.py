@@ -9154,7 +9154,7 @@ def attune_item(char_name: str, item_name: str) -> str:
     item = _item_do_inventario(char, item_name)
     if not item:
         return f"Erro: '{item_name}' não está no inventário de {char['name']}."
-    magico = _item_magico_do_srd(item["nome"])
+    magico = _item_magico_do_srd(item.get("nome_verdadeiro") or item["nome"])
     if not magico:
         return (f"Nota: '{item['nome']}' não é item mágico do SRD; se ele pede "
                 f"sintonização, diga isso na descrição e narre.")
@@ -9170,6 +9170,7 @@ def attune_item(char_name: str, item_name: str) -> str:
     if len(atuais) >= _LIMITE_DE_SINTONIA:
         return (f"Erro: {char['name']} já está sintonizado com {_LIMITE_DE_SINTONIA} itens "
                 f"({', '.join(atuais)}). Desfaça uma sintonia antes (end_attunement).")
+    revelado = _revelar(char, item)
     s["sintonizados"] = atuais + [item["nome"]]
     item["identificado"] = True
     item["custom"] = False
@@ -9181,7 +9182,8 @@ def attune_item(char_name: str, item_name: str) -> str:
     vestir = ""
     if magico.get("slot") in _SLOTS_DO_MAGICO and not _slots_ocupados_por(s.get("equipamentos") or {}, item["nome"]):
         vestir = " Vista o item (equip_item) para ele fazer efeito."
-    return (f"{char['name']} se sintonizou com {item['nome']} ({len(atuais) + 1}/{_LIMITE_DE_SINTONIA})."
+    return ((f"{revelado}. " if revelado else "")
+            + f"{char['name']} se sintonizou com {item['nome']} ({len(atuais) + 1}/{_LIMITE_DE_SINTONIA})."
             + (f" Efeito: {nota}" if nota else "") + vestir)
 
 
@@ -9627,7 +9629,8 @@ def modify_currency(char_name: str, currency_type: str, amount: int) -> str:
 
     Args:
         char_name:     Nome do personagem.
-        currency_type: Tipo de moeda: 'ouro', 'prata' ou 'cobre'.
+        currency_type: Tipo de moeda: 'platina' (10 po), 'ouro', 'electro' (5 pp),
+                       'prata' ou 'cobre'.
         amount:        Quantidade (positivo = recebe, negativo = gasta).
     """
     char, err = _get_char(char_name, allow_dead=True)
@@ -9635,10 +9638,12 @@ def modify_currency(char_name: str, currency_type: str, amount: int) -> str:
         return err
 
     s    = char["sheet"]
-    tipo = currency_type.lower()
+    tipo = currency_type.lower().strip()
+    tipo = {"po": "ouro", "pp": "prata", "pc": "cobre", "pl": "platina", "pe": "electro",
+            "eletro": "electro"}.get(tipo, tipo)
 
-    if tipo not in ("ouro", "prata", "cobre"):
-        return "Tipo de moeda inválido. Use: 'ouro', 'prata' ou 'cobre'."
+    if tipo not in ("platina", "ouro", "electro", "prata", "cobre"):
+        return "Tipo de moeda inválido. Use: 'platina', 'ouro', 'electro', 'prata' ou 'cobre'."
 
     atual = s.get(tipo, 0)
 
@@ -9652,9 +9657,11 @@ def modify_currency(char_name: str, currency_type: str, amount: int) -> str:
     acao    = "recebeu" if amount > 0 else "gastou"
 
     memory.save_campaign()
+    extra = "".join(f" | {rot}: {s.get(k)}" for k, rot in (("platina", "Platina"), ("electro", "Electro"))
+                    if s.get(k))
     return (
         f"{char['name']} {acao} {abs(amount)} {currency_type}.\n"
-        f"   Ouro: {s.get('ouro', 0)} | Prata: {s.get('prata', 0)} | Cobre: {s.get('cobre', 0)}"
+        f"   Ouro: {s.get('ouro', 0)} | Prata: {s.get('prata', 0)} | Cobre: {s.get('cobre', 0)}{extra}"
     )
 
 
@@ -10027,8 +10034,11 @@ def identify_item(char_name: str, item_name: str) -> str:
     if not char:
         return err
 
-    e = _item_magico_do_srd(item_name)
     alvo = _item_do_inventario(char, item_name)
+    real = (alvo or {}).get("nome_verdadeiro") or item_name
+    e = _item_magico_do_srd(real)
+    revelado = _revelar(char, alvo) if alvo else ""
+    nota_revelado = f"\n   {revelado}." if revelado else ""
 
     if e:
         # O item conferido fica marcado: a Mochila só oferece "Identificar"
@@ -10045,8 +10055,8 @@ def identify_item(char_name: str, item_name: str) -> str:
                   if not _mesmo_item(e["nome"], item_name) else f"**{e['nome']}** ({e['nome_srd']})")
         sint = " · requer sintonização" if e.get("sintonizacao") else ""
         bonus = f" · +{e['bonus']}" if e.get("bonus") else ""
-        texto = " ".join(_itens.texto_srd(e, item_name).split())[:700]
-        return (f"{cabeca}\n"
+        texto = " ".join(_itens.texto_srd(e, real).split())[:700]
+        return (f"{cabeca}{nota_revelado}\n"
                 f"   Tipo: {e.get('tipo', '')} · Raridade: {e.get('raridade', '')}{bonus}{sint}\n"
                 f"   Texto do SRD (em inglês; narre em português): {texto}")
 
@@ -10056,12 +10066,49 @@ def identify_item(char_name: str, item_name: str) -> str:
         alvo["identificado"] = True
         memory.save_campaign()
     nivel = (char.get("sheet") or {}).get("nivel", 1)
+    if revelado:
+        memory.save_campaign()
+        return (f"{revelado}. Não é item do SRD: é item próprio da campanha; "
+                f"o que ele faz está na descrição.")
     return (
         f"Aviso: '{item_name}' não existe no SRD de D&D 5e.\n"
         f"   Este parece ser um item customizado/homebrew.\n"
         f"   Certifique-se de que seus efeitos são balanceados para "
         f"um grupo nível {nivel}. Ajuste a descrição se necessário."
     )
+
+
+def _separar_disfarce(nome: str) -> tuple[str, str]:
+    """
+    "Anel de prata com runas = Anel de Proteção" → ("Anel de prata com runas",
+    "Anel de Proteção"). Sem "=", (nome, "").
+    """
+    if "=" not in (nome or ""):
+        return (nome or "").strip(), ""
+    visivel, _, verdadeiro = nome.partition("=")
+    return visivel.strip(), verdadeiro.strip()
+
+
+def _revelar(char: dict, item: dict) -> str:
+    """
+    O item disfarçado ganha o nome verdadeiro (ao identificar ou sintonizar),
+    no inventário, nos slots e na sintonia. Devolve "X é, na verdade, Y" ou "".
+    """
+    verdadeiro = item.pop("nome_verdadeiro", "")
+    if not verdadeiro:
+        return ""
+    antigo = item["nome"]
+    item["nome"] = verdadeiro
+    s = char.get("sheet") or {}
+    equip = s.get("equipamentos") or {}
+    for slot, valor in list(equip.items()):
+        if isinstance(valor, str) and _norm_txt(valor) == _norm_txt(antigo):
+            equip[slot] = verdadeiro
+    if s.get("sintonizados"):
+        s["sintonizados"] = [verdadeiro if _norm_txt(n) == _norm_txt(antigo) else n
+                             for n in s["sintonizados"]]
+    _recalculate_ca(char)
+    return f"{antigo} é, na verdade, {verdadeiro}"
 
 
 def add_item(char_name: str, item_name: str, quantity: int = 1, description: str = "") -> str:
@@ -10076,6 +10123,9 @@ def add_item(char_name: str, item_name: str, quantity: int = 1, description: str
     Args:
         char_name:   Nome do personagem.
         item_name:   Nome do item (ex: 'Poção de Cura', 'Espada Longa +1').
+                     Item mágico disfarçado: 'o que se vê = o que ele é'
+                     ('Frasco de vidro azul = Poção de Invisibilidade'): o
+                     grupo só descobre ao identificar.
         quantity:    Quantidade a adicionar (padrão: 1). Com 0, só troca a
                      descrição de um item que o personagem já tem (o ferreiro
                      que tempera a lâmina).
@@ -10093,8 +10143,9 @@ def add_item(char_name: str, item_name: str, quantity: int = 1, description: str
     inv = char["inventario"]
 
     # Empilha pelo nome sem caixa e sem acento, como o resto do motor procura:
-    # "Pocao de cura" e "Poção de Cura" eram duas pilhas.
-    existing = _item_do_inventario(char, item_name)
+    # "Pocao de cura" e "Poção de Cura" eram duas pilhas. O disfarçado empilha
+    # pelo nome que se vê.
+    existing = _item_do_inventario(char, _separar_disfarce(item_name)[0])
     if quantity < 0 or (quantity == 0 and not (existing and description)):
         return (f"Erro: quantidade inválida ({quantity}). Para tirar itens do "
                 f"inventário, use remove_item; com 0, só se troca a descrição "
@@ -10111,7 +10162,9 @@ def add_item(char_name: str, item_name: str, quantity: int = 1, description: str
     item_dict["qtd"] = quantity
     inv.append(item_dict)
     memory.save_campaign()
-    return f"{item_name} (×{quantity}) adicionado ao inventário de {char['name']}.{warning}"
+    disfarce = " (disfarçado: o grupo não sabe o que é)" if item_dict.get("nome_verdadeiro") else ""
+    return (f"{item_dict['nome']} (×{quantity}) adicionado ao inventário de "
+            f"{char['name']}{disfarce}.{warning}")
 
 
 def _conferir_item_novo(item_name: str, description: str = "", nivel: int = 1) -> tuple[dict, str]:
@@ -10122,8 +10175,20 @@ def _conferir_item_novo(item_name: str, description: str = "", nivel: int = 1) -
     Devolve (item sem quantidade, aviso). O aviso começa com quebra de linha,
     como add_item sempre anexou.
     """
-    item_dict: dict = {"nome": item_name, "descricao": description}
+    visivel, verdadeiro = _separar_disfarce(item_name)
+    item_dict: dict = {"nome": visivel, "descricao": description}
     warning = ""
+
+    # Disfarçado: o que ele é fica guardado, e o grupo só vê o que vê.
+    if verdadeiro:
+        item_dict["nome_verdadeiro"] = verdadeiro
+        item_dict["identificado"] = False
+        srd_v = _item_magico_do_srd(verdadeiro)
+        item_dict["custom"] = not srd_v
+        if srd_v:
+            item_dict["nome_srd"] = srd_v["nome_srd"]
+            item_dict["srd"] = _dados_srd_do_item(srd_v)
+        return item_dict, ""
 
     # O compêndio é local: todo item passa por ele, sem custo. Antes a
     # consulta ia à rede, e por isso só disparava para nome mágico ou efeito
@@ -10247,6 +10312,58 @@ def list_custom_items() -> str:
         partes.append(f"Só sabor ({len(so_sabor)}) — inventados, sem efeito "
                       f"declarado:\n" + "\n".join(so_sabor))
     return "\n\n".join(partes)
+
+
+def give_item(from_char: str, to_char: str, item_name: str, quantity: int = 1) -> str:
+    """
+    Passa um item de um personagem para outro do grupo (a poção que a
+    clériga entrega ao guerreiro, a corda que muda de mochila). O item vai
+    com tudo o que tem (cargas, sintonia não: quem recebe se sintoniza de
+    novo), e sai do corpo de quem deu se estava equipado. Fora da luta.
+
+    Args:
+        from_char: Quem dá.
+        to_char:   Quem recebe.
+        item_name: O item.
+        quantity:  Quantas unidades (padrão 1).
+    """
+    de, err = _get_char(from_char)
+    if not de:
+        return err
+    para, err = _get_char(to_char, allow_dead=False)
+    if not para:
+        return err
+    if memory.char_key(de["name"]) == memory.char_key(para["name"]):
+        return "Aviso: escolha outra pessoa para receber."
+    if not (memory.is_party_member(para) and memory.is_party_member(de)):
+        return "Aviso: dar item é entre o grupo; para um NPC, narre e use remove_item/add_item."
+    if _em_combate():
+        return "Aviso: no meio da luta não dá para arrumar as mochilas; passe o item depois."
+    item = _item_do_inventario(de, item_name)
+    if not item:
+        return f"Erro: {de['name']} não tem '{item_name}'."
+    try:
+        qtd = max(1, int(quantity))
+    except (TypeError, ValueError):
+        qtd = 1
+    if int(item.get("qtd", 1) or 1) < qtd:
+        return f"Aviso: {de['name']} tem só {item.get('qtd', 1)}x {item['nome']}."
+    nome = item["nome"]
+    destino = _item_do_inventario(para, nome)
+    if destino:
+        destino["qtd"] = int(destino.get("qtd", 1) or 1) + qtd
+    else:
+        copia = copy.deepcopy(item)
+        copia["qtd"] = qtd
+        para.setdefault("inventario", []).append(copia)
+    item["qtd"] = int(item.get("qtd", 1) or 1) - qtd
+    if item["qtd"] <= 0:
+        de["inventario"].remove(item)
+    nota = _desequipar_o_que_saiu(de, nome)
+    estado, carga, cap = _estado_de_carga(para)
+    aviso = f" {para['name']} fica {estado} ({carga:.1f}/{cap:.1f} kg)." if estado != "livre" else ""
+    memory.save_campaign()
+    return f"{de['name']} deu {qtd}x {nome} a {para['name']}.{aviso}{nota}"
 
 
 def remove_item(char_name: str, item_name: str, quantity: int = 1) -> str:
@@ -11071,8 +11188,7 @@ def hero_snapshot(char_name: str = "") -> dict:
         "equipados": [{"rotulo": _ROTULO_DO_SLOT[slot], "item": equip.get(slot) or ""}
                       for slot in _SLOTS if slot in _SLOTS_BASICOS or equip.get(slot)],
         "sintonizados": [n for n in s.get("sintonizados") or [] if isinstance(n, str)],
-        "moedas": {"ouro": int(s.get("ouro", 0) or 0), "prata": int(s.get("prata", 0) or 0),
-                   "cobre": int(s.get("cobre", 0) or 0)},
+        "moedas": _moedas_da_ficha(s),
         "carga": {"kg": carga, "capacidade": cap, "estado": estado},
         "itens": sum(1 for i in (alvo.get("inventario") or []) if isinstance(i, dict)),
         "habilidades": [{"nome": h.get("nome", ""), "descricao": h.get("descricao", "") or "",
@@ -11234,7 +11350,7 @@ def _a_identificar(item: dict) -> bool:
     """
     if item.get("identificado"):
         return False
-    if item.get("srd"):
+    if item.get("srd") or item.get("nome_verdadeiro"):
         return True
     if "custom" in item:
         return False
@@ -11486,14 +11602,16 @@ def inventory_snapshot(char_name: str = "") -> dict:
             "efeito_desconhecido": bool(it.get("efeito_desconhecido")),
             "uso": _uso_na_mochila(alvo, it),
             "sintonia": _sintonia_na_mochila(alvo, it),
+            # Para quem do grupo dá para passar o item (vivo, e não ele mesmo).
+            "dar_a": [c.get("name", "") for c in grupo
+                      if c is not alvo and (c.get("status") or "").lower() != "morto"],
         })
 
     base["personagem"] = {
         "nome": alvo.get("name", ""), "classe": s.get("classe", ""),
         "nivel": int(s.get("nivel", 1) or 1), "forca": int(s.get("forca", 10) or 10),
         "ca": ca_atual,
-        "moedas": {"ouro": int(s.get("ouro", 0) or 0), "prata": int(s.get("prata", 0) or 0),
-                   "cobre": int(s.get("cobre", 0) or 0)},
+        "moedas": _moedas_da_ficha(s),
         "carga": {"kg": carga, "capacidade": cap, "estado": estado,
                   "metade": round(cap / 2, 1)},
         "sintonizados": {"usados": len([n for n in s.get("sintonizados") or [] if isinstance(n, str)]),
@@ -11509,7 +11627,7 @@ def inventory_action(action: str, char: str = "", item: str = "", slot: str = ""
     """
     Aplica UMA intenção da Mochila.
 
-    actions: equipar | desequipar | largar | identificar | usar | sintonizar | dessintonizar
+    actions: equipar | desequipar | largar | identificar | usar | sintonizar | dessintonizar | dar
 
     Só despacho: equip_item, unequip_item, remove_item (uma unidade) e
     identify_item — as mesmas ferramentas do mestre. "usar" aplica um
@@ -11518,6 +11636,8 @@ def inventory_action(action: str, char: str = "", item: str = "", slot: str = ""
     a = (action or "").lower().strip()
     if a == "usar":
         msg = _usar_na_mochila(char, item, alvo)
+    elif a == "dar":
+        msg = give_item(char, alvo, item, 1)
     elif a == "sintonizar":
         # Um descanso curto com o item: a hora passa no relógio, como no
         # "Identificar" (attune_item, a ferramenta do mestre, não mexe nele).
@@ -11548,7 +11668,11 @@ def inventory_action(action: str, char: str = "", item: str = "", slot: str = ""
             return {"ok": False,
                     "message": "Aviso: estudar um item leva uma hora; não dá no meio da luta.",
                     "snapshot": inventory_snapshot(char)}
+        nome_antes = gravado_i["nome"]
+        nome_final = gravado_i.get("nome_verdadeiro") or gravado_i["nome"]
         msg = identify_item(char, item)
+        if not msg.lstrip().startswith("Erro:"):
+            item = nome_final
         como = ""
         if not msg.lstrip().startswith("Erro:"):
             if pocao:
@@ -11567,6 +11691,7 @@ def inventory_action(action: str, char: str = "", item: str = "", slot: str = ""
                        {})
         srd_i = gravado.get("srd") or {}
         resultado = {"item": item, "consultou": ok, "como": como,
+                     "revelado_de": nome_antes if _norm_txt(nome_antes) != _norm_txt(item) else "",
                      "encontrado": ok and bool(gravado.get("nome_srd")),
                      "nome_srd": srd_i.get("nome", "") if ok else "",
                      "tipo": srd_i.get("tipo", "") if ok else "",
@@ -12353,6 +12478,8 @@ def shop_snapshot(shop_name: str = "", buyer: str = "") -> dict:
             "ouro":   int(sh.get("ouro", 0) or 0),
             "prata":  int(sh.get("prata", 0) or 0),
             "cobre":  int(sh.get("cobre", 0) or 0),
+            "platina": int(sh.get("platina", 0) or 0),
+            "electro": int(sh.get("electro", 0) or 0),
             "bolsa_em_cobre": _cobre_total(sh),
             "bolsa_texto": _fmt_pc(_cobre_total(sh)),
             "carga":      round(carga, 1),
@@ -12516,9 +12643,15 @@ def shop_recap_payload(desde_seq: int = 0, loja: str = "") -> str:
 
 
 def _cobre_total(sheet: dict) -> int:
-    return (int(sheet.get("ouro", 0) or 0) * 100
+    return (int(sheet.get("platina", 0) or 0) * 1000
+            + int(sheet.get("ouro", 0) or 0) * 100
+            + int(sheet.get("electro", 0) or 0) * 50
             + int(sheet.get("prata", 0) or 0) * 10
             + int(sheet.get("cobre", 0) or 0))
+
+
+def _moedas_da_ficha(s: dict) -> dict:
+    return {k: int(s.get(k, 0) or 0) for k in ("platina", "ouro", "electro", "prata", "cobre")}
 
 
 def _receber(sheet: dict, cobre: int) -> None:
@@ -12534,7 +12667,15 @@ def _pagar(sheet: dict, cobre: int) -> bool:
     total = _cobre_total(sheet)
     if total < cobre:
         return False
-    resto = total - cobre
+    # Paga com ouro, prata e cobre; a platina e o electro só se quebram (e
+    # viram troco) quando eles não bastam.
+    basico = (int(sheet.get("ouro", 0) or 0) * 100 + int(sheet.get("prata", 0) or 0) * 10
+              + int(sheet.get("cobre", 0) or 0))
+    if basico < cobre:
+        basico = total
+        sheet["platina"] = 0
+        sheet["electro"] = 0
+    resto = basico - cobre
     sheet["ouro"]  = resto // 100
     sheet["prata"] = (resto % 100) // 10
     sheet["cobre"] = resto % 10
@@ -16113,6 +16254,8 @@ def spawn_monster(
             "death_saves_sucessos": 0,
             "death_saves_falhas":   0,
             "cr":                   cr_label,
+            # "leather armor, shield": o saque sugerido sabe o que ele vestia.
+            "armadura_desc":        str(m.get("armor_desc") or ""),
             # O tipo (Imobilizar Pessoa: só humanoides) e o que não o afeta.
             "tipo":                 monster_type,
             "visao_no_escuro":      (round(int(_m_vis.group(1)) * 0.3)
@@ -19768,6 +19911,17 @@ def combat_recap_payload() -> str:
             "add_item/modify_currency para o saque. Conceda XP a cada membro do "
             "grupo com grant_xp(). Depois siga a história."
         )
+        _caidos_inimigos = [c.get("name", "") for c in res.get("caidos", [])
+                            if not c.get("is_party")]
+        if _caidos_inimigos:
+            from rpg import saque as _saque_r
+            _sug = _saque_r.sugerir_saque(_caidos_inimigos)
+            if _sug["itens"] or _sug["moedas"]:
+                instrucao += (
+                    " SAQUE SUGERIDO PELO MOTOR (o que os caídos carregavam: armas, armadura, "
+                    "inventário e moedas pelo ND): " + _sug["chamada"] + " — use como base, "
+                    "acrescente o tesouro que a história pede (gema com o valor no nome, item "
+                    "mágico disfarçado: \"o que se vê = o que é\") e tire o que a cena não justifica.")
         if res.get("poupados"):
             instrucao += (
                 " POUPADOS (" + ", ".join(f"{c.get('name')}: {c.get('status')}" for c in res["poupados"])
@@ -19820,6 +19974,7 @@ DND_TOOLS = [
     attune_item,
     end_attunement,
     use_magic_item,
+    give_item,
     choose_feat,
     apply_asi,
     set_feature_choice,
@@ -19865,6 +20020,7 @@ DND_TOOLS = [
 
 # Tela de saque: offer_loot mora em rpg/saque.py, que importa este módulo.
 # O import vem depois de tudo definido, então não há ciclo pela metade.
-from rpg.saque import offer_loot  # noqa: E402
+from rpg.saque import offer_loot, suggest_loot  # noqa: E402
 
 DND_TOOLS.append(offer_loot)
+DND_TOOLS.append(suggest_loot)

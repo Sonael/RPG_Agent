@@ -335,7 +335,7 @@ def test_acao_de_identificar_traz_o_resultado_em_dados(aria):
     r = td.inventory_action("identificar", char="Aria", item="Manto Élfico")
 
     assert r["resultado"] == {"item": "Manto Élfico", "consultou": True, "encontrado": True,
-                              "como": "Aria estudou o item por uma hora.",
+                              "como": "Aria estudou o item por uma hora.", "revelado_de": "",
                               "nome_srd": "Manto Élfico", "tipo": "item maravilhoso",
                               "raridade": "incomum", "sintonizacao": True}
     manto = next(i for i in r["snapshot"]["personagem"]["itens"] if i["nome"] == "Manto Élfico")

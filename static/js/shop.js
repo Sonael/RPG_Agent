@@ -148,7 +148,9 @@
   function moedas(c, dono = '') {
     const b = (k, v) => `<b${dono ? ` data-num="${esc(dono)}:${k}"` : ''}>${v}</b>`;
     const p = [];
+    if (c.platina) p.push(`${b('platina', c.platina)} pl`);
     if (c.ouro)  p.push(`${b('ouro', c.ouro)} po`);
+    if (c.electro) p.push(`${b('electro', c.electro)} pe`);
     if (c.prata) p.push(`${b('prata', c.prata)} pp`);
     if (c.cobre) p.push(`${b('cobre', c.cobre)} pc`);
     return p.length ? p.join(' · ') : `${b('ouro', 0)} po`;

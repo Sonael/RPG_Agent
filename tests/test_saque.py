@@ -49,7 +49,7 @@ def test_offer_loot_poe_no_chao_sem_tocar_nas_fichas(grupo):
     assert s["origem"] == "os bandidos da estrada"
     assert [(i["nome"], i["qtd"], i["sobra"]) for i in s["itens"]] == [
         ("Cota de Malha", 1, 1), ("Poção de Cura", 3, 3)]
-    assert s["moedas"] == {"ouro": 10, "prata": 5, "cobre": 0}
+    assert s["moedas"] == {"platina": 0, "ouro": 10, "electro": 0, "prata": 5, "cobre": 0}
     assert _item("Cota de Malha")["peso"] > 15
     assert _inv("alden") == {"Adaga": 1}, "o saque foi para a ficha antes da divisão"
 

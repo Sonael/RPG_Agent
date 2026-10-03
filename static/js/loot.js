@@ -127,9 +127,12 @@
       </div>`;
   }
 
+  // Da maior para a menor; platina e electro só aparecem quando há.
+  const MOEDAS = [['platina', 'pl'], ['ouro', 'po'], ['electro', 'pe'], ['prata', 'pp'], ['cobre', 'pc']];
+
   function moedas(s, grupo) {
     const m = s.moedas || {};
-    const total = [['ouro', 'po'], ['prata', 'pp'], ['cobre', 'pc']]
+    const total = MOEDAS
       .filter(([k]) => m[k]).map(([k, a]) => `<b>${m[k]}</b> ${a}`).join(' · ');
     if (!total) return '';
     const vivos = grupo.filter(p => !p.morto);
@@ -151,7 +154,7 @@
     const cls = c.estado_previsto === 'imovel' ? ' lot-carga-imovel'
               : (c.estado_previsto === 'sobrecarregado' ? ' lot-carga-cheia' : '');
     const piora = c.estado_previsto !== c.estado;
-    const moedasTxt = [['ouro', 'po'], ['prata', 'pp'], ['cobre', 'pc']]
+    const moedasTxt = MOEDAS
       .filter(([k]) => (p.moedas_recebe || {})[k]).map(([k, a]) => `${p.moedas_recebe[k]} ${a}`).join(' ');
     const recebe = p.recebe.map(r => `
         <li><span>${r.qtd > 1 ? `${r.qtd}x ` : ''}${esc(r.nome)}</span>

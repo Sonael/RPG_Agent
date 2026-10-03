@@ -80,7 +80,9 @@
   function moedas(m, dono = '') {
     const b = (k, v) => `<b${dono ? ` data-num="${esc(dono)}:${k}"` : ''}>${v}</b>`;
     const p = [];
+    if (m.platina) p.push(`${b('platina', m.platina)} pl`);
     if (m.ouro)  p.push(`${b('ouro', m.ouro)} po`);
+    if (m.electro) p.push(`${b('electro', m.electro)} pe`);
     if (m.prata) p.push(`${b('prata', m.prata)} pp`);
     if (m.cobre) p.push(`${b('cobre', m.cobre)} pc`);
     return p.length ? p.join(' · ') : `${b('ouro', 0)} po`;
@@ -198,6 +200,11 @@
           ${usos(i)}
           ${botoes}
           ${sintonia(i)}
+          ${(i.dar_a || []).length ? `<select class="inv-dar" aria-label="Dar a alguém do grupo"
+                  onchange="if (this.value) window.Inventory._dar('${aspas(i.nome)}', this.value)">
+              <option value="">Dar a…</option>
+              ${i.dar_a.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('')}
+            </select>` : ''}
           ${i.a_identificar ? `<button class="inv-btn inv-btn-identificar"
                                        title="Confere o item no SRD de D&amp;D 5e"
                                        onclick="window.Inventory._identificar('${aspas(i.nome)}', this)">Identificar</button>` : ''}
@@ -310,8 +317,10 @@
     }
     const detalhes = [r.tipo, r.raridade, r.sintonizacao ? 'requer sintonização' : '']
       .filter(Boolean).join(', ');
-    const nome = r.nome_srd && r.nome_srd.toLowerCase() !== r.item.toLowerCase()
-      ? `${r.item} é ${r.nome_srd} no SRD` : `${r.item} está no SRD`;
+    const nome = r.revelado_de
+      ? `${r.revelado_de} é, na verdade, ${r.item}`
+      : (r.nome_srd && r.nome_srd.toLowerCase() !== r.item.toLowerCase()
+          ? `${r.item} é ${r.nome_srd} no SRD` : `${r.item} está no SRD`);
     return `${r.como ? r.como + ' ' : ''}${nome}${detalhes ? ` (${detalhes})` : ''}.`;
   }
 
@@ -381,6 +390,7 @@
     _usar: (item, alvo) => agir({ action: 'usar', item, alvo }),
     _identificar: identificar,
     _sintonizar: (item) => agir({ action: 'sintonizar', item }),
+    _dar: (item, alvo) => agir({ action: 'dar', item, alvo }),
     _dessintonizar: (item) => agir({ action: 'dessintonizar', item }),
   };
 
