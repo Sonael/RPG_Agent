@@ -16,7 +16,9 @@
  *  - Tudo o resto (/api/*, /healthz, terceiros, métodos não-GET): passa
  *    direto para a rede, sem cache.
  */
-const CACHE = "rpg-agent-v2";
+// Subir o nome descarta o cache antigo de quem já tem o SW (activate apaga
+// os outros). O ?v= dos scripts já vem do conteúdo (server._com_versoes).
+const CACHE = "rpg-agent-v3";
 
 // Quanto esperar pela rede numa navegação antes de mostrar a tela de
 // despertar. O servidor quente devolve o HTML em <1s; 4.5s evita falsos
@@ -65,6 +67,16 @@ function fetchWithTimeout(req, ms) {
   });
 }
 
+// Apaga do cache as outras versões (outro ?v=) do mesmo arquivo. As entradas
+// sem ?v= são o casco do PRECACHE e ficam.
+async function podarVersoesAntigas(cache, url) {
+  if (!url.search) return;
+  for (const k of await cache.keys()) {
+    const u = new URL(k.url);
+    if (u.pathname === url.pathname && u.search && u.search !== url.search) cache.delete(k);
+  }
+}
+
 self.addEventListener("fetch", (event) => {
   const req = event.request;
   if (req.method !== "GET") return;
@@ -101,7 +113,12 @@ self.addEventListener("fetch", (event) => {
         const cached = await cache.match(req);
         const network = fetch(req)
           .then((res) => {
-            if (res && res.status === 200) cache.put(req, res.clone());
+            if (res && res.status === 200) {
+              cache.put(req, res.clone());
+              // Versão nova (?v= é o resumo do conteúdo): as cópias antigas
+              // do mesmo arquivo não servem mais a ninguém.
+              if (!cached) podarVersoesAntigas(cache, url);
+            }
             return res;
           })
           .catch(() => cached);

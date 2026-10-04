@@ -873,24 +873,69 @@ def add_security_headers(resp):
 # Static
 # ---------------------------------------------------------------------------
 
+# ── Versão dos arquivos estáticos pelo conteúdo ─────────────────────────────
+# As páginas carregam "/static/js/shop.js?v=18", e o service worker (sw.js)
+# responde /static/* do cache pela URL inteira. O ?v= era subido à mão a cada
+# mudança, e o esquecimento já aconteceu várias vezes: depois de uma
+# atualização da loja, a primeira carga servia o shop.js velho, que lia um
+# campo que o servidor não mandava mais, e todo preço saía "undefined po".
+# Aqui o número vira um resumo do conteúdo do arquivo: mudou o arquivo, mudou
+# a URL, e cópia velha nenhuma volta. O ?v= do HTML continua lá; é o servidor
+# que o troca ao servir a página.
+import hashlib as _hashlib
+
+_STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
+_VERSAO_RE = re.compile(r'(/static/([\w./\-]+\.(?:js|css)))\?v=[\w.\-]+')
+_versoes_lidas: dict[str, tuple[float, int, str]] = {}
+
+
+def _versao_do_arquivo(rel: str) -> str:
+    """Os 10 primeiros caracteres do SHA-1 do arquivo (em cache por mtime e tamanho); '' se não existe."""
+    caminho = os.path.normpath(os.path.join(_STATIC_DIR, rel))
+    if not caminho.startswith(_STATIC_DIR) or not os.path.isfile(caminho):
+        return ""
+    st = os.stat(caminho)
+    lido = _versoes_lidas.get(caminho)
+    if lido and lido[0] == st.st_mtime and lido[1] == st.st_size:
+        return lido[2]
+    with open(caminho, "rb") as f:
+        versao = _hashlib.sha1(f.read()).hexdigest()[:10]
+    _versoes_lidas[caminho] = (st.st_mtime, st.st_size, versao)
+    return versao
+
+
+def _com_versoes(html: str) -> str:
+    def trocar(m):
+        versao = _versao_do_arquivo(m.group(2))
+        return f"{m.group(1)}?v={versao}" if versao else m.group(0)
+    return _VERSAO_RE.sub(trocar, html)
+
+
+def _pagina(nome: str, cache: str = "no-cache") -> Response:
+    with open(os.path.join(_STATIC_DIR, nome), encoding="utf-8") as f:
+        html = _com_versoes(f.read())
+    resp = Response(html, mimetype="text/html")
+    resp.headers["Cache-Control"] = cache
+    return resp
+
+
 @app.route("/")
 def index():
-    return send_from_directory("static", "login.html")
+    return _pagina("login.html")
 
 @app.route("/login.html")
 def login_page():
-    return send_from_directory("static", "login.html")
+    return _pagina("login.html")
 
 @app.route("/menu.html")
 def menu_page():
-    resp = send_from_directory("static", "menu.html")
-    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+    resp = _pagina("menu.html", "no-store, no-cache, must-revalidate")
     resp.headers["Pragma"] = "no-cache"
     return resp
 
 @app.route("/game.html")
 def game_page():
-    return send_from_directory("static", "game.html")
+    return _pagina("game.html")
 
 # --- PWA ---------------------------------------------------------------------
 # O service worker precisa ser servido a partir da raiz para o seu escopo
