@@ -116,18 +116,67 @@ _ATCK_TOOLS  = {"attack_roll", "use_ability"}
 _LEARN_TOOLS = {"learn_spell", "learn_ability"}  # Ferramentas que ensinam magias/habilidades
 _CONDITION_TOOLS = {"apply_condition"}
 _XP_TOOLS        = {"grant_xp"}
-_CONDITION_APPLIED_RE = re.compile(
-    r'\b(?:'
-    # Apenas verbos de mudança de estado (nova aplicação).
-    # "está"/"fica" são omitidos: descrevem estado já existente e causam falso positivo.
-    # "caído" é omitido: usado para descrever inconscientes, não a condição Prone.
-    r'(?:ficou|foi|torna.?se|tornou.?se|recebeu|sofreu)\s+'
-    r'(?:a\s+condição\s+(?:de\s+)?)?'
-    r'(?:cego|enfeitiçado|paralisado|envenenado|atordoado|amedrontado|'
-    r'petrificado|invisív[ei]l|incapacitado|surdo|exausto|agarrado)'
-    r')',
-    re.IGNORECASE,
-)
+# Condição narrada como NOVA: cada grupo é (condição para o apply_condition,
+# radicais que a ficha pode ter com esse sentido, padrão da narração).
+#
+# Antes era um padrão só, no masculino singular ("ficou paralisado"), e sem o
+# sono: "Lyra é atingida pelo feitiço Sono de Estradivarius e adormece
+# profundamente" passou, e a Lyra continuou acordada na ficha (campanha
+# Teste3, 04/10/2026). Agora o padrão aceita feminino e plural, a voz
+# passiva ("é paralisada") e o sono e o desmaio, e a cobrança olha a FICHA de
+# quem foi citado, não só se apply_condition foi chamado.
+#
+# "está" e "fica" ficam de fora: descrevem estado que já existe ("está
+# envenenado desde ontem"). "caído" também: descreve quem desmaiou, não a
+# condição Caído.
+_MUDOU = (r'(?:ficou|ficaram|foi|foram|torna-se|tornam-se|tornou-se|tornaram-se|'
+          r'recebeu|receberam|sofreu|sofreram|acabou|acabaram|cai|caem|caiu|caíram)')
+# "é"/"são" só com particípio: "é paralisada" é a magia pegando; "é cego"
+# descreve o NPC cego de nascença.
+_MUDOU_OU_PASSIVA = _MUDOU[:-1] + r'|é|são)'
+_SONO = ("inconsc", "adormec", "dormind", "sono", "desmai", "desacord")
+# (condição, radicais que a ficha pode ter, padrão, aceita a voz passiva)
+_COND_NARRAVEIS = [
+    ("Paralisado",   ("paralis",),         r"paralisad[oa]s?",                True),
+    ("Envenenado",   ("envenen",),         r"envenenad[oa]s?",                True),
+    ("Atordoado",    ("atordo",),          r"atordoad[oa]s?",                 True),
+    ("Amedrontado",  ("amedront", "apavor", "medo"), r"(?:amedrontad|apavorad)[oa]s?", True),
+    ("Petrificado",  ("petrific",),        r"petrificad[oa]s?",               True),
+    ("Incapacitado", ("incapacit",),       r"incapacitad[oa]s?",              True),
+    ("Agarrado",     ("agarr",),           r"agarrad[oa]s?",                  True),
+    ("Contido",      ("contid", "imobiliz", "impedid", "preso", "presa"),
+                                           r"(?:contid|imobilizad)[oa]s?",    True),
+    # "encantado" fica de fora: "ficou encantada com a joia" é admiração.
+    ("Enfeitiçado",  ("enfeiti", "encant"), r"enfeitiçad[oa]s?",              True),
+    ("Cego",         ("ceg",),             r"cegad[oa]s?",                    True),
+    ("Cego",         ("ceg",),             r"ceg[oa]s?",                      False),
+    ("Surdo",        ("surd", "ensurdec"), r"ensurdecid[oa]s?",               True),
+    ("Surdo",        ("surd", "ensurdec"), r"surd[oa]s?",                     False),
+    ("Exausto",      ("exaust",),          r"exaust[oa]s?",                   False),
+    ("Invisível",    ("invisi", "invisí"), r"invisíve(?:l|is)",               False),
+    ("Inconsciente", _SONO,                r"(?:adormecid|desacordad)[oa]s?", True),
+    ("Inconsciente", _SONO,                r"inconscientes?",                 False),
+]
+_CONDICAO_NARRADA = [
+    (nome, radicais, re.compile(
+        r"\b" + (_MUDOU_OU_PASSIVA if passiva else _MUDOU)
+        + r"\s+(?:a\s+condição\s+(?:de\s+)?)?" + padrao + r"\b", re.IGNORECASE))
+    for nome, radicais, padrao, passiva in _COND_NARRAVEIS
+]
+# Frase sem ninguém citado ("ela fica paralisada") só cobra as condições sem
+# outro sentido comum: "o incêndio foi contido", "a cidade adormece".
+_SEM_NOME_COBRA = {"Cego", "Enfeitiçado", "Paralisado", "Envenenado", "Atordoado", "Amedrontado",
+                   "Petrificado", "Invisível", "Incapacitado", "Surdo", "Exausto", "Agarrado"}
+# O sono e o desmaio têm verbo próprio: "adormece", "cai no sono", "desmaia".
+_SONO_NARRADO = re.compile(
+    r"\b(?:adormece|adormecem|adormeceu|adormeceram|desmaia|desmaiam|desmaiou|desmaiaram"
+    r"|ca(?:i|em|iu|íram)\s+(?:num|no|em|em\s+um)\s+(?:sono|torpor|transe)"
+    r"|perde(?:|m|u|ram)\s+(?:os\s+sentidos|a\s+consciência))\b",
+    re.IGNORECASE)
+_RADICAIS_DO_SONO = _SONO
+# Dormir no descanso não é a condição.
+_REST_TOOLS = {"long_rest", "short_rest", "offer_rest", "advance_time"}
+_FRASES_RE = re.compile(r"(?<=[.!?…])\s+|\n+")
 
 # Padrões que indicam que o agente narrou mecânicas sem ferramentas
 _COMBAT_START_RE = re.compile(
@@ -406,6 +455,77 @@ def _check_itens_inventados(tools_called: set) -> list[str]:
     ]
 
 
+def _tem_condicao(ch: dict, radicais: tuple) -> bool:
+    """A ficha (ou o status) do personagem já diz isso?"""
+    def _norm(t):
+        return (t or "").lower()
+    s = ch.get("sheet") or {}
+    nomes = [_norm(c.get("nome") if isinstance(c, dict) else c) for c in s.get("condicoes") or []]
+    nomes.append(_norm(ch.get("status")))
+    return any(r in n for n in nomes for r in radicais)
+
+
+def _check_condicoes_narradas(text: str, tools_called: set) -> list[str]:
+    """
+    Condição narrada como nova ("Lyra adormece", "o guarda fica paralisado")
+    que não chegou à ficha.
+
+    Frase por frase: em cada uma que narra uma condição, olha a ficha dos
+    personagens citados nela. Se algum deles já tem a condição (o Mestre
+    chamou apply_condition, ou o motor aplicou pela magia), está certo. Se
+    nenhum tem, cobra, dizendo quem foi citado; quem recebeu o efeito, o
+    Mestre sabe (pode ser a Lyra, não o Estradivarius que conjurou). Frase
+    com condição e sem ninguém citado ("ela adormece") cobra só se
+    apply_condition não foi chamado no turno.
+    """
+    if not text:
+        return []
+    chars = [c for c in memory.campaign.get("characters", {}).values()
+             if isinstance(c, dict) and c.get("name") and isinstance(c.get("sheet"), dict)]
+    descansou = bool(_REST_TOOLS.intersection(tools_called))
+    faltando: list[tuple[str, list[str]]] = []
+    sem_nome = False
+    for frase in _FRASES_RE.split(text):
+        achadas = [(nome, radicais) for nome, radicais, padrao in _CONDICAO_NARRADA
+                   if padrao.search(frase)]
+        if _SONO_NARRADO.search(frase) and not descansou:
+            achadas.append(("Inconsciente", _RADICAIS_DO_SONO))
+        if descansou:
+            achadas = [(n, r) for n, r in achadas if n != "Inconsciente"]
+        if not achadas:
+            continue
+        # O primeiro nome também conta ("Kaelen" por "Kaelen Vane"), se não
+        # for artigo ou título curto ("O Velho").
+        citados = [c for c in chars if _mencionado(c["name"], frase)
+                   or (len(c["name"].split()[0]) >= 4 and _mencionado(c["name"].split()[0], frase))]
+        for nome, radicais in dict(achadas).items():
+            if not citados:
+                sem_nome = sem_nome or nome in _SEM_NOME_COBRA
+            elif not any(_tem_condicao(c, radicais) for c in citados):
+                faltando.append((nome, [c["name"] for c in citados]))
+
+    violacoes = []
+    vistos = set()
+    for nome, quem in faltando:
+        chave = (nome, tuple(quem))
+        if chave in vistos:
+            continue
+        vistos.add(chave)
+        violacoes.append(
+            f"Narrou a condição {nome} ({' ou '.join(quem)}) e ela NÃO está na ficha: "
+            f"para o jogo, ninguém ficou {nome.lower()}. Chame apply_condition(char_name, "
+            f"'{nome}', duration_turns) para quem recebeu o efeito (a duração em rodadas: "
+            f"1 minuto = 10), ou reescreva sem a condição se ela não pegou."
+        )
+    if sem_nome and not faltando and not _CONDITION_TOOLS.intersection(tools_called):
+        violacoes.append(
+            "Narrou aplicação de condição (cego, paralisado, adormecido, etc.) sem chamar "
+            "apply_condition(). A condição NÃO foi salva na ficha. Chame "
+            "apply_condition(char_name, 'condição') para registrar o efeito mecânico."
+        )
+    return violacoes
+
+
 def _verify_agent_response(
     text: str,
     tools_called: set,
@@ -508,14 +628,8 @@ def _verify_agent_response(
             "Chame learn_spell(char_name, spell_name) agora para registrar corretamente."
         )
 
-    # 6. Condição aplicada narrativamente sem apply_condition()
-    if (not _CONDITION_TOOLS.intersection(tools_called)
-            and _CONDITION_APPLIED_RE.search(text)):
-        violations.append(
-            "Narrou aplicação de condição (cego, paralisado, envenenado, etc.) "
-            "sem chamar apply_condition(). A condição NÃO foi salva na ficha. "
-            "Chame apply_condition(char_name, 'condição') para registrar o efeito mecânico."
-        )
+    # 6. Condição narrada que não está na ficha de ninguém citado.
+    violations.extend(_check_condicoes_narradas(text, tools_called))
 
     # 7. end_combat() sem grant_xp() — SÓ é violação numa VITÓRIA.
     #    Numa DERROTA (grupo todo caído/inconsciente/fugiu) não há XP a

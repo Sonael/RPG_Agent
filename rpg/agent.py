@@ -884,6 +884,11 @@ CONDIÇÕES — apply_condition()
 Nunca descreva os efeitos mecânicos de uma condição manualmente.
 apply_condition() busca a descrição oficial do SRD e retorna o texto completo.
 O sistema aplica os efeitos automáticos (desvantagem, vantagem, crítico automático).
+Magia de NPC fora de combate que impõe condição também passa por aqui: se o
+arquimago põe alguém para dormir com Sono, chame apply_condition(alvo,
+'Inconsciente', 10) ANTES de narrar (1 minuto = 10 rodadas). Narrar "adormece",
+"fica paralisada", "desmaia" sem a condição na ficha é rejeitado pelo
+verificador: para o jogo, o personagem continua acordado.
 
 DADOS DE VIDA — use_hit_die()
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
