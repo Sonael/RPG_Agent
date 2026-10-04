@@ -23,6 +23,8 @@
   const esc = (s) => (window.escapeHtml ? window.escapeHtml(s) : String(s == null ? '' : s));
   const q   = (id) => document.getElementById(id);
   const aspas = (s) => esc(s).replace(/'/g, "\\'");
+  const ROTULO_CARGA = { livre: 'livre', sobrecarregado: 'sobrecarregado',
+                         muito_sobrecarregado: 'muito sobrecarregado', imovel: 'imóvel' };
 
   // ---- DOM ---------------------------------------------------------
   function ensureDom() {
@@ -89,12 +91,15 @@
   }
 
   function resumo(p) {
-    // A barra de carga com a marca da metade, como na loja: acima da marca o
-    // personagem luta com desvantagem, e é isso que faz o peso ser escolha.
+    // A barra de carga com as marcas de 1/3 e 2/3, como na loja: acima da
+    // segunda o personagem luta com desvantagem, e é isso que faz o peso ser
+    // escolha.
     const c = p.carga;
     const pct = c.capacidade > 0 ? Math.max(0, Math.min(100, (c.kg / c.capacidade) * 100)) : 0;
     const cls = c.estado === 'imovel' ? ' inv-carga-imovel'
               : (/sobrecarregado/.test(c.estado) ? ' inv-carga-cheia' : '');
+    // O motor manda a chave ("muito_sobrecarregado"); a tela escreve a palavra.
+    const rotulo = ROTULO_CARGA[c.estado] || c.estado;
     return `
       <div class="inv-ca" title="Classe de Armadura">
         <span class="inv-ca-num" id="inv-ca-num" data-num="inv:${esc(p.nome)}:ca">${p.ca}</span><span class="inv-ca-rotulo">CA</span>
@@ -102,7 +107,7 @@
       <div class="inv-carga">
         <div class="inv-carga-topo">
           <span>Carga</span>
-          <span class="inv-num"><span data-num="inv:${esc(p.nome)}:kg">${c.kg}</span> / ${c.capacidade} kg — ${esc(c.estado)}</span>
+          <span class="inv-num"><span data-num="inv:${esc(p.nome)}:kg">${c.kg}</span> / ${c.capacidade} kg — ${esc(rotulo)}</span>
         </div>
         <div class="inv-carga-barra">
           <div class="inv-carga-fill${cls}" data-barra="inv:${esc(p.nome)}:carga" style="width:${pct}%"></div>

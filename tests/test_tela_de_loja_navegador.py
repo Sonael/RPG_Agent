@@ -415,3 +415,20 @@ def test_lojista_sem_dinheiro_trava_a_venda(pagina):
     assert "tem 3 po para comprar" in pg.inner_text("#shp-lista")
     assert pg.is_disabled(_botao(pg, "Espada Curta"))            # vale 5 po para ele
     assert pg.is_enabled(_botao(pg, "Adaga"))                    # vale 1 po
+
+
+@pytest.mark.parametrize("kg, rotulo", [(60, "muito sobrecarregado"), (90, "imóvel")])
+def test_o_estado_da_carga_sai_escrito_por_extenso(pagina, kg, rotulo):
+    """A chave do motor ("muito_sobrecarregado", "imovel") não vai crua para a tela."""
+    import copy
+    import requests
+    import capturar_telas as cap
+    pg, _ = pagina
+    estado = copy.deepcopy(cap.LOJA)
+    estado["characters"]["helena"]["inventario"].append(
+        {"nome": "Bigorna", "qtd": 1, "descricao": "", "peso": kg})
+    requests.post(f"{pg.url_base}/__estado", json=estado, timeout=10)
+    pg.evaluate("window.Shop._quem('Helena')")
+    pg.wait_for_timeout(600)
+    texto = pg.inner_text(".shp-carga-num")
+    assert rotulo in texto and "_" not in texto, texto

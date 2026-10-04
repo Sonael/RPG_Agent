@@ -177,7 +177,8 @@
       ? Math.max(0, Math.min(100, (c.carga / c.capacidade) * 100)) : 0;
     const cls = c.estado_carga === 'imovel' ? ' shp-carga-imovel'
               : (/sobrecarregado/.test(c.estado_carga) ? ' shp-carga-cheia' : '');
-    const rotulo = String(c.estado_carga || '').replace('_', ' ');
+    const rotulo = { muito_sobrecarregado: 'muito sobrecarregado', imovel: 'imóvel' }[c.estado_carga]
+                   || String(c.estado_carga || '');
 
     el.innerHTML = `
       <div class="shp-bolsa-quem">${troca}</div>

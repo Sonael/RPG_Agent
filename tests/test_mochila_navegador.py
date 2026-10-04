@@ -306,7 +306,9 @@ def test_sobrecarregada_pinta_a_barra(navegador):
     import capturar_telas as cap
     pg, _ = navegador(cap.MOCHILA_PESADA)
     assert pg.is_visible(".inv-carga-cheia")
-    assert "sobrecarregado" in pg.inner_text(".inv-carga-topo")
+    # FOR 8 com a cota: acima de 2/3. A chave do motor não vaza para a tela.
+    topo = pg.inner_text(".inv-carga-topo")
+    assert "muito sobrecarregado" in topo and "_" not in topo
 
 
 def test_trocar_de_personagem(pagina):
