@@ -1472,6 +1472,8 @@ def create_agent(model, campaign_type: str = "fantasia", dnd_mode: bool | None =
     # Ferramenta inexistente ou que levanta exceção vira "Erro: ..." para o
     # mestre, em vez de derrubar o turno (ver rpg/erros_de_ferramenta.py).
     from rpg.erros_de_ferramenta import ao_falhar_ferramenta
+    # Histórico enxuto e o limite de tokens por minuto (ver rpg/ritmo.py).
+    from rpg import ritmo
 
     try:
         # Forma idiomática (ADK >= 1.x): instruction como provider dinâmico.
@@ -1481,6 +1483,8 @@ def create_agent(model, campaign_type: str = "fantasia", dnd_mode: bool | None =
             instruction=_instruction_provider,
             tools=ferramentas,
             on_tool_error_callback=ao_falhar_ferramenta,
+            before_model_callback=ritmo.antes_do_modelo,
+            after_model_callback=ritmo.depois_do_modelo,
         )
     except Exception:
         # Fallback defensivo: ADK sem suporte a provider → instrução estática
@@ -1491,6 +1495,8 @@ def create_agent(model, campaign_type: str = "fantasia", dnd_mode: bool | None =
             instruction=_instruction_provider(),
             tools=ferramentas,
             on_tool_error_callback=ao_falhar_ferramenta,
+            before_model_callback=ritmo.antes_do_modelo,
+            after_model_callback=ritmo.depois_do_modelo,
         )
 
 

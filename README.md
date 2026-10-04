@@ -1703,6 +1703,35 @@ que já foi feito e a instrução de não refazer; ferramentas de consulta
 `test_combate_repetido.py` refaz a sequência da campanha e testa a retomada
 pela rota `/api/chat`, com um runner que chama `roll_initiative` e cai com 503.
 
+### Tokens por minuto (`rpg/ritmo.py`)
+
+Numa partida longa o Gemini do plano gratuito (250 mil tokens de entrada por
+minuto no Flash, 125 mil no Pro) respondia "limite de tokens por minuto" no
+meio do turno. Cada chamada ao modelo leva uns 35 mil tokens fixos (as
+instruções do Mestre, ~14 mil, e o esquema das ferramentas), um turno são
+várias chamadas (uma por ida e volta de ferramenta), e a sessão do ADK
+reenviava a partida inteira, com toda chamada e resposta de ferramenta, em
+cada uma delas. O retry esperava 2, 4, 8 e 16 segundos, menos que o minuto da
+janela, e cada tentativa gastava o prompt inteiro de novo.
+
+- **Histórico enxuto** (`before_model_callback`): o turno em andamento vai
+  inteiro; dos 10 anteriores, só a fala e a narração; antes deles, nada. O
+  estado do jogo já vai atualizado nas instruções de cada chamada (cena,
+  relações, mundo, pendências), e o resumo e o diário cobrem o que saiu.
+- **Ritmo**: os tokens enviados no último minuto, por chave de API (um
+  resumo dela). Antes de uma chamada que passaria de 90% do limite, o Mestre
+  espera o necessário e a tela diz "Aguardando o limite de tokens por
+  minuto do modelo". O número de cada chamada é corrigido pelo que o
+  provedor informa (`after_model_callback`). Ollama não tem janela.
+- **Erro 429**: espera o que o Gemini pede (`retryDelay`, "retry in 23s")
+  em vez de 2 segundos; aprende o limite que o erro informa ("limit:
+  250000"), o que vale também para o plano pago; e a cota **diária** para na
+  hora, com a explicação, porque ela não volta em segundos.
+
+`test_ritmo.py` testa o histórico enxuto, a janela, a leitura do erro, o
+Mestre esperando de ponta a ponta pelo ADK (modelo falso) e o retry pela rota
+`/api/chat`.
+
 ### Log estruturado
 
 Cada evento mecânico do combate vira uma entrada em `combat_state["log"]`

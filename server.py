@@ -24,6 +24,7 @@ from google.genai import types as gtypes
 # sempre o Flask; o código da aplicação vem sempre de `rpg.*`.
 from rpg import memory
 from rpg import database
+from rpg import ritmo as _ritmo
 from rpg import eco
 from rpg import epilogo
 from rpg import chaves
@@ -1954,11 +1955,21 @@ def start_session():
         app_name=APP_NAME, user_id=adk_user, session_id=adk_session
     ))
 
+    # A cota de tokens por minuto é da CHAVE de API (do projeto no Google),
+    # então a janela do rpg/ritmo.py é por chave: um resumo dela, nunca ela.
+    if model_id.startswith("ollama:"):
+        cota = ""
+    else:
+        import hashlib as _h
+        segredo = deepseek_key if model_id.startswith("deepseek:") else google_key
+        cota = _h.sha256(f"{model_id}|{segredo}".encode()).hexdigest()[:16] if segredo else ""
+
     _sessions[user_id] = {
     "runner":          runner,
     "session_service": session_service,
     "is_ollama":       is_ollama,
     "model_id":        model_id,
+    "cota":            cota,
     "adk_user":        adk_user,
     "adk_session":     adk_session,
     }
@@ -2337,6 +2348,10 @@ def chat():
         # contexto desta Task, garantindo que as tools operem na campanha
         # do usuário correto.
         memory.bind_request(user_id)
+        # O ritmo das chamadas deste turno (rpg/ritmo.py): a janela de tokens
+        # por minuto da chave e o aviso na tela quando o Mestre precisa esperar.
+        _ritmo.vincular(sess.get("cota", ""), model_id,
+                        avisar=lambda texto_aviso: result_q.put(("retrying", texto_aviso)))
         msg          = gtypes.Content(role="user", parts=[gtypes.Part(text=texto)])
         MAX_RETRIES  = 5
 
@@ -2452,13 +2467,25 @@ def chat():
                     "overloaded", "429", "503", "500", "504",
                     "rate limit", "quota", "resource exhausted", "deadline",
                 ))
+                # O tempo certo para tentar de novo (rpg/ritmo.py): o que o
+                # Gemini pede no erro, ou o que falta para o minuto passar no
+                # limite de tokens por minuto. Antes era 2, 4, 8, 16 s para
+                # tudo, e o limite por minuto não passa em 2 segundos.
+                wait = (_ritmo.espera_para_tentar_de_novo(str(exc), attempt, sess.get("cota", ""), model_id)
+                        if is_retryable else None)
+                if is_retryable and wait is None:
+                    result_q.put(("error", "O limite DIÁRIO de uso do modelo acabou para esta chave de "
+                                           "API. Ele volta amanhã; até lá, dá para trocar de modelo no menu."))
+                    return
                 if is_retryable and attempt < MAX_RETRIES - 1:
                     escritas_feitas |= {t for t in tools_called if not _so_le(t)}
                     if escritas_feitas:
                         msg = gtypes.Content(role="user", parts=[gtypes.Part(
                             text=_mensagem_de_retomada(texto, escritas_feitas))])
-                    wait = (2 ** (attempt + 1)) + random.uniform(0, 1)
-                    result_q.put(("retrying", f"Mestre ocupado (Tentativa {attempt + 1}/{MAX_RETRIES}). Retomando em {wait:.1f}s..."))
+                    wait += random.uniform(0, 1)
+                    motivo = ("Limite de tokens por minuto do modelo" if _ritmo.e_limite_por_minuto(str(exc))
+                              else "Mestre ocupado")
+                    result_q.put(("retrying", f"{motivo} (Tentativa {attempt + 1}/{MAX_RETRIES}). Retomando em {wait:.0f}s..."))
                     await asyncio.sleep(wait)
                 else:
                     result_q.put(("error", f"O RPG AGENT silenciou: {str(exc)}"))
