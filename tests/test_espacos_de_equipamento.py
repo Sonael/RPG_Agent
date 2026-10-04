@@ -113,6 +113,43 @@ def test_o_que_e_do_pescoco_ou_nao_tem_vaga_fica(equip):
     assert char["sheet"]["equipamentos"]["amuleto"] == equip["amuleto"]
 
 
+def test_editor_do_menu_le_migrado_e_grava_sem_desfazer(monkeypatch):
+    """
+    O editor da campanha lê do banco, sem o carregamento do jogo: mostrava o
+    anel no Amuleto. Lido migrado, a gravação (sem correção) não pode achar
+    que o anel "mudou de lugar" e devolvê-lo ao pescoço.
+    """
+    import copy
+    import sys
+    sys.path.insert(0, str(RAIZ / "scripts"))
+    import capturar_telas as cap
+    import server
+    from rpg import database
+
+    ficha = criar_ficha("Stelar", grupo=True)
+    ficha["sheet"]["equipamentos"] = {"armadura": None, "escudo": None,
+                                      "arma_principal": "espada longa",
+                                      "amuleto": "Anel de Ferro com Rubi"}
+    cap._instalar_dubles({"name": "Teste", "characters": {"stelar": ficha}}, "Teste")
+    gravado = {}
+    monkeypatch.setattr(database, "save_campaign", lambda uid, nome, dados: gravado.update(dados))
+    cliente = server.app.test_client()
+    auth = {"Authorization": f"Bearer {cap.TOKEN}"}
+    try:
+        lida = cliente.get("/api/campaigns/Teste", headers=auth).get_json()["campaign"]
+        eq = lida["characters"]["stelar"]["sheet"]["equipamentos"]
+        assert set(eq) == DOZE
+        assert eq["anel_1"] == "Anel de Ferro com Rubi" and eq["amuleto"] is None
+
+        r = cliente.put("/api/campaigns/Teste", json={"campaign": copy.deepcopy(lida)}, headers=auth)
+        assert r.status_code == 200
+        assert not (r.get_json().get("mantidos") or {}), r.get_json()
+        eq = gravado["characters"]["stelar"]["sheet"]["equipamentos"]
+        assert eq["anel_1"] == "Anel de Ferro com Rubi" and eq["amuleto"] is None
+    finally:
+        cap._remover_dubles()
+
+
 # ---------------------------------------------------------------------------
 # A ficha do herói e a Mochila mostram os doze
 # ---------------------------------------------------------------------------

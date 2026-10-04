@@ -2103,6 +2103,12 @@ def normalize_edited_character(novo: dict, antigo: dict | None,
     novo.pop("correcao_manual", None)
     # Campos gravados como null viram o padrão (a mesma migração da carga).
     memory._migrate_sheet_fields(novo)
+    # A gravada também, numa cópia: o editor do menu lê a campanha do banco e
+    # a recebe migrada (o anel que estava no Amuleto já no espaço Anel). Sem
+    # migrar a antiga, a comparação via equipamento mexido e o desfazia.
+    if isinstance(antigo, dict):
+        antigo = copy.deepcopy(antigo)
+        memory._migrate_sheet_fields(antigo)
     s = novo.get("sheet")
     if not isinstance(s, dict):
         return []

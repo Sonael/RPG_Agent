@@ -1243,6 +1243,12 @@ def get_campaign(name):
         data = database.get_campaign(g.user_id, name)
         if data is None:
             return jsonify({"error": "Campanha não encontrada"}), 404
+        # O editor do menu lê a campanha daqui, sem passar pelo carregamento
+        # do jogo: as fichas recebem a mesma migração (os doze espaços de
+        # equipamento, o anel que o editor antigo punha no Amuleto...).
+        for ch in (data.get("characters") or {}).values():
+            if isinstance(ch, dict) and isinstance(ch.get("sheet"), dict):
+                memory._migrate_sheet_fields(ch)
         return jsonify({"ok": True, "campaign": data})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
