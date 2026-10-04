@@ -18,6 +18,8 @@ from __future__ import annotations
 
 import copy
 
+from rpg.itens import equipamentos_vazios
+
 # nd: o nível de desafio, como fração ("1/4") ou inteiro.
 # voa/nada: a Forma Selvagem só libera essas formas em níveis maiores.
 FICHAS: dict[str, dict] = {
@@ -347,8 +349,7 @@ def montar_sheet(chave: str) -> dict:
         "vida_atual": f["pv"], "vida_max": f["pv"], "mana_atual": 0, "mana_max": 0,
         "ca": f["ca"], "proficiencia": prof, "hit_die": 8,
         "ouro": 0, "prata": 0, "cobre": 0,
-        "equipamentos": {"armadura": None, "escudo": None,
-                         "arma_principal": ataques[0]["nome"] if ataques else None, "amuleto": None},
+        "equipamentos": equipamentos_vazios(arma_principal=ataques[0]["nome"] if ataques else None),
         "ataques": ataques,
         "arma_dado": ataques[0]["dado"] if ataques else "",
         "multiattack": int(f.get("multiataque", 1)),

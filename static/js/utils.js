@@ -346,6 +346,35 @@ function showToast(msg) {
 // ═══════════════════════════════════════
 //  Escape HTML
 // ═══════════════════════════════════════
+// Os doze espaços de equipamento da ficha, na ordem do motor (rpg/itens.py,
+// SLOTS; test_espacos_de_equipamento confere que as duas listas batem). Os
+// editores de ficha e a importação montam os campos daqui: antes cada um
+// tinha os cinco de antes escritos à mão, e os de item mágico (anel, manto,
+// botas...) não apareciam em lugar nenhum fora da Mochila.
+const SLOTS_DE_EQUIPAMENTO = [
+  { slot: 'armadura',        rotulo: 'Armadura',                    exemplo: 'Ex: Cota de malha' },
+  { slot: 'escudo',          rotulo: 'Escudo',                      exemplo: 'Ex: Escudo' },
+  { slot: 'arma_principal',  rotulo: 'Arma principal',              exemplo: 'Ex: Espada longa' },
+  { slot: 'arma_secundaria', rotulo: 'Arma secundária / distância', exemplo: 'Ex: Arco curto, Besta leve' },
+  { slot: 'amuleto',         rotulo: 'Amuleto (pescoço)',           exemplo: 'Ex: Amuleto de Saúde' },
+  { slot: 'anel_1',          rotulo: 'Anel',                        exemplo: 'Ex: Anel de Proteção' },
+  { slot: 'anel_2',          rotulo: 'Segundo anel',                exemplo: 'Ex: Anel de Resistência' },
+  { slot: 'capa',            rotulo: 'Capa ou manto',               exemplo: 'Ex: Manto Élfico' },
+  { slot: 'botas',           rotulo: 'Botas',                       exemplo: 'Ex: Botas Élficas' },
+  { slot: 'luvas',           rotulo: 'Luvas ou braçadeiras',        exemplo: 'Ex: Manoplas de Força de Ogro' },
+  { slot: 'cabeca',          rotulo: 'Cabeça',                      exemplo: 'Ex: Tiara do Intelecto' },
+  { slot: 'cinto',           rotulo: 'Cinto',                       exemplo: 'Ex: Cinto de Força de Gigante' },
+];
+window.SLOTS_DE_EQUIPAMENTO = SLOTS_DE_EQUIPAMENTO;
+
+// Equipamentos de uma ficha nova: os doze espaços, vazios, mais os dados.
+function equipamentosVazios(ocupados) {
+  const eq = {};
+  SLOTS_DE_EQUIPAMENTO.forEach(s => { eq[s.slot] = null; });
+  return Object.assign(eq, ocupados || {});
+}
+window.equipamentosVazios = equipamentosVazios;
+
 function escapeHtml(s) {
   if (s == null) return '';
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');

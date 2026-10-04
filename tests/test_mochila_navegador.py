@@ -302,6 +302,27 @@ def test_em_combate_a_mochila_manda_para_a_tela_tatica(navegador):
 
 # ---- carga, grupo, outras telas --------------------------------------------
 
+def test_no_corpo_mostra_os_doze_espacos(navegador):
+    """Os de item mágico (anel, capa, botas...) aparecem vazios também."""
+    import capturar_telas as cap
+    pg, erros = navegador(cap.MOCHILA_MAGICA)
+    assert pg.locator("#inv-slots .inv-slot").count() == 12
+    assert "Anel de Proteção" in pg.inner_text("#inv-slots .inv-slot[data-slot='anel_1']")
+    assert "vazio" in pg.inner_text("#inv-slots .inv-slot[data-slot='botas']")
+    assert not erros, erros[:3]
+
+
+def test_a_ficha_do_heroi_mostra_os_doze_espacos(navegador):
+    import capturar_telas as cap
+    pg, erros = navegador(cap.MOCHILA_MAGICA, abrir_mochila=False)
+    pg.evaluate("() => window.Herois._abrir('Stelar')")
+    pg.wait_for_selector("#hro-equipamento .hro-slot", timeout=5000)
+    assert pg.locator("#hro-equipamento .hro-slot").count() == 12
+    texto = pg.inner_text("#hro-equipamento").lower()      # o rótulo sai em versal
+    assert "anel de proteção" in texto and "cintura" in texto
+    assert not erros, erros[:3]
+
+
 def test_sobrecarregada_pinta_a_barra(navegador):
     import capturar_telas as cap
     pg, _ = navegador(cap.MOCHILA_PESADA)
@@ -354,8 +375,9 @@ def test_sintonizar_marca_o_item_e_conta_a_vaga(pagina):
     pg, _ = pagina
     manto = _item('Manto Élfico')
     assert 'pede sintonia' in pg.inner_text(manto)
-    # Os slots de item mágico não aparecem vazios.
-    assert pg.locator(_slot('botas')).count() == 0 and pg.locator(_slot('armadura')).count() == 1
+    # Os doze espaços aparecem, os de item mágico vazios também.
+    assert pg.locator(_slot('botas')).count() == 1 and pg.locator(_slot('armadura')).count() == 1
+    assert "vazio" in pg.inner_text(_slot('capa'))
     _clicar(pg, f"{manto} .inv-btn-sintonizar", 1200)
     assert 'sintonizado' in pg.inner_text(manto)
     assert pg.locator(f"{manto} .inv-btn-dessintonizar").count() == 1

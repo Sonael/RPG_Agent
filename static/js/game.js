@@ -2093,11 +2093,7 @@ function buildEditFields(type, data) {
           <div class="ed-dnd-section-title">Equipamentos</div>
           ${travado ? `<div style="margin-bottom:6px;"><button type="button" class="clean-button" style="width:auto;padding:4px 12px;margin:0;font-size:12px;" onclick="gameAbrirTela('mochila','${nomeJs}')">Abrir Mochila</button></div>` : ''}
           ${gameTrava(travado, `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-            ${field('sheet_eq_armadura','Armadura', s.equipamentos?.armadura??'')}
-            ${field('sheet_eq_escudo','Escudo', s.equipamentos?.escudo??'')}
-            ${field('sheet_eq_arma','Arma Principal', s.equipamentos?.arma_principal??'')}
-            ${field('sheet_eq_arma_sec','Arma Secundária / Distância', s.equipamentos?.arma_secundaria??'')}
-            ${field('sheet_eq_amuleto','Amuleto', s.equipamentos?.amuleto??'')}
+            ${SLOTS_DE_EQUIPAMENTO.map(e => field('sheet_eq_' + e.slot, e.rotulo, s.equipamentos?.[e.slot] ?? '')).join('')}
           </div>`)}
         </div>`;
         html += travado
@@ -2134,7 +2130,7 @@ function getEditValues() {
         // CR: campo de texto para NPCs (pode ser "1/4", "1", etc.); preserva original se elemento não existir
         const crEl  = document.getElementById('ef-sheet_cr');
         const crVal = crEl ? (crEl.value.trim() || null) : (orig.cr ?? null);
-        base.sheet = { ...orig, classe: f('sheet_classe').toLowerCase() || orig.classe, raca: f('sheet_raca').toLowerCase() || orig.raca, cr: crVal, nivel: n('sheet_nivel', orig.nivel), xp: n('sheet_xp', orig.xp), vida_atual: n('sheet_vida_atual'), vida_max: n('sheet_vida_max'), mana_atual: n('sheet_mana_atual'), mana_max: n('sheet_mana_max'), ca: n('sheet_ca'), proficiencia: n('sheet_proficiencia', orig.proficiencia), forca: n('sheet_forca'), destreza: n('sheet_destreza'), constituicao: n('sheet_constituicao'), inteligencia: n('sheet_inteligencia'), sabedoria: n('sheet_sabedoria'), carisma: n('sheet_carisma'), ouro: n('sheet_ouro'), prata: n('sheet_prata'), cobre: n('sheet_cobre'), equipamentos: { ...(orig.equipamentos || {}), armadura: f('sheet_eq_armadura') || null, escudo: f('sheet_eq_escudo') || null, arma_principal: f('sheet_eq_arma') || null, arma_secundaria: f('sheet_eq_arma_sec') || null, amuleto: f('sheet_eq_amuleto') || null }, death_saves_sucessos: n('sheet_ds_suc'), death_saves_falhas: n('sheet_ds_fail') };
+        base.sheet = { ...orig, classe: f('sheet_classe').toLowerCase() || orig.classe, raca: f('sheet_raca').toLowerCase() || orig.raca, cr: crVal, nivel: n('sheet_nivel', orig.nivel), xp: n('sheet_xp', orig.xp), vida_atual: n('sheet_vida_atual'), vida_max: n('sheet_vida_max'), mana_atual: n('sheet_mana_atual'), mana_max: n('sheet_mana_max'), ca: n('sheet_ca'), proficiencia: n('sheet_proficiencia', orig.proficiencia), forca: n('sheet_forca'), destreza: n('sheet_destreza'), constituicao: n('sheet_constituicao'), inteligencia: n('sheet_inteligencia'), sabedoria: n('sheet_sabedoria'), carisma: n('sheet_carisma'), ouro: n('sheet_ouro'), prata: n('sheet_prata'), cobre: n('sheet_cobre'), equipamentos: { ...(orig.equipamentos || {}), ...Object.fromEntries(SLOTS_DE_EQUIPAMENTO.map(e => [e.slot, f('sheet_eq_' + e.slot) || null])) }, death_saves_sucessos: n('sheet_ds_suc'), death_saves_falhas: n('sheet_ds_fail') };
         base.habilidades = _editCtx.data.habilidades || [];
         // Sem isto o servidor mantém nível, atributos, CA, equipamento e
         // magias como estavam (normalize_edited_character).
@@ -2156,7 +2152,7 @@ function addNewFlag() { openEditModal('flag', 'nova', { key: '', value: '' }); }
 function addNewCharacter() {
   const isDnd = window._lastMem?.dnd_mode === true || window._lastMem?.campaign_type === 'dnd';
   const base = { name: '', description: '', traits: '', status: 'vivo', notes: '' };
-  if (isDnd) base.sheet = { classe: '', raca: '', nivel: 1, xp: 0, forca: 10, destreza: 10, constituicao: 10, inteligencia: 10, sabedoria: 10, carisma: 10, vida_atual: 10, vida_max: 10, mana_atual: 0, mana_max: 0, ca: 10, proficiencia: 2, hit_die: 8, ouro: 0, prata: 0, cobre: 0, equipamentos: { armadura: null, escudo: null, arma_principal: null, arma_secundaria: null, amuleto: null }, condicoes: [], death_saves_sucessos: 0, death_saves_falhas: 0 };
+  if (isDnd) base.sheet = { classe: '', raca: '', nivel: 1, xp: 0, forca: 10, destreza: 10, constituicao: 10, inteligencia: 10, sabedoria: 10, carisma: 10, vida_atual: 10, vida_max: 10, mana_atual: 0, mana_max: 0, ca: 10, proficiencia: 2, hit_die: 8, ouro: 0, prata: 0, cobre: 0, equipamentos: equipamentosVazios(), condicoes: [], death_saves_sucessos: 0, death_saves_falhas: 0 };
   openEditModal('character', '__novo__', base);
 }
 function addNewPartyMember() { openEditModal('party', '__novo__', { name: '', role: '', notes: '' }); }

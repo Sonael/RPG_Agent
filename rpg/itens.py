@@ -44,6 +44,19 @@ from functools import lru_cache
 
 from rpg.compendio import DADOS, norm
 
+# Os doze espaços de equipamento da ficha, na ordem de toda a interface. Os
+# cinco primeiros são os de sempre; os outros recebem os itens mágicos de
+# vestir (anel, manto, botas...), para que dois mantos não deem +2 de CA. A
+# mesma lista está em static/js/utils.js (SLOTS_DE_EQUIPAMENTO); o teste
+# test_espacos_de_equipamento confere que as duas não se separam.
+SLOTS = ("armadura", "escudo", "arma_principal", "arma_secundaria", "amuleto",
+         "anel_1", "anel_2", "capa", "botas", "luvas", "cabeca", "cinto")
+
+
+def equipamentos_vazios(**ocupados) -> dict:
+    """O dicionário de equipamentos de uma ficha nova, com os doze espaços."""
+    return {**{s: None for s in SLOTS}, **ocupados}
+
 # "+1" no fim, no meio ("Espada +1 de Prata") ou entre parênteses ("(+2)").
 _BONUS = re.compile(r"\(?\s*\+\s*([123])\s*\)?(?=\s|$|\))")
 # "Flechas (20)", "Flechas x20", "20x Flechas", "Flechas ×20".

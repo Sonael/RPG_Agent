@@ -2070,6 +2070,17 @@ _CAMPOS_DE_CONSTRUCAO = (
 )
 
 
+def _mesmo_valor_de_ficha(campo: str, novo, antigo) -> bool:
+    """
+    Nos equipamentos vale o que está vestido: espaço ausente, None e '' são o
+    mesmo vazio. Sem isso, a ficha gravada com os cinco espaços de antes contra
+    a do editor, que manda os doze, parecia equipamento mexido.
+    """
+    if campo == "equipamentos" and isinstance(novo, dict) and isinstance(antigo, dict):
+        return ({k: v for k, v in novo.items() if v} == {k: v for k, v in antigo.items() if v})
+    return novo == antigo
+
+
 def normalize_edited_character(novo: dict, antigo: dict | None,
                                correcao_manual: bool = False) -> list[str]:
     """
@@ -2101,9 +2112,12 @@ def normalize_edited_character(novo: dict, antigo: dict | None,
     antiga = (antigo or {}).get("sheet") if isinstance(antigo, dict) else None
     if jogavel and isinstance(antiga, dict) and not correcao_manual:
         for campo in _CAMPOS_DE_CONSTRUCAO:
-            if campo in antiga and s.get(campo) != antiga[campo]:
+            if campo in antiga and not _mesmo_valor_de_ficha(campo, s.get(campo), antiga[campo]):
                 s[campo] = copy.deepcopy(antiga[campo])
                 mantidos.append(campo)
+        if isinstance(s.get("equipamentos"), dict):
+            for slot in _SLOTS:
+                s["equipamentos"].setdefault(slot, None)
         habs_antigas = antigo.get("habilidades")
         if isinstance(habs_antigas, list) and novo.get("habilidades") != habs_antigas:
             novo["habilidades"] = copy.deepcopy(habs_antigas)
@@ -6073,7 +6087,7 @@ def create_character_sheet(
         "ouro":                  0,
         "prata":                 0,
         "cobre":                 0,
-        "equipamentos":          {"armadura": None, "escudo": None, "arma_principal": None, "amuleto": None},
+        "equipamentos":          _itens.equipamentos_vazios(),
         "condicoes":             [],          # lista de {"nome": str, "duracao": int|None}
         "death_saves_sucessos":  0,
         "death_saves_falhas":    0,
@@ -8936,11 +8950,9 @@ def use_ability(
 # 7. Equipamentos e CA Dinâmica  (NOVO)
 # ---------------------------------------------------------------------------
 
-# Ordem dos slots em toda a interface. Os cinco primeiros são os de sempre; os
-# outros recebem os itens mágicos de vestir (anel, manto, botas...), para que
-# dois mantos não deem +2 de CA. A Mochila só mostra os novos quando ocupados.
-_SLOTS = ("armadura", "escudo", "arma_principal", "arma_secundaria", "amuleto",
-          "anel_1", "anel_2", "capa", "botas", "luvas", "cabeca", "cinto")
+# Ordem dos slots em toda a interface (rpg/itens.py). A ficha, a Mochila e os
+# editores mostram os doze.
+_SLOTS = _itens.SLOTS
 _SLOTS_BASICOS = _SLOTS[:5]
 _PALAVRAS_DE_AMULETO = ("amuleto", "colar", "pingente", "talisma", "medalhao", "periapto",
                         "escaravelho", "broche")
@@ -11234,9 +11246,9 @@ def hero_snapshot(char_name: str = "") -> dict:
         "atributos": atributos,
         "pericias": pericias,
         "ataques": ataques,
-        # Os slots de item mágico só entram ocupados, como na Mochila.
-        "equipados": [{"rotulo": _ROTULO_DO_SLOT[slot], "item": equip.get(slot) or ""}
-                      for slot in _SLOTS if slot in _SLOTS_BASICOS or equip.get(slot)],
+        # Os doze espaços, vazios inclusive, como na Mochila.
+        "equipados": [{"slot": slot, "rotulo": _ROTULO_DO_SLOT[slot], "item": equip.get(slot) or ""}
+                      for slot in _SLOTS],
         "sintonizados": [n for n in s.get("sintonizados") or [] if isinstance(n, str)],
         "moedas": _moedas_da_ficha(s),
         "carga": {"kg": carga, "capacidade": cap, "estado": estado},
@@ -11689,7 +11701,7 @@ def inventory_snapshot(char_name: str = "") -> dict:
                 detalhe = (magico_s["efeito"]["nota"] if ativo
                            else "sem efeito até sintonizar")
         equipados.append({"slot": slot, "rotulo": _ROTULO_DO_SLOT[slot],
-                          # Os slots de item mágico só aparecem ocupados.
+                          # Os cinco de sempre; os outros são de item mágico.
                           "basico": slot in _SLOTS_BASICOS,
                           "item": nome or "", "detalhe": detalhe,
                           # Equipado sem estar na mochila: ficha antiga ou do
@@ -14050,7 +14062,7 @@ def _default_npc_sheet() -> dict:
         "ouro":                 0,
         "prata":                0,
         "cobre":                0,
-        "equipamentos":         {"armadura": None, "escudo": None, "arma_principal": None, "amuleto": None},
+        "equipamentos":         _itens.equipamentos_vazios(),
         "condicoes":            [],
         "death_saves_sucessos": 0,
         "death_saves_falhas":   0,
@@ -16403,12 +16415,7 @@ def spawn_monster(
             "ouro":                 0,
             "prata":                0,
             "cobre":                0,
-            "equipamentos":         {
-                "armadura":      None,
-                "escudo":        None,
-                "arma_principal": arma_principal or None,
-                "amuleto":       None,
-            },
+            "equipamentos":         _itens.equipamentos_vazios(arma_principal=arma_principal or None),
             # Ataques do stat block: sem isto, attack_roll não encontra
             # "bite"/"claw" em /weapons/ e cai no fallback genérico de 1d6.
             "ataques":              ataques,

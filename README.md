@@ -793,9 +793,14 @@ mãos com um escudo.
 - **Slots.** Além dos cinco de sempre, `anel_1`, `anel_2`, `capa`, `botas`,
   `luvas`, `cabeca` e `cinto`. O slot de cada item mágico vem do compêndio
   (`SLOT_POR_NOME` em `gerar_itens.py`); item fora do SRD vai pela primeira
-  palavra ("Capa de Viagem"). A Mochila e a ficha do herói só mostram os
-  slots novos ocupados. O editor de ficha deixou de apagar os slots que ele
-  não mostra.
+  palavra ("Capa de Viagem"). A lista é uma só: `SLOTS` em `rpg/itens.py` e
+  `SLOTS_DE_EQUIPAMENTO` em `utils.js` (`test_espacos_de_equipamento` confere
+  que batem). A Mochila, a ficha do herói, o "Editar Ficha Completa", o
+  editor da campanha, o assistente e a importação mostram os doze, vazios
+  inclusive; toda ficha nova (personagem, NPC, monstro, criatura) nasce com
+  eles, e a ficha gravada antes ganha os que faltam ao carregar. Na proteção
+  da ficha em jogo, espaço ausente, `None` e vazio contam igual: só vestir
+  pelo editor (sem o Modo de correção) é barrado.
 - **Mãos.** Duas, não três (`_conflito_de_maos`): arma de duas mãos não divide
   a mão com escudo nem com outra arma, e duas armas não cabem com um escudo.
 - **Sintonização.** `attune_item` / `end_attunement`, e os botões na Mochila
@@ -2132,9 +2137,10 @@ armadura não é cena. Com ela aberta, as outras telas esperam, e a fila só a
 redesenha com o que mudar no chat (saque, compra, venda).
 
 **O que mostra.** No cabeçalho, os três números que mudam a cada clique: a
-CA, a barra de carga com a marca da metade (acima dela, desvantagem) e as
-moedas. À esquerda os cinco slots, sempre na mesma ordem — armadura, escudo,
-mão principal, mão secundária, pescoço —, com o botão **Tirar**. À direita os
+CA, a barra de carga com as marcas de 1/3 e 2/3 (acima da segunda,
+desvantagem) e as moedas. À esquerda os doze slots, sempre na mesma ordem —
+armadura, escudo, mão principal, mão secundária, pescoço, dois anéis, capa,
+pés, mãos, cabeça e cintura —, com o botão **Tirar** nos ocupados. À direita os
 itens, cada um com peso, onde está equipado, a marca "próprio da campanha" e
 os botões:
 

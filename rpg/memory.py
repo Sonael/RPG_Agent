@@ -21,6 +21,8 @@ import contextlib
 import json
 import contextvars
 
+from rpg.itens import equipamentos_vazios as _equipamentos_vazios
+
 # ---------------------------------------------------------------------------
 # Estado por sessão — substitui o antigo dict global único
 # ---------------------------------------------------------------------------
@@ -297,7 +299,7 @@ def _migrate_sheet_fields(char: dict) -> None:
         "ouro":                 0,
         "prata":                0,
         "cobre":                0,
-        "equipamentos":         {"armadura": None, "escudo": None, "arma_principal": None, "amuleto": None},
+        "equipamentos":         _equipamentos_vazios(),
         "condicoes":            [],
         "death_saves_sucessos": 0,
         "death_saves_falhas":   0,
@@ -318,6 +320,12 @@ def _migrate_sheet_fields(char: dict) -> None:
             # Copiar para evitar objetos mutáveis compartilhados
             import copy
             sheet[key] = copy.deepcopy(default_val)
+
+    # Ficha gravada antes dos espaços de item mágico: completa os que faltam,
+    # sem mexer no que já está vestido.
+    if isinstance(sheet.get("equipamentos"), dict):
+        for slot in _equipamentos_vazios():
+            sheet["equipamentos"].setdefault(slot, None)
 
 
 def _migrate_combat_state() -> None:

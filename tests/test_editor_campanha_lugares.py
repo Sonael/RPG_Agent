@@ -198,7 +198,13 @@ def test_ficha_mochila_e_habilidades_que_o_editor_nao_manda_ficam(rota):
     assert brom["inventario"] == [{"nome": "Martelo", "qtd": 1, "descricao": ""}]
     assert brom["habilidades"] == [{"nome": "Forjar", "descricao": ""}]
     ficha = antiga["characters"]["alden"]["sheet"]
-    assert {k: alden["sheet"][k] for k in ficha} == ficha      # a normalização só acrescenta padrões
+    # A normalização só acrescenta padrões: nos equipamentos, os espaços de
+    # item mágico que a ficha gravada não tinha, vazios.
+    eq = alden["sheet"]["equipamentos"]
+    assert {k: eq[k] for k in ficha["equipamentos"]} == ficha["equipamentos"]
+    assert all(v is None for k, v in eq.items() if k not in ficha["equipamentos"])
+    assert {k: alden["sheet"][k] for k in ficha if k != "equipamentos"} == \
+        {k: v for k, v in ficha.items() if k != "equipamentos"}
 
     # Mandados, valem: é o editor com as regras, que mostra os três.
     gravado.clear()

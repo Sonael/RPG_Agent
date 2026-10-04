@@ -250,9 +250,9 @@
         : '')
       + `<span><span class="inv-classe">${esc(p.classe)}</span> · nível ${p.nivel} · FOR ${p.forca}</span>`;
     q('inv-resumo').innerHTML = resumo(p);
-    // Os slots de item mágico (anel, manto, botas...) só aparecem ocupados:
-    // vazios, eles só alongariam a lista. O botão de vestir está no item.
-    q('inv-slots').innerHTML = p.equipados.filter(e => e.basico || e.item).map(slot).join('')
+    // Os doze espaços, vazios inclusive: escondidos, o jogador não sabia que
+    // tinha onde pôr o anel ou as botas. O botão de vestir está no item.
+    q('inv-slots').innerHTML = p.equipados.map(slot).join('')
       + (p.sintonizados && p.sintonizados.usados
           ? `<div class="inv-sintonia-conta" title="Itens mágicos sintonizados (no máximo ${p.sintonizados.limite})">Sintonia: ${p.sintonizados.usados}/${p.sintonizados.limite}</div>`
           : '');

@@ -191,6 +191,38 @@ def test_ficha_completa_trava_e_mostra_os_atalhos(navegador):
     assert not erros, erros[:3]
 
 
+def test_ficha_completa_tem_os_doze_espacos_e_grava_o_anel(navegador):
+    """Antes eram cinco campos: anel, capa, botas, luvas, cabeça e cinto não existiam."""
+    pg, erros = navegador("/game.html")
+    _abrir_ficha_no_jogo(pg)
+    assert pg.locator("#edit-body input[id^='ef-sheet_eq_']").count() == 12
+    pg.click("#edit-body input.ed-correcao")
+    pg.wait_for_timeout(300)
+    pg.fill("#ef-sheet_eq_anel_1", "Anel de Proteção")
+    pg.evaluate("() => saveCurrentItem()")
+    pg.wait_for_timeout(1200)
+    eq = _personagem_da_memoria(pg, "Helena")["sheet"]["equipamentos"]
+    assert eq["anel_1"] == "Anel de Proteção"
+    assert len(eq) >= 12
+    assert not erros, erros[:3]
+
+
+def test_editor_da_campanha_tem_os_doze_espacos(navegador):
+    pg, erros = navegador("/menu.html")
+    i = _abrir_editor_da_campanha(pg)
+    campos = pg.locator(f"#ed-dnd-sections-{i} .ed-equip-slots input")
+    assert campos.count() == 12
+    assert pg.locator(f"#ed-dnd-sections-{i} .ed-equip-slots input[data-slot='cinto']").count() == 1
+    assert not erros, erros[:3]
+
+
+def test_personagem_novo_e_importacao_tem_os_doze(navegador):
+    pg, _ = navegador("/menu.html")
+    _abrir_editor_da_campanha(pg)
+    eq = pg.evaluate("() => { addEditChar(); return edChars[edChars.length - 1].sheet.equipamentos; }")
+    assert len(eq) == 12 and "botas" in eq
+
+
 def test_salvar_sem_correcao_nao_muda_o_nivel_mesmo_forcado(navegador):
     pg, _ = navegador("/game.html")
     antes = _personagem_da_memoria(pg, "Helena")["sheet"]

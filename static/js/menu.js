@@ -482,7 +482,7 @@ function getImportPrompt(theme) {
   }
 
   if (isDnd) {
-    prompt += `,\n      "sheet": {\n        "classe": "<classe>", "raca": "<raça>", "nivel": 1, "xp": 0, "xp_proximo": 300,\n        "forca": 10, "destreza": 10, "constituicao": 10, "inteligencia": 10, "sabedoria": 10, "carisma": 10,\n        "vida_atual": 10, "vida_max": 10, "mana_atual": 0, "mana_max": 0, "ca": 10, "proficiencia": 2, "hit_die": 8,\n        "ouro": 0, "prata": 0, "cobre": 0,\n        "equipamentos": {"armadura": null, "escudo": null, "arma_principal": null, "amuleto": null},\n        "condicoes": [],\n        "death_saves_sucessos": 0, "death_saves_falhas": 0\n      },\n      "inventario": [\n        {"nome": "<nome_item>", "qtd": 1, "descricao": "<efeito>", "custom": false}\n      ],\n      "habilidades": [\n        {"nome": "<nome_hab>", "descricao": "<efeito>", "custo_mana": 0, "dado": "1d6"}\n      ]`;
+    prompt += `,\n      "sheet": {\n        "classe": "<classe>", "raca": "<raça>", "nivel": 1, "xp": 0, "xp_proximo": 300,\n        "forca": 10, "destreza": 10, "constituicao": 10, "inteligencia": 10, "sabedoria": 10, "carisma": 10,\n        "vida_atual": 10, "vida_max": 10, "mana_atual": 0, "mana_max": 0, "ca": 10, "proficiencia": 2, "hit_die": 8,\n        "ouro": 0, "prata": 0, "cobre": 0,\n        "equipamentos": ${JSON.stringify(equipamentosVazios())},\n        "condicoes": [],\n        "death_saves_sucessos": 0, "death_saves_falhas": 0\n      },\n      "inventario": [\n        {"nome": "<nome_item>", "qtd": 1, "descricao": "<efeito>", "custom": false}\n      ],\n      "habilidades": [\n        {"nome": "<nome_hab>", "descricao": "<efeito>", "custo_mana": 0, "dado": "1d6"}\n      ]`;
   }
 
   prompt += `\n    }\n  },\n  "locations": {\n    "<nome_em_lowercase>": {\n      "name": "<Nome do Local>",\n      "description": "<descrição sensorial completa>",\n      "details": "<pontos geográficos específicos>",\n      "notes": "<eventos passados ocorridos aqui>"${mundo ? `,\n      "mudancas": [{"texto": "<como o lugar mudou pelo que o grupo fez>", "causa": "<o que o grupo fez>", "cap": <capítulo>}]` : ''}\n    }\n  },\n  "events": [\n    {\n      "index": 1,\n      "summary": "<narração detalhada>",\n      "characters_involved": "<nomes separados por vírgula>",\n      "location": "<onde ocorreu>",\n      "consequence": "<consequência imediata e ramificações>"\n    }\n  ],\n  "party": [\n    {\n      "name": "<nome>",\n      "role": "<função ou classe>",\n      "notes": "<fatos marcantes>"\n    }\n  ],\n  "quest_flags": {\n    "<nome_da_flag>": "<valor detalhado>"\n  },\n  "quests": {\n    "<titulo em lowercase>": {\n      "titulo": "<Titulo da Missao>",\n      "descricao": "<o que o grupo aceitou fazer>",\n      "status": "<ativa|concluida|falhou|abandonada>",\n      "quem_deu": "<quem encomendou>",\n      "recompensa": "<o que foi combinado>",\n      "objetivos": [{"texto": "<passo>", "feito": false}]\n    }\n  },\n  "diary": [\n    {\n      "chapter": <numero>,\n      "title": "<título evocativo>",\n      "content": "<narração em terceira pessoa com estilo literário>"\n    }\n  ]`;
@@ -3454,13 +3454,12 @@ async function createCampaignFromWizard() {
         proficiencia: edProfForLevel(nivel),
         hit_die:     hitDie,
         ouro:        10, prata: 5, cobre: 0,
-        equipamentos:{
+        equipamentos: equipamentosVazios({
           armadura:        startEquip.arm,
           escudo:          startEquip.esc,
           arma_principal:  startEquip.arma,
           arma_secundaria: startEquip.arma_sec || null,
-          amuleto:         null,
-        },
+        }),
         condicoes:   [],
         death_saves_sucessos: 0,
         death_saves_falhas:   0,
@@ -3679,7 +3678,7 @@ function edBlankSheet() {
     forca:10, destreza:10, constituicao:10, inteligencia:10, sabedoria:10, carisma:10,
     vida_atual:10, vida_max:10, mana_atual:0, mana_max:0, ca:10, proficiencia:2, hit_die:8,
     ouro:0, prata:0, cobre:0,
-    equipamentos:{ armadura:'', escudo:'', arma_principal:'', arma_secundaria:'', amuleto:'' },
+    equipamentos: equipamentosVazios(),
     condicoes:[],
     death_saves_sucessos:0, death_saves_falhas:0,
   };
@@ -4714,17 +4713,8 @@ function edBuildDndSections(i) {
         <div><span class="cwc-label">Cobre</span><input type="number" min="0" value="${s.cobre??0}" onchange="edSheetChange(${i},'cobre',this.value)"></div>
       </div>
       ${travado ? `<div class="ed-aviso-inline">Equipamento se veste e se tira na Mochila, durante a sessão.</div>` : ''}
-      ${edTrava(ch, `<div class="cwc-row2">
-        <div><span class="cwc-label">Armadura</span><input value="${escHtml(eq.armadura||'')}" onchange="edEquipChange(${i},'armadura',this.value)" placeholder="Ex: Cota de malha"></div>
-        <div><span class="cwc-label">Escudo</span><input value="${escHtml(eq.escudo||'')}" onchange="edEquipChange(${i},'escudo',this.value)" placeholder="Ex: Escudo de madeira"></div>
-      </div>
-      <div class="cwc-row2" style="margin-top:10px;">
-        <div><span class="cwc-label">Arma Principal</span><input value="${escHtml(eq.arma_principal||'')}" onchange="edEquipChange(${i},'arma_principal',this.value)" placeholder="Ex: Espada longa"></div>
-        <div><span class="cwc-label">Arma Secundária / Distância</span><input value="${escHtml(eq.arma_secundaria||'')}" onchange="edEquipChange(${i},'arma_secundaria',this.value)" placeholder="Ex: Arco curto, Besta leve"></div>
-      </div>
-      <div class="cwc-row2" style="margin-top:10px;">
-        <div><span class="cwc-label">Amuleto</span><input value="${escHtml(eq.amuleto||'')}" onchange="edEquipChange(${i},'amuleto',this.value)" placeholder="Ex: Amuleto da proteção"></div>
-        <div></div>
+      ${edTrava(ch, `<div class="cwc-row2 ed-equip-slots">
+        ${SLOTS_DE_EQUIPAMENTO.map(e => `<div><span class="cwc-label">${e.rotulo}</span><input data-slot="${e.slot}" value="${escHtml(eq[e.slot]||'')}" onchange="edEquipChange(${i},'${e.slot}',this.value)" placeholder="${escHtml(e.exemplo)}"></div>`).join('')}
       </div>`)}
     </div>`;
 
