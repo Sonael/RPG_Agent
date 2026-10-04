@@ -12651,7 +12651,10 @@ def shop_snapshot(shop_name: str = "", buyer: str = "") -> dict:
                 "ilimitado": int(i["qtd"]) >= 99,
                 "descricao": i.get("descricao", ""),
                 "peso":      round(_peso_do_item({"nome": i["nome"]}), 2),
-                "custom":    not (_itens.comum(i["nome"]) or _itens.magico(i["nome"])),
+                # O pergaminho de magia ("Pergaminho de Bola de Fogo") é do
+                # SRD, e o próprio gerador põe na loja do templo e na arcana.
+                "custom":    not (_itens.comum(i["nome"]) or _itens.magico(i["nome"])
+                                  or _magia_do_pergaminho(i["nome"])),
             })
 
     return {

@@ -707,6 +707,67 @@ SAQUE = {
 }
 
 
+# LOJA ARCANA. O preço de item mágico sai da raridade (o SRD não dá preço),
+# em cobre; a Lyssa gosta do grupo (atitude 45), então o pedido fica abaixo
+# da tabela e a linha mostra as duas coisas ("de 315 po"). A Helena não
+# alcança o anel: o botão trava pela bolsa, não pelo estoque.
+LOJA_MAGICA = copy.deepcopy(LOJA)
+LOJA_MAGICA["characters"]["helena"]["sheet"].update({"ouro": 412, "prata": 5})
+LOJA_MAGICA["characters"]["lyssa"] = {
+    **_npc("Lyssa", "Elfa de dedos manchados de tinta; fala com os livros.", "Oakhaven"),
+    "atitude": 45,
+    "atitude_historico": [{"delta": 45, "motivo": "O grupo devolveu o grimório roubado", "cap": 2}],
+}
+LOJA_MAGICA["lojas"] = {
+    "arcano da lyssa": {
+        "nome": "Arcano da Lyssa", "local": "Oakhaven", "dono": "Lyssa", "tipo": "arcana",
+        "estoque": [
+            {"nome": "Poção de Cura",              "preco_pc": 5000,   "qtd": 4, "base": 4, "descricao": ""},
+            {"nome": "Poção de Cura Maior",        "preco_pc": 15000,  "qtd": 2, "base": 2, "descricao": ""},
+            {"nome": "Pergaminho de Bola de Fogo", "preco_pc": 15000,  "qtd": 1, "base": 1, "descricao": ""},
+            {"nome": "Varinha de Mísseis Mágicos", "preco_pc": 30000,  "qtd": 1, "base": 1, "descricao": ""},
+            {"nome": "Bolsa de Contenção",         "preco_pc": 30000,  "qtd": 1, "base": 1, "descricao": ""},
+            {"nome": "Espada Longa +1",            "preco_pc": 31500,  "qtd": 1, "base": 1, "descricao": ""},
+            {"nome": "Anel de Proteção",           "preco_pc": 250000, "qtd": 1, "base": 1, "descricao": ""},
+        ],
+    },
+}
+
+
+# MOCHILA COM ITENS MÁGICOS. Stelar empunha a Espada Longa +1, veste o Anel
+# de Proteção sintonizado (Sintonia 1/3 no cabeçalho) e carrega um Manto de
+# Proteção que ainda pede sintonia. A Bolsa de Contenção leva a corda e as
+# tochas, que não pesam; a varinha mostra as cargas; "Dar a..." passa a poção
+# para alguém do grupo.
+MOCHILA_MAGICA = {
+    "characters": {
+        "stelar": {
+            "sheet": {"forca": 16, "destreza": 12, "ca": 15,
+                      "ouro": 38, "prata": 6, "cobre": 0,
+                      "sintonizados": ["Anel de Proteção"],
+                      "equipamentos": {"armadura": "Camisão de Malha", "escudo": None,
+                                       "arma_principal": "Espada Longa +1",
+                                       "arma_secundaria": None, "amuleto": None,
+                                       "anel_1": "Anel de Proteção"}},
+            "inventario": [
+                # Já identificados: a espada pelo uso, o anel pela sintonia
+                # (attune_item identifica; aqui o estado chega pronto).
+                {"nome": "Espada Longa +1", "qtd": 1, "descricao": "", "identificado": True},
+                {"nome": "Camisão de Malha", "qtd": 1, "descricao": ""},
+                {"nome": "Anel de Proteção", "qtd": 1, "descricao": "", "identificado": True},
+                {"nome": "Manto de Proteção", "qtd": 1, "descricao": "achado na cripta"},
+                {"nome": "Varinha de Mísseis Mágicos", "qtd": 1, "descricao": "", "cargas": 5},
+                {"nome": "Bolsa de Contenção", "qtd": 1, "descricao": ""},
+                {"nome": "Corda de Cânhamo", "qtd": 1, "descricao": "15 metros", "na_bolsa": True},
+                {"nome": "Tocha", "qtd": 5, "descricao": "", "na_bolsa": True},
+                {"nome": "Poção de Cura Maior", "qtd": 1, "descricao": ""},
+                {"nome": "Ração (1 dia)", "qtd": 4, "descricao": ""},
+            ],
+        },
+    },
+}
+
+
 # FICHA DO HERÓI. Stelar é um Campeão de Grande Arma com XP para subir:
 # o ataque mostra as notas do estilo e do crítico, e o botão de nível aparece.
 # Helena está envenenada e concentrada em Bênção, com PV temporários.
@@ -933,6 +994,23 @@ COMBATE_MAGIAS["combat_state"].update({
         "stelar": "Sacada", "victoria": "Sacada", "cultista": "Sacada",
     },
 })
+
+
+# MAGIAS DE ITEM NA TELA TÁTICA. A Helena conjura pela varinha (cargas no
+# contador), pelo Cajado do Poder sintonizado (Bola de Fogo no 5º círculo),
+# pelo pergaminho (que se desfaz) e pela Varinha das Maravilhas (d100).
+COMBATE_ITENS_MAGICOS = copy.deepcopy(COMBATE_MAGIAS)
+COMBATE_ITENS_MAGICOS["characters"]["helena"]["habilidades"] = \
+    COMBATE_MAGIAS["characters"]["helena"]["habilidades"][:1]
+COMBATE_ITENS_MAGICOS["characters"]["helena"]["sheet"]["sintonizados"] = [
+    "Cajado do Poder", "Varinha das Maravilhas"]
+COMBATE_ITENS_MAGICOS["characters"]["helena"]["inventario"] = [
+    {"nome": "Varinha de Mísseis Mágicos", "qtd": 1, "descricao": "", "cargas": 4},
+    {"nome": "Cajado do Poder", "qtd": 1, "descricao": "", "cargas": 14},
+    {"nome": "Pergaminho de Bola de Fogo", "qtd": 1, "descricao": ""},
+    {"nome": "Varinha das Maravilhas", "qtd": 1, "descricao": "", "cargas": 6},
+    {"nome": "Poção de Cura", "qtd": 1, "descricao": ""},
+]
 
 
 # Painel de fim de combate (vitória do grupo).
@@ -1225,6 +1303,9 @@ TELAS = [
     {"nome": "loja-duas-no-local", "pagina": "/game.html",
      "estado": LOJA_DUAS, "espera": 700,
      "exigir": ".shp-loja-sel"},
+    {"nome": "loja-arcana", "pagina": "/game.html",
+     "estado": LOJA_MAGICA, "espera": 700,
+     "exigir": "#shop-overlay:not(.hidden)"},
 
     # ── Subida de nível ──────────────────────────────────────────────
     # Sem `js` para abrir: o gatilho automático (alguém está devendo escolha)
@@ -1302,6 +1383,10 @@ TELAS = [
      "estado": MOCHILA_PESADA, "espera": 900,
      "js": "window.Inventory._abrir('Stelar')",
      "exigir": ".inv-carga-cheia"},
+    {"nome": "mochila-itens-magicos", "pagina": "/game.html",
+     "estado": MOCHILA_MAGICA, "espera": 900,
+     "js": "window.Inventory._abrir('Stelar')",
+     "exigir": ".inv-sintonia-conta"},
 
     # ── Descanso ─────────────────────────────────────────────────────
     # Abre sozinha pela proposta do mestre, como a loja e o nível.
@@ -1475,6 +1560,9 @@ TELAS = [
     # Cada magia diz o que faz: efeito, dado, salvaguarda, área, quem atinge.
     {"nome": "combate-habilidades", "pagina": "/game.html",
      "estado": COMBATE_MAGIAS, "espera": 700,
+     "js": "window.Combat._sel('ability')", "exigir": "#cbt-targets .cbt-hab"},
+    {"nome": "combate-magias-de-item", "pagina": "/game.html",
+     "estado": COMBATE_ITENS_MAGICOS, "espera": 700,
      "js": "window.Combat._sel('ability')", "exigir": "#cbt-targets .cbt-hab"},
     # A descrição completa abre no toque (antes só existia no `title`).
     {"nome": "combate-habilidade-detalhes", "pagina": "/game.html",

@@ -181,3 +181,15 @@ def test_tela_mostra_a_bolsa_do_lojista(vila):
     td.open_shop("Armazém", kind="armazem", size="vila", location="Oakhaven", owner="Bram")
     snap = td.shop_snapshot("Armazém", "Aria")
     assert snap["bolsa_loja_texto"] == "200 po" and snap["tipo"] == "armazem"
+
+
+def test_nada_que_a_loja_gerada_vende_sai_como_proprio_da_campanha(vila):
+    """O gerador põe "Pergaminho de Bola de Fogo" no templo e na arcana, e o
+    selo "próprio da campanha" não reconhecia o pergaminho de magia."""
+    for tipo in ("arcana", "templo", "forja", "boticario"):
+        td.open_shop(f"Loja {tipo}", kind=tipo, size="metropole", location="Oakhaven")
+        snap = td.shop_snapshot(f"Loja {tipo}", "Aria")
+        proprios = [i["nome"] for i in snap["estoque"] if i["custom"]]
+        assert not proprios, (tipo, proprios)
+    assert any(i["nome"].startswith("Pergaminho de ")
+               for i in td.shop_snapshot("Loja templo", "Aria")["estoque"])
