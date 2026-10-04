@@ -326,6 +326,10 @@ def _migrate_sheet_fields(char: dict) -> None:
     if isinstance(sheet.get("equipamentos"), dict):
         for slot in _equipamentos_vazios():
             sheet["equipamentos"].setdefault(slot, None)
+        # E o anel (ou manto, botas...) que o editor antigo punha no Amuleto,
+        # o único campo que ele tinha para isso, vai para o espaço dele.
+        from rpg.tools_dnd import _realocar_o_que_estava_no_amuleto
+        _realocar_o_que_estava_no_amuleto(sheet)
 
 
 def _migrate_combat_state() -> None:

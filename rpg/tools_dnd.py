@@ -8996,6 +8996,28 @@ def _slots_para_item(nome: str) -> list[str]:
     return []
 
 
+def _realocar_o_que_estava_no_amuleto(sheet: dict) -> bool:
+    """
+    Até o lote 3 dos itens, o editor de ficha só tinha o campo Amuleto para o
+    que não era arma, armadura ou escudo: anéis, mantos e botas foram parar
+    nele ("Pescoço: Anel de Ferro com Rubi"). Na ficha gravada assim, o que o
+    motor reconhece como de outro espaço vai para ele, se estiver livre. O que
+    não se reconhece (ou cujo espaço já está ocupado) fica onde está.
+    """
+    eq = (sheet or {}).get("equipamentos")
+    nome = eq.get("amuleto") if isinstance(eq, dict) else None
+    if not nome or not isinstance(nome, str):
+        return False
+    destinos = _slots_para_item(nome)
+    if not destinos or "amuleto" in destinos:
+        return False
+    livre = next((d for d in destinos if d not in _SLOTS_BASICOS and not eq.get(d)), None)
+    if not livre:
+        return False
+    eq[livre], eq["amuleto"] = nome, None
+    return True
+
+
 def _conflito_de_maos(equip: dict, slot: str, nome: str) -> str:
     """
     Duas mãos, não três: arma de duas mãos não divide a mão com escudo nem

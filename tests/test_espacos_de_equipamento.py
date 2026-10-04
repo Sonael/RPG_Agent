@@ -88,6 +88,31 @@ def test_ficha_antiga_ganha_os_que_faltam_sem_perder_o_que_veste():
     assert eq["anel_1"] is None and eq["cinto"] is None
 
 
+@pytest.mark.parametrize("nome, espaco", [
+    ("Anel de Ferro com Rubi", "anel_1"),      # fora do SRD: pela primeira palavra
+    ("Anel de Proteção", "anel_1"),            # do SRD: pelo compêndio
+    ("Manto Élfico", "capa"),
+    ("Botas Élficas", "botas"),
+])
+def test_o_que_o_editor_antigo_pos_no_amuleto_vai_para_o_espaco_dele(nome, espaco):
+    char = {"name": "Velho", "sheet": {"equipamentos": {"amuleto": nome}}}
+    memory._migrate_sheet_fields(char)
+    eq = char["sheet"]["equipamentos"]
+    assert eq[espaco] == nome and eq["amuleto"] is None
+
+
+@pytest.mark.parametrize("equip", [
+    {"amuleto": "Amuleto de Saúde"},                          # é de pescoço mesmo
+    {"amuleto": "Pingente de Cristal da Alvorada"},
+    {"amuleto": "Lembrança da Mãe"},                          # não se sabe onde vai
+    {"amuleto": "Anel de Ferro", "anel_1": "Anel A", "anel_2": "Anel B"},   # sem vaga
+])
+def test_o_que_e_do_pescoco_ou_nao_tem_vaga_fica(equip):
+    char = {"name": "Velho", "sheet": {"equipamentos": dict(equip)}}
+    memory._migrate_sheet_fields(char)
+    assert char["sheet"]["equipamentos"]["amuleto"] == equip["amuleto"]
+
+
 # ---------------------------------------------------------------------------
 # A ficha do herói e a Mochila mostram os doze
 # ---------------------------------------------------------------------------
