@@ -217,6 +217,11 @@ def normalizar_campanha_editada(novos_locais: dict, antigos_locais: dict,
 
 
 _FORA_DE_ALCANCE = ("morto", "desaparecido", "preso", "exilado", "fugiu")
+# Está ali, mas não responde: o nocauteado do golpe não letal ("estabilizado"),
+# o desacordado, quem dorme. O botão "Falar com" ficava ativo para eles.
+DESACORDADO = ("estabilizado", "inconsciente", "dormindo")
+# O status do motor em palavras da mesa ("estabilizado" é o nocaute).
+STATUS_EM_PALAVRAS = {"estabilizado": "nocauteado (estável)"}
 
 
 MAX_ACONTECIMENTOS = 5
@@ -323,9 +328,11 @@ def ficha(nome: str = "") -> dict:
         pessoas.append({
             "nome": ch.get("name", ""),
             "status": ch.get("status", "") or "vivo",
+            "status_texto": STATUS_EM_PALAVRAS.get(status, ch.get("status", "") or "vivo"),
             "descricao": (ch.get("description", "") or "")[:160],
-            # Falar é com quem está onde o grupo está, ou a um passo.
-            "pode_falar": bool(alcance_aqui) and status not in _FORA_DE_ALCANCE,
+            # Falar é com quem está onde o grupo está, ou a um passo, e acordado.
+            "pode_falar": (bool(alcance_aqui) and status not in _FORA_DE_ALCANCE
+                           and status not in DESACORDADO),
         })
 
     cenas = acontecimentos(nome_final)

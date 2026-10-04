@@ -184,3 +184,46 @@ def test_editor_grava_o_que_o_grupo_sabe_e_a_ficha_mostra(pagina):
     assert "Deve dinheiro à guarda" in sabe
     assert "Aprendeu o ofício" not in sabe
     assert not erros, erros[:3]
+
+
+def _duelista(cap):
+    """O guerreiro do duelo da Teste3, nocauteado pelo golpe não letal."""
+    import copy
+    estado = copy.deepcopy(cap.CIDADE)
+    kaelen = cap._figurante("Kaelen Vane", 12, ca=18, arma="Espada Longa")
+    kaelen["sheet"].update({"vida_atual": 0, "classe": "guerreiro", "nivel": 1,
+                            "acorda_hora": 9999, "condicoes": [{"nome": "Envenenado", "duracao": 3}]})
+    kaelen.update({"status": "estabilizado", "local": "Praça de Cliviate", "lado": "inimigo"})
+    estado["characters"]["kaelen vane"] = kaelen
+    return estado
+
+
+def test_ficha_do_npc_mostra_a_ficha_de_regras(pagina):
+    """Antes, PV, CA e condições de um NPC só apareciam em Editar personagem."""
+    import capturar_telas as cap
+    import requests
+    pg, erros, url = pagina
+    requests.post(f"{url}/__estado", json=_duelista(cap), timeout=10)
+    pg.evaluate("() => window.Personagens._abrir('Kaelen Vane')")
+    _esperar_ficha(pg, "Kaelen Vane")
+    regras = pg.inner_text("#psn-regras")
+    assert "0/12" in regras and "18" in regras
+    assert "Nocauteado e estável" in regras and "Acorda com 1 PV" in regras
+    assert "Envenenado (3 turnos)" in regras
+    assert "Guerreiro nível 1" in regras and "Espada Longa" in regras
+    assert pg.locator("#psn-regras .hro-atributo").count() == 6
+    assert "nocauteado (estável)" in pg.inner_text("#psn-status")
+    # Desacordado não conversa.
+    falar = pg.locator("#psn-onde button", has_text="Falar com")
+    assert falar.is_disabled() and "Desacordado" in falar.get_attribute("title")
+    assert not erros, erros[:3]
+
+
+def test_quem_e_do_grupo_abre_a_ficha_completa(pagina):
+    pg, erros, _ = pagina
+    pg.evaluate("() => window.Personagens._abrir('Helena')")
+    _esperar_ficha(pg, "Helena")
+    pg.click("#psn-regras .psn-ficha-completa")
+    pg.wait_for_selector("#heroi-overlay:not(.hidden)", timeout=5000)
+    assert not pg.is_visible("#pessoa-overlay")
+    assert not erros, erros[:3]

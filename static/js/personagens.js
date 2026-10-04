@@ -43,6 +43,7 @@
 
         <div class="lcl-corpo">
           <section class="lcl-corpo-pessoas" aria-label="Relação e o que se sabe">
+            <div id="psn-regras"></div>
             <div id="psn-laco"></div>
             <div id="psn-relacao-bloco">
               <h2 class="lcl-secao" id="psn-relacao-titulo">Relação com o grupo</h2>
@@ -102,7 +103,10 @@
         ? `<button class="lcl-btn lcl-btn-ir" onclick="window.Personagens._falar('${aspas(f.nome)}')"
             title="Manda ao mestre: Quero falar com ${esc(f.nome)}.">Falar com</button>`
         : `<button class="lcl-btn" disabled title="${(f.status || '').toLowerCase() === 'morto'
-            ? 'Não está mais entre os vivos' : `${window.frase('longe', 'Longe do grupo')}: vá até lá primeiro`}">Falar com</button>`);
+            ? 'Não está mais entre os vivos'
+            : ['estabilizado', 'inconsciente', 'dormindo'].includes((f.status || '').toLowerCase())
+              ? 'Desacordado: não responde agora'
+              : `${window.frase('longe', 'Longe do grupo')}: vá até lá primeiro`}">Falar com</button>`);
     }
     return partes.join('');
   }
@@ -326,6 +330,43 @@
       ${titulos ? `<ul class="rel-segs psn-titulos">${titulos}</ul>` : ''}`;
   }
 
+  // A ficha D&D para LER. Antes PV, CA e condições de um NPC só apareciam
+  // em "Editar personagem": o guerreiro do duelo, nocauteado, era um
+  // "— estabilizado" no título e mais nada. Quem é do grupo tem a ficha
+  // completa do herói; aqui ganha o atalho.
+  function regras(f) {
+    const r = f.regras;
+    if (!r) return '';
+    if (r.ficha_completa) {
+      return `<h2 class="lcl-secao">Ficha</h2>
+        <button class="lcl-btn lcl-btn-sec psn-ficha-completa"
+                onclick="window.Personagens._fichaDoHeroi('${aspas(f.nome)}')">Ver a ficha completa</button>`;
+    }
+    const marcas = [];
+    (r.condicoes || []).forEach(c => marcas.push(`<span class="hro-marca hro-marca-perigo">${esc(c.nome)}${
+      c.duracao ? ` (${c.duracao} turno${c.duracao === 1 ? '' : 's'})` : ''}</span>`));
+    if (r.concentracao) marcas.push(`<span class="hro-marca">Concentrado em ${esc(r.concentracao)}</span>`);
+    const vida = r.vida || {};
+    const caiu = vida.max && vida.atual <= 0;
+    const mod = (m) => (m >= 0 ? '+' : '') + m;
+    return `
+      <h2 class="lcl-secao">Ficha${r.titulo ? ` <small class="psn-regras-titulo">${esc(r.titulo)}</small>` : ''}</h2>
+      ${r.estado ? `<p class="psn-regras-estado">${esc(r.estado)}</p>` : ''}
+      ${marcas.length ? `<div class="hro-estado psn-regras-marcas">${marcas.join('')}</div>` : ''}
+      <div class="psn-regras-recursos">
+        <div class="hro-recurso${caiu ? ' hro-recurso-perigo' : ''}"><span class="hro-recurso-rotulo">Vida</span>
+          <span class="hro-recurso-valor">${vida.atual}/${vida.max}</span>
+          ${vida.temp ? `<span class="hro-recurso-detalhe">+${vida.temp} temporária</span>` : ''}</div>
+        <div class="hro-recurso"><span class="hro-recurso-rotulo">CA</span>
+          <span class="hro-recurso-valor">${r.ca}</span></div>
+      </div>
+      ${(r.atributos || []).length ? `<div class="hro-atributos psn-regras-atributos">${r.atributos.map(a => `
+        <div class="hro-atributo"><span class="hro-atributo-sigla">${esc(a.sigla)}</span>
+          <span class="hro-atributo-valor">${a.valor}</span>
+          <span class="hro-atributo-mod">${mod(a.mod)}</span></div>`).join('')}</div>` : ''}
+      ${(r.ataques || []).length ? `<p class="psn-regras-ataques"><span>Ataques</span> ${r.ataques.map(esc).join(' · ')}</p>` : ''}`;
+  }
+
   // As cenas em que ele aparece, da mais recente para trás: é o que o jogador
   // quer lembrar antes de falar com alguém ("o que a gente fez com ele mesmo?").
   function cenas(f) {
@@ -378,6 +419,7 @@
     if (!_last.existe) {
       q('psn-nome').textContent = _last.nome || 'Personagem';
       q('psn-status').textContent = '';
+      q('psn-regras').innerHTML = '';
       q('psn-onde').innerHTML = '';
       q('psn-desc').textContent = 'Este personagem ainda não foi registrado pelo mestre.';
       q('psn-tracos').textContent = '';
@@ -392,7 +434,8 @@
     }
     q('psn-nome').textContent = _last.nome;
     const status = (_last.status || '').toLowerCase();
-    q('psn-status').textContent = status && status !== 'vivo' ? `— ${_last.status}` : '';
+    q('psn-status').textContent = status && status !== 'vivo' ? `— ${_last.status_texto || _last.status}` : '';
+    q('psn-regras').innerHTML = regras(_last);
     q('psn-onde').innerHTML = onde(_last);
     q('psn-desc').textContent = _last.descricao || '';
     q('psn-tracos').textContent = _last.tracos ? `Traços: ${_last.tracos}` : '';
@@ -575,6 +618,7 @@
     _falar: (nome) => enviar(`Quero falar com ${nome}.`),
     _dizer: (fala) => enviar(fala),
     _verLocal: (lugar) => { fechar(); if (window.Locais) window.Locais._abrir(lugar); },
+    _fichaDoHeroi: (nome) => { fechar(); if (window.Herois) window.Herois._abrir(nome); },
     _editar: editar,
     _estado: () => _last,
   };

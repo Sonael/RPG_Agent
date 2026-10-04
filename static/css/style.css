@@ -5378,6 +5378,19 @@ body.local-on, body.pessoa-on, body.heroi-on, body.missoes-on, body.mapa-on, bod
 .psn-em { font-size: 0.86rem; color: var(--lcl-muted); }
 #psn-relacao-bloco { margin-bottom: var(--esp-4); }
 #psn-relacao-bloco.hidden { display: none; }
+/* A ficha D&D do NPC, para ler (rpg/personagens._ficha_de_regras): usa as
+   peças da ficha do herói (hro-recurso, hro-atributo, hro-marca). */
+.psn-regras-titulo { font-family: inherit; font-size: 0.8rem; font-weight: 400; color: var(--lcl-muted);
+  text-transform: none; letter-spacing: 0; }
+.psn-regras-estado { margin: 0 0 var(--esp-2); font-size: 0.86rem; color: var(--lcl-red); font-style: italic; }
+.psn-regras-marcas { justify-content: flex-start; margin: 0 0 var(--esp-2); }
+.psn-regras-recursos { display: grid; grid-template-columns: 1fr 1fr; gap: var(--esp-2); margin-bottom: var(--esp-2); }
+.psn-regras-atributos { margin-bottom: var(--esp-2); }
+.psn-regras-ataques { margin: 0 0 var(--esp-3); font-size: 0.86rem; }
+.psn-regras-ataques span { font-size: 0.7rem; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--lcl-muted); margin-right: var(--esp-1); }
+.psn-ficha-completa { margin-bottom: var(--esp-3); }
+
 /* Enfeitiçado: quem, com que magia e até quando (rpg/encantos.py). */
 .psn-encanto {
   margin-bottom: var(--esp-2); padding: var(--esp-2) var(--esp-3);

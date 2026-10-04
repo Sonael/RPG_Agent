@@ -138,6 +138,94 @@ def _usa_regras() -> bool:
     return _campanha_usa_dnd(memory.campaign)
 
 
+# O status do motor em palavras da mesa. "estabilizado" é o termo da regra
+# (0 PV, fora de perigo), e no título da ficha parecia "quase morreu": é o
+# nocaute do golpe não letal.
+_STATUS_EM_PALAVRAS = {"estabilizado": "nocauteado (estável)", "inconsciente": "inconsciente",
+                       "dormindo": "dormindo", "rendido": "rendido", "fugiu": "fugiu"}
+_ATRIBUTOS = (("FOR", "forca"), ("DES", "destreza"), ("CON", "constituicao"),
+              ("INT", "inteligencia"), ("SAB", "sabedoria"), ("CAR", "carisma"))
+
+
+def _estado_legivel(ch: dict) -> str:
+    """O que o status quer dizer, numa frase; '' quando está de pé."""
+    status = (ch.get("status") or "").lower()
+    s = ch.get("sheet") or {}
+    if status == "estabilizado":
+        frase = "Nocauteado e estável: 0 PV, fora de perigo."
+        acorda = s.get("acorda_hora")
+        if acorda is not None:
+            from rpg.tools_dnd import _agora_em_horas
+            falta = int(acorda) - _agora_em_horas()
+            frase += (" Acorda com 1 PV a qualquer momento." if falta <= 0
+                      else f" Acorda com 1 PV em cerca de {falta} h.")
+        return frase
+    if status == "inconsciente":
+        return ("Inconsciente: 0 PV, fazendo testes de morte."
+                if memory.is_party_member(ch) else "Inconsciente.")
+    if status == "morto":
+        return "Morto."
+    if status in ("rendido", "fugiu", "dormindo"):
+        return _STATUS_EM_PALAVRAS[status].capitalize() + "."
+    return ""
+
+
+def _ficha_de_regras(ch: dict) -> dict | None:
+    """
+    A ficha D&D de quem tem uma, para LER: o jogador só via PV, CA e
+    condições de um NPC abrindo "Editar personagem". Quem é do grupo tem a
+    ficha completa do herói; aqui ele ganha só o atalho.
+    """
+    s = ch.get("sheet")
+    if not isinstance(s, dict) or not (s.get("vida_max") or s.get("classe")):
+        return None
+    if memory.is_party_member(ch):
+        return {"ficha_completa": True}
+
+    def _int(v, padrao=0):
+        try:
+            return int(v)
+        except (TypeError, ValueError):
+            return padrao
+
+    classe = (s.get("classe") or "").strip()
+    if classe and classe.lower() != "npc":
+        titulo = f"{classe.capitalize()} nível {_int(s.get('nivel'), 1)}"
+    elif s.get("cr") not in (None, ""):
+        titulo = f"ND {s.get('cr')}"
+    else:
+        titulo = ""
+    atributos = []
+    for sigla, campo in _ATRIBUTOS:
+        if campo in s:
+            valor = _int(s.get(campo), 10)
+            atributos.append({"sigla": sigla, "valor": valor, "mod": (valor - 10) // 2})
+    ataques = []
+    for a in s.get("ataques") or []:
+        nome_a = a.get("nome") if isinstance(a, dict) else str(a)
+        if nome_a and nome_a not in ataques:
+            ataques.append(nome_a)
+    eq = s.get("equipamentos") or {}
+    for slot in ("arma_principal", "arma_secundaria"):
+        arma = eq.get(slot)
+        if arma and not any(locais.norm(arma) == locais.norm(x) for x in ataques):
+            ataques.append(arma)
+    return {
+        "ficha_completa": False,
+        "titulo": titulo,
+        "vida": {"atual": _int(s.get("vida_atual")), "max": _int(s.get("vida_max")),
+                 "temp": _int(s.get("vida_temp"))},
+        "ca": _int(s.get("ca"), 10),
+        "atributos": atributos,
+        "ataques": ataques,
+        "condicoes": [{"nome": c.get("nome", ""), "duracao": c.get("duracao")}
+                      for c in s.get("condicoes") or [] if isinstance(c, dict) and c.get("nome")],
+        "concentracao": ((s.get("concentracao") or {}).get("magia", "")
+                         if isinstance(s.get("concentracao"), dict) else ""),
+        "estado": _estado_legivel(ch),
+    }
+
+
 def ficha(nome: str) -> dict:
     from rpg.tools import _faixa_atitude, atitude_de
 
@@ -192,6 +280,10 @@ def ficha(nome: str) -> dict:
         "existe": True,
         "nome": nome_real,
         "status": status,
+        "status_texto": _STATUS_EM_PALAVRAS.get(status.lower(), status),
+        # A ficha D&D para ler (None numa campanha sem as regras, ou para
+        # quem não tem ficha).
+        "regras": _ficha_de_regras(ch) if _usa_regras() else None,
         "do_grupo": do_grupo,
         "descricao": ch.get("description", "") or "",
         "tracos": ch.get("traits", "") or "",
@@ -236,7 +328,8 @@ def ficha(nome: str) -> dict:
         "ultima_cena": eventos[0] if eventos else None,
         "loja": loja,
         "pode_falar": (not do_grupo and bool(alcance)
-                       and status.lower() not in _FORA_DE_ALCANCE),
+                       and status.lower() not in _FORA_DE_ALCANCE
+                       and status.lower() not in locais.DESACORDADO),
     }
 
 

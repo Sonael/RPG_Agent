@@ -107,15 +107,20 @@
                     title="Manda ao mestre: Vamos até ${esc(nome)}.">${rotulo || 'Ir até lá'}</button>`;
   }
 
+  // Está ali, mas não responde (rpg/locais.DESACORDADO).
+  const DESACORDADO = ['estabilizado', 'inconsciente', 'dormindo'];
+
   function pessoa(p) {
     const status = (p.status || '').toLowerCase();
     const marca = status && status !== 'vivo'
-      ? `<span class="lcl-marca">${esc(p.status)}</span>` : '';
+      ? `<span class="lcl-marca">${esc(p.status_texto || p.status)}</span>` : '';
     const falar = p.pode_falar
       ? `<button class="lcl-btn lcl-btn-ir" onclick="window.Locais._falar('${aspas(p.nome)}')"
                  title="Manda ao mestre: Quero falar com ${esc(p.nome)}.">Falar com</button>`
       : `<button class="lcl-btn" disabled
-                 title="${status === 'morto' ? 'Não está mais entre os vivos' : `${window.frase('longe', 'Longe do grupo')}: vá até lá primeiro`}">Falar com</button>`;
+                 title="${status === 'morto' ? 'Não está mais entre os vivos'
+                   : DESACORDADO.includes(status) ? 'Desacordado: não responde agora'
+                   : `${window.frase('longe', 'Longe do grupo')}: vá até lá primeiro`}">Falar com</button>`;
     return `
       <div class="lcl-item" data-nome="${esc(p.nome)}">
         <div class="lcl-item-cabeca"><span class="lcl-item-nome">${esc(p.nome)}</span>${marca}</div>
